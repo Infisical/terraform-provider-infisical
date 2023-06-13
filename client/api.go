@@ -6,13 +6,11 @@ const USER_AGENT = "terraform"
 
 func (client Client) CallGetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse, error) {
 	var tokenDetailsResponse GetServiceTokenDetailsResponse
-	response, err := client.cnf.HttpClient.
+	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&tokenDetailsResponse).
 		SetHeader("User-Agent", USER_AGENT).
 		Get("api/v2/service-token")
-
-	fmt.Println("response===>", response.Request)
 
 	if err != nil {
 		return GetServiceTokenDetailsResponse{}, fmt.Errorf("CallGetServiceTokenDetails: Unable to complete api request [err=%s]", err)
@@ -27,13 +25,13 @@ func (client Client) CallGetServiceTokenDetailsV2() (GetServiceTokenDetailsRespo
 
 func (client Client) CallGetSecretsV2(request GetEncryptedSecretsV2Request) (GetEncryptedSecretsV2Response, error) {
 	var secretsResponse GetEncryptedSecretsV2Response
-	requestToBeMade := client.cnf.HttpClient.
+	requestToBeMade := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
 		SetHeader("User-Agent", USER_AGENT).
 		SetQueryParam("environment", request.Environment).
-		SetQueryParam("workspaceId", request.WorkspaceId).
-		SetQueryParam("tagSlugs", request.TagSlugs)
+		SetQueryParam("workspaceId", request.WorkspaceId)
+		// SetQueryParam("tagSlugs", request.TagSlugs)
 
 	if request.SecretPath != "" {
 		requestToBeMade.SetQueryParam("secretsPath", request.SecretPath)

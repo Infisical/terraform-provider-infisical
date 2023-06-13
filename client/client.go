@@ -7,32 +7,27 @@ import (
 )
 
 type Client struct {
-	cnf Config
+	Config Config
 }
 
 type Config struct {
 	HostURL      string
 	ServiceToken string
-	ApiKey       string
 	HttpClient   *resty.Client // By default a client will be created
 }
 
 func NewClient(cnf Config) (*Client, error) {
-	if cnf.ApiKey == "" && cnf.ServiceToken == "" {
-		return nil, fmt.Errorf("You must enter either a API Key or Service token for authentication with Infisical API")
-	}
-
 	if cnf.HttpClient == nil {
 		cnf.HttpClient = resty.New()
 		cnf.HttpClient.SetBaseURL(cnf.HostURL)
 	}
 
-	if cnf.ServiceToken != "" {
-		cnf.HttpClient.SetAuthToken(cnf.ServiceToken)
+	if cnf.ServiceToken == "" {
+		return nil, fmt.Errorf("you must set the service token for the client before making calls")
 	}
 
-	if cnf.ApiKey != "" {
-		cnf.HttpClient.SetHeader("X-API-KEY", cnf.ApiKey)
+	if cnf.ServiceToken != "" {
+		cnf.HttpClient.SetAuthToken(cnf.ServiceToken)
 	}
 
 	cnf.HttpClient.SetHeader("Accept", "application/json")

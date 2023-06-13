@@ -51,3 +51,25 @@ type GetServiceTokenDetailsResponse struct {
 	UpdatedAt    time.Time `json:"updatedAt"`
 	V            int       `json:"__v"`
 }
+
+//
+
+type SingleEnvironmentVariable struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	Type  string `json:"type"`
+	ID    string `json:"_id"`
+	Tags  []struct {
+		ID        string `json:"_id"`
+		Name      string `json:"name"`
+		Slug      string `json:"slug"`
+		Workspace string `json:"workspace"`
+	} `json:"tags"`
+	Comment string `json:"comment"`
+}
+
+type SymmetricEncryptionResult struct {
+	CipherText []byte `json:"CipherText"`
+	Nonce      []byte `json:"Nonce"`
+	AuthTag    []byte `json:"AuthTag"`
+}
