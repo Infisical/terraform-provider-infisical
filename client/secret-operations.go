@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string) ([]SingleEnvironmentVariable, *GetServiceTokenDetailsResponse, error) {
+func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string, envSlug string) ([]SingleEnvironmentVariable, *GetServiceTokenDetailsResponse, error) {
 	if client.Config.ServiceToken == "" {
 		return nil, nil, fmt.Errorf("service token must be defined to fetch secrets")
 	}
@@ -20,16 +20,16 @@ func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string)
 		return nil, nil, fmt.Errorf("unable to get service token details. [err=%v]", err)
 	}
 
-	request := GetEncryptedSecretsV2Request{
+	request := GetEncryptedSecretsV3Request{
 		WorkspaceId: serviceTokenDetails.Workspace,
-		Environment: serviceTokenDetails.Environment,
+		Environment: envSlug,
 	}
 
 	if secretFolderPath != "" {
 		request.SecretPath = secretFolderPath
 	}
 
-	encryptedSecrets, err := client.CallGetSecretsV2(request)
+	encryptedSecrets, err := client.CallGetSecretsV3(request)
 
 	if err != nil {
 		return nil, nil, err

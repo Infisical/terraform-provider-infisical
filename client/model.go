@@ -2,19 +2,24 @@ package infisicalclient
 
 import "time"
 
-type GetEncryptedSecretsV2Request struct {
+type GetEncryptedSecretsV3Request struct {
 	Environment string `json:"environment"`
 	WorkspaceId string `json:"workspaceId"`
-	TagSlugs    string `json:"tagSlugs"`
 	SecretPath  string `json:"secretPath"`
 }
 
-type GetEncryptedSecretsV2Response struct {
+type GetEncryptedSecretsV3Response struct {
 	Secrets []struct {
-		ID                      string    `json:"_id"`
-		Version                 int       `json:"version"`
-		Workspace               string    `json:"workspace"`
-		Type                    string    `json:"type"`
+		ID        string `json:"_id"`
+		Version   int    `json:"version"`
+		Workspace string `json:"workspace"`
+		Type      string `json:"type"`
+		Tags      []struct {
+			ID        string `json:"_id"`
+			Name      string `json:"name"`
+			Slug      string `json:"slug"`
+			Workspace string `json:"workspace"`
+		} `json:"tags"`
 		Environment             string    `json:"environment"`
 		SecretKeyCiphertext     string    `json:"secretKeyCiphertext"`
 		SecretKeyIV             string    `json:"secretKeyIV"`
@@ -25,16 +30,12 @@ type GetEncryptedSecretsV2Response struct {
 		SecretCommentCiphertext string    `json:"secretCommentCiphertext"`
 		SecretCommentIV         string    `json:"secretCommentIV"`
 		SecretCommentTag        string    `json:"secretCommentTag"`
+		Algorithm               string    `json:"algorithm"`
+		KeyEncoding             string    `json:"keyEncoding"`
+		Folder                  string    `json:"folder"`
 		V                       int       `json:"__v"`
 		CreatedAt               time.Time `json:"createdAt"`
 		UpdatedAt               time.Time `json:"updatedAt"`
-		User                    string    `json:"user,omitempty"`
-		Tags                    []struct {
-			ID        string `json:"_id"`
-			Name      string `json:"name"`
-			Slug      string `json:"slug"`
-			Workspace string `json:"workspace"`
-		} `json:"tags"`
 	} `json:"secrets"`
 }
 

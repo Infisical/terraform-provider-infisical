@@ -23,29 +23,28 @@ func (client Client) CallGetServiceTokenDetailsV2() (GetServiceTokenDetailsRespo
 	return tokenDetailsResponse, nil
 }
 
-func (client Client) CallGetSecretsV2(request GetEncryptedSecretsV2Request) (GetEncryptedSecretsV2Response, error) {
-	var secretsResponse GetEncryptedSecretsV2Response
-	requestToBeMade := client.Config.HttpClient.
+func (client Client) CallGetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncryptedSecretsV3Response, error) {
+	var secretsResponse GetEncryptedSecretsV3Response
+
+	httpRequest := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
 		SetHeader("User-Agent", USER_AGENT).
 		SetQueryParam("environment", request.Environment).
 		SetQueryParam("workspaceId", request.WorkspaceId)
-		// SetQueryParam("tagSlugs", request.TagSlugs)
 
 	if request.SecretPath != "" {
-		requestToBeMade.SetQueryParam("secretsPath", request.SecretPath)
+		httpRequest.SetQueryParam("secretPath", request.SecretPath)
 	}
 
-	response, err := requestToBeMade.
-		Get("api/v2/secrets")
+	response, err := httpRequest.Get("api/v3/secrets")
 
 	if err != nil {
-		return GetEncryptedSecretsV2Response{}, fmt.Errorf("CallGetSecretsV2: Unable to complete api request [err=%s]", err)
+		return GetEncryptedSecretsV3Response{}, fmt.Errorf("CallGetSecretsV3: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return GetEncryptedSecretsV2Response{}, fmt.Errorf("CallGetSecretsV2: Unsuccessful response: [response=%v]", response.RawResponse)
+		return GetEncryptedSecretsV3Response{}, fmt.Errorf("CallGetSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%v]", response.RawResponse)
 	}
 
 	return secretsResponse, nil

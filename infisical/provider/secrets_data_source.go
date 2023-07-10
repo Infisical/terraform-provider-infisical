@@ -29,6 +29,7 @@ type SecretsDataSource struct {
 // ExampleDataSourceModel describes the data source data model.
 type SecretDataSourceModel struct {
 	FolderPath types.String                      `tfsdk:"folder_path"`
+	EnvSlug    types.String                      `tfsdk:"env_slug"`
 	Secrets    map[string]InfisicalSecretDetails `tfsdk:"secrets"`
 }
 
@@ -49,7 +50,12 @@ func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 		Attributes: map[string]schema.Attribute{
 			"folder_path": schema.StringAttribute{
 				Description: "The path to the folder from where secrets should be fetched from",
-				Optional:    true,
+				Required:    true,
+				Computed:    false,
+			},
+			"env_slug": schema.StringAttribute{
+				Description: "The environment from where secrets should be fetched from",
+				Required:    true,
 				Computed:    false,
 			},
 			"secrets": schema.MapNestedAttribute{
@@ -105,7 +111,7 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	plainTextSecrets, _, err := d.client.GetPlainTextSecretsViaServiceToken(data.FolderPath.ValueString())
+	plainTextSecrets, _, err := d.client.GetPlainTextSecretsViaServiceToken(data.FolderPath.ValueString(), data.EnvSlug.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Something went wrong while fetching secrets",

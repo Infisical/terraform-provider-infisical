@@ -12,7 +12,7 @@ type DecodedSymmetricEncryptionDetails = struct {
 	Key    []byte
 }
 
-func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV2Response) ([]SingleEnvironmentVariable, error) {
+func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Response) ([]SingleEnvironmentVariable, error) {
 	plainTextSecrets := []SingleEnvironmentVariable{}
 	for _, secret := range encryptedSecrets.Secrets {
 		// Decrypt key
