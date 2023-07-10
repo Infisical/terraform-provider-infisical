@@ -17,14 +17,22 @@ provider "infisical" {
   service_token = "<>" # Get token https://infisical.com/docs/documentation/platform/token
 }
 
-data "infisical_secrets" "my-secrets" {}
-
-output "single-secret" {
-  value = data.infisical_secrets.my-secrets.secrets["SECRET-NAME"]
+data "infisical_secrets" "common-secrets" {
+  env_slug    = "dev"
+  folder_path = "/some-folder/another-folder"
 }
 
-output "all-secrets" {
-  value = data.infisical_secrets.my-secrets.secrets
+data "infisical_secrets" "backend-secrets" {
+  env_slug    = "prod"
+  folder_path = "/"
+}
+
+output "all-project-secrets" {
+  value = data.infisical_secrets.backend-secrets
+}
+
+output "single-secret" {
+  value = data.infisical_secrets.backend-secrets.secrets["SECRET-NAME"]
 }
 
 ```
