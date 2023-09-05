@@ -1,6 +1,8 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const USER_AGENT = "terraform"
 
@@ -45,6 +47,89 @@ func (client Client) CallGetSecretsV3(request GetEncryptedSecretsV3Request) (Get
 
 	if response.IsError() {
 		return GetEncryptedSecretsV3Response{}, fmt.Errorf("CallGetSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%v]", response.RawResponse)
+	}
+
+	return secretsResponse, nil
+}
+
+func (client Client) CallCreateSecretsV3(request CreateSecretV3Request) error {
+	var secretsResponse EncryptedSecretV3
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&secretsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
+
+	if err != nil {
+		return fmt.Errorf("CallCreateSecretsV3: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return fmt.Errorf("CallCreateSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return nil
+}
+
+func (client Client) CallDeleteSecretsV3(request DeleteSecretV3Request) error {
+	var secretsResponse GetEncryptedSecretsV3Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&secretsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Delete(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
+
+	if err != nil {
+		return fmt.Errorf("CallDeleteSecretsV3: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return fmt.Errorf("CallDeleteSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return nil
+}
+
+func (client Client) CallUpdateSecretsV3(request UpdateSecretByNameV3Request) error {
+	var secretsResponse GetEncryptedSecretsV3Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&secretsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
+
+	if err != nil {
+		return fmt.Errorf("CallUpdateSecretsV3: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return fmt.Errorf("CallUpdateSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return nil
+}
+
+func (client Client) CallGetSingleSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleSecretByNameSecretResponse, error) {
+	var secretsResponse GetSingleSecretByNameSecretResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&secretsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("workspaceId", request.WorkspaceId).
+		SetQueryParam("environment", request.Environment).
+		SetQueryParam("type", request.Type).
+		SetQueryParam("secretPath", request.SecretPath).
+		Get(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
+
+	if err != nil {
+		return GetSingleSecretByNameSecretResponse{}, fmt.Errorf("CallGetSingleSecretByNameV3: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return GetSingleSecretByNameSecretResponse{}, fmt.Errorf("CallGetSingleSecretByNameV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
 	}
 
 	return secretsResponse, nil

@@ -2,7 +2,9 @@ package infisicalclient
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"strings"
 )
 
 type DecodedSymmetricEncryptionDetails = struct {
@@ -120,4 +122,13 @@ func GetBase64DecodedSymmetricEncryptionDetails(key string, cipher string, IV st
 		IV:     IVx,
 		Tag:    tagx,
 	}, nil
+}
+
+func GetSymmetricKeyFromServiceToken(serviceToken string) (privateKey string, err error) {
+	serviceTokenParts := strings.SplitN(serviceToken, ".", 4)
+	if len(serviceTokenParts) < 4 {
+		return "", errors.New("invalid service token entered. Please double check your service token and try again")
+	}
+
+	return serviceTokenParts[3], nil
 }
