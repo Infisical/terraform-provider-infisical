@@ -12,21 +12,21 @@ provider "infisical" {
   service_token = "<>"
 }
 
-resource "infisical_secret" "domain" {
+resource "infisical_secret" "mongo_secret" {
   name        = "MONGO_DB"
   value       = "<some-key>"
   env_slug    = "dev"
   folder_path = "/"
 }
 
-resource "infisical_secret" "newKey" {
+resource "infisical_secret" "smtp_secret" {
   name        = "SMTP"
   value       = "<some key>"
   env_slug    = "dev"
   folder_path = "/mail-service"
 }
 
-resource "infisical_secret" "somethingTwo" {
+resource "infisical_secret" "github_action_secret" {
   name        = "GITHUB_ACTION"
   value       = "<some value>"
   env_slug    = "dev"
