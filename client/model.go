@@ -55,8 +55,6 @@ type GetServiceTokenDetailsResponse struct {
 	V            int       `json:"__v"`
 }
 
-//
-
 type SingleEnvironmentVariable struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
@@ -173,4 +171,41 @@ type GetSingleSecretByNameV3Request struct {
 
 type GetSingleSecretByNameSecretResponse struct {
 	Secret EncryptedSecret `json:"secret"`
+}
+
+// create secret imports
+type CreateSecretImportsV1Request struct {
+	Directory    string `json:"directory"`
+	Environment  string `json:"environment"`
+	WorkspaceID  string `json:"workspaceId"`
+	SecretImport struct {
+		Environment string `json:"environment"`
+		SecretPath  string `json:"secretPath"`
+	}
+}
+
+type CreateSecretImportsV1Response struct {
+	Message string `json:"message"`
+}
+
+type DeleteSecretImportsV1Request struct {
+	SecretId         string `json:"secretId"`
+	SecretImportEnv  string `json:"secretImportEnv"`
+	SecretImportPath string `json:"SecretImportPath"`
+}
+
+type DeleteSecretImportsV1Response struct {
+	Message string `json:"message"`
+}
+
+type UpdateSecretImportsV1Request struct {
+	SecretId     string `json:"secretId"`
+	SecretImport struct {
+		Environment string `json:"environment"`
+		SecretPath  string `json:"secretPath"`
+	}
+}
+
+type UpdateSecretImportsV1Response struct {
+	Message string `json:"message"`
 }
