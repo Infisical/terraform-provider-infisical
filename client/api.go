@@ -134,3 +134,80 @@ func (client Client) CallGetSingleSecretByNameV3(request GetSingleSecretByNameV3
 
 	return secretsResponse, nil
 }
+
+func (client Client) CallGetSecretImportsByDirectoryV1(request GetSecretImportsByDirectoryV1Request) (GetSecretImportsByDirectoryV1Response, error) {
+	var importsResponse GetSecretImportsByDirectoryV1Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&importsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("workspaceId", request.WorkspaceId).
+		SetQueryParam("environment", request.Environment).
+		SetQueryParam("directory", request.Directory).
+		Get("api/v1/secret-imports")
+
+	if err != nil {
+		return GetSecretImportsByDirectoryV1Response{}, fmt.Errorf("CallGetSecretImportsByDirectoryV1: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return GetSecretImportsByDirectoryV1Response{}, fmt.Errorf("CallGetSecretImportsByDirectoryV1: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return importsResponse, nil
+}
+
+func (client Client) CallCreateSecretImportsV1(request CreateSecretImportsV1Request) error {
+	var importsResponse CreateSecretImportsV1Response
+	response, err := client.Config.HttpClient.R().SetResult(&importsResponse).SetHeader("User-Agent", USER_AGENT).SetBody(request).Post("/api/v1/secret-imports")
+
+	if err != nil {
+		return fmt.Errorf("CallCreateSecretImportsV1: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return fmt.Errorf("CallCreateSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return nil
+}
+
+func (client Client) CallDeleteSecretImportsV1(request DeleteSecretImportsV1Request) error {
+	var importsResponse DeleteSecretImportsV1Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&importsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Delete(fmt.Sprintf("api/v1/secret-imports/%s", request.SecretId))
+
+	if err != nil {
+		return fmt.Errorf("CallDeleteSecretImportsV1: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return fmt.Errorf("CallDeleteSecretImportsV1: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return nil
+}
+
+func (client Client) CallUpdateSecretImportsV1(request UpdateSecretImportsV1Request) error {
+	var importsResponse DeleteSecretImportsV1Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&importsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Put(fmt.Sprintf("api/v1/secret-imports/%s", request.SecretId))
+
+	if err != nil {
+		return fmt.Errorf("CallDeleteSecretImportsV1: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return fmt.Errorf("CallDeleteSecretImportsV1: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return nil
+}
