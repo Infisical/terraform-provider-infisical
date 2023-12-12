@@ -135,6 +135,28 @@ func (client Client) CallGetSingleSecretByNameV3(request GetSingleSecretByNameV3
 	return secretsResponse, nil
 }
 
+func (client Client) CallGetSecretImportsByDirectoryV1(request GetSecretImportsByDirectoryV1Request) (GetSecretImportsByDirectoryV1Response, error) {
+	var importsResponse GetSecretImportsByDirectoryV1Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&importsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("workspaceId", request.WorkspaceId).
+		SetQueryParam("environment", request.Environment).
+		SetQueryParam("directory", request.Directory).
+		Get("api/v1/secret-imports")
+
+	if err != nil {
+		return GetSecretImportsByDirectoryV1Response{}, fmt.Errorf("CallGetSecretImportsByDirectoryV1: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return GetSecretImportsByDirectoryV1Response{}, fmt.Errorf("CallGetSecretImportsByDirectoryV1: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return importsResponse, nil
+}
+
 func (client Client) CallCreateSecretImportsV1(request CreateSecretImportsV1Request) error {
 	var importsResponse CreateSecretImportsV1Response
 	response, err := client.Config.HttpClient.R().SetResult(&importsResponse).SetHeader("User-Agent", USER_AGENT).SetBody(request).Post("/api/v1/secret-imports")

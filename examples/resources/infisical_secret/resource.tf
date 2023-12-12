@@ -12,23 +12,17 @@ provider "infisical" {
   service_token = "<>"
 }
 
-resource "infisical_secret" "mongo_secret" {
-  name        = "MONGO_DB"
-  value       = "<some-key>"
+resource "infisical_secret_imports" "mongo_import" {
   env_slug    = "dev"
-  folder_path = "/"
-}
+  folder_path = "/apps/api"
 
-resource "infisical_secret" "smtp_secret" {
-  name        = "SMTP"
-  value       = "<some key>"
-  env_slug    = "dev"
-  folder_path = "/mail-service"
-}
+  import_secrets {
+    env_slug = "dev"
+    folder_path = "/db"
+  }
 
-resource "infisical_secret" "github_action_secret" {
-  name        = "GITHUB_ACTION"
-  value       = "<some value>"
-  env_slug    = "dev"
-  folder_path = "/"
+  import_secrets {
+    env_slug = "dev"
+    folder_path = "/mail-services"
+  }
 }

@@ -27,12 +27,12 @@ type secretImportsResource struct {
 
 // secretResourceSourceModel describes the data source data model.
 type secretImportsResourceModel struct {
-	SecretImportsId types.String                   `tfsdk:"secret_imports_id"`
-	FolderPath      types.String                   `tfsdk:"folder_path"`
-	EnvSlug         types.String                   `tfsdk:"env_slug"`
-	WorkspaceId     types.String                   `tfsdk:"workspace_id"`
-	SecretImports   secretImportsSecretImportModel `tfsdk:"import"`
-	LastUpdated     types.String                   `tfsdk:"last_updated"`
+	SecretImportsId types.String                     `tfsdk:"secret_imports_id"`
+	FolderPath      types.String                     `tfsdk:"folder_path"`
+	EnvSlug         types.String                     `tfsdk:"env_slug"`
+	WorkspaceId     types.String                     `tfsdk:"workspace_id"`
+	SecretImports   []secretImportsSecretImportModel `tfsdk:"import"`
+	LastUpdated     types.String                     `tfsdk:"last_updated"`
 }
 
 type secretImportsSecretImportModel struct {
@@ -74,18 +74,20 @@ func (r *secretImportsResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 		},
 		Blocks: map[string]schema.Block{
-			"import": schema.SingleNestedBlock{
+			"import_secrets": schema.ListNestedBlock{
 				Description: "Secret(s) to imports",
-				Attributes: map[string]schema.Attribute{
-					"env_slug": schema.StringAttribute{
-						Description: "Slug of environment to import from",
-						Required:    true,
-						Computed:    false,
-					},
-					"folder_path": schema.StringAttribute{
-						Description: "Path where to import from like / or /foo/bar",
-						Required:    true,
-						Computed:    false,
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"env_slug": schema.StringAttribute{
+							Description: "Slug of environment to import from",
+							Required:    true,
+							Computed:    false,
+						},
+						"folder_path": schema.StringAttribute{
+							Description: "Path where to import from like / or /foo/bar",
+							Required:    true,
+							Computed:    false,
+						},
 					},
 				},
 			},
@@ -131,25 +133,42 @@ func (r *secretImportsResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	payload := infisical.CreateSecretImportsV1Request{
+	for _, item := range plan.SecretImports {
+		payload := infisical.CreateSecretImportsV1Request{
+			Environment: plan.EnvSlug.ValueString(),
+			Directory:   plan.FolderPath.ValueString(),
+			WorkspaceID: serviceTokenDetails.Workspace,
+		}
+		payload.SecretImport.Environment = item.EnvSlug.ValueString()
+		payload.SecretImport.SecretPath = item.FolderPath.ValueString()
+
+		err = r.client.CallCreateSecretImportsV1(payload)
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret imports",
+				"Couldn't create secret-imports, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
+	secretImports, err := r.client.CallGetSecretImportsByDirectoryV1(infisical.GetSecretImportsByDirectoryV1Request{
 		Environment: plan.EnvSlug.ValueString(),
 		Directory:   plan.FolderPath.ValueString(),
-		WorkspaceID: serviceTokenDetails.Workspace,
-	}
-	payload.SecretImport.Environment = plan.SecretImports.EnvSlug.ValueString()
-	payload.SecretImport.SecretPath = plan.SecretImports.FolderPath.ValueString()
-
-	err = r.client.CallCreateSecretImportsV1(payload)
+		WorkspaceId: serviceTokenDetails.Workspace,
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating secret imports",
-			"Couldn't create secret-imports, unexpected error: "+err.Error(),
+			"Couldn't list existing secrets after creation: "+err.Error(),
 		)
 		return
 	}
 
 	// Set state to fully populated data
+	plan.SecretImportsId = types.StringValue(secretImports.SecretImport.Id)
 	plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
@@ -162,6 +181,7 @@ func (r *secretImportsResource) Create(ctx context.Context, req resource.CreateR
 
 // Read refreshes the Terraform state with the latest data.
 func (r *secretImportsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -188,20 +208,22 @@ func (r *secretImportsResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	payload := infisical.UpdateSecretImportsV1Request{
-		SecretId: plan.SecretImportsId.ValueString(),
-	}
-	payload.SecretImport.SecretPath = plan.SecretImports.FolderPath.ValueString()
-	payload.SecretImport.Environment = plan.SecretImports.EnvSlug.ValueString()
+	for _, item := range plan.SecretImports {
+		payload := infisical.UpdateSecretImportsV1Request{
+			SecretId: plan.SecretImportsId.ValueString(),
+		}
+		payload.SecretImport.Environment = item.EnvSlug.ValueString()
+		payload.SecretImport.SecretPath = item.FolderPath.ValueString()
 
-	err := r.client.CallUpdateSecretImportsV1(payload)
+		err := r.client.CallUpdateSecretImportsV1(payload)
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating secret-imports",
-			"Couldn't update secret-imports to Infisical, unexpected error: "+err.Error(),
-		)
-		return
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret imports",
+				"Couldn't create secret-imports, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))

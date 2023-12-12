@@ -174,6 +174,18 @@ type GetSingleSecretByNameSecretResponse struct {
 }
 
 // create secret imports
+type GetSecretImportsByDirectoryV1Request struct {
+	WorkspaceId string `json:"workspaceId"`
+	Environment string `json:"environment"`
+	Directory   string `json:"directory"`
+}
+
+type GetSecretImportsByDirectoryV1Response struct {
+	SecretImport struct {
+		Id string `json:"_id"`
+	} `json:"secretImport"`
+}
+
 type CreateSecretImportsV1Request struct {
 	Directory    string `json:"directory"`
 	Environment  string `json:"environment"`
