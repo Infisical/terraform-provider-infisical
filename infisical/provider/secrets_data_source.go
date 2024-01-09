@@ -28,9 +28,10 @@ type SecretsDataSource struct {
 
 // ExampleDataSourceModel describes the data source data model.
 type SecretDataSourceModel struct {
-	FolderPath types.String                      `tfsdk:"folder_path"`
-	EnvSlug    types.String                      `tfsdk:"env_slug"`
-	Secrets    map[string]InfisicalSecretDetails `tfsdk:"secrets"`
+	FolderPath  types.String                      `tfsdk:"folder_path"`
+	WorkspaceId types.String                      `tfsdk:"workspace_id"`
+	EnvSlug     types.String                      `tfsdk:"env_slug"`
+	Secrets     map[string]InfisicalSecretDetails `tfsdk:"secrets"`
 }
 
 type InfisicalSecretDetails struct {
@@ -58,6 +59,13 @@ func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				Required:    true,
 				Computed:    false,
 			},
+
+			"workspace_id": schema.StringAttribute{
+				Description: "The Infisical project ID (Required for Machine Identity auth)",
+				Optional:    true,
+				Computed:    true,
+			},
+
 			"secrets": schema.MapNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
@@ -111,23 +119,52 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	plainTextSecrets, _, err := d.client.GetPlainTextSecretsViaServiceToken(data.FolderPath.ValueString(), data.EnvSlug.ValueString())
-	if err != nil {
+	if d.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
+
+		plainTextSecrets, _, err := d.client.GetPlainTextSecretsViaServiceToken(data.FolderPath.ValueString(), data.EnvSlug.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Something went wrong while fetching secrets",
+				"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
+					"Infisical Client Error: "+err.Error(),
+			)
+		}
+
+		if data.FolderPath.IsNull() {
+			data.FolderPath = types.StringValue("/")
+		}
+
+		data.Secrets = make(map[string]InfisicalSecretDetails)
+
+		for _, secret := range plainTextSecrets {
+			data.Secrets[secret.Key] = InfisicalSecretDetails{Value: types.StringValue(secret.Value), Comment: types.StringValue(secret.Comment), SecretType: types.StringValue(secret.Type)}
+		}
+	} else if d.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+
+		secrets, err := d.client.GetRawSecretsViaMachineIdentity(data.FolderPath.ValueString(), data.EnvSlug.ValueString(), data.WorkspaceId.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Something went wrong while fetching secrets",
+				"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
+					"Infisical Client Error: "+err.Error(),
+			)
+		}
+
+		if data.FolderPath.IsNull() {
+			data.FolderPath = types.StringValue("/")
+		}
+
+		data.Secrets = make(map[string]InfisicalSecretDetails)
+
+		for _, secret := range secrets {
+			data.Secrets[secret.SecretKey] = InfisicalSecretDetails{Value: types.StringValue(secret.SecretValue), Comment: types.StringValue(secret.SecretComment), SecretType: types.StringValue(secret.Type)}
+		}
+
+	} else {
 		resp.Diagnostics.AddError(
 			"Something went wrong while fetching secrets",
-			"If the error is not clear, please get in touch at infisical.slack.com\n\n"+
-				"Infisical Client Error: "+err.Error(),
+			"Unable to determine authentication strategy. Please report this issue to the Infisical engineers at infisical.com/slack\n\n",
 		)
-	}
-
-	if data.FolderPath.IsNull() {
-		data.FolderPath = types.StringValue("/")
-	}
-
-	data.Secrets = make(map[string]InfisicalSecretDetails)
-
-	for _, secret := range plainTextSecrets {
-		data.Secrets[secret.Key] = InfisicalSecretDetails{Value: types.StringValue(secret.Value), Comment: types.StringValue(secret.Comment), SecretType: types.StringValue(secret.Type)}
 	}
 
 	// Save data into Terraform state
