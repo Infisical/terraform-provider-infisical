@@ -68,7 +68,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed:    false,
 			},
 			"workspace_id": schema.StringAttribute{
-				Description: "The Infisical project ID",
+				Description: "The Infisical project ID (Required for Machine Identity auth)",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -111,89 +111,118 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
-	if err != nil {
+	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
+
+		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Could not get service token details, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// get plain text key
+		symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Could not get encryption key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// encrypt key
+		encryptedKey, err := infisical.EncryptSymmetric([]byte(plan.Name.ValueString()), []byte(plainTextWorkspaceKey))
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't encrypt secret key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// encrypt value
+		encryptedValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't encrypt secret value, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		err = r.client.CallCreateSecretsV3(infisical.CreateSecretV3Request{
+			Environment: plan.EnvSlug.ValueString(),
+			SecretName:  plan.Name.ValueString(),
+			Type:        "shared",
+			SecretPath:  plan.FolderPath.ValueString(),
+			WorkspaceID: serviceTokenDetails.Workspace,
+
+			SecretKeyCiphertext: base64.StdEncoding.EncodeToString(encryptedKey.CipherText),
+			SecretKeyIV:         base64.StdEncoding.EncodeToString(encryptedKey.Nonce),
+			SecretKeyTag:        base64.StdEncoding.EncodeToString(encryptedKey.AuthTag),
+
+			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
+			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
+			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// Set state to fully populated data
+		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+		err := r.client.CallCreateRawSecretsV3(infisical.CreateRawSecretV3Request{
+			Environment: plan.EnvSlug.ValueString(),
+			WorkspaceID: plan.WorkspaceId.ValueString(),
+			Type:        "shared",
+			SecretPath:  plan.FolderPath.ValueString(),
+			SecretKey:   plan.Name.ValueString(),
+			SecretValue: plan.Value.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// No need to set workspace ID as it is already set in the plan
+		//plan.WorkspaceId = plan.WorkspaceId
+	} else {
 		resp.Diagnostics.AddError(
 			"Error creating secret",
-			"Could not get service token details, unexpected error: "+err.Error(),
+			"Unknown authentication strategy",
 		)
 		return
 	}
-
-	// get plain text key
-	symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Could not get encryption key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// encrypt key
-	encryptedKey, err := infisical.EncryptSymmetric([]byte(plan.Name.ValueString()), []byte(plainTextWorkspaceKey))
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Couldn't encrypt secret key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// encrypt value
-	encryptedValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Couldn't encrypt secret value, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	err = r.client.CallCreateSecretsV3(infisical.CreateSecretV3Request{
-		Environment: plan.EnvSlug.ValueString(),
-		SecretName:  plan.Name.ValueString(),
-		Type:        "shared",
-		SecretPath:  plan.FolderPath.ValueString(),
-		WorkspaceID: serviceTokenDetails.Workspace,
-
-		SecretKeyCiphertext: base64.StdEncoding.EncodeToString(encryptedKey.CipherText),
-		SecretKeyIV:         base64.StdEncoding.EncodeToString(encryptedKey.Nonce),
-		SecretKeyTag:        base64.StdEncoding.EncodeToString(encryptedKey.AuthTag),
-
-		SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
-		SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
-		SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// Set state to fully populated data
-	plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags = resp.State.Set(ctx, plan)
@@ -367,6 +396,12 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 		state.Name = types.StringValue(response.Secret.SecretKey)
 		state.Value = types.StringValue(response.Secret.SecretValue)
+	} else {
+		resp.Diagnostics.AddError(
+			"Error Reading Infisical secret",
+			"Unknown authentication strategy",
+		)
+		return
 	}
 
 	// Set refreshed state
@@ -403,75 +438,108 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
-	if err != nil {
+	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
+
+		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Could not get service token details, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// get plain text key
+		symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Could not get encryption key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// encrypt value
+		encryptedValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't encrypt secret value, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		err = r.client.CallUpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
+			Environment: plan.EnvSlug.ValueString(),
+			SecretName:  plan.Name.ValueString(),
+			Type:        "shared",
+			SecretPath:  plan.FolderPath.ValueString(),
+			WorkspaceID: serviceTokenDetails.Workspace,
+
+			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
+			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
+			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// Set state to fully populated data
+		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
+
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+		err := r.client.CallUpdateRawSecretV3(infisical.UpdateRawSecretByNameV3Request{
+			Environment: plan.EnvSlug.ValueString(),
+			WorkspaceID: plan.WorkspaceId.ValueString(),
+			Type:        "shared",
+			SecretPath:  plan.FolderPath.ValueString(),
+			SecretName:  plan.Name.ValueString(),
+			SecretValue: plan.Value.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// No need to set workspace ID as it is already set in the plan
+		//plan.WorkspaceId = plan.WorkspaceId
+		plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+
+	} else {
 		resp.Diagnostics.AddError(
 			"Error creating secret",
-			"Could not get service token details, unexpected error: "+err.Error(),
+			"Unknown authentication strategy",
 		)
 		return
 	}
 
-	// get plain text key
-	symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Could not get encryption key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// encrypt value
-	encryptedValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Couldn't encrypt secret value, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	err = r.client.CallUpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
-		Environment: plan.EnvSlug.ValueString(),
-		SecretName:  plan.Name.ValueString(),
-		Type:        "shared",
-		SecretPath:  plan.FolderPath.ValueString(),
-		WorkspaceID: serviceTokenDetails.Workspace,
-
-		SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
-		SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
-		SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// Set state to fully populated data
-	plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	diags = resp.State.Set(ctx, plan)
@@ -491,20 +559,45 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	// Delete existing order
-	err := r.client.CallDeleteSecretsV3(infisical.DeleteSecretV3Request{
-		SecretName:  state.Name.ValueString(),
-		SecretPath:  state.FolderPath.ValueString(),
-		Environment: state.EnvSlug.ValueString(),
-		Type:        "shared",
-		WorkspaceId: state.WorkspaceId.ValueString(),
-	})
+	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
+		// Delete existing order
+		err := r.client.CallDeleteSecretsV3(infisical.DeleteSecretV3Request{
+			SecretName:  state.Name.ValueString(),
+			SecretPath:  state.FolderPath.ValueString(),
+			Environment: state.EnvSlug.ValueString(),
+			Type:        "shared",
+			WorkspaceId: state.WorkspaceId.ValueString(),
+		})
 
-	if err != nil {
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Deleting Infisical secret",
+				"Could not delete secret, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+		err := r.client.CallDeleteRawSecretV3(infisical.DeleteRawSecretV3Request{
+			SecretName:  state.Name.ValueString(),
+			SecretPath:  state.FolderPath.ValueString(),
+			Environment: state.EnvSlug.ValueString(),
+			Type:        "shared",
+			WorkspaceId: state.WorkspaceId.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Deleting Infisical secret",
+				"Could not delete secret, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	} else {
 		resp.Diagnostics.AddError(
-			"Error Deleting Infisical secret",
-			"Could not delete secret, unexpected error: "+err.Error(),
+			"Error creating secret",
+			"Unknown authentication strategy",
 		)
 		return
 	}
+
 }
