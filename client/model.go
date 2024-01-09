@@ -206,7 +206,6 @@ type GetSingleRawSecretByNameSecretResponse struct {
 
 // create secrets
 type CreateRawSecretV3Request struct {
-	SecretName    string `json:"secretName"`
 	WorkspaceID   string `json:"workspaceId"`
 	Type          string `json:"type"`
 	Environment   string `json:"environment"`
