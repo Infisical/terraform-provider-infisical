@@ -29,7 +29,6 @@ func (client Client) UniversalMachineIdentityAuth() (string, error) {
 	return loginResponse.AccessToken, nil
 }
 
-// done
 func (client Client) CallGetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse, error) {
 	var tokenDetailsResponse GetServiceTokenDetailsResponse
 	response, err := client.Config.HttpClient.
@@ -49,7 +48,6 @@ func (client Client) CallGetServiceTokenDetailsV2() (GetServiceTokenDetailsRespo
 	return tokenDetailsResponse, nil
 }
 
-// done
 func (client Client) CallGetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncryptedSecretsV3Response, error) {
 	var secretsResponse GetEncryptedSecretsV3Response
 
@@ -77,7 +75,6 @@ func (client Client) CallGetSecretsV3(request GetEncryptedSecretsV3Request) (Get
 	return secretsResponse, nil
 }
 
-// done
 func (client Client) CallCreateSecretsV3(request CreateSecretV3Request) error {
 	var secretsResponse EncryptedSecretV3
 	response, err := client.Config.HttpClient.
@@ -98,7 +95,6 @@ func (client Client) CallCreateSecretsV3(request CreateSecretV3Request) error {
 	return nil
 }
 
-// done
 func (client Client) CallDeleteSecretsV3(request DeleteSecretV3Request) error {
 	var secretsResponse GetEncryptedSecretsV3Response
 	response, err := client.Config.HttpClient.
@@ -119,7 +115,6 @@ func (client Client) CallDeleteSecretsV3(request DeleteSecretV3Request) error {
 	return nil
 }
 
-// done
 func (client Client) CallUpdateSecretsV3(request UpdateSecretByNameV3Request) error {
 
 	//var secretName = request.SecretName
@@ -144,7 +139,6 @@ func (client Client) CallUpdateSecretsV3(request UpdateSecretByNameV3Request) er
 	return nil
 }
 
-// done
 func (client Client) CallGetSingleSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleSecretByNameSecretResponse, error) {
 	var secretsResponse GetSingleSecretByNameSecretResponse
 	response, err := client.Config.HttpClient.
