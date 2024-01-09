@@ -39,6 +39,9 @@ type infisicalProvider struct {
 type infisicalProviderModel struct {
 	Host         types.String `tfsdk:"host"`
 	ServiceToken types.String `tfsdk:"service_token"`
+
+	ClientId     types.String `tfsdk:"client_id"`
+	ClientSecret types.String `tfsdk:"client_secret"`
 }
 
 // Metadata returns the provider type name.
@@ -61,6 +64,17 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Sensitive:   true,
 				Description: "Used to fetch/modify secrets for a given project",
 			},
+
+			"client_id": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Machine identity client ID. Used to fetch/modify secrets for a given project",
+			},
+			"client_secret": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
+			},
 		},
 	}
 }
@@ -80,8 +94,14 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		resp.Diagnostics.AddError("No authentication credentials provided", "You must define service_token field of the provider")
 	}
 
-	serviceToken := os.Getenv("INFISICAL_SERVICE_TOKEN")
 	host := os.Getenv("INFISICAL_HOST")
+
+	// Service Token
+	serviceToken := os.Getenv("INFISICAL_SERVICE_TOKEN")
+
+	// Machine Identity
+	clientId := os.Getenv("INFISICAL_CLIENT_ID")
+	clientSecret := os.Getenv("INFISICAL_CLIENT_SECRET")
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -91,20 +111,28 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		serviceToken = config.ServiceToken.ValueString()
 	}
 
+	if !config.ClientId.IsNull() {
+		clientId = config.ClientId.ValueString()
+	}
+
+	if !config.ClientSecret.IsNull() {
+		clientSecret = config.ClientSecret.ValueString()
+	}
+
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
 	}
 
-	if serviceToken == "" {
-		resp.Diagnostics.AddError("No authentication credentials provided", "You must define service_token field of the provider")
+	if serviceToken == "" && clientId == "" && clientSecret == "" {
+		resp.Diagnostics.AddError("No authentication credentials provided", "You must define the service_token, or client_id and client_secret field of the provider.")
 	}
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken})
+	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
