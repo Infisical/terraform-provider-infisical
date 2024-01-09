@@ -138,7 +138,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		resp.Diagnostics.AddError(
 			"Unable to Create Infisical API Client",
 			"An unexpected error occurred when creating the Infisical API client. "+
-				"If the error is not clear, please get in touch at infisical.slack.com.\n\n"+
+				"If the error is not clear, please get in touch at infisical.com/slack.\n\n"+
 				"Infisical Client Error: "+err.Error(),
 		)
 		return
