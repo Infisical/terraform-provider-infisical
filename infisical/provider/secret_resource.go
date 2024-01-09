@@ -72,6 +72,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:    true,
 				Computed:    true,
 			},
+
 			"last_updated": schema.StringAttribute{
 				Computed: true,
 			},
@@ -213,136 +214,160 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Could not get service token details, unexpected error: "+err.Error(),
-		)
-		return
+	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
+
+		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Could not get service token details, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// get plain text key
+		symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"Could not get encryption key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating secret",
+				"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		// Get refreshed order value from HashiCups
+		response, err := r.client.CallGetSingleSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
+			SecretName:  state.Name.ValueString(),
+			Type:        "shared",
+			WorkspaceId: state.WorkspaceId.ValueString(),
+			Environment: state.EnvSlug.ValueString(),
+			SecretPath:  state.FolderPath.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		// Decrypt key
+		key_iv, err := base64.StdEncoding.DecodeString(response.Secret.SecretKeyIV)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to decode secret IV for secret key "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		key_tag, err := base64.StdEncoding.DecodeString(response.Secret.SecretKeyTag)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to decode secret authentication tag for secret key "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		key_ciphertext, err := base64.StdEncoding.DecodeString(response.Secret.SecretKeyCiphertext)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to decode secret cipher text for secret key "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		plainTextKey, err := infisical.DecryptSymmetric(plainTextWorkspaceKey, key_ciphertext, key_tag, key_iv)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to symmetrically decrypt secret key "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		// Decrypt value
+		value_iv, err := base64.StdEncoding.DecodeString(response.Secret.SecretValueIV)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to decode secret IV for secret value "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		value_tag, err := base64.StdEncoding.DecodeString(response.Secret.SecretValueTag)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to decode secret authentication tag for secret value "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		value_ciphertext, _ := base64.StdEncoding.DecodeString(response.Secret.SecretValueCiphertext)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to decode secret cipher text for secret key "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		plainTextValue, err := infisical.DecryptSymmetric(plainTextWorkspaceKey, value_ciphertext, value_tag, value_iv)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"unable to symmetrically decrypt secret value "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		state.Name = types.StringValue(string(plainTextKey))
+		state.Value = types.StringValue(string(plainTextValue))
+
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+		// Get refreshed order value from HashiCups
+		response, err := r.client.CallGetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
+			SecretName:  state.Name.ValueString(),
+			Type:        "shared",
+			WorkspaceId: state.WorkspaceId.ValueString(),
+			Environment: state.EnvSlug.ValueString(),
+			SecretPath:  state.FolderPath.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Infisical secret",
+				"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		state.Name = types.StringValue(response.Secret.SecretKey)
+		state.Value = types.StringValue(response.Secret.SecretValue)
 	}
-
-	// get plain text key
-	symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Could not get encryption key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// Get refreshed order value from HashiCups
-	response, err := r.client.CallGetSingleSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
-		SecretName:  state.Name.ValueString(),
-		Type:        "shared",
-		WorkspaceId: state.WorkspaceId.ValueString(),
-		Environment: state.EnvSlug.ValueString(),
-		SecretPath:  state.FolderPath.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	// Decrypt key
-	key_iv, err := base64.StdEncoding.DecodeString(response.Secret.SecretKeyIV)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to decode secret IV for secret key "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	key_tag, err := base64.StdEncoding.DecodeString(response.Secret.SecretKeyTag)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to decode secret authentication tag for secret key "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	key_ciphertext, err := base64.StdEncoding.DecodeString(response.Secret.SecretKeyCiphertext)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to decode secret cipher text for secret key "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	plainTextKey, err := infisical.DecryptSymmetric(plainTextWorkspaceKey, key_ciphertext, key_tag, key_iv)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to symmetrically decrypt secret key "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	// Decrypt value
-	value_iv, err := base64.StdEncoding.DecodeString(response.Secret.SecretValueIV)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to decode secret IV for secret value "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	value_tag, err := base64.StdEncoding.DecodeString(response.Secret.SecretValueTag)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to decode secret authentication tag for secret value "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	value_ciphertext, _ := base64.StdEncoding.DecodeString(response.Secret.SecretValueCiphertext)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to decode secret cipher text for secret key "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	plainTextValue, err := infisical.DecryptSymmetric(plainTextWorkspaceKey, value_ciphertext, value_tag, value_iv)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Infisical secret",
-			"unable to symmetrically decrypt secret value "+state.Name.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	state.Name = types.StringValue(string(plainTextKey))
-	state.Value = types.StringValue(string(plainTextValue))
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
