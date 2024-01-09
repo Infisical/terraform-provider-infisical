@@ -198,7 +198,7 @@ func (client Client) CallCreateRawSecretsV3(request CreateRawSecretV3Request) er
 		SetResult(&secretsResponse).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
+		Post(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretKey))
 
 	if err != nil {
 		return fmt.Errorf("CallCreateRawSecretsV3: Unable to complete api request [err=%s]", err)
