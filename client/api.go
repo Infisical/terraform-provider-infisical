@@ -121,6 +121,10 @@ func (client Client) CallDeleteSecretsV3(request DeleteSecretV3Request) error {
 
 // done
 func (client Client) CallUpdateSecretsV3(request UpdateSecretByNameV3Request) error {
+
+	//var secretName = request.SecretName
+	//request.SecretName = ""
+
 	var secretsResponse GetEncryptedSecretsV3Response
 	response, err := client.Config.HttpClient.
 		R().

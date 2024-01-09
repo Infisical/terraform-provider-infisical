@@ -443,7 +443,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"Could not get service token details, unexpected error: "+err.Error(),
 			)
 			return
@@ -453,7 +453,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		symmetricKeyFromServiceToken, err := infisical.GetSymmetricKeyFromServiceToken(r.client.Config.ServiceToken)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"Could not get encryption key, unexpected error: "+err.Error(),
 			)
 			return
@@ -462,7 +462,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		decodedSymmetricEncryptionDetails, err := infisical.GetBase64DecodedSymmetricEncryptionDetails(symmetricKeyFromServiceToken, serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"unable to get base 64 decoded encryption details, unexpected error: "+err.Error(),
 			)
 			return
@@ -471,18 +471,26 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"unable to decrypt the required workspace key, unexpected error: "+err.Error(),
 			)
 			return
 		}
 
 		// encrypt value
-		encryptedValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedSecretValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"Couldn't encrypt secret value, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating secret",
+				"Couldn't encrypt secret key, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -494,14 +502,14 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			SecretPath:  plan.FolderPath.ValueString(),
 			WorkspaceID: serviceTokenDetails.Workspace,
 
-			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
-			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
-			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
+			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
+			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
+			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
 		})
 
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
 			)
 			return
@@ -522,7 +530,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating secret",
+				"Error updating secret",
 				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
 			)
 			return
@@ -534,7 +542,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	} else {
 		resp.Diagnostics.AddError(
-			"Error creating secret",
+			"Error updating secret",
 			"Unknown authentication strategy",
 		)
 		return
