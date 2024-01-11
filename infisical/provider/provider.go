@@ -100,8 +100,8 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	serviceToken := os.Getenv("INFISICAL_SERVICE_TOKEN")
 
 	// Machine Identity
-	clientId := os.Getenv("INFISICAL_CLIENT_ID")
-	clientSecret := os.Getenv("INFISICAL_CLIENT_SECRET")
+	clientId := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID")
+	clientSecret := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET")
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -122,10 +122,6 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
-	}
-
-	if serviceToken == "" && clientId == "" && clientSecret == "" {
-		resp.Diagnostics.AddError("No authentication credentials provided", "You must define the service_token, or client_id and client_secret field of the provider.")
 	}
 
 	if resp.Diagnostics.HasError() {
