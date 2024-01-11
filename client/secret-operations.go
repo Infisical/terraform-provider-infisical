@@ -53,7 +53,7 @@ func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string,
 	return plainTextSecrets, &serviceTokenDetails, nil
 }
 
-func (client Client) GetRawSecretsViaMachineIdentity(secretFolderPath string, envSlug string, workspaceId string) ([]RawV3Secret, error) {
+func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, workspaceId string) ([]RawV3Secret, error) {
 	if client.Config.ClientId == "" || client.Config.ClientSecret == "" {
 		return nil, fmt.Errorf("client ID and client secret must be defined to fetch secrets with machine identity")
 	}
