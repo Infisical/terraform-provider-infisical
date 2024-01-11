@@ -44,7 +44,7 @@ func NewClient(cnf Config) (*Client, error) {
 	}
 
 	if cnf.ServiceToken == "" && cnf.ClientId == "" && cnf.ClientSecret == "" {
-		return nil, fmt.Errorf("you must set the service token, or a client secret and client ID for the client before making calls")
+		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth before making calls")
 	}
 
 	var authToken string
