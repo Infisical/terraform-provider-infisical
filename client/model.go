@@ -55,7 +55,12 @@ type GetServiceTokenDetailsResponse struct {
 	V            int       `json:"__v"`
 }
 
-//
+type UniversalMachineIdentityAuthResponse struct {
+	AccessToken       string `json:"accessToken"`
+	ExpiresIn         int    `json:"expiresIn"`
+	AccessTokenMaxTTL int    `json:"accessTokenMaxTTL"`
+	TokenType         string `json:"tokenType"`
+}
 
 type SingleEnvironmentVariable struct {
 	Key   string `json:"key"`
@@ -173,4 +178,57 @@ type GetSingleSecretByNameV3Request struct {
 
 type GetSingleSecretByNameSecretResponse struct {
 	Secret EncryptedSecret `json:"secret"`
+}
+
+type GetRawSecretsV3Request struct {
+	Environment string `json:"environment"`
+	WorkspaceId string `json:"workspaceId"`
+	SecretPath  string `json:"secretPath"`
+}
+
+type RawV3Secret struct {
+	Version       int    `json:"version"`
+	Workspace     string `json:"workspace"`
+	Type          string `json:"type"`
+	Environment   string `json:"environment"`
+	SecretKey     string `json:"secretKey"`
+	SecretValue   string `json:"secretValue"`
+	SecretComment string `json:"secretComment"`
+}
+
+type GetRawSecretsV3Response struct {
+	Secrets []RawV3Secret `json:"secrets"`
+}
+
+type GetSingleRawSecretByNameSecretResponse struct {
+	Secret RawV3Secret `json:"secret"`
+}
+
+// create secrets
+type CreateRawSecretV3Request struct {
+	WorkspaceID   string `json:"workspaceId"`
+	Type          string `json:"type"`
+	Environment   string `json:"environment"`
+	SecretKey     string `json:"secretKey"`
+	SecretValue   string `json:"secretValue"`
+	SecretComment string `json:"secretComment"`
+	SecretPath    string `json:"secretPath"`
+}
+
+type DeleteRawSecretV3Request struct {
+	SecretName  string `json:"secretName"`
+	WorkspaceId string `json:"workspaceId"`
+	Environment string `json:"environment"`
+	Type        string `json:"type"`
+	SecretPath  string `json:"secretPath"`
+}
+
+// update secret by name api
+type UpdateRawSecretByNameV3Request struct {
+	SecretName  string `json:"secretName"`
+	WorkspaceID string `json:"workspaceId"`
+	Environment string `json:"environment"`
+	Type        string `json:"type"`
+	SecretPath  string `json:"secretPath"`
+	SecretValue string `json:"secretValue"`
 }
