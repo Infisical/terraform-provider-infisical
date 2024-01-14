@@ -139,15 +139,6 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 		}
 
-		plainTextSecrets, err = expandPlainTextSecrets(plainTextSecrets, d.client)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Something went wrong while fetching secrets",
-				"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
-					"Infisical Client Error: "+err.Error(),
-			)
-		}
-
 		if data.FolderPath.IsNull() {
 			data.FolderPath = types.StringValue("/")
 		}
@@ -157,17 +148,25 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		for _, secret := range plainTextSecrets {
 			data.Secrets[secret.Key] = InfisicalSecretDetails{Value: types.StringValue(secret.Value), Comment: types.StringValue(secret.Comment), SecretType: types.StringValue(secret.Type)}
 		}
+
+		data.Secrets = expandSecrets(data.Secrets, func(env string, path string, key string, cache map[string]string) (map[string]string, error) {
+			relevantSecrets, _, err := d.client.GetPlainTextSecretsViaServiceToken(path, env)
+
+			if err != nil {
+				return cache, err
+			}
+
+			cacheKey := strings.Join([]string{env, path, key}, ".")
+
+			for _, secret := range relevantSecrets {
+				cache[cacheKey] = secret.Value
+			}
+
+			return cache, nil
+		})
+
 	} else if d.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		secrets, err := d.client.GetRawSecrets(data.FolderPath.ValueString(), data.EnvSlug.ValueString(), data.WorkspaceId.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Something went wrong while fetching secrets",
-				"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
-					"Infisical Client Error: "+err.Error(),
-			)
-		}
-
-		secrets, err = expandRawSecrets(secrets, data.WorkspaceId.ValueString(), d.client)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Something went wrong while fetching secrets",
@@ -186,6 +185,21 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			data.Secrets[secret.SecretKey] = InfisicalSecretDetails{Value: types.StringValue(secret.SecretValue), Comment: types.StringValue(secret.SecretComment), SecretType: types.StringValue(secret.Type)}
 		}
 
+		data.Secrets = expandSecrets(data.Secrets, func(env string, path string, key string, cache map[string]string) (map[string]string, error) {
+			relevantSecrets, err := d.client.GetRawSecrets(path, env, data.WorkspaceId.ValueString())
+
+			if err != nil {
+				return cache, err
+			}
+
+			cacheKey := strings.Join([]string{env, path, key}, ".")
+
+			for _, secret := range relevantSecrets {
+				cache[cacheKey] = secret.SecretValue
+			}
+
+			return cache, nil
+		})
 	} else {
 		resp.Diagnostics.AddError(
 			"Something went wrong while fetching secrets",
@@ -199,37 +213,36 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 var secRefRegex = regexp.MustCompile(`\${([^\}]*)}`)
 
-/*
-	TODO: cleanup and merge repetitive code in functions below
-	right now 4 total functions with largely same logic because of []infisical.SingleEnvironmentVariable
-	and secrets []infisical.RawV3Secret for both auth strategies
-*/
-
-func expandPlainTextSecrets(secrets []infisical.SingleEnvironmentVariable, client *infisical.Client) ([]infisical.SingleEnvironmentVariable, error) {
+func expandSecrets(secrets map[string]InfisicalSecretDetails, crossEnvFetch func(env string, path string, key string, cache map[string]string) (map[string]string, error)) map[string]InfisicalSecretDetails {
 	expandedSecs := make(map[string]string)
 	interpolatedSecs := make(map[string]string)
+	crossEnvCache := make(map[string]string)
 
-	for _, secret := range secrets {
-		refs := secRefRegex.FindAllStringSubmatch(secret.Value, -1)
+	for key, value := range secrets {
+		refs := secRefRegex.FindAllStringSubmatch(value.Value.ValueString(), -1)
 		if refs == nil {
-			expandedSecs[secret.Key] = secret.Value
+			expandedSecs[key] = value.Value.ValueString()
 		} else {
-			interpolatedSecs[secret.Key] = secret.Value
+			interpolatedSecs[key] = value.Value.ValueString()
 		}
 	}
 
-	for i, secret := range secrets {
-		data, err := recursivelyExpandSecretViaServiceToken(secret.Value, expandedSecs, interpolatedSecs, client)
+	for key, value := range interpolatedSecs {
+		data, err := recursivelyExpandSecret(value, expandedSecs, interpolatedSecs, crossEnvCache, crossEnvFetch)
+
 		if err != nil {
-			return nil, errors.New("failed to expand secrets: " + err.Error())
+			return nil
 		}
-		secrets[i].Value = data
+
+		newSecret := secrets[key]
+		newSecret.Value = types.StringValue(data)
+		secrets[key] = newSecret
 	}
 
-	return secrets, nil
+	return secrets
 }
 
-func recursivelyExpandSecretViaServiceToken(value string, expandedSecs map[string]string, interpolatedSecs map[string]string, client *infisical.Client) (string, error) {
+func recursivelyExpandSecret(value string, expandedSecs map[string]string, interpolatedSecs map[string]string, crossEnvCache map[string]string, crossEnvFetch func(env string, path string, key string, cache map[string]string) (map[string]string, error)) (string, error) {
 	refs := secRefRegex.FindAllStringSubmatch(value, -1)
 	if refs == nil {
 		return value, nil
@@ -241,9 +254,9 @@ func recursivelyExpandSecretViaServiceToken(value string, expandedSecs map[strin
 				if data, ok := expandedSecs[key]; ok {
 					value = strings.Replace(value, repl, data, -1)
 				} else {
-					data, err := recursivelyExpandSecretViaServiceToken(interpolatedSecs[key], expandedSecs, interpolatedSecs, client)
+					data, err := recursivelyExpandSecret(interpolatedSecs[key], expandedSecs, interpolatedSecs, crossEnvCache, crossEnvFetch)
 					if err != nil {
-						return "", errors.New("failed to expand secret " + key)
+						return "", errors.New("failed to expand secret: " + key)
 					}
 					value = strings.Replace(value, repl, data, -1)
 				}
@@ -253,98 +266,31 @@ func recursivelyExpandSecretViaServiceToken(value string, expandedSecs map[strin
 					path += strings.Join(query[1:len(query)-1], "/")
 				}
 
-				// TODO: add cache to avoid redundant api calls
+				cacheKey := strings.Join([]string{env, path, key}, ".")
 
-				relevantSecrets, _, err := client.GetPlainTextSecretsViaServiceToken(path, env)
+				if crossEnvSec, ok := crossEnvCache[cacheKey]; ok {
+					data, err := recursivelyExpandSecret(crossEnvSec, expandedSecs, interpolatedSecs, crossEnvCache, crossEnvFetch)
 
-				if err != nil {
-					return "", errors.New("failed to retrieve secret " + " " + path + " " + env)
-				}
+					if err != nil {
+						return "", errors.New("failed to expand secret: " + cacheKey)
+					}
 
-				relevantSecretsByName := make(map[string]infisical.SingleEnvironmentVariable, len(relevantSecrets))
-
-				for _, secret := range relevantSecrets {
-					relevantSecretsByName[secret.Key] = secret
-				}
-
-				data, err := recursivelyExpandSecretViaServiceToken(relevantSecretsByName[key].Value, expandedSecs, interpolatedSecs, client)
-
-				if err != nil {
-					return "", errors.New("failed to expand secret" + key)
-				}
-				value = strings.Replace(value, repl, data, -1)
-			}
-		}
-		return value, nil
-	}
-}
-
-func expandRawSecrets(secrets []infisical.RawV3Secret, workspaceId string, client *infisical.Client) ([]infisical.RawV3Secret, error) {
-	expandedSecs := make(map[string]string)
-	interpolatedSecs := make(map[string]string)
-
-	for _, secret := range secrets {
-		refs := secRefRegex.FindAllStringSubmatch(secret.SecretValue, -1)
-		if refs == nil {
-			expandedSecs[secret.SecretKey] = secret.SecretValue
-		} else {
-			interpolatedSecs[secret.SecretKey] = secret.SecretValue
-		}
-	}
-
-	for i, secret := range secrets {
-		data, err := recursivelyExpandRawSecret(secret.SecretValue, expandedSecs, interpolatedSecs, workspaceId, client)
-		if err != nil {
-			return nil, errors.New("failed to expand secret: " + err.Error())
-		}
-		secrets[i].SecretValue = data
-	}
-
-	return secrets, nil
-}
-
-func recursivelyExpandRawSecret(value string, expandedSecs map[string]string, interpolatedSecs map[string]string, workspaceId string, client *infisical.Client) (string, error) {
-	refs := secRefRegex.FindAllStringSubmatch(value, -1)
-	if refs == nil {
-		return value, nil
-	} else {
-		for _, ref := range refs {
-			repl, key := ref[0], ref[1]
-			query := strings.Split(key, ".")
-			if len(query) == 1 {
-				if data, ok := expandedSecs[key]; ok {
 					value = strings.Replace(value, repl, data, -1)
 				} else {
-					data, err := recursivelyExpandRawSecret(interpolatedSecs[key], expandedSecs, interpolatedSecs, workspaceId, client)
-					if err != nil {
-						return "", errors.New("failed to expand secret " + key)
+					crossEnvCache, fetchErr := crossEnvFetch(env, path, key, crossEnvCache)
+
+					if fetchErr != nil {
+						return "", errors.New("failed to fetch cross env secrets: " + fetchErr.Error())
 					}
+
+					data, err := recursivelyExpandSecret(crossEnvCache[cacheKey], expandedSecs, interpolatedSecs, crossEnvCache, crossEnvFetch)
+
+					if err != nil {
+						return "", errors.New("failed to expand secret: " + cacheKey)
+					}
+
 					value = strings.Replace(value, repl, data, -1)
 				}
-			} else if len(query) > 1 {
-				env, path, key := query[0], "/", query[len(query)-1]
-				if len(query) >= 2 {
-					path += strings.Join(query[1:len(query)-1], "/")
-				}
-
-				relevantSecrets, err := client.GetRawSecrets(path, env, workspaceId)
-
-				if err != nil {
-					return "", errors.New("failed to retrieve secret " + " " + path + " " + env)
-				}
-
-				relevantSecretsByName := make(map[string]infisical.RawV3Secret, len(relevantSecrets))
-
-				for _, secret := range relevantSecrets {
-					relevantSecretsByName[secret.SecretKey] = secret
-				}
-
-				data, err := recursivelyExpandRawSecret(relevantSecretsByName[key].SecretValue, expandedSecs, interpolatedSecs, workspaceId, client)
-
-				if err != nil {
-					return "", errors.New("failed to expand secret" + key)
-				}
-				value = strings.Replace(value, repl, data, -1)
 			}
 		}
 		return value, nil
