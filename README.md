@@ -8,7 +8,6 @@ terraform {
     infisical = {
       # version = <latest version>
       source = "hashicorp.com/edu/infisical"
-
     }
   }
 }
