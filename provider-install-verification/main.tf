@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     infisical = {
-      source = "hashicorp.com/edu/infisical"
+      source = "infisical/infisical"
     }
   }
 }

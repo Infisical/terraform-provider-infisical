@@ -2,7 +2,7 @@ terraform {
   required_providers {
     infisical = {
       # version = <latest version>
-      source = "hashicorp.com/edu/infisical"
+      source = "infisical/infisical"
 
     }
   }
