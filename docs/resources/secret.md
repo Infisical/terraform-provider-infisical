@@ -65,7 +65,7 @@ resource "infisical_secret" "github_action_secret" {
 
 ### Optional
 
-- `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth)
+- `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only
 

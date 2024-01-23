@@ -61,7 +61,7 @@ func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			},
 
 			"workspace_id": schema.StringAttribute{
-				Description: "The Infisical project ID (Required for Machine Identity auth)",
+				Description: "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
 				Optional:    true,
 				Computed:    true,
 			},
