@@ -157,5 +157,6 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewSecretResource,
+		NewProjectResource,
 	}
 }
