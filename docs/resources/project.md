@@ -3,12 +3,12 @@
 page_title: "infisical_project Resource - terraform-provider-infisical"
 subcategory: ""
 description: |-
-  Create projects & save to Infisical
+  Create projects & save to Infisical. Only Machine Identity authentication is supported for this data source.
 ---
 
 # infisical_project (Resource)
 
-Create projects & save to Infisical
+Create projects & save to Infisical. Only Machine Identity authentication is supported for this data source.
 
 ## Example Usage
 
@@ -53,8 +53,8 @@ resource "infisical_project" "azure-project" {
 ### Required
 
 - `name` (String) The name of the project
-- `organization_id` (String) The organization ID of the project
-- `slug` (String) The slug of the project. This is optional when creating a project, but for all other operations it is required
+- `organization_id` (String) The ID of the organization to which the project belongs
+- `slug` (String) The slug of the project
 
 ### Read-Only
 

@@ -52,11 +52,11 @@ func (d *ProjectsDataSource) Metadata(ctx context.Context, req datasource.Metada
 
 func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get secrets from Infisical",
+		Description: "Interact with Infisical projects. Only Machine Identity authentication is supported for this data source.",
 
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
-				Description: "The slug of the project",
+				Description: "The slug of the project to fetch",
 				Required:    true,
 			},
 
@@ -76,7 +76,7 @@ func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 			},
 
 			"org_id": schema.StringAttribute{
-				Description: "The organization ID of the project",
+				Description: "The ID of the organization to which the project belongs",
 				Computed:    true,
 			},
 

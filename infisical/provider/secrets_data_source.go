@@ -46,7 +46,7 @@ func (d *SecretsDataSource) Metadata(ctx context.Context, req datasource.Metadat
 
 func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get secrets from Infisical",
+		Description: "Interact with Infisical secrets",
 
 		Attributes: map[string]schema.Attribute{
 			"folder_path": schema.StringAttribute{

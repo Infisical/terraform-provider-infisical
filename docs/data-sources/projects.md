@@ -3,12 +3,12 @@
 page_title: "infisical_projects Data Source - terraform-provider-infisical"
 subcategory: ""
 description: |-
-  Get secrets from Infisical
+  Interact with Infisical projects. Only Machine Identity authentication is supported for this data source.
 ---
 
 # infisical_projects (Data Source)
 
-Get secrets from Infisical
+Interact with Infisical projects. Only Machine Identity authentication is supported for this data source.
 
 ## Example Usage
 
@@ -48,7 +48,7 @@ output "entire-project" {
 
 ### Required
 
-- `slug` (String) The slug of the project
+- `slug` (String) The slug of the project to fetch
 
 ### Read-Only
 
@@ -57,7 +57,7 @@ output "entire-project" {
 - `environments` (Attributes Map) (see [below for nested schema](#nestedatt--environments))
 - `id` (String) The ID of the project
 - `name` (String) The name of the project
-- `org_id` (String) The organization ID of the project
+- `org_id` (String) The ID of the organization to which the project belongs
 - `updated_at` (String) The last update date of the project
 - `upgrade_status` (String) The upgrade status of the project
 - `version` (Number) The version of the project

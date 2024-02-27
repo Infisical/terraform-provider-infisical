@@ -42,14 +42,14 @@ func (r *projectResource) Metadata(_ context.Context, req resource.MetadataReque
 // Schema defines the schema for the resource.
 func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create projects & save to Infisical",
+		Description: "Create projects & save to Infisical. Only Machine Identity authentication is supported for this data source.",
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
-				Description: "The slug of the project. This is optional when creating a project, but for all other operations it is required",
+				Description: "The slug of the project",
 				Required:    true,
 			},
 			"organization_id": schema.StringAttribute{
-				Description: "The organization ID of the project",
+				Description: "The ID of the organization to which the project belongs",
 				Required:    true,
 			},
 			"name": schema.StringAttribute{
