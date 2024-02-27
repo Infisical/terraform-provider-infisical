@@ -51,6 +51,22 @@ type Project struct {
 }
 
 type ProjectWithEnvironments struct {
+	ID                 string               `json:"id"`
+	Name               string               `json:"name"`
+	Slug               string               `json:"slug"`
+	AutoCapitalization bool                 `json:"autoCapitalization"`
+	OrgID              string               `json:"orgId"`
+	CreatedAt          string               `json:"createdAt"`
+	UpdatedAt          string               `json:"updatedAt"`
+	Version            int64                `json:"version"`
+	UpgradeStatus      string               `json:"upgradeStatus"`
+	Environments       []ProjectEnvironment `json:"environments"`
+}
+
+type ProjectEnvironment struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	ID   string `json:"id"`
 }
 
 type CreateProjectResponse struct {
@@ -58,10 +74,6 @@ type CreateProjectResponse struct {
 }
 
 type DeleteProjectResponse struct {
-	Project Project `json:"workspace"`
-}
-
-type GetProjectResponse struct {
 	Project Project `json:"workspace"`
 }
 
@@ -278,7 +290,6 @@ type GetProjectRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Slug               string `json:"slug"`
-	ProjectName        string `json:"name"`
-	AutoCapitalization bool   `json:"autoCapitalization"`
+	Slug        string `json:"slug"`
+	ProjectName string `json:"name"`
 }
