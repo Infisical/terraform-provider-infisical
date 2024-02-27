@@ -2,21 +2,33 @@ terraform {
   required_providers {
     infisical = {
       # version = <latest version>
-      source = "hashicorp.com/edu/infisical"
+      source = "infisical/infisical"
     }
   }
 }
 
 provider "infisical" {
   host          = "http://localhost:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  client_id =    "3f6135db-f237-421d-af66-a8f4e80d443b"
-  client_secret = "d1a9238d9fe9476e545ba92c25ece3866178e468d3b0b8f263af64026ac835bf"
+  client_id     = "<machine-identity-client-id>"
+  client_secret = "<machine-identity-client-secret>"
 }
 
-resource "infisical_project" "a-new-project" {
-  name              = "new name123"
-  slug              = "a-new-project-slug"
-  organization_id   = "180870b7-f464-4740-8ffe-9d11c9245ea7"
+resource "infisical_project" "gcp-project" {
+  name            = "GCP Project"
+  slug            = "gcp-project"
+  organization_id = "<organization-id>"
+}
+
+resource "infisical_project" "aws-project" {
+  name            = "AWS Project"
+  slug            = "aws-project"
+  organization_id = "<organization-id>"
+}
+
+resource "infisical_project" "azure-project" {
+  name            = "Azure Project"
+  slug            = "azure-project"
+  organization_id = "<organization-id>"
 }
 
 
