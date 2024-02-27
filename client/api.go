@@ -316,8 +316,8 @@ func (client Client) CallDeleteProject(request DeleteProjectRequest) error {
 	return nil
 }
 
-func (client Client) CallGetProject(request GetProjectRequest) (GetProjectResponse, error) {
-	var projectResponse GetProjectResponse
+func (client Client) CallGetProject(request GetProjectRequest) (ProjectWithEnvironments, error) {
+	var projectResponse ProjectWithEnvironments
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&projectResponse).
@@ -325,11 +325,11 @@ func (client Client) CallGetProject(request GetProjectRequest) (GetProjectRespon
 		Get(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
 
 	if err != nil {
-		return GetProjectResponse{}, fmt.Errorf("CallGetProject: Unable to complete api request [err=%s]", err)
+		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return GetProjectResponse{}, fmt.Errorf("CallGetProject: Unsuccessful response. [response=%s]", response)
+		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unsuccessful response. [response=%s]", response)
 	}
 
 	return projectResponse, nil
