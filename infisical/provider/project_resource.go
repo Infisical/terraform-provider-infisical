@@ -28,12 +28,10 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug               types.String `tfsdk:"slug"`
-	OrganizationId     types.String `tfsdk:"organization_id"`
-	Name               types.String `tfsdk:"name"`
-	AutoCapitalization types.Bool   `tfsdk:"auto_capitalization"`
-	ProjectId          types.String `tfsdk:"project_Id"`
-	LastUpdated        types.String `tfsdk:"last_updated"`
+	Slug           types.String `tfsdk:"slug"`
+	OrganizationId types.String `tfsdk:"organization_id"`
+	Name           types.String `tfsdk:"name"`
+	LastUpdated    types.String `tfsdk:"last_updated"`
 }
 
 // Metadata returns the resource type name.
@@ -57,14 +55,6 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Description: "The name of the project",
 				Required:    true,
-			},
-			"auto_capitalization": schema.StringAttribute{
-				Description: "",
-				Required:    true,
-				Computed:    false,
-			},
-			"project_Id": schema.StringAttribute{
-				Computed: true,
 			},
 
 			"last_updated": schema.StringAttribute{
@@ -112,7 +102,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	res, err := r.client.CallCreateProject(infisical.CreateProjectRequest{
+	_, err := r.client.CallCreateProject(infisical.CreateProjectRequest{
 		OrganizationId: plan.OrganizationId.ValueString(),
 		ProjectName:    plan.Name.ValueString(),
 		Slug:           plan.Slug.ValueString(),
@@ -126,12 +116,10 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	plan.AutoCapitalization = types.BoolValue(res.Project.AutoCapitalization)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-	plan.Name = types.StringValue(res.Project.Name)
-	plan.OrganizationId = types.StringValue(res.Project.OrgID)
-	plan.ProjectId = types.StringValue(res.Project.ID)
-	plan.Slug = types.StringValue(res.Project.Slug)
+	plan.Slug = types.StringValue(plan.Slug.ValueString())
+	plan.OrganizationId = types.StringValue(plan.OrganizationId.ValueString())
+	plan.Name = types.StringValue(plan.Name.ValueString())
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -160,7 +148,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Get the latest data from the API
-	res, err := r.client.CallGetProject(infisical.GetProjectRequest{
+	project, err := r.client.CallGetProject(infisical.GetProjectRequest{
 		Slug: state.Slug.ValueString(),
 	})
 
@@ -172,12 +160,9 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	state.AutoCapitalization = types.BoolValue(res.Project.AutoCapitalization)
-	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-	state.Name = types.StringValue(res.Project.Name)
-	state.OrganizationId = types.StringValue(res.Project.OrgID)
-	state.ProjectId = types.StringValue(res.Project.ID)
-	state.Slug = types.StringValue(res.Project.Slug)
+	if state.Name.ValueString() != project.Name {
+		state.Name = types.StringValue(project.Name)
+	}
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -205,10 +190,32 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	updatedProject, err := r.client.CallUpdateProject(infisical.UpdateProjectRequest{
-		ProjectName:        plan.Name.ValueString(),
-		AutoCapitalization: plan.AutoCapitalization.ValueBool(),
-		Slug:               plan.Slug.ValueString(),
+	var state projectResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.Slug != plan.Slug {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"Slug cannot be updated",
+		)
+		return
+	}
+
+	if state.OrganizationId != plan.OrganizationId {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"Organization ID cannot be updated",
+		)
+		return
+	}
+
+	_, err := r.client.CallUpdateProject(infisical.UpdateProjectRequest{
+		ProjectName: plan.Name.ValueString(),
+		Slug:        plan.Slug.ValueString(),
 	})
 
 	if err != nil {
@@ -219,12 +226,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	plan.AutoCapitalization = types.BoolValue(updatedProject.AutoCapitalization)
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-	plan.Name = types.StringValue(updatedProject.Name)
-	plan.OrganizationId = types.StringValue(updatedProject.OrgID)
-	plan.ProjectId = types.StringValue(updatedProject.ID)
-	plan.Slug = types.StringValue(updatedProject.Slug)
+	plan.Name = types.StringValue(plan.Name.ValueString())
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
