@@ -29,7 +29,7 @@ provider "infisical" {
 }
 
 data "infisical_projects" "test-project" {
-  slug = "new-test"
+  slug = "<project-slug>"
 }
 
 // Get the value of the "dev" environment
