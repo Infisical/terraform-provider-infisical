@@ -273,8 +273,8 @@ func (client Client) CallCreateProject(request CreateProjectRequest) (CreateProj
 
 	if request.Slug == "" {
 		request = CreateProjectRequest{
-			ProjectName:    request.ProjectName,
-			OrganizationId: request.OrganizationId,
+			ProjectName:      request.ProjectName,
+			OrganizationSlug: request.OrganizationSlug,
 		}
 	}
 

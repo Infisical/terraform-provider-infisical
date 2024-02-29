@@ -276,9 +276,9 @@ type UpdateRawSecretByNameV3Request struct {
 }
 
 type CreateProjectRequest struct {
-	ProjectName    string `json:"projectName"`
-	Slug           string `json:"slug"`
-	OrganizationId string `json:"organizationId"`
+	ProjectName      string `json:"projectName"`
+	Slug             string `json:"slug"`
+	OrganizationSlug string `json:"organizationSlug"`
 }
 
 type DeleteProjectRequest struct {
