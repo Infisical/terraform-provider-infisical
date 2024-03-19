@@ -62,7 +62,7 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 			"service_token": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Used to fetch/modify secrets for a given project",
+				Description: " (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project",
 			},
 
 			"client_id": schema.StringAttribute{

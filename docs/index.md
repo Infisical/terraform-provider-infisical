@@ -18,13 +18,15 @@ terraform {
     infisical = {
       # version = <latest version>
       source = "infisical/infisical"
+
     }
   }
 }
 
 provider "infisical" {
   host          = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  service_token = "<>"
+  client_id     = "<>"
+  client_secret = "<>"
 }
 ```
 
@@ -33,5 +35,7 @@ provider "infisical" {
 
 ### Optional
 
+- `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
+- `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project
 - `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host.
-- `service_token` (String, Sensitive) Used to fetch/modify secrets for a given project
+- `service_token` (String, Sensitive) (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project
