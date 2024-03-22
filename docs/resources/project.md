@@ -29,21 +29,18 @@ provider "infisical" {
 }
 
 resource "infisical_project" "gcp-project" {
-  name              = "GCP Project"
-  slug              = "gcp-project"
-  organization_slug = "<organization-slug>"
+  name = "GCP Project"
+  slug = "gcp-project"
 }
 
 resource "infisical_project" "aws-project" {
-  name              = "AWS Project"
-  slug              = "aws-project"
-  organization_slug = "<organization-slug>"
+  name = "AWS Project"
+  slug = "aws-project"
 }
 
 resource "infisical_project" "azure-project" {
-  name              = "Azure Project"
-  slug              = "azure-project"
-  organization_slug = "<organization-slug>"
+  name = "Azure Project"
+  slug = "azure-project"
 }
 ```
 
@@ -53,7 +50,6 @@ resource "infisical_project" "azure-project" {
 ### Required
 
 - `name` (String) The name of the project
-- `organization_slug` (String) The slug of the organization to which the project belongs
 - `slug` (String) The slug of the project
 
 ### Read-Only
