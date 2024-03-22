@@ -14,21 +14,18 @@ provider "infisical" {
 }
 
 resource "infisical_project" "gcp-project" {
-  name              = "GCP Project"
-  slug              = "gcp-project"
-  organization_slug = "<organization-slug>"
+  name = "GCP Project"
+  slug = "gcp-project"
 }
 
 resource "infisical_project" "aws-project" {
-  name              = "AWS Project"
-  slug              = "aws-project"
-  organization_slug = "<organization-slug>"
+  name = "AWS Project"
+  slug = "aws-project"
 }
 
 resource "infisical_project" "azure-project" {
-  name              = "Azure Project"
-  slug              = "azure-project"
-  organization_slug = "<organization-slug>"
+  name = "Azure Project"
+  slug = "azure-project"
 }
 
 

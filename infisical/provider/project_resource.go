@@ -28,10 +28,9 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug             types.String `tfsdk:"slug"`
-	OrganizationSlug types.String `tfsdk:"organization_slug"`
-	Name             types.String `tfsdk:"name"`
-	LastUpdated      types.String `tfsdk:"last_updated"`
+	Slug        types.String `tfsdk:"slug"`
+	Name        types.String `tfsdk:"name"`
+	LastUpdated types.String `tfsdk:"last_updated"`
 }
 
 // Metadata returns the resource type name.
@@ -46,10 +45,6 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
 				Description: "The slug of the project",
-				Required:    true,
-			},
-			"organization_slug": schema.StringAttribute{
-				Description: "The slug of the organization to which the project belongs",
 				Required:    true,
 			},
 			"name": schema.StringAttribute{
@@ -103,9 +98,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	_, err := r.client.CallCreateProject(infisical.CreateProjectRequest{
-		OrganizationSlug: plan.OrganizationSlug.ValueString(),
-		ProjectName:      plan.Name.ValueString(),
-		Slug:             plan.Slug.ValueString(),
+		ProjectName: plan.Name.ValueString(),
+		Slug:        plan.Slug.ValueString(),
 	})
 
 	if err != nil {
@@ -118,7 +112,6 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	plan.Slug = types.StringValue(plan.Slug.ValueString())
-	plan.OrganizationSlug = types.StringValue(plan.OrganizationSlug.ValueString())
 	plan.Name = types.StringValue(plan.Name.ValueString())
 
 	diags = resp.State.Set(ctx, plan)
@@ -201,14 +194,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError(
 			"Unable to update project",
 			"Slug cannot be updated",
-		)
-		return
-	}
-
-	if state.OrganizationSlug != plan.OrganizationSlug {
-		resp.Diagnostics.AddError(
-			"Unable to update project",
-			"Organization slug cannot be updated",
 		)
 		return
 	}
