@@ -150,6 +150,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewSecretDataSource,
+		NewProjectDataSource,
 	}
 }
 
@@ -157,5 +158,6 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewSecretResource,
+		NewProjectResource,
 	}
 }

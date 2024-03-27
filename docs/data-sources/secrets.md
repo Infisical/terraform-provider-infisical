@@ -3,12 +3,12 @@
 page_title: "infisical_secrets Data Source - terraform-provider-infisical"
 subcategory: ""
 description: |-
-  Get secrets from Infisical
+  Interact with Infisical secrets
 ---
 
 # infisical_secrets (Data Source)
 
-Get secrets from Infisical
+Interact with Infisical secrets
 
 ## Example Usage
 

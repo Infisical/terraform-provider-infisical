@@ -37,6 +37,48 @@ type EncryptedSecretV3 struct {
 	UpdatedAt               time.Time `json:"updatedAt"`
 }
 
+type Project struct {
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	Slug               string    `json:"slug"`
+	AutoCapitalization bool      `json:"autoCapitalization"`
+	OrgID              string    `json:"orgId"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
+	Version            int       `json:"version"`
+
+	UpgradeStatus string `json:"upgradeStatus"` // can be null. if its null it will be converted to an empty string.
+}
+
+type ProjectWithEnvironments struct {
+	ID                 string               `json:"id"`
+	Name               string               `json:"name"`
+	Slug               string               `json:"slug"`
+	AutoCapitalization bool                 `json:"autoCapitalization"`
+	OrgID              string               `json:"orgId"`
+	CreatedAt          string               `json:"createdAt"`
+	UpdatedAt          string               `json:"updatedAt"`
+	Version            int64                `json:"version"`
+	UpgradeStatus      string               `json:"upgradeStatus"`
+	Environments       []ProjectEnvironment `json:"environments"`
+}
+
+type ProjectEnvironment struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	ID   string `json:"id"`
+}
+
+type CreateProjectResponse struct {
+	Project Project `json:"project"`
+}
+
+type DeleteProjectResponse struct {
+	Project Project `json:"workspace"`
+}
+
+type UpdateProjectResponse Project
+
 type GetEncryptedSecretsV3Response struct {
 	Secrets []EncryptedSecretV3 `json:"secrets"`
 }
@@ -231,4 +273,23 @@ type UpdateRawSecretByNameV3Request struct {
 	Type        string `json:"type"`
 	SecretPath  string `json:"secretPath"`
 	SecretValue string `json:"secretValue"`
+}
+
+type CreateProjectRequest struct {
+	ProjectName      string `json:"projectName"`
+	Slug             string `json:"slug"`
+	OrganizationSlug string `json:"organizationSlug"`
+}
+
+type DeleteProjectRequest struct {
+	Slug string `json:"slug"`
+}
+
+type GetProjectRequest struct {
+	Slug string `json:"slug"`
+}
+
+type UpdateProjectRequest struct {
+	Slug        string `json:"slug"`
+	ProjectName string `json:"name"`
 }
