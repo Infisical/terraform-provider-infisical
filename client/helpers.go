@@ -50,9 +50,6 @@ func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Respo
 		}
 
 		value_ciphertext, _ := base64.StdEncoding.DecodeString(secret.SecretValueCiphertext)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode secret cipher text for secret key")
-		}
 
 		plainTextValue, err := DecryptSymmetric(key, value_ciphertext, value_tag, value_iv)
 		if err != nil {
@@ -71,9 +68,6 @@ func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Respo
 		}
 
 		comment_ciphertext, _ := base64.StdEncoding.DecodeString(secret.SecretCommentCiphertext)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode secret cipher text for secret key")
-		}
 
 		plainTextComment, err := DecryptSymmetric(key, comment_ciphertext, comment_tag, comment_iv)
 		if err != nil {

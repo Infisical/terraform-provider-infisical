@@ -1,6 +1,8 @@
 package infisicalclient
 
-import "time"
+import (
+	"time"
+)
 
 type GetEncryptedSecretsV3Request struct {
 	Environment string `json:"environment"`
@@ -63,6 +65,14 @@ type ProjectWithEnvironments struct {
 	Environments       []ProjectEnvironment `json:"environments"`
 }
 
+type ProjectMemberships struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	UserID    string    `json:"userId"`
+	ProjectID string    `json:"projectId"`
+}
+
 type ProjectEnvironment struct {
 	Name string `json:"name"`
 	Slug string `json:"slug"`
@@ -71,6 +81,10 @@ type ProjectEnvironment struct {
 
 type CreateProjectResponse struct {
 	Project Project `json:"project"`
+}
+
+type InviteUsersToProjectResponse struct {
+	Members []ProjectMemberships
 }
 
 type DeleteProjectResponse struct {
@@ -292,4 +306,9 @@ type GetProjectRequest struct {
 type UpdateProjectRequest struct {
 	Slug        string `json:"slug"`
 	ProjectName string `json:"name"`
+}
+
+type InviteUsersToProjectRequest struct {
+	ProjectID string   `json:"projectId"`
+	Usernames []string `json:"usernames"`
 }

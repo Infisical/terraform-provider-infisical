@@ -354,7 +354,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			return
 		}
 
-		value_ciphertext, _ := base64.StdEncoding.DecodeString(response.Secret.SecretValueCiphertext)
+		value_ciphertext, err := base64.StdEncoding.DecodeString(response.Secret.SecretValueCiphertext)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Infisical secret",
@@ -482,14 +482,6 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			resp.Diagnostics.AddError(
 				"Error updating secret",
 				"Couldn't encrypt secret value, unexpected error: "+err.Error(),
-			)
-			return
-		}
-
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating secret",
-				"Couldn't encrypt secret key, unexpected error: "+err.Error(),
 			)
 			return
 		}

@@ -297,6 +297,26 @@ func (client Client) CallCreateProject(request CreateProjectRequest) (CreateProj
 	return projectResponse, nil
 }
 
+func (client Client) CallInviteUsersToProject(request InviteUsersToProjectRequest) ([]ProjectMemberships, error) {
+	var inviteUsersToProjectResponse InviteUsersToProjectResponse 
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&inviteUsersToProjectResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post(fmt.Sprintf("api/v2/workspace/%s/memberships",request.ProjectID))
+
+	if err != nil {
+		return nil, fmt.Errorf("CallInviteUsersToProject: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return nil, fmt.Errorf("InviteUsersToProjectRequest: Unsuccessful response. [response=%s]", response)
+	}
+
+	return inviteUsersToProjectResponse.Members, nil
+}
+
 func (client Client) CallDeleteProject(request DeleteProjectRequest) error {
 	var projectResponse DeleteProjectResponse
 	response, err := client.Config.HttpClient.
