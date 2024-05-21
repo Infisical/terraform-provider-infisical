@@ -52,6 +52,33 @@ type Project struct {
 	UpgradeStatus string `json:"upgradeStatus"` // can be null. if its null it will be converted to an empty string.
 }
 
+type ProjectUser struct {
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+	User   struct {
+		Email     string `json:"email"`
+		ID        string `json:"id"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		PublicKey string `json:"publicKey"`
+	} `json:"user"`
+	Roles []ProjectRole
+}
+
+type ProjectRole struct {
+	ID                       string    `json:"id"`
+	Role                     string    `json:"role"`
+	ProjectMembershipId      string    `json:"projectMembershipId"`
+	CustomRoleId             string    `json:"customRoleId"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
+}
+
 type ProjectWithEnvironments struct {
 	ID                 string               `json:"id"`
 	Name               string               `json:"name"`
@@ -311,4 +338,59 @@ type UpdateProjectRequest struct {
 type InviteUsersToProjectRequest struct {
 	ProjectID string   `json:"projectId"`
 	Usernames []string `json:"usernames"`
+}
+
+type CreateProjectUserRequest struct {
+	ProjectID string   `json:"projectId"`
+	Username  []string `json:"usernames"`
+}
+
+type CreateProjectUserResponse struct {
+	Memberships []CreateProjectUserResponseMembers `json:"memberships"`
+}
+
+type CreateProjectUserResponseMembers struct {
+	ID     string `json:"id"`
+	UserId string `json:"userId"`
+}
+
+type GetProjectUserByUserNameRequest struct {
+	ProjectID string `json:"projectId"`
+	Username  string `json:"username"`
+}
+
+type GetProjectUserByUserNameResponse struct {
+	Membership ProjectUser `json:"membership"`
+}
+
+type UpdateProjectUserRequest struct {
+	ProjectID    string                          `json:"projectId"`
+	MembershipID string                          `json:"membershipId"`
+	Roles        []UpdateProjectUserRequestRoles `json:"roles"`
+}
+
+type UpdateProjectUserRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type UpdateProjectUserResponse struct {
+	Roles []ProjectRole `json:"roles"`
+}
+
+type DeleteProjectUserRequest struct {
+	ProjectID string   `json:"projectId"`
+	Username  []string `json:"usernames"`
+}
+
+type DeleteProjectUserResponse struct {
+	Memberships []DeleteProjectUserResponseMembers `json:"memberships"`
+}
+
+type DeleteProjectUserResponseMembers struct {
+	ID     string `json:"id"`
+	UserId string `json:"userId"`
 }
