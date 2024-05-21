@@ -160,5 +160,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		NewSecretResource,
 		NewProjectResource,
 		NewProjectUserResource,
+		NewProjectIdentityResource,
 	}
 }

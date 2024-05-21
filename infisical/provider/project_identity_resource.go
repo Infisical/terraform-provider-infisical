@@ -17,38 +17,35 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &ProjectUserResource{}
+	_ resource.Resource = &ProjectIdentityResource{}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
-func NewProjectUserResource() resource.Resource {
-	return &ProjectUserResource{}
+func NewProjectIdentityResource() resource.Resource {
+	return &ProjectIdentityResource{}
 }
 
-// ProjectUserResource is the resource implementation.
-type ProjectUserResource struct {
+// ProjectIdentityResource is the resource implementation.
+type ProjectIdentityResource struct {
 	client *infisical.Client
 }
 
 // projectResourceSourceModel describes the data source data model.
-type ProjectUserResourceModel struct {
-	ProjectID    types.String      `tfsdk:"project_id"`
-	Username     types.String      `tfsdk:"username"`
-	User         types.Object      `tfsdk:"user"`
-	Roles        []ProjectUserRole `tfsdk:"roles"`
-	MembershipId types.String      `tfsdk:"membership_id"`
+type ProjectIdentityResourceModel struct {
+	ProjectID    types.String          `tfsdk:"project_id"`
+	IdentityID   types.String          `tfsdk:"identity_id"`
+	Identity     types.Object          `tfsdk:"identity"`
+	Roles        []ProjectIdentityRole `tfsdk:"roles"`
+	MembershipId types.String          `tfsdk:"membership_id"`
 }
 
-type ProjectUserPersonalDetails struct {
-	ID        types.String `tfsdk:"id"`
-	Email     types.String `tfsdk:"email"`
-	FirstName types.String `tfsdk:"first_name"`
-	LastName  types.String `tfsdk:"last_name"`
+type ProjectIdentityDetails struct {
+	ID         types.String `tfsdk:"id"`
+	Name       types.String `tfsdk:"name"`
+	AuthMethod types.String `tfsdk:"auth_method"`
 }
 
-const TEMPORARY_MODE_RELATIVE = "relative"
-
-type ProjectUserRole struct {
+type ProjectIdentityRole struct {
 	ID                      types.String `tfsdk:"id"`
 	RoleSlug                types.String `tfsdk:"role_slug"`
 	CustomRoleID            types.String `tfsdk:"custom_role_id"`
@@ -60,12 +57,12 @@ type ProjectUserRole struct {
 }
 
 // Metadata returns the resource type name.
-func (r *ProjectUserResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_project_user"
+func (r *ProjectIdentityResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_project_identity"
 }
 
 // Schema defines the schema for the resource.
-func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Create projects & save to Infisical. Only Machine Identity authentication is supported for this data source",
 		Attributes: map[string]schema.Attribute{
@@ -73,44 +70,41 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The id of the project",
 				Required:    true,
 			},
-			"username": schema.StringAttribute{
-				Description: "The usename of the user. By default its the email",
+			"identity_id": schema.StringAttribute{
+				Description: "The id of the identity.",
 				Required:    true,
 			},
 			"membership_id": schema.StringAttribute{
-				Description:   "The membershipId of the project user",
+				Description:   "The membershipId of the project identity",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"user": schema.SingleNestedAttribute{
+			"identity": schema.SingleNestedAttribute{
 				Computed:    true,
-				Description: "The user details of the project user",
+				Description: "The identity details of the project identity",
 				Attributes: map[string]schema.Attribute{
-					"email": schema.StringAttribute{
-						Description: "The email of the user",
-						Computed:    true,
-					},
-					"first_name": schema.StringAttribute{
-						Description: "The first name of the user",
-						Computed:    true,
-					},
-					"last_name": schema.StringAttribute{
-						Description: "The last name of the user",
-						Computed:    true,
-					},
 					"id": schema.StringAttribute{
-						Description: "The id of the user",
+						Description:   "The ID of the identity",
+						Computed:      true,
+						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+					},
+					"name": schema.StringAttribute{
+						Description: "The name of the identity",
+						Computed:    true,
+					},
+					"auth_method": schema.StringAttribute{
+						Description: "The auth method for the identity",
 						Computed:    true,
 					},
 				},
 			},
 			"roles": schema.ListNestedAttribute{
 				Required:    true,
-				Description: "The roles assigned to the project user",
+				Description: "The roles assigned to the project identity",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Description: "The ID of the project user role.",
+							Description: "The ID of the project identity role.",
 							Computed:    true,
 						},
 						"role_slug": schema.StringAttribute{
@@ -156,7 +150,7 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *ProjectUserResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *ProjectIdentityResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -176,24 +170,24 @@ func (r *ProjectUserResource) Configure(_ context.Context, req resource.Configur
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		resp.Diagnostics.AddError(
-			"Unable to create project user",
+			"Unable to create project identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan ProjectUserResourceModel
+	var plan ProjectIdentityResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var roles []infisical.UpdateProjectUserRequestRoles
+	var roles []infisical.CreateProjectIdentityRequestRoles
 	var hasAtleastOnePermanentRole bool
 	for _, el := range plan.Roles {
 		isTemporary := el.IsTemporary.ValueBool()
@@ -225,7 +219,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 			temporaryRange = "1h"
 		}
 
-		roles = append(roles, infisical.UpdateProjectUserRequestRoles{
+		roles = append(roles, infisical.CreateProjectIdentityRequestRoles{
 			Role:                     el.RoleSlug.ValueString(),
 			IsTemporary:              isTemporary,
 			TemporaryMode:            temporaryMode,
@@ -234,50 +228,38 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		})
 	}
 	if !hasAtleastOnePermanentRole {
-		resp.Diagnostics.AddError("Error assigning role to user", "Must have atleast one permanent role")
+		resp.Diagnostics.AddError("Error assigning role to identity", "Must have atleast one permanent role")
 		return
 	}
 
-	_, err := r.client.CallInviteUsersToProject(infisical.InviteUsersToProjectRequest{
-		ProjectID: plan.ProjectID.ValueString(),
-		Usernames: []string{plan.Username.ValueString()},
+	_, err := r.client.CallCreateProjectIdentity(infisical.CreateProjectIdentityRequest{
+		ProjectID:  plan.ProjectID.ValueString(),
+		IdentityID: plan.IdentityID.ValueString(),
+		Roles:      roles,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error inviting user",
+			"Error attaching identity to project",
 			"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
 		)
 		return
 	}
 
-	projectUserDetails, err := r.client.CallGetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
-		ProjectID: plan.ProjectID.ValueString(),
-		Username:  plan.Username.ValueString(),
+	projectIdentityDetails, err := r.client.CallGetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
+		ProjectID:  plan.ProjectID.ValueString(),
+		IdentityID: plan.IdentityID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error fetching user",
-			"Couldn't find user in project, unexpected error: "+err.Error(),
+			"Error fetching identity",
+			"Couldn't find identity in project, unexpected error: "+err.Error(),
 		)
 		return
 	}
 
-	updatedRoles, err := r.client.CallUpdateProjectUser(infisical.UpdateProjectUserRequest{
-		ProjectID:    plan.ProjectID.ValueString(),
-		MembershipID: projectUserDetails.Membership.ID,
-		Roles:        roles,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to user",
-			"Couldn't update role , unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	planRoles := make([]ProjectUserRole, 0, len(updatedRoles.Roles))
-	for _, el := range updatedRoles.Roles {
-		val := ProjectUserRole{
+	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	for _, el := range projectIdentityDetails.Membership.Roles {
+		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
 			RoleSlug:                types.StringValue(el.Role),
 			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
@@ -296,20 +278,19 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		planRoles = append(planRoles, val)
 	}
 	plan.Roles = planRoles
-	plan.MembershipId = types.StringValue(projectUserDetails.Membership.ID)
+	plan.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	userPersonalDetails := ProjectUserPersonalDetails{
-		Email:     types.StringValue(projectUserDetails.Membership.User.Email),
-		FirstName: types.StringValue(projectUserDetails.Membership.User.FirstName),
-		LastName:  types.StringValue(projectUserDetails.Membership.User.LastName),
-		ID:        types.StringValue(projectUserDetails.Membership.User.ID),
+	identityDetails := ProjectIdentityDetails{
+		ID:         types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name:       types.StringValue(projectIdentityDetails.Membership.Identity.Name),
+		AuthMethod: types.StringValue(projectIdentityDetails.Membership.Identity.AuthMethod),
 	}
-	diags = resp.State.SetAttribute(ctx, path.Root("user"), userPersonalDetails)
+	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -318,38 +299,37 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		resp.Diagnostics.AddError(
-			"Unable to read project user",
+			"Unable to read project identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Get current state
-	var state ProjectUserResourceModel
+	var state ProjectIdentityResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	projectUserDetails, err := r.client.CallGetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
-		ProjectID: state.ProjectID.ValueString(),
-		Username:  state.Username.ValueString(),
+	projectIdentityDetails, err := r.client.CallGetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
+		ProjectID:  state.ProjectID.ValueString(),
+		IdentityID: state.IdentityID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error fetching user",
-			"Couldn't find user in project, unexpected error: "+err.Error(),
+			"Error fetching identity",
+			"Couldn't find identity in project, unexpected error: "+err.Error(),
 		)
 		return
 	}
-
-	planRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
-	for _, el := range projectUserDetails.Membership.Roles {
-		val := ProjectUserRole{
+	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	for _, el := range projectIdentityDetails.Membership.Roles {
+		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
 			RoleSlug:                types.StringValue(el.Role),
 			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
@@ -375,13 +355,12 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	userPersonalDetails := ProjectUserPersonalDetails{
-		Email:     types.StringValue(projectUserDetails.Membership.User.Email),
-		FirstName: types.StringValue(projectUserDetails.Membership.User.FirstName),
-		LastName:  types.StringValue(projectUserDetails.Membership.User.LastName),
-		ID:        types.StringValue(projectUserDetails.Membership.User.ID),
+	identityDetails := ProjectIdentityDetails{
+		ID:         types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name:       types.StringValue(projectIdentityDetails.Membership.Identity.Name),
+		AuthMethod: types.StringValue(projectIdentityDetails.Membership.Identity.AuthMethod),
 	}
-	diags = resp.State.SetAttribute(ctx, path.Root("user"), userPersonalDetails)
+	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -390,39 +369,39 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		resp.Diagnostics.AddError(
-			"Unable to update project user",
+			"Unable to update project identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan ProjectUserResourceModel
+	var plan ProjectIdentityResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state ProjectUserResourceModel
+	var state ProjectIdentityResourceModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if state.Username != plan.Username {
+	if state.IdentityID != plan.IdentityID {
 		resp.Diagnostics.AddError(
-			"Unable to update project user",
-			fmt.Sprintf("Cannot change username, previous username: %s, new username: %s", state.Username, plan.Username),
+			"Unable to update project identity",
+			fmt.Sprintf("Cannot change identity id, previous identity: %s, new identity id: %s", state.IdentityID, plan.IdentityID),
 		)
 		return
 	}
 
-	var roles []infisical.UpdateProjectUserRequestRoles
+	var roles []infisical.UpdateProjectIdentityRequestRoles
 	var hasAtleastOnePermanentRole bool
 	for _, el := range plan.Roles {
 		isTemporary := el.IsTemporary.ValueBool()
@@ -454,7 +433,7 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 			temporaryRange = "1h"
 		}
 
-		roles = append(roles, infisical.UpdateProjectUserRequestRoles{
+		roles = append(roles, infisical.UpdateProjectIdentityRequestRoles{
 			Role:                     el.RoleSlug.ValueString(),
 			IsTemporary:              isTemporary,
 			TemporaryMode:            temporaryMode,
@@ -464,38 +443,38 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	if !hasAtleastOnePermanentRole {
-		resp.Diagnostics.AddError("Error assigning role to user", "Must have atleast one permanent role")
+		resp.Diagnostics.AddError("Error assigning role to identity", "Must have atleast one permanent role")
 		return
 	}
 
-	projectUserDetails, err := r.client.CallGetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
-		ProjectID: plan.ProjectID.ValueString(),
-		Username:  plan.Username.ValueString(),
+	projectIdentityDetails, err := r.client.CallGetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
+		ProjectID:  plan.ProjectID.ValueString(),
+		IdentityID: plan.IdentityID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error fetching user",
-			"Couldn't find user in project, unexpected error: "+err.Error(),
+			"Error fetching identity",
+			"Couldn't find identity in project, unexpected error: "+err.Error(),
 		)
 		return
 	}
 
-	updatedRoles, err := r.client.CallUpdateProjectUser(infisical.UpdateProjectUserRequest{
-		ProjectID:    plan.ProjectID.ValueString(),
-		MembershipID: projectUserDetails.Membership.ID,
-		Roles:        roles,
+	updatedRoles, err := r.client.CallUpdateProjectIdentity(infisical.UpdateProjectIdentityRequest{
+		ProjectID:  plan.ProjectID.ValueString(),
+		IdentityID: projectIdentityDetails.Membership.Identity.Id,
+		Roles:      roles,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error assigning roles to user",
+			"Error assigning roles to identity",
 			"Couldn't update role , unexpected error: "+err.Error(),
 		)
 		return
 	}
 
-	planRoles := make([]ProjectUserRole, 0, len(updatedRoles.Roles))
+	planRoles := make([]ProjectIdentityRole, 0, len(updatedRoles.Roles))
 	for _, el := range updatedRoles.Roles {
-		val := ProjectUserRole{
+		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
 			RoleSlug:                types.StringValue(el.Role),
 			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
@@ -520,13 +499,12 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	userPersonalDetails := ProjectUserPersonalDetails{
-		Email:     types.StringValue(projectUserDetails.Membership.User.Email),
-		FirstName: types.StringValue(projectUserDetails.Membership.User.FirstName),
-		LastName:  types.StringValue(projectUserDetails.Membership.User.LastName),
-		ID:        types.StringValue(projectUserDetails.Membership.User.ID),
+	identityDetails := ProjectIdentityDetails{
+		ID:         types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name:       types.StringValue(projectIdentityDetails.Membership.Identity.Name),
+		AuthMethod: types.StringValue(projectIdentityDetails.Membership.Identity.AuthMethod),
 	}
-	diags = resp.State.SetAttribute(ctx, path.Root("user"), userPersonalDetails)
+	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -534,32 +512,32 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *ProjectIdentityResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
 	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		resp.Diagnostics.AddError(
-			"Unable to delete project user",
+			"Unable to delete project identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var state ProjectUserResourceModel
+	var state ProjectIdentityResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err := r.client.CallDeleteProjectUser(infisical.DeleteProjectUserRequest{
-		ProjectID: state.ProjectID.ValueString(),
-		Username:  []string{state.Username.ValueString()},
+	_, err := r.client.CallDeleteProjectIdentity(infisical.DeleteProjectIdentityRequest{
+		ProjectID:  state.ProjectID.ValueString(),
+		IdentityID: state.IdentityID.ValueString(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting project user",
-			"Couldn't delete project user from Infiscial, unexpected error: "+err.Error(),
+			"Error deleting project identity",
+			"Couldn't delete project identity from Infiscial, unexpected error: "+err.Error(),
 		)
 		return
 	}

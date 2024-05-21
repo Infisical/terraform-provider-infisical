@@ -65,6 +65,17 @@ type ProjectUser struct {
 	Roles []ProjectRole
 }
 
+type ProjectIdentity struct {
+	ID         string `json:"id"`
+	IdentityID string `json:"identityId"`
+	Roles      []ProjectRole
+	Identity   struct {
+		Name       string `json:"name"`
+		Id         string `json:"id"`
+		AuthMethod string `json:"authMethod"`
+	} `json:"identity"`
+}
+
 type ProjectRole struct {
 	ID                       string    `json:"id"`
 	Role                     string    `json:"role"`
@@ -393,4 +404,69 @@ type DeleteProjectUserResponse struct {
 type DeleteProjectUserResponseMembers struct {
 	ID     string `json:"id"`
 	UserId string `json:"userId"`
+}
+
+// identity
+type CreateProjectIdentityRequest struct {
+	ProjectID  string                              `json:"projectId"`
+	IdentityID string                              `json:"identityId"`
+	Roles      []CreateProjectIdentityRequestRoles `json:"roles"`
+}
+
+type CreateProjectIdentityRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type CreateProjectIdentityResponse struct {
+	Membership CreateProjectIdentityResponseMembers `json:"identityMembership"`
+}
+
+type CreateProjectIdentityResponseMembers struct {
+	ID         string `json:"id"`
+	IdentityId string `json:"identityId"`
+}
+
+type GetProjectIdentityByIDRequest struct {
+	ProjectID  string `json:"projectId"`
+	IdentityID string `json:"identityId"`
+}
+
+type GetProjectIdentityByIDResponse struct {
+	Membership ProjectIdentity `json:"identityMembership"`
+}
+
+type UpdateProjectIdentityRequest struct {
+	ProjectID  string                              `json:"projectId"`
+	IdentityID string                              `json:"identityId"`
+	Roles      []UpdateProjectIdentityRequestRoles `json:"roles"`
+}
+
+type UpdateProjectIdentityRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type UpdateProjectIdentityResponse struct {
+	Roles []ProjectRole `json:"roles"`
+}
+
+type DeleteProjectIdentityRequest struct {
+	ProjectID  string `json:"projectId"`
+	IdentityID string `json:"identityId"`
+}
+
+type DeleteProjectIdentityResponse struct {
+	Membership DeleteProjectIdentityResponseIdentities `json:"identityMembership"`
+}
+
+type DeleteProjectIdentityResponseIdentities struct {
+	ID         string `json:"id"`
+	IdentityID string `json:"identityId"`
 }
