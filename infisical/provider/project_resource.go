@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -31,6 +32,7 @@ type projectResource struct {
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
 	Slug                  types.String `tfsdk:"slug"`
+	ID                    types.String `tfsdk:"id"`
 	Name                  types.String `tfsdk:"name"`
 	LastUpdated           types.String `tfsdk:"last_updated"`
 	InviteUsersByUsername types.List   `tfsdk:"invite_users_by_username"`
@@ -53,6 +55,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Description: "The name of the project",
 				Required:    true,
+			},
+			"id": schema.StringAttribute{
+				Description:   "The ID of the project",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"invite_users_by_username": schema.ListAttribute{
 				ElementType:   types.StringType,
@@ -149,6 +156,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	plan.Slug = types.StringValue(plan.Slug.ValueString())
 	plan.Name = types.StringValue(plan.Name.ValueString())
+	plan.ID = types.StringValue(newProject.Project.ID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
