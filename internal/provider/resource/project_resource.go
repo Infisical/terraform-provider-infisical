@@ -1,9 +1,9 @@
-package provider
+package resource
 
 import (
 	"context"
 	"fmt"
-	infisical "terraform-provider-infisical/client"
+	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -112,7 +112,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	newProject, err := r.client.CallCreateProject(infisical.CreateProjectRequest{
+	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
 		ProjectName: plan.Name.ValueString(),
 		Slug:        plan.Slug.ValueString(),
 	})
@@ -139,7 +139,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			}
 		}
 
-		_, err = r.client.CallInviteUsersToProject(infisical.InviteUsersToProjectRequest{
+		_, err = r.client.InviteUsersToProject(infisical.InviteUsersToProjectRequest{
 			ProjectID: newProject.Project.ID,
 			Usernames: userNames,
 		})
@@ -185,7 +185,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Get the latest data from the API
-	project, err := r.client.CallGetProject(infisical.GetProjectRequest{
+	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: state.Slug.ValueString(),
 	})
 
@@ -246,7 +246,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError("Unable to update project", "User invitation cannot be updated after project has been created.")
 	}
 
-	_, err := r.client.CallUpdateProject(infisical.UpdateProjectRequest{
+	_, err := r.client.UpdateProject(infisical.UpdateProjectRequest{
 		ProjectName: plan.Name.ValueString(),
 		Slug:        plan.Slug.ValueString(),
 	})
@@ -288,7 +288,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.CallDeleteProject(infisical.DeleteProjectRequest{
+	err := r.client.DeleteProject(infisical.DeleteProjectRequest{
 		Slug: state.Slug.ValueString(),
 	})
 

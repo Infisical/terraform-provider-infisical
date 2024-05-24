@@ -1,10 +1,11 @@
-package provider
+package resource 
 
 import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	infisical "terraform-provider-infisical/client"
+	infisical "terraform-provider-infisical/internal/client"
+	"terraform-provider-infisical/internal/crypto"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -113,7 +114,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 
-		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
+		serviceTokenDetails, err := r.client.GetServiceTokenDetailsV2()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -141,7 +142,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			return
 		}
 
-		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+		plainTextWorkspaceKey, err := crypto.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -151,7 +152,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		// encrypt key
-		encryptedKey, err := infisical.EncryptSymmetric([]byte(plan.Name.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedKey, err := crypto.EncryptSymmetric([]byte(plan.Name.ValueString()), []byte(plainTextWorkspaceKey))
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -161,7 +162,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		// encrypt value
-		encryptedValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedValue, err := crypto.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -170,7 +171,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			return
 		}
 
-		err = r.client.CallCreateSecretsV3(infisical.CreateSecretV3Request{
+		err = r.client.CreateSecretsV3(infisical.CreateSecretV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			SecretName:  plan.Name.ValueString(),
 			Type:        "shared",
@@ -197,7 +198,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		// Set state to fully populated data
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
-		err := r.client.CallCreateRawSecretsV3(infisical.CreateRawSecretV3Request{
+		err := r.client.CreateRawSecretsV3(infisical.CreateRawSecretV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			WorkspaceID: plan.WorkspaceId.ValueString(),
 			Type:        "shared",
@@ -244,7 +245,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 
-		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
+		serviceTokenDetails, err := r.client.GetServiceTokenDetailsV2()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -272,7 +273,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			return
 		}
 
-		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+		plainTextWorkspaceKey, err := crypto.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -282,7 +283,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		}
 
 		// Get refreshed order value from HashiCups
-		response, err := r.client.CallGetSingleSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
+		response, err := r.client.GetSingleSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
 			SecretName:  state.Name.ValueString(),
 			Type:        "shared",
 			WorkspaceId: state.WorkspaceId.ValueString(),
@@ -326,7 +327,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			return
 		}
 
-		plainTextKey, err := infisical.DecryptSymmetric(plainTextWorkspaceKey, key_ciphertext, key_tag, key_iv)
+		plainTextKey, err := crypto.DecryptSymmetric(plainTextWorkspaceKey, key_ciphertext, key_tag, key_iv)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Infisical secret",
@@ -363,7 +364,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			return
 		}
 
-		plainTextValue, err := infisical.DecryptSymmetric(plainTextWorkspaceKey, value_ciphertext, value_tag, value_iv)
+		plainTextValue, err := crypto.DecryptSymmetric(plainTextWorkspaceKey, value_ciphertext, value_tag, value_iv)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Infisical secret",
@@ -377,7 +378,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		// Get refreshed order value from HashiCups
-		response, err := r.client.CallGetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
+		response, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
 			SecretName:  state.Name.ValueString(),
 			Type:        "shared",
 			WorkspaceId: state.WorkspaceId.ValueString(),
@@ -439,7 +440,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 
-		serviceTokenDetails, err := r.client.CallGetServiceTokenDetailsV2()
+		serviceTokenDetails, err := r.client.GetServiceTokenDetailsV2()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating secret",
@@ -467,7 +468,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			return
 		}
 
-		plainTextWorkspaceKey, err := infisical.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+		plainTextWorkspaceKey, err := crypto.DecryptSymmetric([]byte(symmetricKeyFromServiceToken), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating secret",
@@ -477,7 +478,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 
 		// encrypt value
-		encryptedSecretValue, err := infisical.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedSecretValue, err := crypto.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating secret",
@@ -486,7 +487,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			return
 		}
 
-		err = r.client.CallUpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
+		err = r.client.UpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			SecretName:  plan.Name.ValueString(),
 			Type:        "shared",
@@ -510,7 +511,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 
 	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
-		err := r.client.CallUpdateRawSecretV3(infisical.UpdateRawSecretByNameV3Request{
+		err := r.client.UpdateRawSecretV3(infisical.UpdateRawSecretByNameV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			WorkspaceID: plan.WorkspaceId.ValueString(),
 			Type:        "shared",
@@ -560,7 +561,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 		// Delete existing order
-		err := r.client.CallDeleteSecretsV3(infisical.DeleteSecretV3Request{
+		err := r.client.DeleteSecretsV3(infisical.DeleteSecretV3Request{
 			SecretName:  state.Name.ValueString(),
 			SecretPath:  state.FolderPath.ValueString(),
 			Environment: state.EnvSlug.ValueString(),
@@ -576,7 +577,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			return
 		}
 	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
-		err := r.client.CallDeleteRawSecretV3(infisical.DeleteRawSecretV3Request{
+		err := r.client.DeleteRawSecretV3(infisical.DeleteRawSecretV3Request{
 			SecretName:  state.Name.ValueString(),
 			SecretPath:  state.FolderPath.ValueString(),
 			Environment: state.EnvSlug.ValueString(),

@@ -170,12 +170,6 @@ type SingleEnvironmentVariable struct {
 	Comment string `json:"comment"`
 }
 
-type SymmetricEncryptionResult struct {
-	CipherText []byte `json:"CipherText"`
-	Nonce      []byte `json:"Nonce"`
-	AuthTag    []byte `json:"AuthTag"`
-}
-
 // Workspace key request
 type GetEncryptedWorkspaceKeyRequest struct {
 	WorkspaceId string `json:"workspaceId"`

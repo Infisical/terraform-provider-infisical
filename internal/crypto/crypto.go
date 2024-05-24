@@ -1,4 +1,4 @@
-package infisicalclient
+package crypto
 
 import (
 	"crypto/aes"
