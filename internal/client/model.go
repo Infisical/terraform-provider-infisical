@@ -62,13 +62,13 @@ type ProjectUser struct {
 		LastName  string `json:"lastName"`
 		PublicKey string `json:"publicKey"`
 	} `json:"user"`
-	Roles []ProjectRole
+	Roles []ProjectMemberRole
 }
 
 type ProjectIdentity struct {
 	ID         string `json:"id"`
 	IdentityID string `json:"identityId"`
-	Roles      []ProjectRole
+	Roles      []ProjectMemberRole
 	Identity   struct {
 		Name       string `json:"name"`
 		Id         string `json:"id"`
@@ -76,7 +76,7 @@ type ProjectIdentity struct {
 	} `json:"identity"`
 }
 
-type ProjectRole struct {
+type ProjectMemberRole struct {
 	ID                       string    `json:"id"`
 	Role                     string    `json:"role"`
 	ProjectMembershipId      string    `json:"projectMembershipId"`
@@ -88,6 +88,14 @@ type ProjectRole struct {
 	TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
 	CreatedAt                time.Time `json:"createdAt"`
 	UpdatedAt                time.Time `json:"updatedAt"`
+}
+
+type ProjectRole struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// because permission can have multiple structure
+	Permissions []map[string]any
 }
 
 type ProjectWithEnvironments struct {
@@ -383,7 +391,7 @@ type UpdateProjectUserRequestRoles struct {
 }
 
 type UpdateProjectUserResponse struct {
-	Roles []ProjectRole `json:"roles"`
+	Roles []ProjectMemberRole `json:"roles"`
 }
 
 type DeleteProjectUserRequest struct {
@@ -448,7 +456,7 @@ type UpdateProjectIdentityRequestRoles struct {
 }
 
 type UpdateProjectIdentityResponse struct {
-	Roles []ProjectRole `json:"roles"`
+	Roles []ProjectMemberRole `json:"roles"`
 }
 
 type DeleteProjectIdentityRequest struct {
@@ -463,4 +471,53 @@ type DeleteProjectIdentityResponse struct {
 type DeleteProjectIdentityResponseIdentities struct {
 	ID         string `json:"id"`
 	IdentityID string `json:"identityId"`
+}
+
+type CreateProjectRoleRequest struct {
+	ProjectSlug string                         `json:"projectSlug"`
+	Slug        string                         `json:"slug"`
+	Name        string                         `json:"name"`
+	Description string                         `json:"description"`
+	Permissions []ProjectRolePermissionRequest `json:"permissions"`
+}
+
+type CreateProjectRoleResponse struct {
+	Role ProjectRole `json:"role"`
+}
+
+type UpdateProjectRoleRequest struct {
+	ProjectSlug string                         `json:"projectSlug"`
+	RoleId      string                         `json:"roleId"`
+	Slug        string                         `json:"slug"`
+	Name        string                         `json:"name"`
+	Description string                         `json:"description"`
+	Permissions []ProjectRolePermissionRequest `json:"permissions"`
+}
+
+type UpdateProjectRoleResponse struct {
+	Role ProjectRole `json:"role"`
+}
+
+type DeleteProjectRoleRequest struct {
+	ProjectSlug string `json:"projectSlug"`
+	RoleId      string `json:"roleId"`
+}
+
+type DeleteProjectRoleResponse struct {
+	Role ProjectRole `json:"role"`
+}
+
+type GetProjectRoleBySlugRequest struct {
+	ProjectSlug string `json:"projectSlug"`
+	RoleSlug    string `json:"roleSlug"`
+}
+
+type GetProjectRoleBySlugResponse struct {
+	Role ProjectRole `json:"role"`
+}
+
+type ProjectRolePermissionRequest struct {
+	Action     string         `json:"action"`
+	Subject    string         `json:"subject"`
+	Conditions map[string]any `json:"conditions,omitempty"`
 }
