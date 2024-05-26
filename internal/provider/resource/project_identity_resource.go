@@ -64,7 +64,7 @@ func (r *ProjectIdentityResource) Metadata(_ context.Context, req resource.Metad
 // Schema defines the schema for the resource.
 func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create projects & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "Create project identities & save to Infisical. Only Machine Identity authentication is supported for this data source",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Description: "The id of the project",
@@ -75,7 +75,7 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required:    true,
 			},
 			"membership_id": schema.StringAttribute{
-				Description:   "The membershipId of the project identity",
+				Description:   "The membership Id of the project identity",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -240,7 +240,7 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching identity to project",
-			"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create project identity to Infiscial, unexpected error: "+err.Error(),
 		)
 		return
 	}

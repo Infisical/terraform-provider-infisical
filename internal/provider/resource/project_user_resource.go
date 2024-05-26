@@ -67,7 +67,7 @@ func (r *ProjectUserResource) Metadata(_ context.Context, req resource.MetadataR
 // Schema defines the schema for the resource.
 func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create projects & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Description: "The id of the project",
@@ -245,7 +245,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error inviting user",
-			"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create project user to Infiscial, unexpected error: "+err.Error(),
 		)
 		return
 	}
