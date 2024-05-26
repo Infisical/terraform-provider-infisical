@@ -90,6 +90,21 @@ type ProjectMemberRole struct {
 	UpdatedAt                time.Time `json:"updatedAt"`
 }
 
+type ProjectIdentitySpecificPrivilege struct {
+	ID                       string    `json:"id"`
+	Slug                     string    `json:"slug"`
+	ProjectMembershipId      string    `json:"projectMembershipId"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+	// because permission can have multiple structure
+	Permissions []map[string]any
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
 type ProjectRole struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -520,4 +535,71 @@ type ProjectRolePermissionRequest struct {
 	Action     string         `json:"action"`
 	Subject    string         `json:"subject"`
 	Conditions map[string]any `json:"conditions,omitempty"`
+}
+
+type ProjectSpecificPrivilegePermissionRequest struct {
+	Actions    []string       `json:"actions"`
+	Subject    string         `json:"subject"`
+	Conditions map[string]any `json:"conditions,omitempty"`
+}
+
+type CreatePermanentProjectIdentitySpecificPrivilegeRequest struct {
+	ProjectSlug string                                    `json:"projectSlug"`
+	IdentityId  string                                    `json:"identityId"`
+	Slug        string                                    `json:"slug,omitempty"`
+	Permissions ProjectSpecificPrivilegePermissionRequest `json:"privilegePermission"`
+}
+
+type CreateTemporaryProjectIdentitySpecificPrivilegeRequest struct {
+	ProjectSlug              string                                    `json:"projectSlug"`
+	IdentityId               string                                    `json:"identityId"`
+	Slug                     string                                    `json:"slug,omitempty"`
+	Permissions              ProjectSpecificPrivilegePermissionRequest `json:"privilegePermission"`
+	TemporaryMode            string                                    `json:"temporaryMode"`
+	TemporaryRange           string                                    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time                                 `json:"temporaryAccessStartTime"`
+}
+
+type CreateProjectIdentitySpecificPrivilegeResponse struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type UpdateProjectIdentitySpecificPrivilegeRequest struct {
+	ProjectSlug   string                                            `json:"projectSlug"`
+	IdentityId    string                                            `json:"identityId"`
+	PrivilegeSlug string                                            `json:"privilegeSlug,omitempty"`
+	Details       UpdateProjectIdentitySpecificPrivilegeDataRequest `json:"privilegeDetails"`
+}
+
+type UpdateProjectIdentitySpecificPrivilegeDataRequest struct {
+	Slug                     string                                    `json:"slug,omitempty"`
+	Permissions              ProjectSpecificPrivilegePermissionRequest `json:"privilegePermission"`
+	IsTemporary              bool                                      `json:"isTemporary"`
+	TemporaryMode            string                                    `json:"temporaryMode,omitempty"`
+	TemporaryRange           string                                    `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime time.Time                                 `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type UpdateProjectIdentitySpecificPrivilegeResponse struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type DeleteProjectIdentitySpecificPrivilegeRequest struct {
+	ProjectSlug   string `json:"projectSlug"`
+	IdentityId    string `json:"identityId"`
+	PrivilegeSlug string `json:"privilegeSlug,omitempty"`
+}
+
+type DeleteProjectIdentitySpecificPrivilegeResponse struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type GetProjectIdentitySpecificPrivilegeRequest struct {
+	ProjectSlug   string `json:"projectSlug"`
+	IdentityId    string `json:"identityId"`
+	PrivilegeSlug string `json:"privilegeSlug,omitempty"`
+}
+
+type GetProjectIdentitySpecificPrivilegeResponse struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
 }
