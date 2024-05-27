@@ -19,7 +19,7 @@ resource "infisical_project" "example" {
 }
 
 resource "infisical_project_identity" "test-identity" {
-  project_id = infisical_project.example.id
+  project_id  = infisical_project.example.id
   identity_id = "<identity id>"
   roles = [
     {
