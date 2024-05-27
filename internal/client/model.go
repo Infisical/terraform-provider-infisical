@@ -99,7 +99,7 @@ type ProjectIdentitySpecificPrivilege struct {
 	TemporaryRange           string    `json:"temporaryRange"`
 	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
 	TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
-	// because permission can have multiple structure
+	// because permission can have multiple structure.
 	Permissions []map[string]any
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
@@ -109,7 +109,7 @@ type ProjectRole struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	// because permission can have multiple structure
+	// because permission can have multiple structure.
 	Permissions []map[string]any
 }
 
@@ -193,12 +193,12 @@ type SingleEnvironmentVariable struct {
 	Comment string `json:"comment"`
 }
 
-// Workspace key request
+// Workspace key request.
 type GetEncryptedWorkspaceKeyRequest struct {
 	WorkspaceId string `json:"workspaceId"`
 }
 
-// Workspace key response
+// Workspace key response.
 type GetEncryptedWorkspaceKeyResponse struct {
 	ID           string `json:"_id"`
 	EncryptedKey string `json:"encryptedKey"`
@@ -221,7 +221,7 @@ type GetEncryptedWorkspaceKeyResponse struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// encrypted secret
+// encrypted secret.
 type EncryptedSecret struct {
 	SecretName              string `json:"secretName"`
 	WorkspaceID             string `json:"workspaceId"`
@@ -239,7 +239,7 @@ type EncryptedSecret struct {
 	SecretPath              string `json:"secretPath"`
 }
 
-// create secrets
+// create secrets.
 type CreateSecretV3Request struct {
 	SecretName              string `json:"secretName"`
 	WorkspaceID             string `json:"workspaceId"`
@@ -257,7 +257,7 @@ type CreateSecretV3Request struct {
 	SecretPath              string `json:"secretPath"`
 }
 
-// delete secret by name api
+// delete secret by name api.
 type DeleteSecretV3Request struct {
 	SecretName  string `json:"secretName"`
 	WorkspaceId string `json:"workspaceId"`
@@ -266,7 +266,7 @@ type DeleteSecretV3Request struct {
 	SecretPath  string `json:"secretPath"`
 }
 
-// update secret by name api
+// update secret by name api.
 type UpdateSecretByNameV3Request struct {
 	SecretName            string `json:"secretName"`
 	WorkspaceID           string `json:"workspaceId"`
@@ -278,7 +278,7 @@ type UpdateSecretByNameV3Request struct {
 	SecretValueTag        string `json:"secretValueTag"`
 }
 
-// get secret by name api
+// get secret by name api.
 type GetSingleSecretByNameV3Request struct {
 	SecretName  string `json:"secretName"`
 	WorkspaceId string `json:"workspaceId"`
@@ -315,7 +315,7 @@ type GetSingleRawSecretByNameSecretResponse struct {
 	Secret RawV3Secret `json:"secret"`
 }
 
-// create secrets
+// create secrets.
 type CreateRawSecretV3Request struct {
 	WorkspaceID   string `json:"workspaceId"`
 	Type          string `json:"type"`
@@ -334,7 +334,7 @@ type DeleteRawSecretV3Request struct {
 	SecretPath  string `json:"secretPath"`
 }
 
-// update secret by name api
+// update secret by name api.
 type UpdateRawSecretByNameV3Request struct {
 	SecretName  string `json:"secretName"`
 	WorkspaceID string `json:"workspaceId"`
@@ -423,7 +423,7 @@ type DeleteProjectUserResponseMembers struct {
 	UserId string `json:"userId"`
 }
 
-// identity
+// identity.
 type CreateProjectIdentityRequest struct {
 	ProjectID  string                              `json:"projectId"`
 	IdentityID string                              `json:"identityId"`

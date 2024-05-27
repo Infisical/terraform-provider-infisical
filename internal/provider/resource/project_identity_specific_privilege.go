@@ -100,7 +100,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 				Computed:    true,
 			},
 			"temporary_range": schema.StringAttribute{
-				Description: "TTL for the temporay time. Eg: 1m, 1h, 1d",
+				Description: "TTL for the temporary time. Eg: 1m, 1h, 1d",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -340,20 +340,59 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 	for _, el := range projectIdentitySpecificPrivilegeResource.Privilege.Permissions {
 		action, isValid := el["action"].(string)
 		if el["action"] != nil && !isValid {
-			action = el["action"].([]any)[0].(string)
+			action, isValid = el["action"].([]any)[0].(string)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project identity specific privilege",
+					"Couldn't read project identity specific privilege from Infiscial, invalid action field in permission",
+				)
+				return
+			}
 		}
 
 		subject, isValid := el["subject"].(string)
 		if el["subject"] != nil && !isValid {
-			subject = el["subject"].([]any)[0].(string)
+			subject, isValid = el["subject"].([]any)[0].(string)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project identity specific privilege",
+					"Couldn't read project identity specific privilege from Infiscial, invalid subject field in permission",
+				)
+				return
+			}
 		}
 
-		conditions := el["conditions"].(map[string]any)
+		conditions, isValid := el["conditions"].(map[string]any)
+		if !isValid {
+			resp.Diagnostics.AddError(
+				"Error reading project identity specific privilege",
+				"Couldn't read project identity specific privilege from Infiscial, invalid conditions field in permission",
+			)
+			return
+		}
+
 		planPermissionActions = append(planPermissionActions, types.StringValue(action))
-		planPermissionEnvironment = types.StringValue(conditions["environment"].(string))
+		environment, isValid := conditions["environment"].(string)
+		if !isValid {
+			resp.Diagnostics.AddError(
+				"Error reading project identity specific privilege",
+				"Couldn't read project identity specific privilege from Infiscial, invalid environment field in permission",
+			)
+			return
+		}
+		planPermissionEnvironment = types.StringValue(environment)
+
 		planPermissionSubject = types.StringValue(subject)
 		if val, isValid := conditions["secretPath"].(map[string]any); isValid {
-			planPermissionSecretPath = types.StringValue(val["$glob"].(string))
+			secretPath, isValid := val["$glob"].(string)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project identity specific privilege",
+					"Couldn't read project identity specific privilege from Infiscial, invalid secret path field in permission",
+				)
+				return
+			}
+			planPermissionSecretPath = types.StringValue(secretPath)
 		}
 	}
 

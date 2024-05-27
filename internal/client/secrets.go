@@ -228,7 +228,6 @@ func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3R
 	return secretsResponse, nil
 }
 
-
 func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string, envSlug string) ([]SingleEnvironmentVariable, *GetServiceTokenDetailsResponse, error) {
 	if client.Config.ServiceToken == "" {
 		return nil, nil, fmt.Errorf("service token must be defined to fetch secrets")
@@ -301,7 +300,6 @@ func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, work
 
 }
 
-
 func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Response) ([]SingleEnvironmentVariable, error) {
 	plainTextSecrets := []SingleEnvironmentVariable{}
 	for _, secret := range encryptedSecrets.Secrets {
@@ -365,7 +363,7 @@ func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Respo
 		plainTextSecret := SingleEnvironmentVariable{
 			Key:     string(plainTextKey),
 			Value:   string(plainTextValue),
-			Type:    string(secret.Type),
+			Type:    secret.Type,
 			ID:      secret.ID,
 			Tags:    secret.Tags,
 			Comment: string(plainTextComment),

@@ -1,4 +1,4 @@
-package resource 
+package resource
 
 import (
 	"context"
@@ -152,7 +152,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		// encrypt key
-		encryptedKey, err := crypto.EncryptSymmetric([]byte(plan.Name.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedKey, err := crypto.EncryptSymmetric([]byte(plan.Name.ValueString()), plainTextWorkspaceKey)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -162,7 +162,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		// encrypt value
-		encryptedValue, err := crypto.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedValue, err := crypto.EncryptSymmetric([]byte(plan.Value.ValueString()), plainTextWorkspaceKey)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating secret",
@@ -478,7 +478,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 
 		// encrypt value
-		encryptedSecretValue, err := crypto.EncryptSymmetric([]byte(plan.Value.ValueString()), []byte(plainTextWorkspaceKey))
+		encryptedSecretValue, err := crypto.EncryptSymmetric([]byte(plan.Value.ValueString()), plainTextWorkspaceKey)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating secret",

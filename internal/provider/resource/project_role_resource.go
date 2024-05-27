@@ -244,19 +244,57 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 	for _, el := range projectRole.Role.Permissions {
 		action, isValid := el["action"].(string)
 		if el["action"] != nil && !isValid {
-			action = el["action"].([]any)[0].(string)
+			action, isValid = el["action"].([]any)[0].(string)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project role",
+					"Couldn't read project role from Infiscial, invalid action field in permission",
+				)
+				return
+			}
 		}
 
 		subject, isValid := el["subject"].(string)
 		if el["subject"] != nil && !isValid {
-			subject = el["subject"].([]any)[0].(string)
+			subject, isValid = el["subject"].([]any)[0].(string)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project role",
+					"Couldn't read project role from Infiscial, invalid subject field in permission",
+				)
+				return
+			}
 		}
 		var secretPath, environment string
 		if el["conditions"] != nil {
-			conditions := el["conditions"].(map[string]any)
-			environment = conditions["environment"].(string)
+			conditions, isValid := el["conditions"].(map[string]any)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project role",
+					"Couldn't read project role from Infiscial, invalid conditions field in permission",
+				)
+				return
+			}
+
+			environment, isValid = conditions["environment"].(string)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project role",
+					"Couldn't read project role from Infiscial, invalid environment field in permission",
+				)
+				return
+			}
+
+			// secret path parsing.
 			if val, isValid := conditions["secretPath"].(map[string]any); isValid {
-				secretPath = val["$glob"].(string)
+				secretPath, isValid = val["$glob"].(string)
+				if !isValid {
+					resp.Diagnostics.AddError(
+						"Error reading project role",
+						"Couldn't read project role from Infiscial, invalid secret path field in permission",
+					)
+					return
+				}
 			}
 		}
 
@@ -270,6 +308,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		})
 	}
 
+	state.Permissions = permissionPlan
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

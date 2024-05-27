@@ -1,4 +1,4 @@
-package resource 
+package resource
 
 import (
 	"context"
@@ -134,7 +134,7 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 							Computed:    true,
 						},
 						"temporary_range": schema.StringAttribute{
-							Description: "TTL for the temporay time. Eg: 1m, 1h, 1d",
+							Description: "TTL for the temporary time. Eg: 1m, 1h, 1d",
 							Optional:    true,
 							Computed:    true,
 						},
