@@ -73,7 +73,7 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
 - `temporary_access_end_time` (String) ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time
 - `temporary_access_start_time` (String) ISO time for which temporary access should begin.
 - `temporary_mode` (String) Type of temporary access given. Types: relative
-- `temporary_range` (String) TTL for the temporay time. Eg: 1m, 1h, 1d
+- `temporary_range` (String) TTL for the temporary time. Eg: 1m, 1h, 1d
 
 ### Read-Only
 
