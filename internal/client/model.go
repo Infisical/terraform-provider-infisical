@@ -79,6 +79,7 @@ type ProjectIdentity struct {
 type ProjectMemberRole struct {
 	ID                       string    `json:"id"`
 	Role                     string    `json:"role"`
+	CustomRoleSlug           string    `json:"customRoleSlug"`
 	ProjectMembershipId      string    `json:"projectMembershipId"`
 	CustomRoleId             string    `json:"customRoleId"`
 	IsTemporary              bool      `json:"isTemporary"`
@@ -145,7 +146,7 @@ type CreateProjectResponse struct {
 }
 
 type InviteUsersToProjectResponse struct {
-	Members []ProjectMemberships
+	Members []ProjectMemberships `json:"memberships"`
 }
 
 type DeleteProjectResponse struct {
@@ -406,7 +407,19 @@ type UpdateProjectUserRequestRoles struct {
 }
 
 type UpdateProjectUserResponse struct {
-	Roles []ProjectMemberRole `json:"roles"`
+	Roles []struct {
+		ID                       string    `json:"id"`
+		Role                     string    `json:"role"`
+		ProjectMembershipId      string    `json:"projectMembershipId"`
+		CustomRoleId             string    `json:"customRoleId"`
+		IsTemporary              bool      `json:"isTemporary"`
+		TemporaryMode            string    `json:"temporaryMode"`
+		TemporaryRange           string    `json:"temporaryRange"`
+		TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+		TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+		CreatedAt                time.Time `json:"createdAt"`
+		UpdatedAt                time.Time `json:"updatedAt"`
+	} `json:"roles"`
 }
 
 type DeleteProjectUserRequest struct {
@@ -471,7 +484,19 @@ type UpdateProjectIdentityRequestRoles struct {
 }
 
 type UpdateProjectIdentityResponse struct {
-	Roles []ProjectMemberRole `json:"roles"`
+	Roles []struct {
+		ID                       string    `json:"id"`
+		Role                     string    `json:"role"`
+		ProjectMembershipId      string    `json:"projectMembershipId"`
+		CustomRoleId             string    `json:"customRoleId"`
+		IsTemporary              bool      `json:"isTemporary"`
+		TemporaryMode            string    `json:"temporaryMode"`
+		TemporaryRange           string    `json:"temporaryRange"`
+		TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+		TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+		CreatedAt                time.Time `json:"createdAt"`
+		UpdatedAt                time.Time `json:"updatedAt"`
+	} `json:"roles"`
 }
 
 type DeleteProjectIdentityRequest struct {

@@ -269,6 +269,10 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+		}
+
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
 			val.TemporaryRange = types.StringNull()
@@ -338,6 +342,9 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 			CustomRoleID:            types.StringValue(el.CustomRoleId),
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
@@ -447,6 +454,19 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
+	_, err := r.client.UpdateProjectIdentity(infisical.UpdateProjectIdentityRequest{
+		ProjectID:  plan.ProjectID.ValueString(),
+		IdentityID: plan.IdentityID.ValueString(),
+		Roles:      roles,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error assigning roles to identity",
+			"Couldn't update role , unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	projectIdentityDetails, err := r.client.GetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
 		ProjectID:  plan.ProjectID.ValueString(),
 		IdentityID: plan.IdentityID.ValueString(),
@@ -459,21 +479,8 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	updatedRoles, err := r.client.UpdateProjectIdentity(infisical.UpdateProjectIdentityRequest{
-		ProjectID:  plan.ProjectID.ValueString(),
-		IdentityID: projectIdentityDetails.Membership.Identity.Id,
-		Roles:      roles,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to identity",
-			"Couldn't update role , unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	planRoles := make([]ProjectIdentityRole, 0, len(updatedRoles.Roles))
-	for _, el := range updatedRoles.Roles {
+	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	for _, el := range projectIdentityDetails.Membership.Roles {
 		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
 			RoleSlug:                types.StringValue(el.Role),
@@ -484,6 +491,11 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
+		
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+		}
+
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
 			val.TemporaryRange = types.StringNull()

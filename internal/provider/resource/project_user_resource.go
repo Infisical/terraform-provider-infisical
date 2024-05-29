@@ -238,7 +238,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	_, err := r.client.InviteUsersToProject(infisical.InviteUsersToProjectRequest{
+	invitedUser, err := r.client.InviteUsersToProject(infisical.InviteUsersToProjectRequest{
 		ProjectID: plan.ProjectID.ValueString(),
 		Usernames: []string{plan.Username.ValueString()},
 	})
@@ -246,6 +246,19 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		resp.Diagnostics.AddError(
 			"Error inviting user",
 			"Couldn't create project user to Infiscial, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	_, err = r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
+		ProjectID:    plan.ProjectID.ValueString(),
+		MembershipID: invitedUser[0].ID,
+		Roles:        roles,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error assigning roles to user",
+			"Couldn't update role , unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -262,21 +275,8 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	updatedRoles, err := r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
-		ProjectID:    plan.ProjectID.ValueString(),
-		MembershipID: projectUserDetails.Membership.ID,
-		Roles:        roles,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to user",
-			"Couldn't update role , unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	planRoles := make([]ProjectUserRole, 0, len(updatedRoles.Roles))
-	for _, el := range updatedRoles.Roles {
+	planRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
+	for _, el := range projectUserDetails.Membership.Roles {
 		val := ProjectUserRole{
 			ID:                      types.StringValue(el.ID),
 			RoleSlug:                types.StringValue(el.Role),
@@ -286,7 +286,12 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 			CustomRoleID:            types.StringValue(el.CustomRoleId),
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}	
+
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
+
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
 			val.TemporaryRange = types.StringNull()
@@ -358,6 +363,9 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 			CustomRoleID:            types.StringValue(el.CustomRoleId),
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
@@ -468,6 +476,19 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	_, err := r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
+		ProjectID:    plan.ProjectID.ValueString(),
+		MembershipID: plan.MembershipId.ValueString(),
+		Roles:        roles,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error assigning roles to user",
+			"Couldn't update role , unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	projectUserDetails, err := r.client.GetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
 		ProjectID: plan.ProjectID.ValueString(),
 		Username:  plan.Username.ValueString(),
@@ -480,21 +501,8 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	updatedRoles, err := r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
-		ProjectID:    plan.ProjectID.ValueString(),
-		MembershipID: projectUserDetails.Membership.ID,
-		Roles:        roles,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to user",
-			"Couldn't update role , unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	planRoles := make([]ProjectUserRole, 0, len(updatedRoles.Roles))
-	for _, el := range updatedRoles.Roles {
+	planRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
+	for _, el := range projectUserDetails.Membership.Roles {
 		val := ProjectUserRole{
 			ID:                      types.StringValue(el.ID),
 			RoleSlug:                types.StringValue(el.Role),
@@ -504,6 +512,9 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 			CustomRoleID:            types.StringValue(el.CustomRoleId),
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
