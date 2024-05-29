@@ -73,6 +73,7 @@ func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 						"value": schema.StringAttribute{
 							Computed:    true,
 							Description: "The secret value",
+							Sensitive:   true,
 						},
 						"comment": schema.StringAttribute{
 							Computed:    true,

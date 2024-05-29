@@ -67,6 +67,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Description: "The value of the secret",
 				Required:    true,
 				Computed:    false,
+				Sensitive:   true,
 			},
 			"workspace_id": schema.StringAttribute{
 				Description: "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
