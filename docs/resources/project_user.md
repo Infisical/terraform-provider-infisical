@@ -70,9 +70,9 @@ Optional:
 - `custom_role_id` (String) The id of the custom role slug
 - `is_temporary` (Boolean) Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
 - `temporary_access_end_time` (String) ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time
-- `temporary_access_start_time` (String) ISO time for which temporary access should begin.
-- `temporary_mode` (String) Type of temporary access given. Types: relative
-- `temporary_range` (String) TTL for the temporary time. Eg: 1m, 1h, 1d
+- `temporary_access_start_time` (String) ISO time for which temporary access should begin. The current time is used by default.
+- `temporary_mode` (String) Type of temporary access given. Types: relative. Default: relative
+- `temporary_range` (String) TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h
 
 Read-Only:
 

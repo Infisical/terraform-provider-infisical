@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -35,7 +34,6 @@ type projectResourceModel struct {
 	ID                    types.String `tfsdk:"id"`
 	Name                  types.String `tfsdk:"name"`
 	LastUpdated           types.String `tfsdk:"last_updated"`
-	InviteUsersByUsername types.List   `tfsdk:"invite_users_by_username"`
 }
 
 // Metadata returns the resource type name.
@@ -60,12 +58,6 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description:   "The ID of the project",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"invite_users_by_username": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
-				Description:   "List of org users to invite to the project to join. By default username is email.",
 			},
 			"last_updated": schema.StringAttribute{
 				Computed: true,
@@ -123,34 +115,6 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
 		)
 		return
-	}
-
-	planUsernames := make([]types.String, 0, len(plan.InviteUsersByUsername.Elements()))
-	diags = plan.InviteUsersByUsername.ElementsAs(ctx, &planUsernames, false)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if len(planUsernames) > 0 {
-		userNames := make([]string, 0, len(planUsernames))
-		for _, k := range planUsernames {
-			if k.ValueString() != "" {
-				userNames = append(userNames, k.ValueString())
-			}
-		}
-
-		_, err = r.client.InviteUsersToProject(infisical.InviteUsersToProjectRequest{
-			ProjectID: newProject.Project.ID,
-			Usernames: userNames,
-		})
-
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error inviting users",
-				"Unexpected error: "+err.Error(),
-			)
-			return
-		}
 	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
@@ -240,10 +204,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			"Slug cannot be updated",
 		)
 		return
-	}
-
-	if len(state.InviteUsersByUsername.Elements()) != len(plan.InviteUsersByUsername.Elements()) {
-		resp.Diagnostics.AddError("Unable to update project", "User invitation cannot be updated after project has been created.")
 	}
 
 	_, err := r.client.UpdateProject(infisical.UpdateProjectRequest{

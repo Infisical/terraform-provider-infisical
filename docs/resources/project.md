@@ -52,10 +52,6 @@ resource "infisical_project" "azure-project" {
 - `name` (String) The name of the project
 - `slug` (String) The slug of the project
 
-### Optional
-
-- `invite_users_by_username` (List of String) List of org users to invite to the project to join. By default username is email.
-
 ### Read-Only
 
 - `id` (String) The ID of the project

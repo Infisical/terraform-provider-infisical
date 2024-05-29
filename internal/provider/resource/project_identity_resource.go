@@ -123,17 +123,17 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 							Default:     booldefault.StaticBool(false),
 						},
 						"temporary_mode": schema.StringAttribute{
-							Description: "Type of temporary access given. Types: relative",
+							Description: "Type of temporary access given. Types: relative. Default: relative",
 							Optional:    true,
 							Computed:    true,
 						},
 						"temporary_range": schema.StringAttribute{
-							Description: "TTL for the temporary time. Eg: 1m, 1h, 1d",
+							Description: "TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h",
 							Optional:    true,
 							Computed:    true,
 						},
 						"temporary_access_start_time": schema.StringAttribute{
-							Description: "ISO time for which temporary access should begin.",
+							Description: "ISO time for which temporary access should begin. The current time is used by default.",
 							Optional:    true,
 							Computed:    true,
 						},

@@ -61,7 +61,7 @@ resource "infisical_secret" "github_action_secret" {
 - `env_slug` (String) The environment slug of the secret to modify/create
 - `folder_path` (String) The path to the folder where the given secret resides
 - `name` (String) The name of the secret
-- `value` (String) The value of the secret
+- `value` (String, Sensitive) The value of the secret
 
 ### Optional
 

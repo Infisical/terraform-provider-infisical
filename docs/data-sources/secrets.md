@@ -72,4 +72,4 @@ Read-Only:
 
 - `comment` (String) The secret comment
 - `secret_type` (String) The secret type (shared or personal)
-- `value` (String) The secret value
+- `value` (String, Sensitive) The secret value
