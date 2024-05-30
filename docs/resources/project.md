@@ -54,4 +54,5 @@ resource "infisical_project" "azure-project" {
 
 ### Read-Only
 
+- `id` (String) The ID of the project
 - `last_updated` (String)

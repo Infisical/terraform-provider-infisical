@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 
-	infisical "terraform-provider-infisical/client"
+	infisical "terraform-provider-infisical/internal/client"
+	infisicalDatasource "terraform-provider-infisical/internal/provider/datasource"
+	infisicalResource "terraform-provider-infisical/internal/provider/resource"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -149,15 +151,19 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 // DataSources defines the data sources implemented in the provider.
 func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewSecretDataSource,
-		NewProjectDataSource,
+		infisicalDatasource.NewSecretDataSource,
+		infisicalDatasource.NewProjectDataSource,
 	}
 }
 
 // Resources defines the resources implemented in the provider.
 func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewSecretResource,
-		NewProjectResource,
+		infisicalResource.NewSecretResource,
+		infisicalResource.NewProjectResource,
+		infisicalResource.NewProjectUserResource,
+		infisicalResource.NewProjectIdentityResource,
+		infisicalResource.NewProjectRoleResource,
+		infisicalResource.NewProjectIdentitySpecificPrivilegeResource,
 	}
 }

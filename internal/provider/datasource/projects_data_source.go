@@ -1,13 +1,13 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package provider
+package datasource
 
 import (
 	"context"
 	"fmt"
 
-	infisical "terraform-provider-infisical/client"
+	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -162,7 +162,7 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	project, err := d.client.CallGetProject(infisical.GetProjectRequest{
+	project, err := d.client.GetProject(infisical.GetProjectRequest{
 		Slug: data.Slug.ValueString(),
 	})
 	if err != nil {

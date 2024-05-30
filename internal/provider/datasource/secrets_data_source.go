@@ -1,13 +1,13 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package provider
+package datasource
 
 import (
 	"context"
 	"fmt"
 
-	infisical "terraform-provider-infisical/client"
+	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -73,6 +73,7 @@ func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 						"value": schema.StringAttribute{
 							Computed:    true,
 							Description: "The secret value",
+							Sensitive:   true,
 						},
 						"comment": schema.StringAttribute{
 							Computed:    true,

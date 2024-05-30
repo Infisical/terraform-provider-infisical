@@ -1,13 +1,15 @@
-package provider
+package resource
 
 import (
 	"context"
 	"fmt"
-	infisical "terraform-provider-infisical/client"
+	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -28,9 +30,10 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug        types.String `tfsdk:"slug"`
-	Name        types.String `tfsdk:"name"`
-	LastUpdated types.String `tfsdk:"last_updated"`
+	Slug                  types.String `tfsdk:"slug"`
+	ID                    types.String `tfsdk:"id"`
+	Name                  types.String `tfsdk:"name"`
+	LastUpdated           types.String `tfsdk:"last_updated"`
 }
 
 // Metadata returns the resource type name.
@@ -51,7 +54,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The name of the project",
 				Required:    true,
 			},
-
+			"id": schema.StringAttribute{
+				Description:   "The ID of the project",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"last_updated": schema.StringAttribute{
 				Computed: true,
 			},
@@ -97,7 +104,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	_, err := r.client.CallCreateProject(infisical.CreateProjectRequest{
+	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
 		ProjectName: plan.Name.ValueString(),
 		Slug:        plan.Slug.ValueString(),
 	})
@@ -113,6 +120,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	plan.Slug = types.StringValue(plan.Slug.ValueString())
 	plan.Name = types.StringValue(plan.Name.ValueString())
+	plan.ID = types.StringValue(newProject.Project.ID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -141,7 +149,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Get the latest data from the API
-	project, err := r.client.CallGetProject(infisical.GetProjectRequest{
+	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: state.Slug.ValueString(),
 	})
 
@@ -198,7 +206,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	_, err := r.client.CallUpdateProject(infisical.UpdateProjectRequest{
+	_, err := r.client.UpdateProject(infisical.UpdateProjectRequest{
 		ProjectName: plan.Name.ValueString(),
 		Slug:        plan.Slug.ValueString(),
 	})
@@ -240,7 +248,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.CallDeleteProject(infisical.DeleteProjectRequest{
+	err := r.client.DeleteProject(infisical.DeleteProjectRequest{
 		Slug: state.Slug.ValueString(),
 	})
 

@@ -1,54 +1,13 @@
 package infisicalclient
 
 import (
+	"encoding/base64"
 	"fmt"
+	"strings"
+	"terraform-provider-infisical/internal/crypto"
 )
 
-const USER_AGENT = "terraform"
-
-func (client Client) UniversalMachineIdentityAuth() (string, error) {
-	if client.Config.ClientId == "" || client.Config.ClientSecret == "" {
-		return "", fmt.Errorf("you must set the client secret and client ID for the client before making calls")
-	}
-
-	var loginResponse UniversalMachineIdentityAuthResponse
-
-	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(map[string]string{
-		"clientId":     client.Config.ClientId,
-		"clientSecret": client.Config.ClientSecret,
-	}).Post("api/v1/auth/universal-auth/login")
-
-	if err != nil {
-		return "", fmt.Errorf("UniversalMachineIdentityAuth: Unable to complete api request [err=%s]", err)
-	}
-
-	if res.IsError() {
-		return "", fmt.Errorf("UniversalMachineIdentityAuth: Unsuccessful response: [response=%s]", res)
-	}
-
-	return loginResponse.AccessToken, nil
-}
-
-func (client Client) CallGetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse, error) {
-	var tokenDetailsResponse GetServiceTokenDetailsResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&tokenDetailsResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		Get("api/v2/service-token")
-
-	if err != nil {
-		return GetServiceTokenDetailsResponse{}, fmt.Errorf("CallGetServiceTokenDetails: Unable to complete api request [err=%s]", err)
-	}
-
-	if response.IsError() {
-		return GetServiceTokenDetailsResponse{}, fmt.Errorf("CallGetServiceTokenDetails: Unsuccessful response: [response=%s]", response)
-	}
-
-	return tokenDetailsResponse, nil
-}
-
-func (client Client) CallGetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncryptedSecretsV3Response, error) {
+func (client Client) GetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncryptedSecretsV3Response, error) {
 	var secretsResponse GetEncryptedSecretsV3Response
 
 	httpRequest := client.Config.HttpClient.
@@ -75,7 +34,7 @@ func (client Client) CallGetSecretsV3(request GetEncryptedSecretsV3Request) (Get
 	return secretsResponse, nil
 }
 
-func (client Client) CallCreateSecretsV3(request CreateSecretV3Request) error {
+func (client Client) CreateSecretsV3(request CreateSecretV3Request) error {
 	var secretsResponse EncryptedSecretV3
 	response, err := client.Config.HttpClient.
 		R().
@@ -95,7 +54,7 @@ func (client Client) CallCreateSecretsV3(request CreateSecretV3Request) error {
 	return nil
 }
 
-func (client Client) CallDeleteSecretsV3(request DeleteSecretV3Request) error {
+func (client Client) DeleteSecretsV3(request DeleteSecretV3Request) error {
 	var secretsResponse GetEncryptedSecretsV3Response
 	response, err := client.Config.HttpClient.
 		R().
@@ -115,7 +74,7 @@ func (client Client) CallDeleteSecretsV3(request DeleteSecretV3Request) error {
 	return nil
 }
 
-func (client Client) CallUpdateSecretsV3(request UpdateSecretByNameV3Request) error {
+func (client Client) UpdateSecretsV3(request UpdateSecretByNameV3Request) error {
 
 	var secretsResponse GetEncryptedSecretsV3Response
 	response, err := client.Config.HttpClient.
@@ -136,7 +95,7 @@ func (client Client) CallUpdateSecretsV3(request UpdateSecretByNameV3Request) er
 	return nil
 }
 
-func (client Client) CallGetSingleSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleSecretByNameSecretResponse, error) {
+func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleSecretByNameSecretResponse, error) {
 	var secretsResponse GetSingleSecretByNameSecretResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -159,7 +118,7 @@ func (client Client) CallGetSingleSecretByNameV3(request GetSingleSecretByNameV3
 	return secretsResponse, nil
 }
 
-func (client Client) CallGetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecretsV3Response, error) {
+func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecretsV3Response, error) {
 	var secretsResponse GetRawSecretsV3Response
 
 	httpRequest := client.Config.HttpClient.
@@ -186,7 +145,7 @@ func (client Client) CallGetSecretsRawV3(request GetRawSecretsV3Request) (GetRaw
 	return secretsResponse, nil
 }
 
-func (client Client) CallCreateRawSecretsV3(request CreateRawSecretV3Request) error {
+func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) error {
 	var secretsResponse EncryptedSecretV3
 	response, err := client.Config.HttpClient.
 		R().
@@ -206,7 +165,7 @@ func (client Client) CallCreateRawSecretsV3(request CreateRawSecretV3Request) er
 	return nil
 }
 
-func (client Client) CallDeleteRawSecretV3(request DeleteRawSecretV3Request) error {
+func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {
 	var secretsResponse GetRawSecretsV3Response
 	response, err := client.Config.HttpClient.
 		R().
@@ -226,7 +185,7 @@ func (client Client) CallDeleteRawSecretV3(request DeleteRawSecretV3Request) err
 	return nil
 }
 
-func (client Client) CallUpdateRawSecretV3(request UpdateRawSecretByNameV3Request) error {
+func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) error {
 	var secretsResponse GetRawSecretsV3Response
 	response, err := client.Config.HttpClient.
 		R().
@@ -246,7 +205,7 @@ func (client Client) CallUpdateRawSecretV3(request UpdateRawSecretByNameV3Reques
 	return nil
 }
 
-func (client Client) CallGetSingleRawSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleRawSecretByNameSecretResponse, error) {
+func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleRawSecretByNameSecretResponse, error) {
 	var secretsResponse GetSingleRawSecretByNameSecretResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -269,88 +228,149 @@ func (client Client) CallGetSingleRawSecretByNameV3(request GetSingleSecretByNam
 	return secretsResponse, nil
 }
 
-func (client Client) CallCreateProject(request CreateProjectRequest) (CreateProjectResponse, error) {
+func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string, envSlug string) ([]SingleEnvironmentVariable, *GetServiceTokenDetailsResponse, error) {
+	if client.Config.ServiceToken == "" {
+		return nil, nil, fmt.Errorf("service token must be defined to fetch secrets")
+	}
 
-	if request.Slug == "" {
-		request = CreateProjectRequest{
-			ProjectName:      request.ProjectName,
-			OrganizationSlug: request.OrganizationSlug,
+	serviceTokenParts := strings.SplitN(client.Config.ServiceToken, ".", 4)
+	if len(serviceTokenParts) < 4 {
+		return nil, nil, fmt.Errorf("invalid service token entered. Please double check your service token and try again")
+	}
+
+	serviceTokenDetails, err := client.GetServiceTokenDetailsV2()
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get service token details. [err=%v]", err)
+	}
+
+	request := GetEncryptedSecretsV3Request{
+		WorkspaceId: serviceTokenDetails.Workspace,
+		Environment: envSlug,
+	}
+
+	if secretFolderPath != "" {
+		request.SecretPath = secretFolderPath
+	}
+
+	encryptedSecrets, err := client.GetSecretsV3(request)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	decodedSymmetricEncryptionDetails, err := GetBase64DecodedSymmetricEncryptionDetails(serviceTokenParts[3], serviceTokenDetails.EncryptedKey, serviceTokenDetails.Iv, serviceTokenDetails.Tag)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to decode symmetric encryption details [err=%v]", err)
+	}
+
+	plainTextWorkspaceKey, err := crypto.DecryptSymmetric([]byte(serviceTokenParts[3]), decodedSymmetricEncryptionDetails.Cipher, decodedSymmetricEncryptionDetails.Tag, decodedSymmetricEncryptionDetails.IV)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to decrypt the required workspace key")
+	}
+
+	plainTextSecrets, err := GetPlainTextSecrets(plainTextWorkspaceKey, encryptedSecrets)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to decrypt your secrets [err=%v]", err)
+	}
+
+	return plainTextSecrets, &serviceTokenDetails, nil
+}
+
+func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, workspaceId string) ([]RawV3Secret, error) {
+	if client.Config.ClientId == "" || client.Config.ClientSecret == "" {
+		return nil, fmt.Errorf("client ID and client secret must be defined to fetch secrets with machine identity")
+	}
+
+	request := GetRawSecretsV3Request{
+		Environment: envSlug,
+		WorkspaceId: workspaceId,
+	}
+
+	if secretFolderPath != "" {
+		request.SecretPath = secretFolderPath
+	}
+
+	secrets, err := client.GetSecretsRawV3(request)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.Secrets, nil
+
+}
+
+func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Response) ([]SingleEnvironmentVariable, error) {
+	plainTextSecrets := []SingleEnvironmentVariable{}
+	for _, secret := range encryptedSecrets.Secrets {
+		// Decrypt key
+		key_iv, err := base64.StdEncoding.DecodeString(secret.SecretKeyIV)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret IV for secret key")
 		}
+
+		key_tag, err := base64.StdEncoding.DecodeString(secret.SecretKeyTag)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret authentication tag for secret key")
+		}
+
+		key_ciphertext, err := base64.StdEncoding.DecodeString(secret.SecretKeyCiphertext)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret cipher text for secret key")
+		}
+
+		plainTextKey, err := crypto.DecryptSymmetric(key, key_ciphertext, key_tag, key_iv)
+		if err != nil {
+			return nil, fmt.Errorf("unable to symmetrically decrypt secret key")
+		}
+
+		// Decrypt value
+		value_iv, err := base64.StdEncoding.DecodeString(secret.SecretValueIV)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret IV for secret value")
+		}
+
+		value_tag, err := base64.StdEncoding.DecodeString(secret.SecretValueTag)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret authentication tag for secret value")
+		}
+
+		value_ciphertext, _ := base64.StdEncoding.DecodeString(secret.SecretValueCiphertext)
+
+		plainTextValue, err := crypto.DecryptSymmetric(key, value_ciphertext, value_tag, value_iv)
+		if err != nil {
+			return nil, fmt.Errorf("unable to symmetrically decrypt secret value")
+		}
+
+		// Decrypt comment
+		comment_iv, err := base64.StdEncoding.DecodeString(secret.SecretCommentIV)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret IV for secret value")
+		}
+
+		comment_tag, err := base64.StdEncoding.DecodeString(secret.SecretCommentTag)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode secret authentication tag for secret value")
+		}
+
+		comment_ciphertext, _ := base64.StdEncoding.DecodeString(secret.SecretCommentCiphertext)
+
+		plainTextComment, err := crypto.DecryptSymmetric(key, comment_ciphertext, comment_tag, comment_iv)
+		if err != nil {
+			return nil, fmt.Errorf("unable to symmetrically decrypt secret comment")
+		}
+
+		plainTextSecret := SingleEnvironmentVariable{
+			Key:     string(plainTextKey),
+			Value:   string(plainTextValue),
+			Type:    secret.Type,
+			ID:      secret.ID,
+			Tags:    secret.Tags,
+			Comment: string(plainTextComment),
+		}
+
+		plainTextSecrets = append(plainTextSecrets, plainTextSecret)
 	}
 
-	var projectResponse CreateProjectResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&projectResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		SetBody(request).
-		Post("api/v2/workspace")
-
-	if err != nil {
-		return CreateProjectResponse{}, fmt.Errorf("CallCreateProject: Unable to complete api request [err=%s]", err)
-	}
-
-	if response.IsError() {
-		return CreateProjectResponse{}, fmt.Errorf("CallCreateProject: Unsuccessful response. [response=%s]", response)
-	}
-
-	return projectResponse, nil
-}
-
-func (client Client) CallDeleteProject(request DeleteProjectRequest) error {
-	var projectResponse DeleteProjectResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&projectResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		Delete(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
-
-	if err != nil {
-		return fmt.Errorf("CallDeleteProject: Unable to complete api request [err=%s]", err)
-	}
-
-	if response.IsError() {
-		return fmt.Errorf("CallDeleteProject: Unsuccessful response. [response=%s]", response)
-	}
-
-	return nil
-}
-
-func (client Client) CallGetProject(request GetProjectRequest) (ProjectWithEnvironments, error) {
-	var projectResponse ProjectWithEnvironments
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&projectResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
-
-	if err != nil {
-		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unable to complete api request [err=%s]", err)
-	}
-
-	if response.IsError() {
-		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unsuccessful response. [response=%s]", response)
-	}
-
-	return projectResponse, nil
-}
-
-func (client Client) CallUpdateProject(request UpdateProjectRequest) (UpdateProjectResponse, error) {
-	var projectResponse UpdateProjectResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&projectResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		SetBody(request).
-		Patch(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
-
-	if err != nil {
-		return UpdateProjectResponse{}, fmt.Errorf("CallUpdateProject: Unable to complete api request [err=%s]", err)
-	}
-
-	if response.IsError() {
-		return UpdateProjectResponse{}, fmt.Errorf("CallUpdateProject: Unsuccessful response. [response=%s]", response)
-	}
-
-	return projectResponse, nil
+	return plainTextSecrets, nil
 }
