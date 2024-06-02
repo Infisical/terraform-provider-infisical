@@ -16,7 +16,7 @@ type LoggedInUser struct {
 	Domain string `json:"domain"`
 }
 
-// The file struct for Infisical config file
+// The file struct for Infisical config file.
 type ConfigFile struct {
 	LoggedInUserEmail  string         `json:"loggedInUserEmail"`
 	LoggedInUserDomain string         `json:"LoggedInUserDomain,omitempty"`
@@ -48,11 +48,10 @@ func GetConfigFile() (ConfigFile, error) {
 
 	configFileAsBytes, err := os.ReadFile(fullConfigFilePath)
 	if err != nil {
-		if err, ok := err.(*os.PathError); ok {
-			return ConfigFile{}, nil
-		} else {
+		if err, ok := err.(*os.PathError); !ok {
 			return ConfigFile{}, err
 		}
+		return ConfigFile{}, nil
 	}
 
 	var configFile ConfigFile

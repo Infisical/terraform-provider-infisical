@@ -286,7 +286,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 			CustomRoleID:            types.StringValue(el.CustomRoleId),
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}	
+		}
 
 		if el.CustomRoleId != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)

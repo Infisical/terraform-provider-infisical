@@ -491,7 +491,7 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
-		
+
 		if el.CustomRoleId != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
