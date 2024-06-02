@@ -144,11 +144,10 @@ func (d *ProjectsDataSource) Configure(ctx context.Context, req datasource.Confi
 }
 
 func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-
-	if d.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if isValid, err := d.client.ValidateAuthMode([]infisical.AuthStrategyType{infisical.AuthStrategy.USER_PROFILE, infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY}); !isValid {
 		resp.Diagnostics.AddError(
-			"Unable to create project",
-			"Only Machine Identity authentication is supported for this operation",
+			"Unable to read project",
+			err.Error(),
 		)
 		return
 	}

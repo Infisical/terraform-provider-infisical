@@ -198,7 +198,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 		// Set state to fully populated data
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
-	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY || r.client.Config.AuthStrategy == infisical.AuthStrategy.USER_PROFILE {
 		err := r.client.CreateRawSecretsV3(infisical.CreateRawSecretV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			WorkspaceID: plan.WorkspaceId.ValueString(),
@@ -377,7 +377,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		state.Name = types.StringValue(string(plainTextKey))
 		state.Value = types.StringValue(string(plainTextValue))
 
-	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY || r.client.Config.AuthStrategy == infisical.AuthStrategy.USER_PROFILE {
 		// Get refreshed order value from HashiCups
 		response, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
 			SecretName:  state.Name.ValueString(),
@@ -511,7 +511,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		// Set state to fully populated data
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 
-	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY || r.client.Config.AuthStrategy == infisical.AuthStrategy.USER_PROFILE {
 		err := r.client.UpdateRawSecretV3(infisical.UpdateRawSecretByNameV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			WorkspaceID: plan.WorkspaceId.ValueString(),
@@ -577,7 +577,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			)
 			return
 		}
-	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	} else if r.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY || r.client.Config.AuthStrategy == infisical.AuthStrategy.USER_PROFILE {
 		err := r.client.DeleteRawSecretV3(infisical.DeleteRawSecretV3Request{
 			SecretName:  state.Name.ValueString(),
 			SecretPath:  state.FolderPath.ValueString(),

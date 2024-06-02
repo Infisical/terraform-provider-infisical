@@ -177,10 +177,10 @@ func (r *ProjectUserResource) Configure(_ context.Context, req resource.Configur
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if isValid, err := r.client.ValidateAuthMode([]infisical.AuthStrategyType{infisical.AuthStrategy.USER_PROFILE, infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY}); !isValid {
 		resp.Diagnostics.AddError(
 			"Unable to create project user",
-			"Only Machine Identity authentication is supported for this operation",
+			err.Error(),
 		)
 		return
 	}
@@ -324,10 +324,10 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 
 // Read refreshes the Terraform state with the latest data.
 func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if isValid, err := r.client.ValidateAuthMode([]infisical.AuthStrategyType{infisical.AuthStrategy.USER_PROFILE, infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY}); !isValid {
 		resp.Diagnostics.AddError(
 			"Unable to read project user",
-			"Only Machine Identity authentication is supported for this operation",
+			err.Error(),
 		)
 		return
 	}
@@ -399,10 +399,10 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if isValid, err := r.client.ValidateAuthMode([]infisical.AuthStrategyType{infisical.AuthStrategy.USER_PROFILE, infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY}); !isValid {
 		resp.Diagnostics.AddError(
 			"Unable to update project user",
-			"Only Machine Identity authentication is supported for this operation",
+			err.Error(),
 		)
 		return
 	}
@@ -546,11 +546,10 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if isValid, err := r.client.ValidateAuthMode([]infisical.AuthStrategyType{infisical.AuthStrategy.USER_PROFILE, infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY}); !isValid {
 		resp.Diagnostics.AddError(
 			"Unable to delete project user",
-			"Only Machine Identity authentication is supported for this operation",
+			err.Error(),
 		)
 		return
 	}

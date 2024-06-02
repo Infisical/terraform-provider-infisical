@@ -140,7 +140,7 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		for _, secret := range plainTextSecrets {
 			data.Secrets[secret.Key] = InfisicalSecretDetails{Value: types.StringValue(secret.Value), Comment: types.StringValue(secret.Comment), SecretType: types.StringValue(secret.Type)}
 		}
-	} else if d.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	} else if d.client.Config.AuthStrategy == infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY || d.client.Config.AuthStrategy == infisical.AuthStrategy.USER_PROFILE {
 		secrets, err := d.client.GetRawSecrets(data.FolderPath.ValueString(), data.EnvSlug.ValueString(), data.WorkspaceId.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
