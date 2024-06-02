@@ -42,6 +42,8 @@ type infisicalProviderModel struct {
 	Host         types.String `tfsdk:"host"`
 	ServiceToken types.String `tfsdk:"service_token"`
 
+	Profile types.String `tfsdk:"profile"`
+
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 }
@@ -66,7 +68,11 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Sensitive:   true,
 				Description: " (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project",
 			},
-
+			"profile": schema.StringAttribute{
+				Optional:    true,
+				Description: "Email or username of the user to use. The user credentials are fetched from system keyring that gets saved from cli infisical login.",
+				Sensitive:   true,
+			},
 			"client_id": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
@@ -105,6 +111,8 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	clientId := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID")
 	clientSecret := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET")
 
+	userProfile := os.Getenv("INFISICAL_USER_PROFILE")
+
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
 	}
@@ -121,6 +129,10 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		clientSecret = config.ClientSecret.ValueString()
 	}
 
+	if !config.Profile.IsNull() {
+		userProfile = config.Profile.ValueString()
+	}
+
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
@@ -130,7 +142,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret})
+	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret, Profile: userProfile})
 
 	if err != nil {
 		resp.Diagnostics.AddError(

@@ -2,6 +2,9 @@ package infisicalclient
 
 import (
 	"fmt"
+	"slices"
+	"strings"
+	"terraform-provider-infisical/internal/cliuser"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -15,9 +18,11 @@ type AuthStrategyType string
 var AuthStrategy = struct {
 	SERVICE_TOKEN              AuthStrategyType
 	UNIVERSAL_MACHINE_IDENTITY AuthStrategyType
+	USER_PROFILE               AuthStrategyType
 }{
 	SERVICE_TOKEN:              "SERVICE_TOKEN",
 	UNIVERSAL_MACHINE_IDENTITY: "UNIVERSAL_MACHINE_IDENTITY",
+	USER_PROFILE:               "USER_PROFILE",
 }
 
 type Config struct {
@@ -32,9 +37,23 @@ type Config struct {
 	ClientId     string
 	ClientSecret string
 
+	Profile string
+
 	EnvSlug     string
 	SecretsPath string
 	HttpClient  *resty.Client // By default a client will be created
+}
+
+func (c *Client) ValidateAuthMode(modes []AuthStrategyType) (bool, error) {
+	if slices.Contains(modes, c.Config.AuthStrategy) {
+		return true, nil
+	}
+
+	var authErrorString []string
+	for _, mode := range modes {
+		authErrorString = append(authErrorString, string(mode))
+	}
+	return false, fmt.Errorf("Only %s authentication is supported", strings.Join(authErrorString, ","))
 }
 
 func NewClient(cnf Config) (*Client, error) {
@@ -46,13 +65,7 @@ func NewClient(cnf Config) (*Client, error) {
 	// Add more auth strategies here later
 	var usingServiceToken = cnf.ServiceToken != ""
 	var usingUniversalAuth = cnf.ClientId != "" && cnf.ClientSecret != ""
-
-	// Check if the user got multiple configured authentication methods, or none set at all.
-	if usingServiceToken && usingUniversalAuth {
-		return nil, fmt.Errorf("you have configured multiple authentication methods, please only use one")
-	} else if !usingServiceToken && !usingUniversalAuth {
-		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth before making calls")
-	}
+	var usingInfisicalProfile = cnf.Profile != ""
 
 	if usingUniversalAuth {
 		token, err := Client{cnf}.UniversalMachineIdentityAuth()
@@ -66,9 +79,21 @@ func NewClient(cnf Config) (*Client, error) {
 	} else if usingServiceToken {
 		cnf.HttpClient.SetAuthToken(cnf.ServiceToken)
 		cnf.AuthStrategy = AuthStrategy.SERVICE_TOKEN
+	} else if usingInfisicalProfile {
+		token, err := cliuser.GetCurrentLoggedInUserDetails(cnf.Profile)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to authenticate with user profile. [err=%s]", err)
+		}
+		_, err = Client{cnf}.CheckJWTIsValid(token)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to authenticate with user profile. [err=%s]", err)
+		}
+
+		cnf.HttpClient.SetAuthToken(token)
+		cnf.AuthStrategy = AuthStrategy.USER_PROFILE
 	} else {
 		// If no auth strategy is set, then we should return an error
-		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth before making calls")
+		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth or infisical login before making calls")
 	}
 
 	// These two if statements were a part of an older migration.
