@@ -65,6 +65,7 @@ resource "infisical_secret" "github_action_secret" {
 
 ### Optional
 
+- `tags` (List of String) Tag slugs to be attached for the secrets.
 - `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only

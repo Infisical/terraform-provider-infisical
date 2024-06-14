@@ -30,10 +30,10 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug                  types.String `tfsdk:"slug"`
-	ID                    types.String `tfsdk:"id"`
-	Name                  types.String `tfsdk:"name"`
-	LastUpdated           types.String `tfsdk:"last_updated"`
+	Slug        types.String `tfsdk:"slug"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	LastUpdated types.String `tfsdk:"last_updated"`
 }
 
 // Metadata returns the resource type name.
