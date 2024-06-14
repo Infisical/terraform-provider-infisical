@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"terraform-provider-infisical/internal/crypto"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -36,6 +38,7 @@ type secretResourceModel struct {
 	Value       types.String `tfsdk:"value"`
 	WorkspaceId types.String `tfsdk:"workspace_id"`
 	LastUpdated types.String `tfsdk:"last_updated"`
+	Tags        types.List   `tfsdk:"tags"`
 }
 
 // Metadata returns the resource type name.
@@ -78,6 +81,11 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"last_updated": schema.StringAttribute{
 				Computed: true,
 			},
+			"tags": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Description: "Tag slugs to be attached for the secrets.",
+			},
 		},
 	}
 }
@@ -102,6 +110,46 @@ func (r *secretResource) Configure(_ context.Context, req resource.ConfigureRequ
 	r.client = client
 }
 
+func (r *secretResource) getAllTagIds(ctx context.Context, projectID string, tagSlugs []string) ([]string, error) {
+	if len(tagSlugs) == 0 {
+		return []string{}, nil
+	}
+
+	projectTags, err := r.client.GetProjectTags(infisical.GetProjectTagsRequest{
+		ProjectID: projectID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var tagIds []string
+	projectTagGroupBySlug := make(map[string]string)
+
+	for _, tag := range projectTags.Tags {
+		projectTagGroupBySlug[tag.Slug] = tag.ID
+	}
+
+	for _, slug := range tagSlugs {
+		if id, ok := projectTagGroupBySlug[slug]; ok {
+			tagIds = append(tagIds, id)
+		} else {
+			newTag, err := r.client.CreateProjectTags(infisical.CreateProjectTagRequest{
+				ProjectID: projectID,
+				Name:      slug,
+				Slug:      slug,
+				Color:     "#B5C02E",
+			})
+			if err != nil {
+				tflog.Error(ctx, err.Error())
+			} else {
+				tagIds = append(tagIds, newTag.Tag.ID)
+			}
+		}
+	}
+
+	return tagIds, nil
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
@@ -110,6 +158,29 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	planSecretTagSlugs := make([]types.String, 0, len(plan.Tags.Elements()))
+	diags = plan.Tags.ElementsAs(ctx, &planSecretTagSlugs, false)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretTagSlugs := make([]string, 0, len(planSecretTagSlugs))
+	for _, slug := range planSecretTagSlugs {
+		secretTagSlugs = append(secretTagSlugs, strings.ToLower(slug.ValueString()))
+	}
+	secretTagIds, err := r.getAllTagIds(ctx, plan.WorkspaceId.ValueString(), secretTagSlugs)
+	for _, e := range secretTagIds {
+		tflog.Info(ctx, e)
+	}
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating secret",
+			"Could not get tag details, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -186,6 +257,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
 			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
 			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
+			TagIDs:                secretTagIds,
 		})
 
 		if err != nil {
@@ -206,6 +278,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			SecretPath:  plan.FolderPath.ValueString(),
 			SecretKey:   plan.Name.ValueString(),
 			SecretValue: plan.Value.ValueString(),
+			TagIDs:      secretTagIds,
 		})
 
 		if err != nil {
@@ -439,6 +512,26 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	planSecretTagSlugs := make([]types.String, 0, len(plan.Tags.Elements()))
+	diags = plan.Tags.ElementsAs(ctx, &planSecretTagSlugs, false)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretTagSlugs := make([]string, 0, len(planSecretTagSlugs))
+	for _, slug := range planSecretTagSlugs {
+		secretTagSlugs = append(secretTagSlugs, strings.ToLower(slug.ValueString()))
+	}
+	secretTagIds, err := r.getAllTagIds(ctx, plan.WorkspaceId.ValueString(), secretTagSlugs)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating secret",
+			"Could not get tag details, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 
 		serviceTokenDetails, err := r.client.GetServiceTokenDetailsV2()
@@ -489,12 +582,12 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 
 		err = r.client.UpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
-			Environment: plan.EnvSlug.ValueString(),
-			SecretName:  plan.Name.ValueString(),
-			Type:        "shared",
-			SecretPath:  plan.FolderPath.ValueString(),
-			WorkspaceID: serviceTokenDetails.Workspace,
-
+			Environment:           plan.EnvSlug.ValueString(),
+			SecretName:            plan.Name.ValueString(),
+			Type:                  "shared",
+			SecretPath:            plan.FolderPath.ValueString(),
+			WorkspaceID:           serviceTokenDetails.Workspace,
+			TagIDs:                secretTagIds,
 			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
 			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
 			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
@@ -516,6 +609,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			Environment: plan.EnvSlug.ValueString(),
 			WorkspaceID: plan.WorkspaceId.ValueString(),
 			Type:        "shared",
+			TagIDs:      secretTagIds,
 			SecretPath:  plan.FolderPath.ValueString(),
 			SecretName:  plan.Name.ValueString(),
 			SecretValue: plan.Value.ValueString(),
