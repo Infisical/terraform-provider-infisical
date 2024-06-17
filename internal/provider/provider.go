@@ -153,6 +153,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 	return []func() datasource.DataSource{
 		infisicalDatasource.NewSecretDataSource,
 		infisicalDatasource.NewProjectDataSource,
+		infisicalDatasource.NewSecretTagDataSource,
 	}
 }
 
@@ -165,5 +166,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectIdentityResource,
 		infisicalResource.NewProjectRoleResource,
 		infisicalResource.NewProjectIdentitySpecificPrivilegeResource,
+		infisicalResource.NewProjectSecretTagResource,
 	}
 }

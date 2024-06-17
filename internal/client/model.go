@@ -658,3 +658,42 @@ type CreateProjectTagRequest struct {
 type CreateProjectTagResponse struct {
 	Tag ProjectTag `json:"workspaceTag"`
 }
+
+type UpdateProjectTagRequest struct {
+	Name      string `json:"name,omitempty"`
+	Color     string `json:"color,omitempty"`
+	Slug      string `json:"slug,omitempty"`
+	ProjectID string `json:"projectId"`
+	TagID     string `json:"tagId"`
+}
+
+type UpdateProjectTagResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type DeleteProjectTagRequest struct {
+	ProjectID string `json:"projectId"`
+	TagID     string `json:"tagId"`
+}
+
+type DeleteProjectTagResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type GetProjectTagByIDRequest struct {
+	ProjectID string `json:"projectId"`
+	TagID     string `json:"tagId"`
+}
+
+type GetProjectTagByIDResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type GetProjectTagBySlugRequest struct {
+	ProjectID string `json:"projectId"`
+	TagSlug   string `json:"tagSlug"`
+}
+
+type GetProjectTagBySlugResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}

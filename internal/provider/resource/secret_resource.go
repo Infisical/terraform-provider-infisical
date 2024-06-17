@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -38,7 +37,7 @@ type secretResourceModel struct {
 	Value       types.String `tfsdk:"value"`
 	WorkspaceId types.String `tfsdk:"workspace_id"`
 	LastUpdated types.String `tfsdk:"last_updated"`
-	Tags        types.List   `tfsdk:"tags"`
+	Tags        types.List   `tfsdk:"tag_ids"`
 }
 
 // Metadata returns the resource type name.
@@ -81,10 +80,10 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"last_updated": schema.StringAttribute{
 				Computed: true,
 			},
-			"tags": schema.ListAttribute{
+			"tag_ids": schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
-				Description: "Tag slugs to be attached for the secrets.",
+				Description: "Tag ids to be attached for the secrets.",
 			},
 		},
 	}
@@ -110,46 +109,6 @@ func (r *secretResource) Configure(_ context.Context, req resource.ConfigureRequ
 	r.client = client
 }
 
-func (r *secretResource) getAllTagIds(ctx context.Context, projectID string, tagSlugs []string) ([]string, error) {
-	if len(tagSlugs) == 0 {
-		return []string{}, nil
-	}
-
-	projectTags, err := r.client.GetProjectTags(infisical.GetProjectTagsRequest{
-		ProjectID: projectID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var tagIds []string
-	projectTagGroupBySlug := make(map[string]string)
-
-	for _, tag := range projectTags.Tags {
-		projectTagGroupBySlug[tag.Slug] = tag.ID
-	}
-
-	for _, slug := range tagSlugs {
-		if id, ok := projectTagGroupBySlug[slug]; ok {
-			tagIds = append(tagIds, id)
-		} else {
-			newTag, err := r.client.CreateProjectTags(infisical.CreateProjectTagRequest{
-				ProjectID: projectID,
-				Name:      slug,
-				Slug:      slug,
-				Color:     "#B5C02E",
-			})
-			if err != nil {
-				tflog.Error(ctx, err.Error())
-			} else {
-				tagIds = append(tagIds, newTag.Tag.ID)
-			}
-		}
-	}
-
-	return tagIds, nil
-}
-
 // Create creates the resource and sets the initial Terraform state.
 func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
@@ -161,27 +120,16 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	planSecretTagSlugs := make([]types.String, 0, len(plan.Tags.Elements()))
-	diags = plan.Tags.ElementsAs(ctx, &planSecretTagSlugs, false)
+	planSecretTagIds := make([]types.String, 0, len(plan.Tags.Elements()))
+	diags = plan.Tags.ElementsAs(ctx, &planSecretTagIds, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	secretTagSlugs := make([]string, 0, len(planSecretTagSlugs))
-	for _, slug := range planSecretTagSlugs {
-		secretTagSlugs = append(secretTagSlugs, strings.ToLower(slug.ValueString()))
-	}
-	secretTagIds, err := r.getAllTagIds(ctx, plan.WorkspaceId.ValueString(), secretTagSlugs)
-	for _, e := range secretTagIds {
-		tflog.Info(ctx, e)
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating secret",
-			"Could not get tag details, unexpected error: "+err.Error(),
-		)
-		return
+	secretTagIds := make([]string, 0, len(planSecretTagIds))
+	for _, slug := range planSecretTagIds {
+		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
 	}
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
@@ -512,24 +460,16 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	planSecretTagSlugs := make([]types.String, 0, len(plan.Tags.Elements()))
-	diags = plan.Tags.ElementsAs(ctx, &planSecretTagSlugs, false)
+	planSecretTagIds := make([]types.String, 0, len(plan.Tags.Elements()))
+	diags = plan.Tags.ElementsAs(ctx, &planSecretTagIds, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	secretTagSlugs := make([]string, 0, len(planSecretTagSlugs))
-	for _, slug := range planSecretTagSlugs {
-		secretTagSlugs = append(secretTagSlugs, strings.ToLower(slug.ValueString()))
-	}
-	secretTagIds, err := r.getAllTagIds(ctx, plan.WorkspaceId.ValueString(), secretTagSlugs)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating secret",
-			"Could not get tag details, unexpected error: "+err.Error(),
-		)
-		return
+	secretTagIds := make([]string, 0, len(planSecretTagIds))
+	for _, slug := range planSecretTagIds {
+		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
 	}
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
@@ -689,7 +629,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		}
 	} else {
 		resp.Diagnostics.AddError(
-			"Error creating secret",
+			"Error deleting secret",
 			"Unknown authentication strategy",
 		)
 		return
