@@ -56,7 +56,7 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:    true,
 			},
 			"id": schema.StringAttribute{
-				Description:   "The ID of the role",
+				Description:   "The ID of the identity",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
