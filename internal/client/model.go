@@ -100,7 +100,8 @@ type ProjectMemberRole struct {
 
 type OrgIdentity struct {
 	Identity   Identity `json:"identity"`
-	CustomRole struct {
+	Role       string   `json:"role"`
+	CustomRole *struct {
 		ID          string `json:"id"`
 		Name        string `json:"name"`
 		Slug        string `json:"slug"`
