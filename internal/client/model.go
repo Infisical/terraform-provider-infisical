@@ -52,6 +52,13 @@ type Project struct {
 	UpgradeStatus string `json:"upgradeStatus"` // can be null. if its null it will be converted to an empty string.
 }
 
+type ProjectTag struct {
+	ID    string `json:"id"`
+	Slug  string `json:"slug"`
+	Name  string `json:"name"`
+	Color string `json:"color,omitempty"`
+}
+
 type ProjectUser struct {
 	ID     string `json:"id"`
 	UserID string `json:"userId"`
@@ -242,20 +249,21 @@ type EncryptedSecret struct {
 
 // create secrets.
 type CreateSecretV3Request struct {
-	SecretName              string `json:"secretName"`
-	WorkspaceID             string `json:"workspaceId"`
-	Type                    string `json:"type"`
-	Environment             string `json:"environment"`
-	SecretKeyCiphertext     string `json:"secretKeyCiphertext"`
-	SecretKeyIV             string `json:"secretKeyIV"`
-	SecretKeyTag            string `json:"secretKeyTag"`
-	SecretValueCiphertext   string `json:"secretValueCiphertext"`
-	SecretValueIV           string `json:"secretValueIV"`
-	SecretValueTag          string `json:"secretValueTag"`
-	SecretCommentCiphertext string `json:"secretCommentCiphertext"`
-	SecretCommentIV         string `json:"secretCommentIV"`
-	SecretCommentTag        string `json:"secretCommentTag"`
-	SecretPath              string `json:"secretPath"`
+	SecretName              string   `json:"secretName"`
+	WorkspaceID             string   `json:"workspaceId"`
+	Type                    string   `json:"type"`
+	Environment             string   `json:"environment"`
+	SecretKeyCiphertext     string   `json:"secretKeyCiphertext"`
+	SecretKeyIV             string   `json:"secretKeyIV"`
+	SecretKeyTag            string   `json:"secretKeyTag"`
+	SecretValueCiphertext   string   `json:"secretValueCiphertext"`
+	SecretValueIV           string   `json:"secretValueIV"`
+	SecretValueTag          string   `json:"secretValueTag"`
+	SecretCommentCiphertext string   `json:"secretCommentCiphertext"`
+	SecretCommentIV         string   `json:"secretCommentIV"`
+	SecretCommentTag        string   `json:"secretCommentTag"`
+	SecretPath              string   `json:"secretPath"`
+	TagIDs                  []string `json:"tags"`
 }
 
 // delete secret by name api.
@@ -269,14 +277,15 @@ type DeleteSecretV3Request struct {
 
 // update secret by name api.
 type UpdateSecretByNameV3Request struct {
-	SecretName            string `json:"secretName"`
-	WorkspaceID           string `json:"workspaceId"`
-	Environment           string `json:"environment"`
-	Type                  string `json:"type"`
-	SecretPath            string `json:"secretPath"`
-	SecretValueCiphertext string `json:"secretValueCiphertext"`
-	SecretValueIV         string `json:"secretValueIV"`
-	SecretValueTag        string `json:"secretValueTag"`
+	SecretName            string   `json:"secretName"`
+	WorkspaceID           string   `json:"workspaceId"`
+	Environment           string   `json:"environment"`
+	Type                  string   `json:"type"`
+	SecretPath            string   `json:"secretPath"`
+	SecretValueCiphertext string   `json:"secretValueCiphertext"`
+	SecretValueIV         string   `json:"secretValueIV"`
+	SecretValueTag        string   `json:"secretValueTag"`
+	TagIDs                []string `json:"tags,omitempty"`
 }
 
 // get secret by name api.
@@ -318,13 +327,14 @@ type GetSingleRawSecretByNameSecretResponse struct {
 
 // create secrets.
 type CreateRawSecretV3Request struct {
-	WorkspaceID   string `json:"workspaceId"`
-	Type          string `json:"type"`
-	Environment   string `json:"environment"`
-	SecretKey     string `json:"secretKey"`
-	SecretValue   string `json:"secretValue"`
-	SecretComment string `json:"secretComment"`
-	SecretPath    string `json:"secretPath"`
+	WorkspaceID   string   `json:"workspaceId"`
+	Type          string   `json:"type"`
+	Environment   string   `json:"environment"`
+	SecretKey     string   `json:"secretKey"`
+	SecretValue   string   `json:"secretValue"`
+	SecretComment string   `json:"secretComment"`
+	SecretPath    string   `json:"secretPath"`
+	TagIDs        []string `json:"tagIds"`
 }
 
 type DeleteRawSecretV3Request struct {
@@ -337,12 +347,13 @@ type DeleteRawSecretV3Request struct {
 
 // update secret by name api.
 type UpdateRawSecretByNameV3Request struct {
-	SecretName  string `json:"secretName"`
-	WorkspaceID string `json:"workspaceId"`
-	Environment string `json:"environment"`
-	Type        string `json:"type"`
-	SecretPath  string `json:"secretPath"`
-	SecretValue string `json:"secretValue"`
+	SecretName  string   `json:"secretName"`
+	WorkspaceID string   `json:"workspaceId"`
+	Environment string   `json:"environment"`
+	Type        string   `json:"type"`
+	SecretPath  string   `json:"secretPath"`
+	SecretValue string   `json:"secretValue"`
+	TagIDs      []string `json:"tagIds"`
 }
 
 type CreateProjectRequest struct {
@@ -627,4 +638,62 @@ type GetProjectIdentitySpecificPrivilegeRequest struct {
 
 type GetProjectIdentitySpecificPrivilegeResponse struct {
 	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type GetProjectTagsResponse struct {
+	Tags []ProjectTag `json:"workspaceTags"`
+}
+
+type GetProjectTagsRequest struct {
+	ProjectID string `json:"projectId"`
+}
+
+type CreateProjectTagRequest struct {
+	Name      string `json:"name"`
+	Color     string `json:"color"`
+	Slug      string `json:"slug"`
+	ProjectID string `json:"projectId"`
+}
+
+type CreateProjectTagResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type UpdateProjectTagRequest struct {
+	Name      string `json:"name,omitempty"`
+	Color     string `json:"color,omitempty"`
+	Slug      string `json:"slug,omitempty"`
+	ProjectID string `json:"projectId"`
+	TagID     string `json:"tagId"`
+}
+
+type UpdateProjectTagResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type DeleteProjectTagRequest struct {
+	ProjectID string `json:"projectId"`
+	TagID     string `json:"tagId"`
+}
+
+type DeleteProjectTagResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type GetProjectTagByIDRequest struct {
+	ProjectID string `json:"projectId"`
+	TagID     string `json:"tagId"`
+}
+
+type GetProjectTagByIDResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type GetProjectTagBySlugRequest struct {
+	ProjectID string `json:"projectId"`
+	TagSlug   string `json:"tagSlug"`
+}
+
+type GetProjectTagBySlugResponse struct {
+	Tag ProjectTag `json:"workspaceTag"`
 }

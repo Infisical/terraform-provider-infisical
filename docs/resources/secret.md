@@ -44,12 +44,21 @@ resource "infisical_secret" "smtp_secret" {
   folder_path  = "/mail-service"
 }
 
+
+resource "infisical_secret_tag" "terraform" {
+  name       = "terraform"
+  slug       = "terraform"
+  color      = "#fff"
+  project_id = "PROJECT_ID"
+}
+
 resource "infisical_secret" "github_action_secret" {
   name         = "GITHUB_ACTION"
   value        = "<some value>"
   env_slug     = "dev"
   workspace_id = "PROJECT_ID"
   folder_path  = "/"
+  tag_ids      = [infisical_secret_tag.terraform.id]
 }
 ```
 
@@ -65,6 +74,7 @@ resource "infisical_secret" "github_action_secret" {
 
 ### Optional
 
+- `tag_ids` (List of String) Tag ids to be attached for the secrets.
 - `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only

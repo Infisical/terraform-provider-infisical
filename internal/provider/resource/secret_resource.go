@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"terraform-provider-infisical/internal/crypto"
 	"time"
@@ -36,6 +37,7 @@ type secretResourceModel struct {
 	Value       types.String `tfsdk:"value"`
 	WorkspaceId types.String `tfsdk:"workspace_id"`
 	LastUpdated types.String `tfsdk:"last_updated"`
+	Tags        types.List   `tfsdk:"tag_ids"`
 }
 
 // Metadata returns the resource type name.
@@ -78,6 +80,11 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"last_updated": schema.StringAttribute{
 				Computed: true,
 			},
+			"tag_ids": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Description: "Tag ids to be attached for the secrets.",
+			},
 		},
 	}
 }
@@ -111,6 +118,18 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	planSecretTagIds := make([]types.String, 0, len(plan.Tags.Elements()))
+	diags = plan.Tags.ElementsAs(ctx, &planSecretTagIds, false)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretTagIds := make([]string, 0, len(planSecretTagIds))
+	for _, slug := range planSecretTagIds {
+		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
 	}
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
@@ -186,6 +205,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedValue.CipherText),
 			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedValue.Nonce),
 			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedValue.AuthTag),
+			TagIDs:                secretTagIds,
 		})
 
 		if err != nil {
@@ -206,6 +226,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			SecretPath:  plan.FolderPath.ValueString(),
 			SecretKey:   plan.Name.ValueString(),
 			SecretValue: plan.Value.ValueString(),
+			TagIDs:      secretTagIds,
 		})
 
 		if err != nil {
@@ -439,6 +460,18 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	planSecretTagIds := make([]types.String, 0, len(plan.Tags.Elements()))
+	diags = plan.Tags.ElementsAs(ctx, &planSecretTagIds, false)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretTagIds := make([]string, 0, len(planSecretTagIds))
+	for _, slug := range planSecretTagIds {
+		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
+	}
+
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 
 		serviceTokenDetails, err := r.client.GetServiceTokenDetailsV2()
@@ -489,12 +522,12 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 
 		err = r.client.UpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
-			Environment: plan.EnvSlug.ValueString(),
-			SecretName:  plan.Name.ValueString(),
-			Type:        "shared",
-			SecretPath:  plan.FolderPath.ValueString(),
-			WorkspaceID: serviceTokenDetails.Workspace,
-
+			Environment:           plan.EnvSlug.ValueString(),
+			SecretName:            plan.Name.ValueString(),
+			Type:                  "shared",
+			SecretPath:            plan.FolderPath.ValueString(),
+			WorkspaceID:           serviceTokenDetails.Workspace,
+			TagIDs:                secretTagIds,
 			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
 			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
 			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
@@ -516,6 +549,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			Environment: plan.EnvSlug.ValueString(),
 			WorkspaceID: plan.WorkspaceId.ValueString(),
 			Type:        "shared",
+			TagIDs:      secretTagIds,
 			SecretPath:  plan.FolderPath.ValueString(),
 			SecretName:  plan.Name.ValueString(),
 			SecretValue: plan.Value.ValueString(),
@@ -595,7 +629,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		}
 	} else {
 		resp.Diagnostics.AddError(
-			"Error creating secret",
+			"Error deleting secret",
 			"Unknown authentication strategy",
 		)
 		return
