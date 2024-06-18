@@ -98,6 +98,24 @@ type ProjectMemberRole struct {
 	UpdatedAt                time.Time `json:"updatedAt"`
 }
 
+type OrgIdentity struct {
+	Identity   Identity `json:"identity"`
+	CustomRole struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Slug        string `json:"slug"`
+		Description string `json:"description"`
+	} `json:"customRole,omitempty"`
+}
+
+type Identity struct {
+	Name       string    `json:"name"`
+	ID         string    `json:"id"`
+	AuthMethod string    `json:"authMethod"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+}
+
 type ProjectIdentitySpecificPrivilege struct {
 	ID                       string    `json:"id"`
 	Slug                     string    `json:"slug"`
@@ -639,7 +657,7 @@ type DeleteProjectIdentitySpecificPrivilegeResponse struct {
 
 type GetProjectIdentitySpecificPrivilegeRequest struct {
 	ProjectSlug   string `json:"projectSlug"`
-	IdentityId    string `json:"identityId"`
+	IdentityID    string `json:"identityId"`
 	PrivilegeSlug string `json:"privilegeSlug,omitempty"`
 }
 
@@ -794,4 +812,40 @@ type UpdateProjectEnvironmentRequest struct {
 
 type UpdateProjectEnvironmentResponse struct {
 	Environment ProjectEnvironment `json:"environment"`
+}
+
+type CreateIdentityRequest struct {
+	Name  string `json:"name"`
+	OrgID string `json:"organizationId"`
+	Role  string `json:"role"`
+}
+
+type CreateIdentityResponse struct {
+	Identity Identity `json:"identity"`
+}
+
+type UpdateIdentityRequest struct {
+	IdentityID string `json:"identityId"`
+	Name       string `json:"name,omitempty"`
+	Role       string `json:"role,omitempty"`
+}
+
+type UpdateIdentityResponse struct {
+	Identity Identity `json:"identity"`
+}
+
+type DeleteIdentityRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type DeleteIdentityResponse struct {
+	Identity Identity `json:"identity"`
+}
+
+type GetIdentityRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type GetIdentityResponse struct {
+	Identity OrgIdentity `json:"identity"`
 }

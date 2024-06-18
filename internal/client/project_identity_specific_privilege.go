@@ -89,7 +89,7 @@ func (client Client) GetProjectIdentitySpecificPrivilegeBySlug(request GetProjec
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Get(fmt.Sprintf("/api/v1/additional-privilege/identity/%s?projectSlug=%s&identityId=%s", request.PrivilegeSlug, request.ProjectSlug, request.IdentityId))
+		Get(fmt.Sprintf("/api/v1/additional-privilege/identity/%s?projectSlug=%s&identityId=%s", request.PrivilegeSlug, request.ProjectSlug, request.IdentityID))
 
 	if err != nil {
 		return GetProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeBySlug: Unable to complete api request [err=%s]", err)
