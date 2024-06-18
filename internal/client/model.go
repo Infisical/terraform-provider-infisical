@@ -117,6 +117,25 @@ type Identity struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
+type IdentityUniversalAuth struct {
+	ID                      string                           `json:"id"`
+	ClientID                string                           `json:"clientId"`
+	AccessTokenTTL          int64                            `json:"accessTokenTTL"`
+	AccessTokenMaxTTL       int64                            `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit int64                            `json:"accessTokenNumUsesLimit"`
+	CreatedAt               string                           `json:"createdAt"`
+	UpdatedAt               string                           `json:"updatedAt"`
+	IdentityID              string                           `json:"identityId"`
+	ClientSecretTrustedIps  []IdentityUniversalAuthTrustedIp `json:"clientSecretTrustedIps"`
+	AccessTokenTrustedIps   []IdentityUniversalAuthTrustedIp `json:"accessTokenTrustedIps"`
+}
+
+type IdentityUniversalAuthTrustedIp struct {
+	Type      string `json:"type"`
+	Prefix    *int    `json:"prefix,omitempty"`
+	IpAddress string `json:"ipAddress"`
+}
+
 type ProjectIdentitySpecificPrivilege struct {
 	ID                       string    `json:"id"`
 	Slug                     string    `json:"slug"`
@@ -849,4 +868,50 @@ type GetIdentityRequest struct {
 
 type GetIdentityResponse struct {
 	Identity OrgIdentity `json:"identity"`
+}
+
+type UniversalAuthTrustedIp struct {
+	IPAddress string `json:"ipAddress"`
+}
+
+type CreateIdentityUniversalAuthRequest struct {
+	ClientSecretTrustedIPs  []UniversalAuthTrustedIp `json:"clientSecretTrustedIps,omitempty"`
+	AccessTokenTrustedIPs   []UniversalAuthTrustedIp `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                    `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                    `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                    `json:"accessTokenNumUsesLimit,omitempty"`
+	IdentityID              string                   `json:"identityId"`
+}
+
+type CreateIdentityUniversalAuthResponse struct {
+	UniversalAuth IdentityUniversalAuth `json:"identityUniversalAuth"`
+}
+
+type UpdateIdentityUniversalAuthRequest struct {
+	ClientSecretTrustedIPs  []UniversalAuthTrustedIp `json:"clientSecretTrustedIps,omitempty"`
+	AccessTokenTrustedIPs   []UniversalAuthTrustedIp `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                    `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                    `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                    `json:"accessTokenNumUsesLimit,omitempty"`
+	IdentityID              string                   `json:"identityId"`
+}
+
+type UpdateIdentityUniversalAuthResponse struct {
+	UniversalAuth IdentityUniversalAuth `json:"identityUniversalAuth"`
+}
+
+type RevokeIdentityUniversalAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityUniversalAuthResponse struct {
+	UniversalAuth IdentityUniversalAuth `json:"identityUniversalAuth"`
+}
+
+type GetIdentityUniversalAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type GetIdentityUniversalAuthResponse struct {
+	UniversalAuth IdentityUniversalAuth `json:"identityUniversalAuth"`
 }

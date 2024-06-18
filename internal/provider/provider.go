@@ -241,5 +241,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectSecretFolderResource,
 		infisicalResource.NewProjectEnvironmentResource,
 		infisicalResource.NewIdentityResource,
+		infisicalResource.NewIdentityUniversalAuthResource,
 	}
 }
