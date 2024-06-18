@@ -180,6 +180,12 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.AuthMode = types.StringNull()
 	}
 
+	if orgIdentity.CustomRole != nil {
+		state.Role = types.StringValue(orgIdentity.CustomRole.Slug)
+	} else {
+		state.Role = types.StringValue(orgIdentity.Role)
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
