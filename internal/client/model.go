@@ -132,8 +132,21 @@ type IdentityUniversalAuth struct {
 
 type IdentityUniversalAuthTrustedIp struct {
 	Type      string `json:"type"`
-	Prefix    *int    `json:"prefix,omitempty"`
+	Prefix    *int   `json:"prefix,omitempty"`
 	IpAddress string `json:"ipAddress"`
+}
+
+type IdentityUniversalAuthClientSecret struct {
+	ID                       string `json:"id"`
+	CreatedAt                string `json:"createdAt"`
+	UpdatedAt                string `json:"updatedAt"`
+	Description              string `json:"description"`
+	ClientSecretPrefix       string `json:"clientSecretPrefix"`
+	ClientSecretNumUses      int64  `json:"clientSecretNumUses"`
+	ClientSecretNumUsesLimit int64  `json:"clientSecretNumUsesLimit"`
+	ClientSecretTTL          int64  `json:"clientSecretTTL"`
+	IdentityUAID             string `json:"identityUAId"`
+	IsClientSecretRevoked    bool   `json:"isClientSecretRevoked"`
 }
 
 type ProjectIdentitySpecificPrivilege struct {
@@ -914,4 +927,34 @@ type GetIdentityUniversalAuthRequest struct {
 
 type GetIdentityUniversalAuthResponse struct {
 	UniversalAuth IdentityUniversalAuth `json:"identityUniversalAuth"`
+}
+
+type CreateIdentityUniversalAuthClientSecretRequest struct {
+	IdentityID   string `json:"identityId"`
+	Description  string `json:"description"`
+	NumUsesLimit int64  `json:"numUsesLimit"`
+	TTL          int64  `json:"ttl"`
+}
+
+type CreateIdentityUniversalAuthClientSecretResponse struct {
+	ClientSecret     string                            `json:"clientSecret"`
+	ClientSecretData IdentityUniversalAuthClientSecret `json:"clientSecretData"`
+}
+
+type GetIdentityUniversalAuthClientSecretRequest struct {
+	IdentityID     string `json:"identityId"`
+	ClientSecretID string `json:"clientSecretId"`
+}
+
+type GetIdentityUniversalAuthClientSecretResponse struct {
+	ClientSecretData IdentityUniversalAuthClientSecret `json:"clientSecretData"`
+}
+
+type RevokeIdentityUniversalAuthClientSecretRequest struct {
+	IdentityID     string `json:"identityId"`
+	ClientSecretID string `json:"clientSecretId"`
+}
+
+type RevokeIdentityUniversalAuthClientSecretResponse struct {
+	ClientSecretData IdentityUniversalAuthClientSecret `json:"clientSecretData"`
 }
