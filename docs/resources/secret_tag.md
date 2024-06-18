@@ -19,7 +19,7 @@ Create secret tag & save to Infisical.
 
 - `color` (String) Color code for the tag.
 - `name` (String) The name for the new tag
-- `project_id` (String) The ID of the project to create tag
+- `project_id` (String) The project id associated with the secret tag
 - `slug` (String) The slug for the new tag
 
 ### Read-Only

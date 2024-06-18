@@ -55,7 +55,7 @@ func (r *projectSecretTagResource) Schema(_ context.Context, _ resource.SchemaRe
 				Required:    true,
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The ID of the project to create tag",
+				Description: "The project id associated with the secret tag",
 				Required:    true,
 			},
 			"id": schema.StringAttribute{

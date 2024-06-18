@@ -48,7 +48,7 @@ func (d *SecretTagsDataSource) Schema(ctx context.Context, req datasource.Schema
 				Required:    true,
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The secretTag ID of the tag to fetch",
+				Description: "The project id associated with the secret tag",
 				Required:    true,
 			},
 

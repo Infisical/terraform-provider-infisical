@@ -43,7 +43,7 @@ output "secret-tag" {
 
 ### Required
 
-- `project_id` (String) The secretTag ID of the tag to fetch
+- `project_id` (String) The project id associated with the secret tag
 - `slug` (String) The slug of the tag to fetch
 
 ### Read-Only
