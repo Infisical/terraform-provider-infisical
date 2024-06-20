@@ -1,13 +1,8 @@
 package infisicalclient
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-)
-
-var (
-	ErrNotFound = errors.New("Resource not found")
 )
 
 func (client Client) GetIdentity(request GetIdentityRequest) (OrgIdentity, error) {
