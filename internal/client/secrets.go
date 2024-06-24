@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 	"terraform-provider-infisical/internal/crypto"
 )
@@ -128,7 +129,7 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 		SetQueryParams(map[string]string{
 			"environment":            request.Environment,
 			"workspaceId":            request.WorkspaceId,
-			"expandSecretReferences": fmt.Sprintf("%t", request.ExpandSecretReferences),
+			"expandSecretReferences": strconv.FormatBool(request.ExpandSecretReferences),
 		})
 
 	if request.SecretPath != "" {
