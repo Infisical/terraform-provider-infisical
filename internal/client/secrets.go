@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 	"terraform-provider-infisical/internal/crypto"
 )
@@ -125,8 +126,11 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 		R().
 		SetResult(&secretsResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("environment", request.Environment).
-		SetQueryParam("workspaceId", request.WorkspaceId)
+		SetQueryParams(map[string]string{
+			"environment":            request.Environment,
+			"workspaceId":            request.WorkspaceId,
+			"expandSecretReferences": strconv.FormatBool(request.ExpandSecretReferences),
+		})
 
 	if request.SecretPath != "" {
 		httpRequest.SetQueryParam("secretPath", request.SecretPath)
@@ -282,8 +286,9 @@ func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, work
 	}
 
 	request := GetRawSecretsV3Request{
-		Environment: envSlug,
-		WorkspaceId: workspaceId,
+		Environment:            envSlug,
+		WorkspaceId:            workspaceId,
+		ExpandSecretReferences: true,
 	}
 
 	if secretFolderPath != "" {
