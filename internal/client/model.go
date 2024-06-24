@@ -302,9 +302,10 @@ type GetSingleSecretByNameSecretResponse struct {
 }
 
 type GetRawSecretsV3Request struct {
-	Environment string `json:"environment"`
-	WorkspaceId string `json:"workspaceId"`
-	SecretPath  string `json:"secretPath"`
+	Environment            string `json:"environment"`
+	WorkspaceId            string `json:"workspaceId"`
+	SecretPath             string `json:"secretPath"`
+	ExpandSecretReferences bool   `json:"expandSecretReferences"`
 }
 
 type RawV3Secret struct {
