@@ -68,7 +68,8 @@ func (r *IdentityUniversalAuthResource) Schema(_ context.Context, _ resource.Sch
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_address": schema.StringAttribute{
-							Required: true,
+							Optional: true,
+							Computed: true,
 						},
 					},
 				},
@@ -80,7 +81,8 @@ func (r *IdentityUniversalAuthResource) Schema(_ context.Context, _ resource.Sch
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_address": schema.StringAttribute{
-							Required: true,
+							Optional: true,
+							Computed: true,
 						},
 					},
 				},
