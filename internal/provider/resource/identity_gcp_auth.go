@@ -94,7 +94,8 @@ func (r *IdentityGcpAuthResource) Schema(_ context.Context, _ resource.SchemaReq
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_address": schema.StringAttribute{
-							Required: true,
+							Optional: true,
+							Computed: true,
 						},
 					},
 				},

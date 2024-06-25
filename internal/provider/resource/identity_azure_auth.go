@@ -88,7 +88,8 @@ func (r *IdentityAzureAuthResource) Schema(_ context.Context, _ resource.SchemaR
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_address": schema.StringAttribute{
-							Required: true,
+							Optional: true,
+							Computed: true,
 						},
 					},
 				},

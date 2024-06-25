@@ -103,7 +103,8 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ip_address": schema.StringAttribute{
-							Required: true,
+							Optional: true,
+							Computed: true,
 						},
 					},
 				},
