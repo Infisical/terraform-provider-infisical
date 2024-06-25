@@ -39,6 +39,6 @@ Create and manage identity kubernetes auth in Infisical.
 <a id="nestedatt--access_token_trusted_ips"></a>
 ### Nested Schema for `access_token_trusted_ips`
 
-Required:
+Optional:
 
 - `ip_address` (String)

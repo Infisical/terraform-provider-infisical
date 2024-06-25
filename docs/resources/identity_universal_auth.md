@@ -34,7 +34,7 @@ Create and manage identity universal auth in Infisical.
 <a id="nestedatt--access_token_trusted_ips"></a>
 ### Nested Schema for `access_token_trusted_ips`
 
-Required:
+Optional:
 
 - `ip_address` (String)
 
@@ -42,6 +42,6 @@ Required:
 <a id="nestedatt--client_secret_trusted_ips"></a>
 ### Nested Schema for `client_secret_trusted_ips`
 
-Required:
+Optional:
 
 - `ip_address` (String)
