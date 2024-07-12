@@ -148,6 +148,12 @@ type ProjectEnvironment struct {
 	ID   string `json:"id"`
 }
 
+type SecretFolder struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	EnvID string `json:"envId"`
+}
+
 type CreateProjectResponse struct {
 	Project Project `json:"project"`
 }
@@ -697,4 +703,56 @@ type GetProjectTagBySlugRequest struct {
 
 type GetProjectTagBySlugResponse struct {
 	Tag ProjectTag `json:"workspaceTag"`
+}
+
+type CreateSecretFolderRequest struct {
+	Name        string `json:"name"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type CreateSecretFolderResponse struct {
+	Folder SecretFolder `json:"folder"`
+}
+
+type UpdateSecretFolderRequest struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type UpdateSecretFolderResponse struct {
+	Folder SecretFolder `json:"folder"`
+}
+
+type DeleteSecretFolderRequest struct {
+	ID          string `json:"id"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type DeleteSecretFolderResponse struct {
+	Folder SecretFolder `json:"folder"`
+}
+
+type GetSecretFolderByIDRequest struct {
+	ID string `json:"id"`
+}
+
+type GetSecretFolderByIDResponse struct {
+	Folder SecretFolder `json:"folder"`
+}
+
+type ListSecretFolderRequest struct {
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type ListSecretFolderResponse struct {
+	Folders []SecretFolder `json:"folders"`
 }
