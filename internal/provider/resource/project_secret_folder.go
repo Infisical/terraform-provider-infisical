@@ -44,11 +44,11 @@ func (r *projectSecretFolderResource) Schema(_ context.Context, _ resource.Schem
 		Description: "Create secret folder & save to Infisical.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				Description: "The name for the new folder",
+				Description: "The name for the folder",
 				Required:    true,
 			},
 			"folder_path": schema.StringAttribute{
-				Description:   "The path to the folder where the given folder resides",
+				Description:   "The path where the folder should be created/updated",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -168,7 +168,7 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 			return
 		} else {
 			resp.Diagnostics.AddError(
-				"Error reading project secret folder",
+				"Error fetching folders from your project",
 				"Couldn't read project secret folder from Infiscial, unexpected error: "+err.Error(),
 			)
 			return

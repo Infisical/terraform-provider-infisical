@@ -18,8 +18,8 @@ Create secret folder & save to Infisical.
 ### Required
 
 - `environment_slug` (String) The environment slug of the folder to modify/create
-- `folder_path` (String) The path to the folder where the given folder resides
-- `name` (String) The name for the new folder
+- `folder_path` (String) The path where the folder should be created/updated
+- `name` (String) The name for the folder
 - `project_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only

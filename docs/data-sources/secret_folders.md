@@ -18,8 +18,8 @@ Interact with Infisical secret folders.
 ### Required
 
 - `environment_slug` (String) The environment from where folder should be fetched from
-- `folder_path` (String) The path to the folder from where folder should be fetched from
-- `project_id` (String) The project id associated with the secret folder
+- `folder_path` (String) The path from where folders should be fetched from
+- `project_id` (String) The ID of the project where the folder resides
 
 ### Read-Only
 

@@ -46,11 +46,11 @@ func (d *SecretFoldersDataSource) Schema(ctx context.Context, req datasource.Sch
 		Description: "Interact with Infisical secret folders.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Description: "The project id associated with the secret folder",
+				Description: "The ID of the project where the folder resides",
 				Required:    true,
 			},
 			"folder_path": schema.StringAttribute{
-				Description: "The path to the folder from where folder should be fetched from",
+				Description: "The secret path from where folders should be fetched from",
 				Required:    true,
 				Computed:    false,
 			},
@@ -103,7 +103,7 @@ func (d *SecretFoldersDataSource) Read(ctx context.Context, req datasource.ReadR
 
 	if d.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
 		resp.Diagnostics.AddError(
-			"Unable to create secretFolder folder",
+			"Unable to create infisical secrets folder",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
