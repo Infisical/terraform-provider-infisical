@@ -43,3 +43,23 @@ func (client Client) GetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse,
 
 	return tokenDetailsResponse, nil
 }
+
+func (client Client) CheckJWTIsValid(token string) (map[string]any, error) {
+	var tokenDetailsResponse map[string]any
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&tokenDetailsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetAuthToken(token).
+		Post("api/v1/auth/checkAuth")
+
+	if err != nil {
+		return nil, fmt.Errorf("CallGetServiceTokenDetails: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return nil, fmt.Errorf("CallGetServiceTokenDetails: Unsuccessful response: [response=%s]", response)
+	}
+
+	return tokenDetailsResponse, nil
+}
