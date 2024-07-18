@@ -9,26 +9,20 @@ terraform {
 
 provider "infisical" {
   host          = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  client_id     = "<>"
-  client_secret = "<>"
+  client_id     = "<universal-auth-client-id>"
+  client_secret = "<universal-auth-client-secret>"
 }
 
-data "infisical_secrets" "common-secrets" {
+data "infisical_secrets" "common_secrets" {
   env_slug     = "dev"
-  workspace_id = "PROJECT_ID"
-  folder_path  = "/some-folder/another-folder"
-}
-
-data "infisical_secrets" "backend-secrets" {
-  env_slug     = "prod"
-  workspace_id = "PROJECT_ID"
+  workspace_id = "<project id>" // project ID
   folder_path  = "/"
 }
 
 output "all-project-secrets" {
-  value = data.infisical_secrets.backend-secrets
+  value = nonsensitive(data.infisical_secrets.common_secrets.secrets["SECRET-NAME"].value)
 }
 
-output "single-secret" {
-  value = data.infisical_secrets.backend-secrets.secrets["SECRET-NAME"]
+output "all-project-secrets" {
+  value = nonsensitive(data.infisical_secrets.common_secrets.secrets["SECRET-NAME"].comment)
 }
