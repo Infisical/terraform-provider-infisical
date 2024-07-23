@@ -37,4 +37,5 @@ provider "infisical" {
 - `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
 - `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project
 - `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host.
+- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project
 - `service_token` (String, Sensitive) (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project

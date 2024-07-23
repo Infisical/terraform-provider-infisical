@@ -31,6 +31,7 @@ type Config struct {
 	// Universal Machine Identity Auth
 	ClientId     string
 	ClientSecret string
+	IdentityId   string
 
 	EnvSlug     string
 	SecretsPath string
@@ -46,12 +47,24 @@ func NewClient(cnf Config) (*Client, error) {
 	// Add more auth strategies here later
 	var usingServiceToken = cnf.ServiceToken != ""
 	var usingUniversalAuth = cnf.ClientId != "" && cnf.ClientSecret != ""
+	var usingNativeAuth = cnf.IdentityId != ""
 
 	// Check if the user got multiple configured authentication methods, or none set at all.
-	if usingServiceToken && usingUniversalAuth {
+	authCount := 0
+	if usingServiceToken {
+		authCount += 1
+	}
+	if usingUniversalAuth {
+		authCount += 1
+	}
+	if usingNativeAuth {
+		authCount += 1
+	}
+
+	if authCount > 1 {
 		return nil, fmt.Errorf("you have configured multiple authentication methods, please only use one")
-	} else if !usingServiceToken && !usingUniversalAuth {
-		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth before making calls")
+	} else if authCount == 0 {
+		return nil, fmt.Errorf("you must configure an authentication method such as service tokens or Universal Auth before making calls")
 	}
 
 	if usingUniversalAuth {
@@ -66,6 +79,15 @@ func NewClient(cnf Config) (*Client, error) {
 	} else if usingServiceToken {
 		cnf.HttpClient.SetAuthToken(cnf.ServiceToken)
 		cnf.AuthStrategy = AuthStrategy.SERVICE_TOKEN
+	} else if usingNativeAuth {
+		token, err := Client{cnf}.OidcMachineIdentityAuth()
+
+		if err != nil {
+			return nil, fmt.Errorf("unable to authenticate with oidc machine identity [err=%s]", err)
+		}
+
+		cnf.HttpClient.SetAuthToken(token)
+		cnf.AuthStrategy = AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
 	} else {
 		// If no auth strategy is set, then we should return an error
 		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth before making calls")

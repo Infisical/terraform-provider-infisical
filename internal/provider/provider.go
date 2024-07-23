@@ -44,6 +44,8 @@ type infisicalProviderModel struct {
 
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
+
+	IdentityId types.String `tfsdk:"identity_id"`
 }
 
 // Metadata returns the provider type name.
@@ -77,6 +79,11 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Sensitive:   true,
 				Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
 			},
+			"identity_id": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Machine identity ID. Used to fetch/modify secrets for a given project",
+			},
 		},
 	}
 }
@@ -104,6 +111,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	// Machine Identity
 	clientId := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID")
 	clientSecret := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET")
+	identityId := os.Getenv("INFISICAL_MACHINE_IDENTITY_ID")
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -121,6 +129,10 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		clientSecret = config.ClientSecret.ValueString()
 	}
 
+	if !config.IdentityId.IsNull() {
+		identityId = config.IdentityId.ValueString()
+	}
+
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
@@ -130,7 +142,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret})
+	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret, IdentityId: identityId})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
