@@ -34,7 +34,7 @@ provider "infisical" {
 
 ### Optional
 
-- `auth` (Attributes) (see [below for nested schema](#nestedatt--auth))
+- `auth` (Attributes) The configuration values for authentication (see [below for nested schema](#nestedatt--auth))
 - `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
 - `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project
 - `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host.

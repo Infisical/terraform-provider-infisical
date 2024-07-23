@@ -93,7 +93,8 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
 			},
 			"auth": schema.SingleNestedAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: "The configuration values for authentication",
 				Attributes: map[string]schema.Attribute{
 					"universal": schema.SingleNestedAttribute{
 						Optional:    true,
