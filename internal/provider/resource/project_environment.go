@@ -37,7 +37,7 @@ func (r *projectEnvironmentResource) Metadata(_ context.Context, req resource.Me
 // Schema defines the schema for the resource.
 func (r *projectEnvironmentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create project environment & save to Infisical.",
+		Description: "Create project environment",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description:   "The ID of the environment",
@@ -45,11 +45,11 @@ func (r *projectEnvironmentResource) Schema(_ context.Context, _ resource.Schema
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name for the environment",
+				Description: "The name of the environment",
 				Required:    true,
 			},
 			"slug": schema.StringAttribute{
-				Description: "The slug of the environment to modify/create",
+				Description: "The slug of the environment",
 				Required:    true,
 			},
 			"project_id": schema.StringAttribute{
