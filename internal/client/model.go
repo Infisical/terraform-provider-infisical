@@ -193,6 +193,13 @@ type UniversalMachineIdentityAuthResponse struct {
 	TokenType         string `json:"tokenType"`
 }
 
+type OidcMachineIdentityAuthResponse struct {
+	AccessToken       string `json:"accessToken"`
+	ExpiresIn         int    `json:"expiresIn"`
+	AccessTokenMaxTTL int    `json:"accessTokenMaxTTL"`
+	TokenType         string `json:"tokenType"`
+}
+
 type SingleEnvironmentVariable struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`

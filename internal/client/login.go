@@ -58,7 +58,7 @@ func (client Client) OidcMachineIdentityAuth() (string, error) {
 		return "", fmt.Errorf("INFISICAL_AUTH_JWT is not present in the environment")
 	}
 
-	var loginResponse UniversalMachineIdentityAuthResponse
+	var loginResponse OidcMachineIdentityAuthResponse
 
 	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(map[string]string{
 		"identityId": client.Config.IdentityId,
