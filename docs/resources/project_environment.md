@@ -34,9 +34,9 @@ resource "infisical_project" "example" {
 }
 
 resource "infisical_project_environment" "test-environment" {
-  name = "test environment"
-  project_id  = infisical_project.example.id
-  slug = "test-env"
+  name       = "test environment"
+  project_id = infisical_project.example.id
+  slug       = "test-env"
 }
 ```
 
