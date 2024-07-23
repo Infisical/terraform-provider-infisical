@@ -33,10 +33,10 @@ resource "infisical_project" "example" {
   slug = "example"
 }
 
-resource "infisical_project_environment" "test-environment" {
-  name       = "test environment"
+resource "infisical_project_environment" "pre-prod" {
+  name       = "pre-prod"
   project_id = infisical_project.example.id
-  slug       = "test-env"
+  slug       = "preprod"
 }
 ```
 
