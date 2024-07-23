@@ -45,7 +45,21 @@ type infisicalProviderModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 
+	Auth *authModel `tfsdk:"auth"`
+}
+
+type authModel struct {
+	Oidc      *oidcAuthModel      `tfsdk:"oidc"`
+	Universal *universalAuthModel `tfsdk:"universal_auth"`
+}
+
+type oidcAuthModel struct {
 	IdentityId types.String `tfsdk:"identity_id"`
+}
+
+type universalAuthModel struct {
+	ClientId     types.String `tfsdk:"client_id"`
+	ClientSecret types.String `tfsdk:"client_secret"`
 }
 
 // Metadata returns the provider type name.
@@ -68,7 +82,6 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Sensitive:   true,
 				Description: " (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project",
 			},
-
 			"client_id": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
@@ -79,10 +92,37 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Sensitive:   true,
 				Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
 			},
-			"identity_id": schema.StringAttribute{
-				Optional:    true,
-				Sensitive:   true,
-				Description: "Machine identity ID. Used to fetch/modify secrets for a given project",
+			"auth": schema.SingleNestedAttribute{
+				Optional: true,
+				Attributes: map[string]schema.Attribute{
+					"universal_auth": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "The configuration values for Universal Auth",
+						Attributes: map[string]schema.Attribute{
+							"client_id": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "Machine identity client ID. Used to fetch/modify secrets for a given project",
+							},
+							"client_secret": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
+							},
+						},
+					},
+					"oidc": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "The configuration values for OIDC Auth",
+						Attributes: map[string]schema.Attribute{
+							"identity_id": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "Machine identity ID. Used to fetch/modify secrets for a given project",
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -129,10 +169,6 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		clientSecret = config.ClientSecret.ValueString()
 	}
 
-	if !config.IdentityId.IsNull() {
-		identityId = config.IdentityId.ValueString()
-	}
-
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
@@ -142,7 +178,28 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := infisical.NewClient(infisical.Config{HostURL: host, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret, IdentityId: identityId})
+	var authStrategy infisical.AuthStrategyType
+
+	if config.Auth != nil {
+		if config.Auth.Oidc != nil {
+			authStrategy = infisical.AuthStrategy.OIDC_MACHINE_IDENTITY
+			if !config.Auth.Oidc.IdentityId.IsNull() {
+				identityId = config.Auth.Oidc.IdentityId.ValueString()
+			}
+		}
+
+		if config.Auth.Universal != nil {
+			authStrategy = infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
+			if !config.Auth.Universal.ClientId.IsNull() {
+				clientId = config.Auth.Universal.ClientId.ValueString()
+			}
+			if !config.Auth.Universal.ClientSecret.IsNull() {
+				clientSecret = config.Auth.Universal.ClientSecret.ValueString()
+			}
+		}
+	}
+
+	client, err := infisical.NewClient(infisical.Config{HostURL: host, AuthStrategy: authStrategy, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret, IdentityId: identityId})
 
 	if err != nil {
 		resp.Diagnostics.AddError(

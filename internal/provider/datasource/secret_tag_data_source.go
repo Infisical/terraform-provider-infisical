@@ -87,7 +87,7 @@ func (d *SecretTagsDataSource) Configure(ctx context.Context, req datasource.Con
 
 func (d *SecretTagsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 
-	if d.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !d.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create secretTag tag",
 			"Only Machine Identity authentication is supported for this operation",

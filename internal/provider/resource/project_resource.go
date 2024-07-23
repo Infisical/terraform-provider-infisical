@@ -88,7 +88,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create project",
 			"Only Machine Identity authentication is supported for this operation",
@@ -132,7 +132,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 // Read refreshes the Terraform state with the latest data.
 func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read project",
 			"Only Machine Identity authentication is supported for this operation",
@@ -175,7 +175,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update project",
 			"Only Machine Identity authentication is supported for this operation",
@@ -233,7 +233,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete project",
 			"Only Machine Identity authentication is supported for this operation",

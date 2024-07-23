@@ -15,15 +15,18 @@ type AuthStrategyType string
 var AuthStrategy = struct {
 	SERVICE_TOKEN              AuthStrategyType
 	UNIVERSAL_MACHINE_IDENTITY AuthStrategyType
+	OIDC_MACHINE_IDENTITY      AuthStrategyType
 }{
 	SERVICE_TOKEN:              "SERVICE_TOKEN",
 	UNIVERSAL_MACHINE_IDENTITY: "UNIVERSAL_MACHINE_IDENTITY",
+	OIDC_MACHINE_IDENTITY:      "OIDC_MACHINE_IDENTITY",
 }
 
 type Config struct {
 	HostURL string
 
-	AuthStrategy AuthStrategyType
+	AuthStrategy          AuthStrategyType
+	IsMachineIdentityAuth bool
 
 	// Service Token Auth
 	ServiceToken string
@@ -44,53 +47,37 @@ func NewClient(cnf Config) (*Client, error) {
 		cnf.HttpClient.SetBaseURL(cnf.HostURL)
 	}
 
-	// Add more auth strategies here later
 	var usingServiceToken = cnf.ServiceToken != ""
-	var usingUniversalAuth = cnf.ClientId != "" && cnf.ClientSecret != ""
-	var usingNativeAuth = cnf.IdentityId != ""
+
+	selectedAuthStrategy := cnf.AuthStrategy
+	if cnf.ClientId != "" && cnf.ClientSecret != "" && selectedAuthStrategy == "" {
+		selectedAuthStrategy = AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
+	}
 
 	// Check if the user got multiple configured authentication methods, or none set at all.
-	authCount := 0
-	if usingServiceToken {
-		authCount += 1
-	}
-	if usingUniversalAuth {
-		authCount += 1
-	}
-	if usingNativeAuth {
-		authCount += 1
-	}
-
-	if authCount > 1 {
+	if usingServiceToken && selectedAuthStrategy != "" {
 		return nil, fmt.Errorf("you have configured multiple authentication methods, please only use one")
-	} else if authCount == 0 {
+	} else if !usingServiceToken && selectedAuthStrategy == "" {
 		return nil, fmt.Errorf("you must configure an authentication method such as service tokens or Universal Auth before making calls")
 	}
 
-	if usingUniversalAuth {
-		token, err := Client{cnf}.UniversalMachineIdentityAuth()
-
-		if err != nil {
-			return nil, fmt.Errorf("unable to authenticate with universal machine identity [err=%s]", err)
-		}
-
-		cnf.HttpClient.SetAuthToken(token)
-		cnf.AuthStrategy = AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
-	} else if usingServiceToken {
+	if usingServiceToken {
 		cnf.HttpClient.SetAuthToken(cnf.ServiceToken)
 		cnf.AuthStrategy = AuthStrategy.SERVICE_TOKEN
-	} else if usingNativeAuth {
-		token, err := Client{cnf}.OidcMachineIdentityAuth()
-
-		if err != nil {
-			return nil, fmt.Errorf("unable to authenticate with oidc machine identity [err=%s]", err)
+	} else {
+		authStrategies := map[AuthStrategyType]func() (token string, e error){
+			AuthStrategy.UNIVERSAL_MACHINE_IDENTITY: Client{cnf}.UniversalMachineIdentityAuth,
+			AuthStrategy.OIDC_MACHINE_IDENTITY:      Client{cnf}.OidcMachineIdentityAuth,
 		}
 
+		token, err := authStrategies[selectedAuthStrategy]()
+		if err != nil {
+			return nil, fmt.Errorf("unable to authenticate with machine identity [err=%s]", err)
+		}
+
+		cnf.AuthStrategy = selectedAuthStrategy
+		cnf.IsMachineIdentityAuth = true
 		cnf.HttpClient.SetAuthToken(token)
-		cnf.AuthStrategy = AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
-	} else {
-		// If no auth strategy is set, then we should return an error
-		return nil, fmt.Errorf("you must configure a authentication method such as service tokens or Universal Auth before making calls")
 	}
 
 	// These two if statements were a part of an older migration.

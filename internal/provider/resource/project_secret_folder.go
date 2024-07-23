@@ -97,7 +97,7 @@ func (r *projectSecretFolderResource) Configure(_ context.Context, req resource.
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create secret folder",
 			"Only Machine Identity authentication is supported for this operation",
@@ -141,7 +141,7 @@ func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.C
 
 // Read refreshes the Terraform state with the latest data.
 func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read project folder",
 			"Only Machine Identity authentication is supported for this operation",
@@ -185,7 +185,7 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update secret folder",
 			"Only Machine Identity authentication is supported for this operation",
@@ -236,7 +236,7 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete secret folder",
 			"Only Machine Identity authentication is supported for this operation",
