@@ -12,7 +12,7 @@ func (client Client) CreateProjectEnvironment(request CreateProjectEnvironmentRe
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post("api/v1/workspace/" + request.ProjectID + "/environments")
+		Post(fmt.Sprintf("api/v1/workspace/%s/environments", request.ProjectID))
 
 	if err != nil {
 		return CreateProjectEnvironmentResponse{}, fmt.Errorf("CallCreateProjectEnvironment: Unable to complete api request [err=%s]", err)
@@ -32,7 +32,7 @@ func (client Client) DeleteProjectEnvironment(request DeleteProjectEnvironmentRe
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Delete("api/v1/workspace/" + request.ProjectID + "/environments/" + request.ID)
+		Delete(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
 
 	if err != nil {
 		return DeleteProjectEnvironmentResponse{}, fmt.Errorf("CallDeleteProjectEnvironment: Unable to complete api request [err=%s]", err)
@@ -53,7 +53,7 @@ func (client Client) GetProjectEnvironmentByID(request GetProjectEnvironmentByID
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT)
 
-	response, err := httpRequest.Get("api/v1/workspace/" + request.ProjectID + "/environments/" + request.ID)
+	response, err := httpRequest.Get(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
 
 	if response.StatusCode() == http.StatusNotFound {
 		return GetProjectEnvironmentByIDResponse{}, ErrNotFound
@@ -77,7 +77,7 @@ func (client Client) UpdateProjectEnvironment(request UpdateProjectEnvironmentRe
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch("api/v1/workspace/" + request.ProjectID + "/environments/" + request.ID)
+		Patch(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
 
 	if err != nil {
 		return UpdateProjectEnvironmentResponse{}, fmt.Errorf("CallUpdateProjectEnvironment: Unable to complete api request [err=%s]", err)
