@@ -50,7 +50,7 @@ type infisicalProviderModel struct {
 
 type authModel struct {
 	Oidc      *oidcAuthModel      `tfsdk:"oidc"`
-	Universal *universalAuthModel `tfsdk:"universal_auth"`
+	Universal *universalAuthModel `tfsdk:"universal"`
 }
 
 type oidcAuthModel struct {
@@ -95,7 +95,7 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 			"auth": schema.SingleNestedAttribute{
 				Optional: true,
 				Attributes: map[string]schema.Attribute{
-					"universal_auth": schema.SingleNestedAttribute{
+					"universal": schema.SingleNestedAttribute{
 						Optional:    true,
 						Description: "The configuration values for Universal Auth",
 						Attributes: map[string]schema.Attribute{

@@ -46,7 +46,7 @@ provider "infisical" {
 Optional:
 
 - `oidc` (Attributes) The configuration values for OIDC Auth (see [below for nested schema](#nestedatt--auth--oidc))
-- `universal_auth` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal_auth))
+- `universal` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal))
 
 <a id="nestedatt--auth--oidc"></a>
 ### Nested Schema for `auth.oidc`
@@ -56,8 +56,8 @@ Optional:
 - `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project
 
 
-<a id="nestedatt--auth--universal_auth"></a>
-### Nested Schema for `auth.universal_auth`
+<a id="nestedatt--auth--universal"></a>
+### Nested Schema for `auth.universal`
 
 Optional:
 
