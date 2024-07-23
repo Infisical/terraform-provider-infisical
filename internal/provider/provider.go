@@ -239,5 +239,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectIdentitySpecificPrivilegeResource,
 		infisicalResource.NewProjectSecretTagResource,
 		infisicalResource.NewProjectSecretFolderResource,
+		infisicalResource.NewProjectEnvironmentResource,
 	}
 }

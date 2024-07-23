@@ -763,3 +763,42 @@ type ListSecretFolderRequest struct {
 type ListSecretFolderResponse struct {
 	Folders []SecretFolder `json:"folders"`
 }
+
+type CreateProjectEnvironmentRequest struct {
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ProjectID string `json:"workspaceId"`
+}
+
+type CreateProjectEnvironmentResponse struct {
+	Environment ProjectEnvironment `json:"environment"`
+}
+
+type DeleteProjectEnvironmentRequest struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"workspaceId"`
+}
+
+type DeleteProjectEnvironmentResponse struct {
+	Environment ProjectEnvironment `json:"environment"`
+}
+
+type GetProjectEnvironmentByIDRequest struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"workspaceId"`
+}
+
+type GetProjectEnvironmentByIDResponse struct {
+	Environment ProjectEnvironment `json:"environment"`
+}
+
+type UpdateProjectEnvironmentRequest struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ProjectID string `json:"workspaceId"`
+}
+
+type UpdateProjectEnvironmentResponse struct {
+	Environment ProjectEnvironment `json:"environment"`
+}
