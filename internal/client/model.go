@@ -186,7 +186,7 @@ type GetServiceTokenDetailsResponse struct {
 	V            int       `json:"__v"`
 }
 
-type UniversalMachineIdentityAuthResponse struct {
+type MachineIdentityAuthResponse struct {
 	AccessToken       string `json:"accessToken"`
 	ExpiresIn         int    `json:"expiresIn"`
 	AccessTokenMaxTTL int    `json:"accessTokenMaxTTL"`

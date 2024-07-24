@@ -101,7 +101,7 @@ func (d *SecretFoldersDataSource) Configure(ctx context.Context, req datasource.
 
 func (d *SecretFoldersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 
-	if d.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !d.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create infisical secrets folder",
 			"Only Machine Identity authentication is supported for this operation",

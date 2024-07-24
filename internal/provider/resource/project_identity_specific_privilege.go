@@ -169,7 +169,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Configure(_ context.C
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create project identity specific privilege",
 			"Only Machine Identity authentication is supported for this operation",
@@ -291,7 +291,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Co
 
 // Read refreshes the Terraform state with the latest data.
 func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read project identity specific privilege",
 			"Only Machine Identity authentication is supported for this operation",
@@ -420,7 +420,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update project identity specific privilege",
 			"Only Machine Identity authentication is supported for this operation",
@@ -544,7 +544,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *projectIdentitySpecificPrivilegeResourceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete project identity specific privilege",
 			"Only Machine Identity authentication is supported for this operation",

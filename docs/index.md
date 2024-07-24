@@ -34,7 +34,32 @@ provider "infisical" {
 
 ### Optional
 
+- `auth` (Attributes) The configuration values for authentication (see [below for nested schema](#nestedatt--auth))
 - `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
 - `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project
 - `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host.
 - `service_token` (String, Sensitive) (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project
+
+<a id="nestedatt--auth"></a>
+### Nested Schema for `auth`
+
+Optional:
+
+- `oidc` (Attributes) The configuration values for OIDC Auth (see [below for nested schema](#nestedatt--auth--oidc))
+- `universal` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal))
+
+<a id="nestedatt--auth--oidc"></a>
+### Nested Schema for `auth.oidc`
+
+Optional:
+
+- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project
+
+
+<a id="nestedatt--auth--universal"></a>
+### Nested Schema for `auth.universal`
+
+Optional:
+
+- `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
+- `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project

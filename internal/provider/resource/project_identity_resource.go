@@ -171,7 +171,7 @@ func (r *ProjectIdentityResource) Configure(_ context.Context, req resource.Conf
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create project identity",
 			"Only Machine Identity authentication is supported for this operation",
@@ -304,7 +304,7 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 
 // Read refreshes the Terraform state with the latest data.
 func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read project identity",
 			"Only Machine Identity authentication is supported for this operation",
@@ -377,7 +377,7 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update project identity",
 			"Only Machine Identity authentication is supported for this operation",
@@ -525,8 +525,7 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *ProjectIdentityResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete project identity",
 			"Only Machine Identity authentication is supported for this operation",
