@@ -144,15 +144,15 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		resp.Diagnostics.AddError("No authentication credentials provided", "You must define service_token field of the provider")
 	}
 
-	host := os.Getenv("INFISICAL_HOST")
+	host := os.Getenv(infisical.INFISICAL_HOST_NAME)
 
 	// Service Token
-	serviceToken := os.Getenv("INFISICAL_SERVICE_TOKEN")
+	serviceToken := os.Getenv(infisical.INFISICAL_SERVICE_TOKEN_NAME)
 
 	// Machine Identity
-	clientId := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID")
-	clientSecret := os.Getenv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET")
-	identityId := os.Getenv("INFISICAL_MACHINE_IDENTITY_ID")
+	clientId := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME)
+	clientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME)
+	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
