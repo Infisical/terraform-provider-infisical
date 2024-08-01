@@ -252,5 +252,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityOidcAuthResource,
 		infisicalResource.NewSecretApprovalPolicyResource,
 		infisicalResource.NewAccessApprovalPolicyResource,
+		infisicalResource.NewProjectSecretImportResource,
 	}
 }

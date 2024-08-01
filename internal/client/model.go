@@ -287,6 +287,12 @@ type SecretFolder struct {
 	EnvID string `json:"envId"`
 }
 
+type SecretImport struct {
+	ID         string `json:"id"`
+	SecretPath string `json:"secretPath"`
+	ImportPath string `json:"importPath"`
+}
+
 type CreateProjectResponse struct {
 	Project Project `json:"project"`
 }
@@ -1553,4 +1559,66 @@ type DeleteAccessApprovalPolicyRequest struct {
 
 type DeleteAccessApprovalPolicyResponse struct {
 	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+type CreateSecretImportRequest struct {
+	ProjectID     string `json:"workspaceId"`
+	Environment   string `json:"environment"`
+	SecretPath    string `json:"path"`
+	IsReplication bool   `json:"isReplication"`
+	ImportFrom    struct {
+		Environment string `json:"environment"`
+		SecretPath  string `json:"path"`
+	} `json:"import"`
+}
+
+type CreateSecretImportResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type UpdateSecretImportRequest struct {
+	ID            string `json:"id"`
+	ProjectID     string `json:"workspaceId"`
+	Environment   string `json:"environment"`
+	SecretPath    string `json:"path"`
+	IsReplication bool   `json:"isReplication"`
+	ImportFrom    struct {
+		Environment string `json:"environment"`
+		SecretPath  string `json:"path"`
+	} `json:"import"`
+}
+
+type UpdateSecretImportResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type DeleteSecretImportRequest struct {
+	ID          string `json:"id"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type DeleteSecretImportResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type GetSecretImportByIDRequest struct {
+	ID          string `json:"id"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type GetSecretImportByIDResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type ListSecretImportRequest struct {
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type ListSecretImportResponse struct {
+	SecretImports []SecretImport `json:"secretImports"`
 }
