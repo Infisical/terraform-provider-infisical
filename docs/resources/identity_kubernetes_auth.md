@@ -28,8 +28,8 @@ Create and manage identity kubernetes auth in Infisical.
 - `access_token_trusted_ips` (Attributes List) A list of IPs or CIDR ranges that access tokens can be used from. You can use 0.0.0.0/0, to allow usage from any network address.. (see [below for nested schema](#nestedatt--access_token_trusted_ips))
 - `access_token_ttl` (Number) The lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000
 - `allowed_audience` (String) An optional audience claim that the service account JWT token must have to authenticate with Infisical.
-- `allowed_namespaces` (String) A comma-separated list of trusted namespaces that service accounts must belong to authenticate with Infisical.
-- `allowed_service_account_names` (String) A comma-separated list of trusted service account names that are allowed to authenticate with Infisical.
+- `allowed_namespaces` (List of String) List of trusted namespaces that service accounts must belong to authenticate with Infisical.
+- `allowed_service_account_names` (List of String) List of trusted service account names that are allowed to authenticate with Infisical.
 - `kubernetes_ca_certificate` (String) The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.
 
 ### Read-Only

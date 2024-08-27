@@ -26,7 +26,7 @@ Create and manage identity azure auth in Infisical.
 - `access_token_num_uses_limit` (Number) The maximum number of times that an access token can be used; a value of 0 implies infinite number of uses. Default:0
 - `access_token_trusted_ips` (Attributes List) A list of IPs or CIDR ranges that access tokens can be used from. You can use 0.0.0.0/0, to allow usage from any network address.. (see [below for nested schema](#nestedatt--access_token_trusted_ips))
 - `access_token_ttl` (Number) The lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000
-- `allowed_service_principal_ids` (String) A comma-separated list of Azure AD service principal IDs that are allowed to authenticate with Infisical
+- `allowed_service_principal_ids` (List of String) List of Azure AD service principal IDs that are allowed to authenticate with Infisical
 - `resource_url` (String) The resource URL for the application registered in Azure AD. The value is expected to match the `aud` claim of the access token JWT later used in the login operation against Infisical. See the [resource](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-http) parameter for how the audience is set when requesting a JWT access token from the Azure Instance Metadata Service (IMDS) endpoint. In most cases, this value should be `https://management.azure.com/` which is the default
 
 ### Read-Only

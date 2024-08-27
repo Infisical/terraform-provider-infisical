@@ -25,9 +25,9 @@ Create and manage identity gcp auth in Infisical.
 - `access_token_num_uses_limit` (Number) The maximum number of times that an access token can be used; a value of 0 implies infinite number of uses. Default:0
 - `access_token_trusted_ips` (Attributes List) A list of IPs or CIDR ranges that access tokens can be used from. You can use 0.0.0.0/0, to allow usage from any network address.. (see [below for nested schema](#nestedatt--access_token_trusted_ips))
 - `access_token_ttl` (Number) The lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000
-- `allowed_projects` (String) A comma-separated list of trusted GCP projects that the GCE instance must belong to authenticate with Infisical. Note that this validation property will only work for GCE instances
-- `allowed_service_account_emails` (String) A comma-separated list of trusted service account emails corresponding to the GCE resource(s) allowed to authenticate with Infisical; this could be something like `test@project.iam.gserviceaccount.com`, `12345-compute@developer.gserviceaccount.com`, etc.
-- `allowed_zones` (String) A comma-separated list of trusted zones that the GCE instances must belong to authenticate with Infisical; this should be the fully-qualified zone name in the format `<region>-<zone>`like `us-central1-a`, `us-west1-b`, etc. Note that this validation property will only work for GCE instances.
+- `allowed_projects` (List of String) List of trusted GCP projects that the GCE instance must belong to authenticate with Infisical. Note that this validation property will only work for GCE instances
+- `allowed_service_account_emails` (List of String) List of trusted service account emails corresponding to the GCE resource(s) allowed to authenticate with Infisical; this could be something like `test@project.iam.gserviceaccount.com`, `12345-compute@developer.gserviceaccount.com`, etc.
+- `allowed_zones` (List of String) List of trusted zones that the GCE instances must belong to authenticate with Infisical; this should be the fully-qualified zone name in the format `<region>-<zone>`like `us-central1-a`, `us-west1-b`, etc. Note that this validation property will only work for GCE instances.
 - `type` (String) The Type of GCP Auth Method to use: Options are gce, iam. Default:gce
 
 ### Read-Only

@@ -32,7 +32,7 @@ provider "infisical" {
 resource "infisical_identity" "universal-auth" {
   name   = "universal-auth"
   role   = "member"
-  org_id = "<org-id>"
+  org_id = "<org_id>"
 }
 
 resource "infisical_identity_universal_auth" "ua-auth" {
@@ -56,7 +56,7 @@ output "client_secret" {
 resource "infisical_identity" "aws-auth" {
   name   = "aws-auth"
   role   = "member"
-  org_id = "<org-id>"
+  org_id = "<org_id>"
 }
 
 resource "infisical_identity_aws_auth" "aws-auth" {
@@ -64,13 +64,14 @@ resource "infisical_identity_aws_auth" "aws-auth" {
   access_token_ttl            = 2592000
   access_token_max_ttl        = 2592000 * 2
   access_token_num_uses_limit = 3
-  allowed_principal_arns      = "arn:aws:iam::123456789012:user/MyUserName"
+  allowed_principal_arns      = ["arn:aws:iam::123456789012:user/MyUserName"]
+  allowed_account_ids         = ["123456789012", "123456789013"]
 }
 
 resource "infisical_identity" "azure-auth" {
   name   = "azure-auth"
   role   = "member"
-  org_id = "<org-id>"
+  org_id = "<org_id>"
 }
 
 resource "infisical_identity_azure_auth" "azure-auth" {
@@ -81,7 +82,7 @@ resource "infisical_identity_azure_auth" "azure-auth" {
 resource "infisical_identity" "gcp-auth" {
   name   = "gcp-auth"
   role   = "member"
-  org_id = "<org-id>"
+  org_id = "<org_id>"
 }
 
 resource "infisical_identity_gcp_auth" "gcp-auth" {
@@ -92,13 +93,14 @@ resource "infisical_identity_gcp_auth" "gcp-auth" {
 resource "infisical_identity" "k8-auth" {
   name   = "k8-auth"
   role   = "member"
-  org_id = "<org-id>"
+  org_id = "<org_id>"
 }
 
 resource "infisical_identity_kubernetes_auth" "k8-auth" {
   identity_id        = infisical_identity.k8-auth.id
   kubernetes_host    = "http://example.com"
   token_reviewer_jwt = "ey<example>"
+  allowed_namespaces = ["namespace-a", "namespace-b"]
 }
 ```
 
@@ -109,7 +111,7 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 
 - `name` (String) The name for the identity
 - `org_id` (String) The ID of the organization for the identity
-- `role` (String) The role for the identity
+- `role` (String) The role for the identity. Available default role options are 'admin', 'member', and 'no-access'. If you've created custom roles, you can use their slugs as well.
 
 ### Optional
 
