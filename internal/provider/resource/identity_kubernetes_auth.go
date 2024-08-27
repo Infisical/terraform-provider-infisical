@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -33,9 +36,9 @@ type IdentityKubernetesAuthResourceModel struct {
 	KubernetesHost             types.String `tfsdk:"kubernetes_host"`
 	CaCertificate              types.String `tfsdk:"kubernetes_ca_certificate"`
 	TokenReviewerJWT           types.String `tfsdk:"token_reviewer_jwt"`
-	AllowedServiceAccountNames types.String `tfsdk:"allowed_service_account_names"`
+	AllowedServiceAccountNames types.List   `tfsdk:"allowed_service_account_names"`
 	AllowedAudience            types.String `tfsdk:"allowed_audience"`
-	AllowedNamespaces          types.String `tfsdk:"allowed_namespaces"`
+	AllowedNamespaces          types.List   `tfsdk:"allowed_namespaces"`
 	AccessTokenTTL             types.Int64  `tfsdk:"access_token_ttl"`
 	AccessTokenMaxTTL          types.Int64  `tfsdk:"access_token_max_ttl"`
 	AccessTokenNumUsesLimit    types.Int64  `tfsdk:"access_token_num_uses_limit"`
@@ -81,8 +84,9 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				Optional:            true,
 				Computed:            true,
 			},
-			"allowed_service_account_names": schema.StringAttribute{
-				Description: "A comma-separated list of trusted service account names that are allowed to authenticate with Infisical.",
+			"allowed_service_account_names": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of trusted service account names that are allowed to authenticate with Infisical.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -91,8 +95,9 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 			},
-			"allowed_namespaces": schema.StringAttribute{
-				Description: "A comma-separated list of trusted namespaces that service accounts must belong to authenticate with Infisical.",
+			"allowed_namespaces": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of trusted namespaces that service accounts must belong to authenticate with Infisical.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -153,8 +158,6 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenTTL = types.Int64Value(newIdentityKubernetesAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityKubernetesAuth.AccessTokenNumUsesLimit)
 	plan.AllowedAudience = types.StringValue(newIdentityKubernetesAuth.AllowedAudience)
-	plan.AllowedServiceAccountNames = types.StringValue(newIdentityKubernetesAuth.AllowedServiceAccountNames)
-	plan.AllowedNamespaces = types.StringValue(newIdentityKubernetesAuth.AllowedNamespaces)
 	plan.CaCertificate = types.StringValue(newIdentityKubernetesAuth.CACERT)
 
 	planAccessTokenTrustedIps := make([]IdentityKubernetesAuthResourceTrustedIps, len(newIdentityKubernetesAuth.AccessTokenTrustedIPS))
@@ -180,6 +183,13 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 		return
 	}
 
+	plan.AllowedNamespaces, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityKubernetesAuth.AllowedNamespaces, ","))
+	diagnose.Append(diags...)
+	if diagnose.HasError() {
+		return
+	}
+
+	plan.AllowedServiceAccountNames, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityKubernetesAuth.AllowedServiceAccountNames, ","))
 	diagnose.Append(diags...)
 	if diagnose.HasError() {
 		return
@@ -207,6 +217,8 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 	}
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
+	allowedNames := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountNames)
 	newIdentityKubernetesAuth, err := r.client.CreateIdentityKubernetesAuth(infisical.CreateIdentityKubernetesAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
@@ -216,8 +228,8 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 		KubernetesHost:          plan.KubernetesHost.ValueString(),
 		CACERT:                  plan.CaCertificate.ValueString(),
 		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
-		AllowedNamespaces:       plan.AllowedNamespaces.ValueString(),
-		AllowedNames:            plan.AllowedServiceAccountNames.ValueString(),
+		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
+		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),
 	})
 
@@ -309,6 +321,9 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 	}
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+
+	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
+	allowedNames := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountNames)
 	updatedIdentityKubernetesAuth, err := r.client.UpdateIdentityKubernetesAuth(infisical.UpdateIdentityKubernetesAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
@@ -318,8 +333,8 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		KubernetesHost:          plan.KubernetesHost.ValueString(),
 		CACERT:                  plan.CaCertificate.ValueString(),
 		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
-		AllowedNamespaces:       plan.AllowedNamespaces.ValueString(),
-		AllowedNames:            plan.AllowedServiceAccountNames.ValueString(),
+		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
+		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),
 	})
 

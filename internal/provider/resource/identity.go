@@ -52,7 +52,7 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role": schema.StringAttribute{
-				Description: "The role for the identity",
+				Description: "The role for the identity. Available default role options are 'admin', 'member', and 'no-access'. If you've created custom roles, you can use their slugs as well.",
 				Required:    true,
 			},
 			"id": schema.StringAttribute{

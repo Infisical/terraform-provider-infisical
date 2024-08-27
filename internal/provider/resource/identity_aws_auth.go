@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -31,8 +34,8 @@ type IdentityAwsAuthResourceModel struct {
 	ID                      types.String `tfsdk:"id"`
 	IdentityID              types.String `tfsdk:"identity_id"`
 	StsEndpoint             types.String `tfsdk:"sts_endpoint"`
-	AllowedAccountIDs       types.String `tfsdk:"allowed_account_ids"`
-	AllowedPrincipalArns    types.String `tfsdk:"allowed_principal_arns"`
+	AllowedAccountIDs       types.List   `tfsdk:"allowed_account_ids"`
+	AllowedPrincipalArns    types.List   `tfsdk:"allowed_principal_arns"`
 	AccessTokenTrustedIps   types.List   `tfsdk:"access_token_trusted_ips"`
 	AccessTokenTTL          types.Int64  `tfsdk:"access_token_ttl"`
 	AccessTokenMaxTTL       types.Int64  `tfsdk:"access_token_max_ttl"`
@@ -69,14 +72,15 @@ func (r *IdentityAwsAuthResource) Schema(_ context.Context, _ resource.SchemaReq
 				Optional:            true,
 				Computed:            true,
 			},
-
-			"allowed_account_ids": schema.StringAttribute{
-				Description: "A comma-separated list of trusted AWS account IDs that are allowed to authenticate with Infisical.",
+			"allowed_account_ids": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of trusted AWS account IDs that are allowed to authenticate with Infisical.",
 				Optional:    true,
 				Computed:    true,
 			},
-			"allowed_principal_arns": schema.StringAttribute{
-				Description: "A comma-separated list of trusted IAM principal ARNs that are allowed to authenticate with Infisical. The values should take one of three forms: `arn:aws:iam::123456789012:user/MyUserName`, `arn:aws:iam::123456789012:role/MyRoleName`, or `arn:aws:iam::123456789012:*`. Using a wildcard in this case allows any IAM principal in the account `123456789012` to authenticate with Infisical under the identity",
+			"allowed_principal_arns": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of trusted IAM principal ARNs that are allowed to authenticate with Infisical. The values should take one of three forms: `arn:aws:iam::123456789012:user/MyUserName`, `arn:aws:iam::123456789012:role/MyRoleName`, or `arn:aws:iam::123456789012:*`. Using a wildcard in this case allows any IAM principal in the account `123456789012` to authenticate with Infisical under the identity",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -132,7 +136,7 @@ func (r *IdentityAwsAuthResource) Configure(_ context.Context, req resource.Conf
 	r.client = client
 }
 
-func updateAwsAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAwsAuthResourceModel, newIdentityAwsAuth *infisicalclient.IdentityAwsAuth) {
+func updateAwsAuthTerraformStateFromApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAwsAuthResourceModel, newIdentityAwsAuth *infisicalclient.IdentityAwsAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityAwsAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityAwsAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityAwsAuth.AccessTokenNumUsesLimit)
@@ -165,10 +169,20 @@ func updateAwsAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pla
 		return
 	}
 
+	plan.AllowedPrincipalArns, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityAwsAuth.AllowedPrincipalArns, ","))
+	diagnose.Append(diags...)
+	if diagnose.HasError() {
+		return
+	}
+
+	plan.AllowedAccountIDs, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityAwsAuth.AllowedAccountIDS, ","))
+	diagnose.Append(diags...)
+	if diagnose.HasError() {
+		return
+	}
+
 	plan.AccessTokenTrustedIps = stateAccessTokenTrustedIps
 	plan.StsEndpoint = types.StringValue(newIdentityAwsAuth.StsEndpoint)
-	plan.AllowedPrincipalArns = types.StringValue(newIdentityAwsAuth.AllowedPrincipalArns)
-	plan.AllowedAccountIDs = types.StringValue(newIdentityAwsAuth.AllowedAccountIDS)
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -190,14 +204,18 @@ func (r *IdentityAwsAuthResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+
+	allowedPrincipalArns := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedPrincipalArns)
+	allowedAccoundIds := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedAccountIDs)
+
 	newIdentityAwsAuth, err := r.client.CreateIdentityAwsAuth(infisical.CreateIdentityAwsAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
 		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
 		StsEndpoint:             plan.StsEndpoint.ValueString(),
-		AllowedAccountIDS:       plan.AllowedAccountIDs.ValueString(),
-		AllowedPrincipalArns:    plan.AllowedPrincipalArns.ValueString(),
+		AllowedAccountIDS:       strings.Join(allowedAccoundIds, ","),
+		AllowedPrincipalArns:    strings.Join(allowedPrincipalArns, ","),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
 	})
 
@@ -210,7 +228,7 @@ func (r *IdentityAwsAuthResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	plan.ID = types.StringValue(newIdentityAwsAuth.ID)
-	updateAwsAuthStateByApi(ctx, resp.Diagnostics, &plan, &newIdentityAwsAuth)
+	updateAwsAuthTerraformStateFromApi(ctx, resp.Diagnostics, &plan, &newIdentityAwsAuth)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -255,7 +273,7 @@ func (r *IdentityAwsAuthResource) Read(ctx context.Context, req resource.ReadReq
 		}
 	}
 
-	updateAwsAuthStateByApi(ctx, resp.Diagnostics, &state, &identityAwsAuth)
+	updateAwsAuthTerraformStateFromApi(ctx, resp.Diagnostics, &state, &identityAwsAuth)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -289,6 +307,9 @@ func (r *IdentityAwsAuthResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+	allowedPrincipalArns := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedPrincipalArns)
+	allowedAccoundIds := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedAccountIDs)
+
 	updatedIdentityAwsAuth, err := r.client.UpdateIdentityAwsAuth(infisical.UpdateIdentityAwsAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
@@ -296,8 +317,8 @@ func (r *IdentityAwsAuthResource) Update(ctx context.Context, req resource.Updat
 		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
 		StsEndpoint:             plan.StsEndpoint.ValueString(),
-		AllowedAccountIDS:       plan.AllowedAccountIDs.ValueString(),
-		AllowedPrincipalArns:    plan.AllowedPrincipalArns.ValueString(),
+		AllowedAccountIDS:       strings.Join(allowedAccoundIds, ","),
+		AllowedPrincipalArns:    strings.Join(allowedPrincipalArns, ","),
 	})
 
 	if err != nil {
@@ -308,7 +329,7 @@ func (r *IdentityAwsAuthResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	updateAwsAuthStateByApi(ctx, resp.Diagnostics, &plan, &updatedIdentityAwsAuth)
+	updateAwsAuthTerraformStateFromApi(ctx, resp.Diagnostics, &plan, &updatedIdentityAwsAuth)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -33,7 +36,7 @@ type IdentityAzureAuthResourceModel struct {
 	IdentityID                 types.String `tfsdk:"identity_id"`
 	TenantID                   types.String `tfsdk:"tenant_id"`
 	Resource                   types.String `tfsdk:"resource_url"`
-	AllowedServicePrincipalIDs types.String `tfsdk:"allowed_service_principal_ids"`
+	AllowedServicePrincipalIDs types.List   `tfsdk:"allowed_service_principal_ids"`
 	AccessTokenTrustedIps      types.List   `tfsdk:"access_token_trusted_ips"`
 	AccessTokenTTL             types.Int64  `tfsdk:"access_token_ttl"`
 	AccessTokenMaxTTL          types.Int64  `tfsdk:"access_token_max_ttl"`
@@ -76,8 +79,9 @@ func (r *IdentityAzureAuthResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:            true,
 				Default:             stringdefault.StaticString("https://management.azure.com"),
 			},
-			"allowed_service_principal_ids": schema.StringAttribute{
-				Description: "A comma-separated list of Azure AD service principal IDs that are allowed to authenticate with Infisical",
+			"allowed_service_principal_ids": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of Azure AD service principal IDs that are allowed to authenticate with Infisical",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -133,12 +137,11 @@ func (r *IdentityAzureAuthResource) Configure(_ context.Context, req resource.Co
 	r.client = client
 }
 
-func updateAzureAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAzureAuthResourceModel, newIdentityAzureAuth *infisicalclient.IdentityAzureAuth) {
+func updateAzureAuthTerraformStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAzureAuthResourceModel, newIdentityAzureAuth *infisicalclient.IdentityAzureAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityAzureAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityAzureAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityAzureAuth.AccessTokenNumUsesLimit)
 	plan.TenantID = types.StringValue(newIdentityAzureAuth.TenantID)
-	plan.AllowedServicePrincipalIDs = types.StringValue(newIdentityAzureAuth.AllowedServicePrincipalIDS)
 	plan.Resource = types.StringValue(newIdentityAzureAuth.Resource)
 
 	planAccessTokenTrustedIps := make([]IdentityAzureAuthResourceTrustedIps, len(newIdentityAzureAuth.AccessTokenTrustedIPS))
@@ -164,6 +167,7 @@ func updateAzureAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, p
 		return
 	}
 
+	plan.AllowedServicePrincipalIDs, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityAzureAuth.AllowedServicePrincipalIDS, ","))
 	diagnose.Append(diags...)
 	if diagnose.HasError() {
 		return
@@ -190,6 +194,7 @@ func (r *IdentityAzureAuthResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	allowedServicePrincipalIds := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServicePrincipalIDs)
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
 	newIdentityAzureAuth, err := r.client.CreateIdentityAzureAuth(infisical.CreateIdentityAzureAuthRequest{
 		IdentityID:                 plan.IdentityID.ValueString(),
@@ -197,7 +202,7 @@ func (r *IdentityAzureAuthResource) Create(ctx context.Context, req resource.Cre
 		AccessTokenMaxTTL:          plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit:    plan.AccessTokenNumUsesLimit.ValueInt64(),
 		TenantID:                   plan.TenantID.ValueString(),
-		AllowedServicePrincipalIDS: plan.AllowedServicePrincipalIDs.ValueString(),
+		AllowedServicePrincipalIDS: strings.Join(allowedServicePrincipalIds, ","),
 		Resource:                   plan.Resource.ValueString(),
 		AccessTokenTrustedIPS:      accessTokenTrustedIps,
 	})
@@ -211,7 +216,7 @@ func (r *IdentityAzureAuthResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	plan.ID = types.StringValue(newIdentityAzureAuth.ID)
-	updateAzureAuthStateByApi(ctx, resp.Diagnostics, &plan, &newIdentityAzureAuth)
+	updateAzureAuthTerraformStateByApi(ctx, resp.Diagnostics, &plan, &newIdentityAzureAuth)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -256,7 +261,7 @@ func (r *IdentityAzureAuthResource) Read(ctx context.Context, req resource.ReadR
 		}
 	}
 
-	updateAzureAuthStateByApi(ctx, resp.Diagnostics, &state, &identityAzureAuth)
+	updateAzureAuthTerraformStateByApi(ctx, resp.Diagnostics, &state, &identityAzureAuth)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -288,6 +293,7 @@ func (r *IdentityAzureAuthResource) Update(ctx context.Context, req resource.Upd
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	allowedServicePrincipalIds := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServicePrincipalIDs)
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
 	updatedIdentityAzureAuth, err := r.client.UpdateIdentityAzureAuth(infisical.UpdateIdentityAzureAuthRequest{
@@ -297,7 +303,7 @@ func (r *IdentityAzureAuthResource) Update(ctx context.Context, req resource.Upd
 		AccessTokenMaxTTL:          plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit:    plan.AccessTokenNumUsesLimit.ValueInt64(),
 		TenantID:                   plan.TenantID.ValueString(),
-		AllowedServicePrincipalIDS: plan.AllowedServicePrincipalIDs.ValueString(),
+		AllowedServicePrincipalIDS: strings.Join(allowedServicePrincipalIds, ","),
 		Resource:                   plan.Resource.ValueString(),
 	})
 
@@ -309,7 +315,7 @@ func (r *IdentityAzureAuthResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	updateAzureAuthStateByApi(ctx, resp.Diagnostics, &plan, &updatedIdentityAzureAuth)
+	updateAzureAuthTerraformStateByApi(ctx, resp.Diagnostics, &plan, &updatedIdentityAzureAuth)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
+	"terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -32,9 +35,9 @@ type IdentityGcpAuthResourceModel struct {
 	ID                          types.String `tfsdk:"id"`
 	IdentityID                  types.String `tfsdk:"identity_id"`
 	Type                        types.String `tfsdk:"type"`
-	AllowedServiceAccountEmails types.String `tfsdk:"allowed_service_account_emails"`
-	AllowedProjects             types.String `tfsdk:"allowed_projects"`
-	AllowedZones                types.String `tfsdk:"allowed_zones"`
+	AllowedServiceAccountEmails types.List   `tfsdk:"allowed_service_account_emails"`
+	AllowedProjects             types.List   `tfsdk:"allowed_projects"`
+	AllowedZones                types.List   `tfsdk:"allowed_zones"`
 	AccessTokenTrustedIps       types.List   `tfsdk:"access_token_trusted_ips"`
 	AccessTokenTTL              types.Int64  `tfsdk:"access_token_ttl"`
 	AccessTokenMaxTTL           types.Int64  `tfsdk:"access_token_max_ttl"`
@@ -71,19 +74,22 @@ func (r *IdentityGcpAuthResource) Schema(_ context.Context, _ resource.SchemaReq
 				Default:     stringdefault.StaticString("gce"),
 				Computed:    true,
 			},
-			"allowed_service_account_emails": schema.StringAttribute{
-				Description:         " A comma-separated list of trusted service account emails corresponding to the GCE resource(s) allowed to authenticate with Infisical",
-				MarkdownDescription: " A comma-separated list of trusted service account emails corresponding to the GCE resource(s) allowed to authenticate with Infisical; this could be something like `test@project.iam.gserviceaccount.com`, `12345-compute@developer.gserviceaccount.com`, etc.",
+			"allowed_service_account_emails": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Description:         "List of trusted service account emails corresponding to the GCE resource(s) allowed to authenticate with Infisical",
+				MarkdownDescription: "List of trusted service account emails corresponding to the GCE resource(s) allowed to authenticate with Infisical; this could be something like `test@project.iam.gserviceaccount.com`, `12345-compute@developer.gserviceaccount.com`, etc.",
 				Optional:            true,
 				Computed:            true,
 			},
-			"allowed_projects": schema.StringAttribute{
-				Description: "A comma-separated list of trusted GCP projects that the GCE instance must belong to authenticate with Infisical. Note that this validation property will only work for GCE instances",
+			"allowed_projects": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of trusted GCP projects that the GCE instance must belong to authenticate with Infisical. Note that this validation property will only work for GCE instances",
 				Optional:    true,
 				Computed:    true,
 			},
-			"allowed_zones": schema.StringAttribute{
-				Description: "A comma-separated list of trusted zones that the GCE instances must belong to authenticate with Infisical; this should be the fully-qualified zone name in the format `<region>-<zone>`like `us-central1-a`, `us-west1-b`, etc. Note that this validation property will only work for GCE instances.",
+			"allowed_zones": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of trusted zones that the GCE instances must belong to authenticate with Infisical; this should be the fully-qualified zone name in the format `<region>-<zone>`like `us-central1-a`, `us-west1-b`, etc. Note that this validation property will only work for GCE instances.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -143,9 +149,6 @@ func updateGcpAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pla
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityGcpAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityGcpAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityGcpAuth.AccessTokenNumUsesLimit)
-	plan.AllowedZones = types.StringValue(newIdentityGcpAuth.AllowedZones)
-	plan.AllowedProjects = types.StringValue(newIdentityGcpAuth.AllowedProjects)
-	plan.AllowedServiceAccountEmails = types.StringValue(newIdentityGcpAuth.AllowedServiceAccounts)
 
 	planAccessTokenTrustedIps := make([]IdentityGcpAuthResourceTrustedIps, len(newIdentityGcpAuth.AccessTokenTrustedIPS))
 	for i, el := range newIdentityGcpAuth.AccessTokenTrustedIPS {
@@ -170,6 +173,19 @@ func updateGcpAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pla
 		return
 	}
 
+	plan.AllowedServiceAccountEmails, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityGcpAuth.AllowedServiceAccounts, ","))
+	diagnose.Append(diags...)
+	if diagnose.HasError() {
+		return
+	}
+
+	plan.AllowedProjects, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityGcpAuth.AllowedProjects, ","))
+	diagnose.Append(diags...)
+	if diagnose.HasError() {
+		return
+	}
+
+	plan.AllowedZones, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityGcpAuth.AllowedZones, ","))
 	diagnose.Append(diags...)
 	if diagnose.HasError() {
 		return
@@ -197,16 +213,20 @@ func (r *IdentityGcpAuthResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+	allowedProjects := terraform.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedProjects)
+	allowedZones := terraform.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedZones)
+	allowedServiceAccounts := terraform.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountEmails)
+
 	newIdentityGcpAuth, err := r.client.CreateIdentityGcpAuth(infisical.CreateIdentityGcpAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
 		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
 		Type:                    plan.Type.ValueString(),
-		AllowedServiceAccounts:  plan.AllowedServiceAccountEmails.ValueString(),
-		AllowedProjects:         plan.AllowedProjects.ValueString(),
+		AllowedServiceAccounts:  strings.Join(allowedServiceAccounts, ","),
+		AllowedProjects:         strings.Join(allowedProjects, ","),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		AllowedZones:            plan.AllowedZones.ValueString(),
+		AllowedZones:            strings.Join(allowedZones, ","),
 	})
 
 	if err != nil {
@@ -297,16 +317,19 @@ func (r *IdentityGcpAuthResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+	allowedProjects := terraform.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedProjects)
+	allowedZones := terraform.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedZones)
+	allowedServiceAccounts := terraform.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountEmails)
 	updatedIdentityGcpAuth, err := r.client.UpdateIdentityGcpAuth(infisical.UpdateIdentityGcpAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
 		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
 		Type:                    plan.Type.ValueString(),
-		AllowedServiceAccounts:  plan.AllowedServiceAccountEmails.ValueString(),
-		AllowedProjects:         plan.AllowedProjects.ValueString(),
+		AllowedServiceAccounts:  strings.Join(allowedServiceAccounts, ","),
+		AllowedProjects:         strings.Join(allowedProjects, ","),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		AllowedZones:            plan.AllowedZones.ValueString(),
+		AllowedZones:            strings.Join(allowedZones, ","),
 	})
 
 	if err != nil {
