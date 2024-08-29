@@ -311,7 +311,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 	projectIdentitySpecificPrivilegeResource, err := r.client.GetProjectIdentitySpecificPrivilegeBySlug(infisical.GetProjectIdentitySpecificPrivilegeRequest{
 		PrivilegeSlug: state.Slug.ValueString(),
 		ProjectSlug:   state.ProjectSlug.ValueString(),
-		IdentityId:    state.IdentityID.ValueString(),
+		IdentityID:    state.IdentityID.ValueString(),
 	})
 
 	if err != nil {
