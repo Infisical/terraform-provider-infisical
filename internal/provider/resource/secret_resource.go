@@ -29,15 +29,21 @@ type secretResource struct {
 	client *infisical.Client
 }
 
+type SecretReminder struct {
+	Note       types.String `tfsdk:"note"`
+	RepeatDays types.Int64  `tfsdk:"repeat_days"`
+}
+
 // secretResourceSourceModel describes the data source data model.
 type secretResourceModel struct {
-	FolderPath  types.String `tfsdk:"folder_path"`
-	EnvSlug     types.String `tfsdk:"env_slug"`
-	Name        types.String `tfsdk:"name"`
-	Value       types.String `tfsdk:"value"`
-	WorkspaceId types.String `tfsdk:"workspace_id"`
-	LastUpdated types.String `tfsdk:"last_updated"`
-	Tags        types.List   `tfsdk:"tag_ids"`
+	FolderPath     types.String    `tfsdk:"folder_path"`
+	EnvSlug        types.String    `tfsdk:"env_slug"`
+	Name           types.String    `tfsdk:"name"`
+	SecretReminder *SecretReminder `tfsdk:"secret_reminder"`
+	Value          types.String    `tfsdk:"value"`
+	WorkspaceId    types.String    `tfsdk:"workspace_id"`
+	LastUpdated    types.String    `tfsdk:"last_updated"`
+	Tags           types.List      `tfsdk:"tag_ids"`
 }
 
 // Metadata returns the resource type name.
@@ -84,6 +90,22 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				ElementType: types.StringType,
 				Optional:    true,
 				Description: "Tag ids to be attached for the secrets.",
+			},
+			"secret_reminder": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"note": schema.StringAttribute{
+						Description: "Note for the secret rotation reminder",
+						Computed:    false,
+						Optional:    true,
+					},
+					"repeat_days": schema.Int64Attribute{
+						Description: "Frequency of secret rotation reminder in days",
+						Computed:    false,
+						Required:    true,
+					},
+				},
+				Optional: true,
+				Computed: false,
 			},
 		},
 	}
@@ -192,11 +214,13 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		err = r.client.CreateSecretsV3(infisical.CreateSecretV3Request{
-			Environment: plan.EnvSlug.ValueString(),
-			SecretName:  plan.Name.ValueString(),
-			Type:        "shared",
-			SecretPath:  plan.FolderPath.ValueString(),
-			WorkspaceID: serviceTokenDetails.Workspace,
+			Environment:              plan.EnvSlug.ValueString(),
+			SecretName:               plan.Name.ValueString(),
+			Type:                     "shared",
+			SecretPath:               plan.FolderPath.ValueString(),
+			SecretReminderNote:       plan.SecretReminder.Note.ValueString(),
+			SecretReminderRepeatDays: plan.SecretReminder.RepeatDays.ValueInt64(),
+			WorkspaceID:              serviceTokenDetails.Workspace,
 
 			SecretKeyCiphertext: base64.StdEncoding.EncodeToString(encryptedKey.CipherText),
 			SecretKeyIV:         base64.StdEncoding.EncodeToString(encryptedKey.Nonce),
@@ -220,13 +244,15 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	} else if r.client.Config.IsMachineIdentityAuth {
 		err := r.client.CreateRawSecretsV3(infisical.CreateRawSecretV3Request{
-			Environment: plan.EnvSlug.ValueString(),
-			WorkspaceID: plan.WorkspaceId.ValueString(),
-			Type:        "shared",
-			SecretPath:  plan.FolderPath.ValueString(),
-			SecretKey:   plan.Name.ValueString(),
-			SecretValue: plan.Value.ValueString(),
-			TagIDs:      secretTagIds,
+			Environment:              plan.EnvSlug.ValueString(),
+			WorkspaceID:              plan.WorkspaceId.ValueString(),
+			Type:                     "shared",
+			SecretPath:               plan.FolderPath.ValueString(),
+			SecretReminderNote:       plan.SecretReminder.Note.ValueString(),
+			SecretReminderRepeatDays: plan.SecretReminder.RepeatDays.ValueInt64(),
+			SecretKey:                plan.Name.ValueString(),
+			SecretValue:              plan.Value.ValueString(),
+			TagIDs:                   secretTagIds,
 		})
 
 		if err != nil {
@@ -472,6 +498,15 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
 	}
 
+	// null check secret reminder
+	var secretReminderNote string
+	var secretReminderRepeatDays int64
+
+	if plan.SecretReminder != nil {
+		secretReminderNote = plan.SecretReminder.Note.ValueString()
+		secretReminderRepeatDays = plan.SecretReminder.RepeatDays.ValueInt64()
+	}
+
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
 
 		serviceTokenDetails, err := r.client.GetServiceTokenDetailsV2()
@@ -522,15 +557,17 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 
 		err = r.client.UpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
-			Environment:           plan.EnvSlug.ValueString(),
-			SecretName:            plan.Name.ValueString(),
-			Type:                  "shared",
-			SecretPath:            plan.FolderPath.ValueString(),
-			WorkspaceID:           serviceTokenDetails.Workspace,
-			TagIDs:                secretTagIds,
-			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
-			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
-			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
+			Environment:              plan.EnvSlug.ValueString(),
+			SecretName:               plan.Name.ValueString(),
+			Type:                     "shared",
+			SecretPath:               plan.FolderPath.ValueString(),
+			WorkspaceID:              serviceTokenDetails.Workspace,
+			TagIDs:                   secretTagIds,
+			SecretValueCiphertext:    base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
+			SecretValueIV:            base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
+			SecretValueTag:           base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
+			SecretReminderNote:       secretReminderNote,
+			SecretReminderRepeatDays: secretReminderRepeatDays,
 		})
 
 		if err != nil {
@@ -546,13 +583,15 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	} else if r.client.Config.IsMachineIdentityAuth {
 		err := r.client.UpdateRawSecretV3(infisical.UpdateRawSecretByNameV3Request{
-			Environment: plan.EnvSlug.ValueString(),
-			WorkspaceID: plan.WorkspaceId.ValueString(),
-			Type:        "shared",
-			TagIDs:      secretTagIds,
-			SecretPath:  plan.FolderPath.ValueString(),
-			SecretName:  plan.Name.ValueString(),
-			SecretValue: plan.Value.ValueString(),
+			Environment:              plan.EnvSlug.ValueString(),
+			WorkspaceID:              plan.WorkspaceId.ValueString(),
+			Type:                     "shared",
+			TagIDs:                   secretTagIds,
+			SecretPath:               plan.FolderPath.ValueString(),
+			SecretName:               plan.Name.ValueString(),
+			SecretValue:              plan.Value.ValueString(),
+			SecretReminderNote:       secretReminderNote,
+			SecretReminderRepeatDays: secretReminderRepeatDays,
 		})
 
 		if err != nil {
