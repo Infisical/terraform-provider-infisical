@@ -9,8 +9,10 @@ import (
 	"terraform-provider-infisical/internal/crypto"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -102,6 +104,10 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 						Description: "Frequency of secret rotation reminder in days",
 						Computed:    false,
 						Required:    true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(1),
+							int64validator.AtMost(365),
+						},
 					},
 				},
 				Optional: true,
@@ -214,11 +220,11 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		err = r.client.CreateSecretsV3(infisical.CreateSecretV3Request{
-			Environment:              plan.EnvSlug.ValueString(),
-			SecretName:               plan.Name.ValueString(),
-			Type:                     "shared",
-			SecretPath:               plan.FolderPath.ValueString(),
-			WorkspaceID:              serviceTokenDetails.Workspace,
+			Environment: plan.EnvSlug.ValueString(),
+			SecretName:  plan.Name.ValueString(),
+			Type:        "shared",
+			SecretPath:  plan.FolderPath.ValueString(),
+			WorkspaceID: serviceTokenDetails.Workspace,
 
 			SecretKeyCiphertext: base64.StdEncoding.EncodeToString(encryptedKey.CipherText),
 			SecretKeyIV:         base64.StdEncoding.EncodeToString(encryptedKey.Nonce),
@@ -241,7 +247,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		// Set state to fully populated data
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	} else if r.client.Config.IsMachineIdentityAuth {
-		
+
 		// null check secret reminder
 		var secretReminderNote string
 		var secretReminderRepeatDays int64
@@ -565,15 +571,15 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 
 		err = r.client.UpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
-			Environment:              plan.EnvSlug.ValueString(),
-			SecretName:               plan.Name.ValueString(),
-			Type:                     "shared",
-			SecretPath:               plan.FolderPath.ValueString(),
-			WorkspaceID:              serviceTokenDetails.Workspace,
-			TagIDs:                   secretTagIds,
-			SecretValueCiphertext:    base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
-			SecretValueIV:            base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
-			SecretValueTag:           base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
+			Environment:           plan.EnvSlug.ValueString(),
+			SecretName:            plan.Name.ValueString(),
+			Type:                  "shared",
+			SecretPath:            plan.FolderPath.ValueString(),
+			WorkspaceID:           serviceTokenDetails.Workspace,
+			TagIDs:                secretTagIds,
+			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
+			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
+			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
 		})
 
 		if err != nil {
