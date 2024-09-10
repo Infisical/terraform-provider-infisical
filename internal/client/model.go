@@ -381,8 +381,6 @@ type CreateSecretV3Request struct {
 	SecretCommentIV          string   `json:"secretCommentIV"`
 	SecretCommentTag         string   `json:"secretCommentTag"`
 	SecretPath               string   `json:"secretPath"`
-	SecretReminderNote       string   `json:"secretReminderNote"`
-	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
 	TagIDs                   []string `json:"tags"`
 }
 
@@ -402,8 +400,6 @@ type UpdateSecretByNameV3Request struct {
 	Environment              string   `json:"environment"`
 	Type                     string   `json:"type"`
 	SecretPath               string   `json:"secretPath"`
-	SecretReminderNote       string   `json:"secretReminderNote"`
-	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
 	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
 	SecretValueIV            string   `json:"secretValueIV"`
 	SecretValueTag           string   `json:"secretValueTag"`

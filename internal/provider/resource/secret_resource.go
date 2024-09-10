@@ -574,8 +574,6 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			SecretValueCiphertext:    base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
 			SecretValueIV:            base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
 			SecretValueTag:           base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
-			SecretReminderNote:       secretReminderNote,
-			SecretReminderRepeatDays: secretReminderRepeatDays,
 		})
 
 		if err != nil {
