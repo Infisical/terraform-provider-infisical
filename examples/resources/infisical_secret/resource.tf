@@ -22,13 +22,13 @@ resource "infisical_secret" "mongo_secret" {
 }
 
 resource "infisical_secret" "smtp_secret" {
-  name            = "SMTP"
-  value           = "<some key>"
-  env_slug        = "dev"
-  workspace_id    = "PROJECT_ID"
-  folder_path     = "/mail-service"
+  name         = "SMTP"
+  value        = "<some key>"
+  env_slug     = "dev"
+  workspace_id = "PROJECT_ID"
+  folder_path  = "/mail-service"
   secret_reminder = {
-    note = "Rotate this secret using X API"
+    note        = "Rotate this secret using X API"
     repeat_days = 30
   }
 }
