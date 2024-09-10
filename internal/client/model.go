@@ -458,7 +458,7 @@ type CreateRawSecretV3Request struct {
 	SecretComment            string   `json:"secretComment"`
 	SecretPath               string   `json:"secretPath"`
 	SecretReminderNote       string   `json:"secretReminderNote"`
-	SecretReminderRepeatDays int64    `json:"secretReminder"`
+	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
 	TagIDs                   []string `json:"tagIds"`
 }
 

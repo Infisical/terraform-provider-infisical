@@ -218,8 +218,6 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			SecretName:               plan.Name.ValueString(),
 			Type:                     "shared",
 			SecretPath:               plan.FolderPath.ValueString(),
-			SecretReminderNote:       plan.SecretReminder.Note.ValueString(),
-			SecretReminderRepeatDays: plan.SecretReminder.RepeatDays.ValueInt64(),
 			WorkspaceID:              serviceTokenDetails.Workspace,
 
 			SecretKeyCiphertext: base64.StdEncoding.EncodeToString(encryptedKey.CipherText),
@@ -243,13 +241,23 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		// Set state to fully populated data
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 	} else if r.client.Config.IsMachineIdentityAuth {
+		
+		// null check secret reminder
+		var secretReminderNote string
+		var secretReminderRepeatDays int64
+
+		if plan.SecretReminder != nil {
+			secretReminderNote = plan.SecretReminder.Note.ValueString()
+			secretReminderRepeatDays = plan.SecretReminder.RepeatDays.ValueInt64()
+		}
+
 		err := r.client.CreateRawSecretsV3(infisical.CreateRawSecretV3Request{
 			Environment:              plan.EnvSlug.ValueString(),
 			WorkspaceID:              plan.WorkspaceId.ValueString(),
 			Type:                     "shared",
 			SecretPath:               plan.FolderPath.ValueString(),
-			SecretReminderNote:       plan.SecretReminder.Note.ValueString(),
-			SecretReminderRepeatDays: plan.SecretReminder.RepeatDays.ValueInt64(),
+			SecretReminderNote:       secretReminderNote,
+			SecretReminderRepeatDays: secretReminderRepeatDays,
 			SecretKey:                plan.Name.ValueString(),
 			SecretValue:              plan.Value.ValueString(),
 			TagIDs:                   secretTagIds,
