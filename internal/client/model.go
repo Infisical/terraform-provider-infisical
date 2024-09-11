@@ -367,21 +367,21 @@ type EncryptedSecret struct {
 
 // create secrets.
 type CreateSecretV3Request struct {
-	SecretName              string   `json:"secretName"`
-	WorkspaceID             string   `json:"workspaceId"`
-	Type                    string   `json:"type"`
-	Environment             string   `json:"environment"`
-	SecretKeyCiphertext     string   `json:"secretKeyCiphertext"`
-	SecretKeyIV             string   `json:"secretKeyIV"`
-	SecretKeyTag            string   `json:"secretKeyTag"`
-	SecretValueCiphertext   string   `json:"secretValueCiphertext"`
-	SecretValueIV           string   `json:"secretValueIV"`
-	SecretValueTag          string   `json:"secretValueTag"`
-	SecretCommentCiphertext string   `json:"secretCommentCiphertext"`
-	SecretCommentIV         string   `json:"secretCommentIV"`
-	SecretCommentTag        string   `json:"secretCommentTag"`
-	SecretPath              string   `json:"secretPath"`
-	TagIDs                  []string `json:"tags"`
+	SecretName               string   `json:"secretName"`
+	WorkspaceID              string   `json:"workspaceId"`
+	Type                     string   `json:"type"`
+	Environment              string   `json:"environment"`
+	SecretKeyCiphertext      string   `json:"secretKeyCiphertext"`
+	SecretKeyIV              string   `json:"secretKeyIV"`
+	SecretKeyTag             string   `json:"secretKeyTag"`
+	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
+	SecretValueIV            string   `json:"secretValueIV"`
+	SecretValueTag           string   `json:"secretValueTag"`
+	SecretCommentCiphertext  string   `json:"secretCommentCiphertext"`
+	SecretCommentIV          string   `json:"secretCommentIV"`
+	SecretCommentTag         string   `json:"secretCommentTag"`
+	SecretPath               string   `json:"secretPath"`
+	TagIDs                   []string `json:"tags"`
 }
 
 // delete secret by name api.
@@ -395,15 +395,15 @@ type DeleteSecretV3Request struct {
 
 // update secret by name api.
 type UpdateSecretByNameV3Request struct {
-	SecretName            string   `json:"secretName"`
-	WorkspaceID           string   `json:"workspaceId"`
-	Environment           string   `json:"environment"`
-	Type                  string   `json:"type"`
-	SecretPath            string   `json:"secretPath"`
-	SecretValueCiphertext string   `json:"secretValueCiphertext"`
-	SecretValueIV         string   `json:"secretValueIV"`
-	SecretValueTag        string   `json:"secretValueTag"`
-	TagIDs                []string `json:"tags,omitempty"`
+	SecretName               string   `json:"secretName"`
+	WorkspaceID              string   `json:"workspaceId"`
+	Environment              string   `json:"environment"`
+	Type                     string   `json:"type"`
+	SecretPath               string   `json:"secretPath"`
+	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
+	SecretValueIV            string   `json:"secretValueIV"`
+	SecretValueTag           string   `json:"secretValueTag"`
+	TagIDs                   []string `json:"tags,omitempty"`
 }
 
 // get secret by name api.
@@ -446,14 +446,16 @@ type GetSingleRawSecretByNameSecretResponse struct {
 
 // create secrets.
 type CreateRawSecretV3Request struct {
-	WorkspaceID   string   `json:"workspaceId"`
-	Type          string   `json:"type"`
-	Environment   string   `json:"environment"`
-	SecretKey     string   `json:"secretKey"`
-	SecretValue   string   `json:"secretValue"`
-	SecretComment string   `json:"secretComment"`
-	SecretPath    string   `json:"secretPath"`
-	TagIDs        []string `json:"tagIds"`
+	WorkspaceID              string   `json:"workspaceId"`
+	Type                     string   `json:"type"`
+	Environment              string   `json:"environment"`
+	SecretKey                string   `json:"secretKey"`
+	SecretValue              string   `json:"secretValue"`
+	SecretComment            string   `json:"secretComment"`
+	SecretPath               string   `json:"secretPath"`
+	SecretReminderNote       string   `json:"secretReminderNote"`
+	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
+	TagIDs                   []string `json:"tagIds"`
 }
 
 type DeleteRawSecretV3Request struct {
@@ -466,13 +468,15 @@ type DeleteRawSecretV3Request struct {
 
 // update secret by name api.
 type UpdateRawSecretByNameV3Request struct {
-	SecretName  string   `json:"secretName"`
-	WorkspaceID string   `json:"workspaceId"`
-	Environment string   `json:"environment"`
-	Type        string   `json:"type"`
-	SecretPath  string   `json:"secretPath"`
-	SecretValue string   `json:"secretValue"`
-	TagIDs      []string `json:"tagIds"`
+	SecretName               string   `json:"secretName"`
+	WorkspaceID              string   `json:"workspaceId"`
+	Environment              string   `json:"environment"`
+	Type                     string   `json:"type"`
+	SecretPath               string   `json:"secretPath"`
+	SecretReminderNote       string   `json:"secretReminderNote"`
+	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
+	SecretValue              string   `json:"secretValue"`
+	TagIDs                   []string `json:"tagIds"`
 }
 
 type CreateProjectRequest struct {

@@ -42,6 +42,10 @@ resource "infisical_secret" "smtp_secret" {
   env_slug     = "dev"
   workspace_id = "PROJECT_ID"
   folder_path  = "/mail-service"
+  secret_reminder = {
+    note        = "Rotate this secret using X API"
+    repeat_days = 30
+  }
 }
 
 
@@ -74,9 +78,21 @@ resource "infisical_secret" "github_action_secret" {
 
 ### Optional
 
+- `secret_reminder` (Attributes) (see [below for nested schema](#nestedatt--secret_reminder))
 - `tag_ids` (List of String) Tag ids to be attached for the secrets.
 - `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only
 
 - `last_updated` (String)
+
+<a id="nestedatt--secret_reminder"></a>
+### Nested Schema for `secret_reminder`
+
+Required:
+
+- `repeat_days` (Number) Frequency of secret rotation reminder in days
+
+Optional:
+
+- `note` (String) Note for the secret rotation reminder

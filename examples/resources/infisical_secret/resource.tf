@@ -27,6 +27,10 @@ resource "infisical_secret" "smtp_secret" {
   env_slug     = "dev"
   workspace_id = "PROJECT_ID"
   folder_path  = "/mail-service"
+  secret_reminder = {
+    note        = "Rotate this secret using X API"
+    repeat_days = 30
+  }
 }
 
 
