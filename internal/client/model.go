@@ -367,21 +367,21 @@ type EncryptedSecret struct {
 
 // create secrets.
 type CreateSecretV3Request struct {
-	SecretName               string   `json:"secretName"`
-	WorkspaceID              string   `json:"workspaceId"`
-	Type                     string   `json:"type"`
-	Environment              string   `json:"environment"`
-	SecretKeyCiphertext      string   `json:"secretKeyCiphertext"`
-	SecretKeyIV              string   `json:"secretKeyIV"`
-	SecretKeyTag             string   `json:"secretKeyTag"`
-	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
-	SecretValueIV            string   `json:"secretValueIV"`
-	SecretValueTag           string   `json:"secretValueTag"`
-	SecretCommentCiphertext  string   `json:"secretCommentCiphertext"`
-	SecretCommentIV          string   `json:"secretCommentIV"`
-	SecretCommentTag         string   `json:"secretCommentTag"`
-	SecretPath               string   `json:"secretPath"`
-	TagIDs                   []string `json:"tags"`
+	SecretName              string   `json:"secretName"`
+	WorkspaceID             string   `json:"workspaceId"`
+	Type                    string   `json:"type"`
+	Environment             string   `json:"environment"`
+	SecretKeyCiphertext     string   `json:"secretKeyCiphertext"`
+	SecretKeyIV             string   `json:"secretKeyIV"`
+	SecretKeyTag            string   `json:"secretKeyTag"`
+	SecretValueCiphertext   string   `json:"secretValueCiphertext"`
+	SecretValueIV           string   `json:"secretValueIV"`
+	SecretValueTag          string   `json:"secretValueTag"`
+	SecretCommentCiphertext string   `json:"secretCommentCiphertext"`
+	SecretCommentIV         string   `json:"secretCommentIV"`
+	SecretCommentTag        string   `json:"secretCommentTag"`
+	SecretPath              string   `json:"secretPath"`
+	TagIDs                  []string `json:"tags"`
 }
 
 // delete secret by name api.
@@ -395,15 +395,15 @@ type DeleteSecretV3Request struct {
 
 // update secret by name api.
 type UpdateSecretByNameV3Request struct {
-	SecretName               string   `json:"secretName"`
-	WorkspaceID              string   `json:"workspaceId"`
-	Environment              string   `json:"environment"`
-	Type                     string   `json:"type"`
-	SecretPath               string   `json:"secretPath"`
-	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
-	SecretValueIV            string   `json:"secretValueIV"`
-	SecretValueTag           string   `json:"secretValueTag"`
-	TagIDs                   []string `json:"tags,omitempty"`
+	SecretName            string   `json:"secretName"`
+	WorkspaceID           string   `json:"workspaceId"`
+	Environment           string   `json:"environment"`
+	Type                  string   `json:"type"`
+	SecretPath            string   `json:"secretPath"`
+	SecretValueCiphertext string   `json:"secretValueCiphertext"`
+	SecretValueIV         string   `json:"secretValueIV"`
+	SecretValueTag        string   `json:"secretValueTag"`
+	TagIDs                []string `json:"tags,omitempty"`
 }
 
 // get secret by name api.
@@ -491,6 +491,10 @@ type DeleteProjectRequest struct {
 
 type GetProjectRequest struct {
 	Slug string `json:"slug"`
+}
+
+type GetProjectByIdRequest struct {
+	ID string `json:"id"`
 }
 
 type UpdateProjectRequest struct {
@@ -763,6 +767,103 @@ type GetProjectIdentitySpecificPrivilegeResponse struct {
 	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
 }
 
+// group
+type ProjectGroupRole struct {
+	ID                       string    `json:"id"`
+	Role                     string    `json:"role"`
+	CustomRoleSlug           string    `json:"customRoleSlug"`
+	CustomRoleId             string    `json:"customRoleId"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
+}
+
+type ProjectGroup struct {
+	ID      string `json:"id"`
+	GroupID string `json:"groupId"`
+	Roles   []ProjectGroupRole
+}
+
+type CreateProjectGroupRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type CreateProjectGroupRequest struct {
+	ProjectSlug string                           `json:"projectSlug"`
+	GroupSlug   string                           `json:"groupSlug"`
+	Roles       []CreateProjectGroupRequestRoles `json:"roles"`
+}
+
+type CreateProjectGroupResponseMembers struct {
+	ID      string `json:"id"`
+	GroupID string `json:"groupId"`
+}
+
+type CreateProjectGroupResponse struct {
+	Membership CreateProjectGroupResponseMembers `json:"groupMembership"`
+}
+
+type GetProjectGroupMembershipRequest struct {
+	ProjectSlug string `json:"projectSlug"`
+	GroupSlug   string `json:"groupSlug"`
+}
+
+type GetProjectGroupMembershipResponse struct {
+	Membership ProjectGroup `json:"groupMembership"`
+}
+
+type UpdateProjectGroupRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type UpdateProjectGroupRequest struct {
+	ProjectSlug string                           `json:"projectSlug"`
+	GroupSlug   string                           `json:"groupSlug"`
+	Roles       []UpdateProjectGroupRequestRoles `json:"roles"`
+}
+
+type UpdateProjectGroupResponse struct {
+	Roles []struct {
+		ID                       string    `json:"id"`
+		Role                     string    `json:"role"`
+		CustomRoleId             string    `json:"customRoleId"`
+		IsTemporary              bool      `json:"isTemporary"`
+		TemporaryMode            string    `json:"temporaryMode"`
+		TemporaryRange           string    `json:"temporaryRange"`
+		TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+		TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+		CreatedAt                time.Time `json:"createdAt"`
+		UpdatedAt                time.Time `json:"updatedAt"`
+	} `json:"roles"`
+}
+
+type DeleteProjectGroupRequest struct {
+	ProjectSlug string `json:"projectSlug"`
+	GroupSlug   string `json:"groupSlug"`
+}
+
+type DeleteProjectGroupResponseMembers struct {
+	ID      string `json:"id"`
+	GroupID string `json:"groupId"`
+}
+
+type DeleteProjectGroupResponse struct {
+	Membership DeleteProjectGroupResponseMembers `json:"groupMembership"`
+}
+
+// tag
 type GetProjectTagsResponse struct {
 	Tags []ProjectTag `json:"workspaceTags"`
 }

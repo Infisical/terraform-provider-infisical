@@ -237,6 +237,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectIdentityResource,
 		infisicalResource.NewProjectRoleResource,
 		infisicalResource.NewProjectIdentitySpecificPrivilegeResource,
+		infisicalResource.NewProjectGroupResource,
 		infisicalResource.NewProjectSecretTagResource,
 		infisicalResource.NewProjectSecretFolderResource,
 		infisicalResource.NewProjectEnvironmentResource,

@@ -87,3 +87,22 @@ func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectR
 
 	return projectResponse, nil
 }
+
+func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithEnvironments, error) {
+	var projectResponse ProjectWithEnvironments
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&projectResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/workspace/%s", request.ID))
+
+	if err != nil {
+		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unsuccessful response. [response=%s]", response)
+	}
+
+	return projectResponse, nil
+}
