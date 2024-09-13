@@ -191,6 +191,23 @@ type IdentityKubernetesAuth struct {
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
 }
 
+type IdentityOidcAuth struct {
+	ID                      string                  `json:"id"`
+	AccessTokenTTL          int64                   `json:"accessTokenTTL"`
+	AccessTokenMaxTTL       int64                   `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit int64                   `json:"accessTokenNumUsesLimit"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIp `json:"accessTokenTrustedIps"`
+	CreatedAt               string                  `json:"createdAt"`
+	UpdatedAt               string                  `json:"updatedAt"`
+	IdentityID              string                  `json:"identityId"`
+	OidcDiscoveryUrl        string                  `json:"oidcDiscoveryUrl"`
+	BoundIssuer             string                  `json:"boundIssuer"`
+	BoundAudiences          string                  `json:"boundAudiences"`
+	BoundClaims             map[string]string       `json:"boundClaims"`
+	BoundSubject            string                  `json:"boundSubject"`
+	CACERT                  string                  `json:"caCert"`
+}
+
 type IdentityAuthTrustedIp struct {
 	Type      string `json:"type"`
 	Prefix    *int   `json:"prefix,omitempty"`
@@ -367,21 +384,21 @@ type EncryptedSecret struct {
 
 // create secrets.
 type CreateSecretV3Request struct {
-	SecretName               string   `json:"secretName"`
-	WorkspaceID              string   `json:"workspaceId"`
-	Type                     string   `json:"type"`
-	Environment              string   `json:"environment"`
-	SecretKeyCiphertext      string   `json:"secretKeyCiphertext"`
-	SecretKeyIV              string   `json:"secretKeyIV"`
-	SecretKeyTag             string   `json:"secretKeyTag"`
-	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
-	SecretValueIV            string   `json:"secretValueIV"`
-	SecretValueTag           string   `json:"secretValueTag"`
-	SecretCommentCiphertext  string   `json:"secretCommentCiphertext"`
-	SecretCommentIV          string   `json:"secretCommentIV"`
-	SecretCommentTag         string   `json:"secretCommentTag"`
-	SecretPath               string   `json:"secretPath"`
-	TagIDs                   []string `json:"tags"`
+	SecretName              string   `json:"secretName"`
+	WorkspaceID             string   `json:"workspaceId"`
+	Type                    string   `json:"type"`
+	Environment             string   `json:"environment"`
+	SecretKeyCiphertext     string   `json:"secretKeyCiphertext"`
+	SecretKeyIV             string   `json:"secretKeyIV"`
+	SecretKeyTag            string   `json:"secretKeyTag"`
+	SecretValueCiphertext   string   `json:"secretValueCiphertext"`
+	SecretValueIV           string   `json:"secretValueIV"`
+	SecretValueTag          string   `json:"secretValueTag"`
+	SecretCommentCiphertext string   `json:"secretCommentCiphertext"`
+	SecretCommentIV         string   `json:"secretCommentIV"`
+	SecretCommentTag        string   `json:"secretCommentTag"`
+	SecretPath              string   `json:"secretPath"`
+	TagIDs                  []string `json:"tags"`
 }
 
 // delete secret by name api.
@@ -395,15 +412,15 @@ type DeleteSecretV3Request struct {
 
 // update secret by name api.
 type UpdateSecretByNameV3Request struct {
-	SecretName               string   `json:"secretName"`
-	WorkspaceID              string   `json:"workspaceId"`
-	Environment              string   `json:"environment"`
-	Type                     string   `json:"type"`
-	SecretPath               string   `json:"secretPath"`
-	SecretValueCiphertext    string   `json:"secretValueCiphertext"`
-	SecretValueIV            string   `json:"secretValueIV"`
-	SecretValueTag           string   `json:"secretValueTag"`
-	TagIDs                   []string `json:"tags,omitempty"`
+	SecretName            string   `json:"secretName"`
+	WorkspaceID           string   `json:"workspaceId"`
+	Environment           string   `json:"environment"`
+	Type                  string   `json:"type"`
+	SecretPath            string   `json:"secretPath"`
+	SecretValueCiphertext string   `json:"secretValueCiphertext"`
+	SecretValueIV         string   `json:"secretValueIV"`
+	SecretValueTag        string   `json:"secretValueTag"`
+	TagIDs                []string `json:"tags,omitempty"`
 }
 
 // get secret by name api.
@@ -1190,6 +1207,58 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type CreateIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type UpdateIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type GetIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type GetIdentityOidcAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityOidcAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type CreateIdentityOidcAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	OidcDiscoveryUrl        string                         `json:"oidcDiscoveryUrl"`
+	CACERT                  string                         `json:"caCert"`
+	BoundIssuer             string                         `json:"boundIssuer"`
+	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityOidcAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	OidcDiscoveryUrl        string                         `json:"oidcDiscoveryUrl"`
+	CACERT                  string                         `json:"caCert"`
+	BoundIssuer             string                         `json:"boundIssuer"`
+	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	BoundSubject            string                         `json:"boundSubject"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
