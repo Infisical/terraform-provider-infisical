@@ -231,7 +231,15 @@ func (r *IdentityOidcAuthResource) Create(ctx context.Context, req resource.Crea
 
 	boundClaimsMap := make(map[string]string)
 	for key, value := range plan.BoundClaims.Elements() {
-		boundClaimsMap[key] = value.(types.String).ValueString()
+		if strVal, ok := value.(types.String); ok {
+			boundClaimsMap[key] = strVal.ValueString()
+		} else {
+			resp.Diagnostics.AddError(
+				"Error creating identity oidc auth",
+				"Bound claims value is not a string",
+			)
+			return
+		}
 	}
 
 	newIdentityOidcAuth, err := r.client.CreateIdentityOidcAuth(infisical.CreateIdentityOidcAuthRequest{
@@ -340,7 +348,15 @@ func (r *IdentityOidcAuthResource) Update(ctx context.Context, req resource.Upda
 
 	boundClaimsMap := make(map[string]string)
 	for key, value := range plan.BoundClaims.Elements() {
-		boundClaimsMap[key] = value.(types.String).ValueString()
+		if strVal, ok := value.(types.String); ok {
+			boundClaimsMap[key] = strVal.ValueString()
+		} else {
+			resp.Diagnostics.AddError(
+				"Error updating identity oidc auth",
+				"Bound claims value is not a string",
+			)
+			return
+		}
 	}
 
 	updatedIdentityOidcAuth, err := r.client.UpdateIdentityOidcAuth(infisical.UpdateIdentityOidcAuthRequest{
