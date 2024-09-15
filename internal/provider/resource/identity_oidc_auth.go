@@ -14,6 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -78,27 +81,31 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				Required:    true,
 			},
 			"bound_audiences": schema.ListAttribute{
-				Description: "The comma-separated list of intended recipients.",
-				Optional:    true,
-				Computed:    true,
-				ElementType: types.StringType,
+				Description:   "The comma-separated list of intended recipients.",
+				Optional:      true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"bound_claims": schema.MapAttribute{
-				Description: "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
-				Optional:    true,
-				Computed:    true,
-				ElementType: types.StringType,
+				Description:   "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
+				Optional:      true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"bound_subject": schema.StringAttribute{
-				Description: "The expected principal that is the subject of the JWT.",
-				Optional:    true,
-				Computed:    true,
+				Description:   "The expected principal that is the subject of the JWT.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"oidc_ca_certificate": schema.StringAttribute{
 				Description:         "The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints",
 				MarkdownDescription: "The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"access_token_trusted_ips": schema.ListNestedAttribute{
 				Optional:    true,
@@ -112,21 +119,25 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 						},
 					},
 				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"access_token_ttl": schema.Int64Attribute{
-				Description: "The lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000",
-				Computed:    true,
-				Optional:    true,
+				Description:   "The lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000",
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"access_token_max_ttl": schema.Int64Attribute{
-				Description: "The maximum lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000",
-				Computed:    true,
-				Optional:    true,
+				Description:   "The maximum lifetime for an access token in seconds. This value will be referenced at renewal time. Default: 2592000",
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"access_token_num_uses_limit": schema.Int64Attribute{
-				Description: "The maximum number of times that an access token can be used; a value of 0 implies infinite number of uses. Default:0",
-				Computed:    true,
-				Optional:    true,
+				Description:   "The maximum number of times that an access token can be used; a value of 0 implies infinite number of uses. Default:0",
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 		},
 	}
