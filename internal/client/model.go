@@ -771,7 +771,6 @@ type GetProjectIdentitySpecificPrivilegeResponse struct {
 	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
 }
 
-// group
 type ProjectGroupRole struct {
 	ID                       string    `json:"id"`
 	Role                     string    `json:"role"`
@@ -867,7 +866,6 @@ type DeleteProjectGroupResponse struct {
 	Membership DeleteProjectGroupResponseMembers `json:"groupMembership"`
 }
 
-// tag
 type GetProjectTagsResponse struct {
 	Tags []ProjectTag `json:"workspaceTags"`
 }
