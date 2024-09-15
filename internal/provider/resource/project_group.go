@@ -79,8 +79,12 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"roles": schema.ListNestedAttribute{
-				Required:      true,
-				Description:   "The roles assigned to the project group",
+				Required:    true,
+				Description: "The roles assigned to the project group",
+				// For now, we do a full resource replacement if the roles of a project group changes.
+				// We do this in order to prevent state conflict due to re-ordering of role entries
+				// since what we have at the moment is a ListNestedAttribute wherein
+				// the order of the entries matter.
 				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplaceIfConfigured()},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
