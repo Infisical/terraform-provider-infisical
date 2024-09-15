@@ -2,8 +2,8 @@ package pkg
 
 import "strings"
 
-func StringSplitAndTrim(input string, seperator string) []string {
-	splittedStrings := strings.Split(input, seperator)
+func StringSplitAndTrim(input string, separator string) []string {
+	splittedStrings := strings.Split(input, separator)
 	for i := 0; i < len(splittedStrings); i++ {
 		splittedStrings[i] = strings.TrimSpace(splittedStrings[i])
 	}

@@ -248,5 +248,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityKubernetesAuthResource,
 		infisicalResource.NewIdentityGcpAuthResource,
 		infisicalResource.NewIdentityAzureAuthResource,
+		infisicalResource.NewIdentityOidcAuthResource,
 	}
 }

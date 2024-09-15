@@ -191,6 +191,23 @@ type IdentityKubernetesAuth struct {
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
 }
 
+type IdentityOidcAuth struct {
+	ID                      string                  `json:"id"`
+	AccessTokenTTL          int64                   `json:"accessTokenTTL"`
+	AccessTokenMaxTTL       int64                   `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit int64                   `json:"accessTokenNumUsesLimit"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIp `json:"accessTokenTrustedIps"`
+	CreatedAt               string                  `json:"createdAt"`
+	UpdatedAt               string                  `json:"updatedAt"`
+	IdentityID              string                  `json:"identityId"`
+	OidcDiscoveryUrl        string                  `json:"oidcDiscoveryUrl"`
+	BoundIssuer             string                  `json:"boundIssuer"`
+	BoundAudiences          string                  `json:"boundAudiences"`
+	BoundClaims             map[string]string       `json:"boundClaims"`
+	BoundSubject            string                  `json:"boundSubject"`
+	CACERT                  string                  `json:"caCert"`
+}
+
 type IdentityAuthTrustedIp struct {
 	Type      string `json:"type"`
 	Prefix    *int   `json:"prefix,omitempty"`
@@ -1293,6 +1310,58 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type CreateIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type UpdateIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type GetIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type GetIdentityOidcAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityOidcAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityOidcAuthResponse struct {
+	IdentityOidcAuth IdentityOidcAuth `json:"identityOidcAuth"`
+}
+
+type CreateIdentityOidcAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	OidcDiscoveryUrl        string                         `json:"oidcDiscoveryUrl"`
+	CACERT                  string                         `json:"caCert"`
+	BoundIssuer             string                         `json:"boundIssuer"`
+	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityOidcAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	OidcDiscoveryUrl        string                         `json:"oidcDiscoveryUrl"`
+	CACERT                  string                         `json:"caCert"`
+	BoundIssuer             string                         `json:"boundIssuer"`
+	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	BoundSubject            string                         `json:"boundSubject"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
