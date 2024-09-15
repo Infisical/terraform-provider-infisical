@@ -89,7 +89,7 @@ func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectR
 }
 
 func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithEnvironments, error) {
-	var projectResponse ProjectWithEnvironments
+	var projectResponse GetProjectByIdResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&projectResponse).
@@ -104,5 +104,5 @@ func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithE
 		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unsuccessful response. [response=%s]", response)
 	}
 
-	return projectResponse, nil
+	return projectResponse.Workspace, nil
 }

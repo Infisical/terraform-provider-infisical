@@ -6,7 +6,6 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -40,14 +39,14 @@ type ProjectGroupResourceModel struct {
 }
 
 type ProjectGroupRole struct {
-	ID                      types.String `tfsdk:"id"`
-	RoleSlug                types.String `tfsdk:"role_slug"`
-	CustomRoleID            types.String `tfsdk:"custom_role_id"`
-	IsTemporary             types.Bool   `tfsdk:"is_temporary"`
-	TemporaryMode           types.String `tfsdk:"temporary_mode"`
-	TemporaryRange          types.String `tfsdk:"temporary_range"`
-	TemporaryAccesStartTime types.String `tfsdk:"temporary_access_start_time"`
-	TemporaryAccessEndTime  types.String `tfsdk:"temporary_access_end_time"`
+	ID                       types.String `tfsdk:"id"`
+	RoleSlug                 types.String `tfsdk:"role_slug"`
+	CustomRoleID             types.String `tfsdk:"custom_role_id"`
+	IsTemporary              types.Bool   `tfsdk:"is_temporary"`
+	TemporaryMode            types.String `tfsdk:"temporary_mode"`
+	TemporaryRange           types.String `tfsdk:"temporary_range"`
+	TemporaryAccessStartTime types.String `tfsdk:"temporary_access_start_time"`
+	TemporaryAccessEndTime   types.String `tfsdk:"temporary_access_end_time"`
 }
 
 // Metadata returns the resource type name.
@@ -84,12 +83,14 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Description: "The ID of the project group role.",
-							Computed:    true,
+							Description:   "The ID of the project group role.",
+							Computed:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 						},
 						"role_slug": schema.StringAttribute{
-							Description: "The slug of the role",
-							Required:    true,
+							Description:   "The slug of the role",
+							Required:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 						},
 						"custom_role_id": schema.StringAttribute{
 							Description: "The id of the custom role slug",
@@ -149,31 +150,27 @@ func (r *ProjectGroupResource) Configure(_ context.Context, req resource.Configu
 	r.client = client
 }
 
-func updateProjectGroupStateByApi(r *ProjectGroupResource, ctx context.Context, diagnose diag.Diagnostics, state *ProjectGroupResourceModel) {
+func updateProjectGroupStateByApi(r *ProjectGroupResource, ctx context.Context, state *ProjectGroupResourceModel) error {
 	projectGroupDetails, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
 		ProjectSlug: state.ProjectSlug.ValueString(),
 		GroupSlug:   state.GroupSlug.ValueString(),
 	})
 
 	if err != nil {
-		diagnose.AddError(
-			"Error fetching group details",
-			"Couldn't find group in project, unexpected error: "+err.Error(),
-		)
-		return
+		return err
 	}
 
 	planRoles := make([]ProjectGroupRole, 0, len(projectGroupDetails.Membership.Roles))
 	for _, el := range projectGroupDetails.Membership.Roles {
 		val := ProjectGroupRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+			ID:                       types.StringValue(el.ID),
+			RoleSlug:                 types.StringValue(el.Role),
+			TemporaryAccessEndTime:   types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
+			TemporaryRange:           types.StringValue(el.TemporaryRange),
+			TemporaryMode:            types.StringValue(el.TemporaryMode),
+			CustomRoleID:             types.StringValue(el.CustomRoleId),
+			IsTemporary:              types.BoolValue(el.IsTemporary),
+			TemporaryAccessStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
 		if el.CustomRoleId != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
@@ -182,13 +179,15 @@ func updateProjectGroupStateByApi(r *ProjectGroupResource, ctx context.Context, 
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
 			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
+			val.TemporaryAccessStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
 		planRoles = append(planRoles, val)
 	}
 	state.Roles = planRoles
 	state.MembershipID = types.StringValue(projectGroupDetails.Membership.ID)
+
+	return nil
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -215,19 +214,19 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		isTemporary := el.IsTemporary.ValueBool()
 		temporaryMode := el.TemporaryMode.ValueString()
 		temporaryRange := el.TemporaryRange.ValueString()
-		temporaryAccesStartTime := time.Now().UTC()
+		TemporaryAccessStartTime := time.Now().UTC()
 
 		if !isTemporary {
 			hasAtleastOnePermanentRole = true
 		}
 
-		if el.TemporaryAccesStartTime.ValueString() != "" {
+		if el.TemporaryAccessStartTime.ValueString() != "" {
 			var err error
-			temporaryAccesStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccesStartTime.ValueString())
+			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field temporaryAccesStartTime %s, role %s", el.TemporaryAccesStartTime.ValueString(), el.RoleSlug.ValueString()),
+					fmt.Sprintf("Must provider valid ISO timestamp for field TemporaryAccessStartTime %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
 				)
 				return
 			}
@@ -246,7 +245,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 			IsTemporary:              isTemporary,
 			TemporaryMode:            temporaryMode,
 			TemporaryRange:           temporaryRange,
-			TemporaryAccessStartTime: temporaryAccesStartTime,
+			TemporaryAccessStartTime: TemporaryAccessStartTime,
 		})
 	}
 
@@ -282,7 +281,15 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.ProjectSlug = types.StringValue(projectDetail.Slug)
-	updateProjectGroupStateByApi(r, ctx, resp.Diagnostics, &plan)
+	err = updateProjectGroupStateByApi(r, ctx, &plan)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching group details",
+			"Couldn't find group in project, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 }
@@ -305,7 +312,14 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	updateProjectGroupStateByApi(r, ctx, resp.Diagnostics, &state)
+	err := updateProjectGroupStateByApi(r, ctx, &state)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching group details",
+			"Couldn't find group in project, unexpected error: "+err.Error(),
+		)
+		return
+	}
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -349,19 +363,19 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		isTemporary := el.IsTemporary.ValueBool()
 		temporaryMode := el.TemporaryMode.ValueString()
 		temporaryRange := el.TemporaryRange.ValueString()
-		temporaryAccesStartTime := time.Now().UTC()
+		TemporaryAccessStartTime := time.Now().UTC()
 
 		if !isTemporary {
 			hasAtleastOnePermanentRole = true
 		}
 
-		if el.TemporaryAccesStartTime.ValueString() != "" {
+		if el.TemporaryAccessStartTime.ValueString() != "" {
 			var err error
-			temporaryAccesStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccesStartTime.ValueString())
+			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field temporaryAccesStartTime %s, role %s", el.TemporaryAccesStartTime.ValueString(), el.RoleSlug.ValueString()),
+					fmt.Sprintf("Must provider valid ISO timestamp for field TemporaryAccessStartTime %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
 				)
 				return
 			}
@@ -380,7 +394,7 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 			IsTemporary:              isTemporary,
 			TemporaryMode:            temporaryMode,
 			TemporaryRange:           temporaryRange,
-			TemporaryAccessStartTime: temporaryAccesStartTime,
+			TemporaryAccessStartTime: TemporaryAccessStartTime,
 		})
 	}
 
@@ -403,7 +417,14 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	updateProjectGroupStateByApi(r, ctx, resp.Diagnostics, &plan)
+	err = updateProjectGroupStateByApi(r, ctx, &plan)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching group details",
+			"Couldn't find group in project, unexpected error: "+err.Error(),
+		)
+		return
+	}
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 }
