@@ -63,7 +63,7 @@ resource "infisical_project_role" "biller" {
 
 ### Optional
 
-- `description` (String) The description for the new role
+- `description` (String) The description for the new role. Defaults to an empty string.
 
 ### Read-Only
 
