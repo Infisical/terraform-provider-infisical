@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -71,8 +72,10 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "The description for the new role",
+				Description: "The description for the new role. Defaults to an empty string.",
 				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
 			},
 			"project_slug": schema.StringAttribute{
 				Description: "The slug of the project to create role",
