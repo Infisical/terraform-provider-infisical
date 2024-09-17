@@ -1284,3 +1284,66 @@ type RevokeIdentityKubernetesAuthRequest struct {
 type RevokeIdentityKubernetesAuthResponse struct {
 	IdentityKubernetesAuth IdentityKubernetesAuth `json:"identityKubernetesAuth"`
 }
+
+type SecretApprovalPolicyEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type SecretApprovalPolicyApprover struct {
+	ID       string `json:"userId"`
+	Username string `json:"username"`
+}
+
+type SecretApprovalPolicy struct {
+	ID                string                          `json:"id"`
+	ProjectID         string                          `json:"projectId"`
+	Name              string                          `json:"name"`
+	Environment       SecretApprovalPolicyEnvironment `json:"environment"`
+	SecretPath        string                          `json:"secretPath"`
+	Approvers         []SecretApprovalPolicyApprover  `json:"userApprovers"`
+	RequiredApprovals int64                           `json:"approvals"`
+	EnforcementLevel  string                          `json:"enforcementLevel"`
+}
+
+type CreateSecretApprovalPolicyRequest struct {
+	ProjectID         string   `json:"workspaceId"`
+	Name              string   `json:"name"`
+	Environment       string   `json:"environment"`
+	SecretPath        string   `json:"secretPath"`
+	Approvers         []string `json:"approverUsernames"`
+	RequiredApprovals int64    `json:"approvals"`
+	EnforcementLevel  string   `json:"enforcementLevel"`
+}
+
+type CreateSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type GetSecretApprovalPolicyByIDRequest struct {
+	ID string `json:"id"`
+}
+
+type GetSecretApprovalPolicyByIDResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type UpdateSecretApprovalPolicyRequest struct {
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	SecretPath        string   `json:"secretPath"`
+	Approvers         []string `json:"approverUsernames"`
+	RequiredApprovals int64    `json:"approvals"`
+	EnforcementLevel  string   `json:"enforcementLevel"`
+}
+
+type UpdateSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type DeleteSecretApprovalPolicyRequest struct {
+	ID string `json:"id"`
+}
+
+type DeleteSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
