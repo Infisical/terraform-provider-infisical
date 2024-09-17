@@ -9,8 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -40,14 +41,11 @@ type ProjectGroupResourceModel struct {
 }
 
 type ProjectGroupRole struct {
-	ID                       types.String `tfsdk:"id"`
 	RoleSlug                 types.String `tfsdk:"role_slug"`
-	CustomRoleID             types.String `tfsdk:"custom_role_id"`
 	IsTemporary              types.Bool   `tfsdk:"is_temporary"`
 	TemporaryMode            types.String `tfsdk:"temporary_mode"`
 	TemporaryRange           types.String `tfsdk:"temporary_range"`
 	TemporaryAccessStartTime types.String `tfsdk:"temporary_access_start_time"`
-	TemporaryAccessEndTime   types.String `tfsdk:"temporary_access_end_time"`
 }
 
 // Metadata returns the resource type name.
@@ -78,58 +76,41 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"roles": schema.ListNestedAttribute{
+			"roles": schema.SetNestedAttribute{
 				Required:    true,
 				Description: "The roles assigned to the project group",
-				// For now, we do a full resource replacement if the roles of a project group changes.
-				// We do this in order to prevent state conflict due to re-ordering of role entries
-				// since what we have at the moment is a ListNestedAttribute wherein
-				// the order of the entries matter.
-				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplaceIfConfigured()},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Description:   "The ID of the project group role.",
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-						},
 						"role_slug": schema.StringAttribute{
 							Description: "The slug of the role",
 							Required:    true,
 						},
-						"custom_role_id": schema.StringAttribute{
-							Description:   "The id of the custom role slug",
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-						},
 						"is_temporary": schema.BoolAttribute{
-							Description: "Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.",
-							Optional:    true,
-							Computed:    true,
-							Default:     booldefault.StaticBool(false),
+							Description:   "Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.",
+							Optional:      true,
+							Default:       booldefault.StaticBool(false),
+							Computed:      true,
+							PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 						},
 						"temporary_mode": schema.StringAttribute{
 							Description:   "Type of temporary access given. Types: relative. Default: relative",
 							Optional:      true,
+							Default:       stringdefault.StaticString(""),
 							Computed:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 						},
 						"temporary_range": schema.StringAttribute{
-							Description: "TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h",
-							Optional:    true,
-							Computed:    true,
+							Description:   "TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h",
+							Optional:      true,
+							Default:       stringdefault.StaticString(""),
+							Computed:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 						},
 						"temporary_access_start_time": schema.StringAttribute{
 							Description:   "ISO time for which temporary access should begin. The current time is used by default.",
 							Optional:      true,
+							Default:       stringdefault.StaticString(""),
 							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-						},
-						"temporary_access_end_time": schema.StringAttribute{
-							Description:   "ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time",
-							Computed:      true,
-							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 						},
 					},
@@ -157,46 +138,6 @@ func (r *ProjectGroupResource) Configure(_ context.Context, req resource.Configu
 	}
 
 	r.client = client
-}
-
-func updateProjectGroupStateByApi(r *ProjectGroupResource, state *ProjectGroupResourceModel) error {
-	projectGroupDetails, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   state.GroupSlug.ValueString(),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	planRoles := make([]ProjectGroupRole, 0, len(projectGroupDetails.Membership.Roles))
-	for _, el := range projectGroupDetails.Membership.Roles {
-		val := ProjectGroupRole{
-			ID:                       types.StringValue(el.ID),
-			RoleSlug:                 types.StringValue(el.Role),
-			TemporaryAccessEndTime:   types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:           types.StringValue(el.TemporaryRange),
-			TemporaryMode:            types.StringValue(el.TemporaryMode),
-			CustomRoleID:             types.StringValue(el.CustomRoleId),
-			IsTemporary:              types.BoolValue(el.IsTemporary),
-			TemporaryAccessStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccessStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		planRoles = append(planRoles, val)
-	}
-	state.Roles = planRoles
-	state.MembershipID = types.StringValue(projectGroupDetails.Membership.ID)
-
-	return nil
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -275,7 +216,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	_, err = r.client.CreateProjectGroup(infisical.CreateProjectGroupRequest{
+	projectGroupResponse, err := r.client.CreateProjectGroup(infisical.CreateProjectGroupRequest{
 		ProjectSlug: projectDetail.Slug,
 		GroupSlug:   plan.GroupSlug.ValueString(),
 		Roles:       roles,
@@ -290,7 +231,8 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.ProjectSlug = types.StringValue(projectDetail.Slug)
-	err = updateProjectGroupStateByApi(r, &plan)
+	plan.MembershipID = types.StringValue(projectGroupResponse.Membership.ID)
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching group details",
@@ -321,14 +263,6 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	err := updateProjectGroupStateByApi(r, &state)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching group details",
-			"Couldn't find group in project, unexpected error: "+err.Error(),
-		)
-		return
-	}
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -426,14 +360,6 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	err = updateProjectGroupStateByApi(r, &plan)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching group details",
-			"Couldn't find group in project, unexpected error: "+err.Error(),
-		)
-		return
-	}
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 }
