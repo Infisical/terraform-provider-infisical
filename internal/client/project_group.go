@@ -1,6 +1,9 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 func (client Client) CreateProjectGroup(request CreateProjectGroupRequest) (CreateProjectGroupResponse, error) {
 	var responseData CreateProjectGroupResponse
@@ -30,6 +33,10 @@ func (client Client) GetProjectGroupMembership(request GetProjectGroupMembership
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
 		Get(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectSlug, request.GroupSlug))
+
+	if response.StatusCode() == http.StatusNotFound {
+		return GetProjectGroupMembershipResponse{}, ErrNotFound
+	}
 
 	if err != nil {
 		return GetProjectGroupMembershipResponse{}, fmt.Errorf("GetProjectGroupMembershipResponse: Unable to complete api request [err=%s]", err)

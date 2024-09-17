@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicalclient "terraform-provider-infisical/internal/client"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -263,6 +264,47 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
+		ProjectSlug: state.ProjectSlug.ValueString(),
+		GroupSlug:   state.GroupSlug.ValueString(),
+	})
+	if err != nil {
+		if err == infisicalclient.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		} else {
+			resp.Diagnostics.AddError(
+				"Error reading project group membership",
+				"Couldn't read project group membership from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
+	planRoles := make([]ProjectGroupRole, 0, len(projectGroupMembership.Membership.Roles))
+	for _, el := range projectGroupMembership.Membership.Roles {
+		val := ProjectGroupRole{
+			RoleSlug:                 types.StringValue(el.Role),
+			TemporaryRange:           types.StringValue(el.TemporaryRange),
+			TemporaryMode:            types.StringValue(el.TemporaryMode),
+			IsTemporary:              types.BoolValue(el.IsTemporary),
+			TemporaryAccessStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+		}
+
+		if !el.IsTemporary {
+			val.TemporaryMode = types.StringValue("")
+			val.TemporaryRange = types.StringValue("")
+			val.TemporaryAccessStartTime = types.StringValue("")
+		}
+
+		planRoles = append(planRoles, val)
+	}
+
+	state.Roles = planRoles
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 }
