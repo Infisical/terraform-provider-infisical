@@ -57,6 +57,7 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 			"name": schema.StringAttribute{
 				Description:   "The name of the secret approval policy",
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"environment_slug": schema.StringAttribute{
@@ -143,6 +144,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 
 	plan.ID = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.ID)
+	plan.Name = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.Name)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -225,6 +227,14 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.ProjectID != plan.ProjectID {
+		resp.Diagnostics.AddError(
+			"Unable to update secret approval policy",
+			fmt.Sprintf("Cannot change project ID, previous project ID: %s, new project ID: %s", state.ProjectID, plan.ProjectID),
+		)
 		return
 	}
 

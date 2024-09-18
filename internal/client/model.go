@@ -1410,7 +1410,7 @@ type SecretApprovalPolicy struct {
 
 type CreateSecretApprovalPolicyRequest struct {
 	ProjectID         string   `json:"workspaceId"`
-	Name              string   `json:"name"`
+	Name              string   `json:"name,omitempty"`
 	Environment       string   `json:"environment"`
 	SecretPath        string   `json:"secretPath"`
 	Approvers         []string `json:"approverUsernames"`
