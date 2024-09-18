@@ -1450,3 +1450,66 @@ type DeleteSecretApprovalPolicyRequest struct {
 type DeleteSecretApprovalPolicyResponse struct {
 	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
 }
+
+type AccessApprovalPolicyApprover struct {
+	ID       string `json:"userId"`
+	Username string `json:"username"`
+}
+
+type AccessApprovalPolicyEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type AccessApprovalPolicy struct {
+	ID                string                          `json:"id"`
+	ProjectID         string                          `json:"projectId"`
+	Name              string                          `json:"name"`
+	Environment       AccessApprovalPolicyEnvironment `json:"environment"`
+	SecretPath        string                          `json:"secretPath"`
+	Approvers         []AccessApprovalPolicyApprover  `json:"userApprovers"`
+	RequiredApprovals int64                           `json:"approvals"`
+	EnforcementLevel  string                          `json:"enforcementLevel"`
+}
+
+type CreateAccessApprovalPolicyRequest struct {
+	ProjectSlug       string   `json:"projectSlug"`
+	Name              string   `json:"name,omitempty"`
+	Environment       string   `json:"environment"`
+	SecretPath        string   `json:"secretPath"`
+	Approvers         []string `json:"approverUsernames"`
+	RequiredApprovals int64    `json:"approvals"`
+	EnforcementLevel  string   `json:"enforcementLevel"`
+}
+
+type CreateAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type GetAccessApprovalPolicyByIDRequest struct {
+	ID string `json:"id"`
+}
+
+type GetAccessApprovalPolicyByIDResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type UpdateAccessApprovalPolicyRequest struct {
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	SecretPath        string   `json:"secretPath"`
+	Approvers         []string `json:"approverUsernames"`
+	RequiredApprovals int64    `json:"approvals"`
+	EnforcementLevel  string   `json:"enforcementLevel"`
+}
+
+type UpdateAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type DeleteAccessApprovalPolicyRequest struct {
+	ID string `json:"id"`
+}
+
+type DeleteAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}

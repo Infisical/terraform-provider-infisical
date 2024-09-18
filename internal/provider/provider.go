@@ -250,5 +250,6 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityAzureAuthResource,
 		infisicalResource.NewIdentityOidcAuthResource,
 		infisicalResource.NewSecretApprovalPolicyResource,
+		infisicalResource.NewAccessApprovalPolicyResource,
 	}
 }
