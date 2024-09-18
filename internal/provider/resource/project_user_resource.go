@@ -47,6 +47,7 @@ type ProjectUserPersonalDetails struct {
 }
 
 const TEMPORARY_MODE_RELATIVE = "relative"
+const TEMPORARY_RANGE_DEFAULT = "1h"
 
 type ProjectUserRole struct {
 	ID                      types.String `tfsdk:"id"`

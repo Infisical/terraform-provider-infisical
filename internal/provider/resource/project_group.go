@@ -9,10 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -44,7 +41,6 @@ type ProjectGroupResourceModel struct {
 type ProjectGroupRole struct {
 	RoleSlug                 types.String `tfsdk:"role_slug"`
 	IsTemporary              types.Bool   `tfsdk:"is_temporary"`
-	TemporaryMode            types.String `tfsdk:"temporary_mode"`
 	TemporaryRange           types.String `tfsdk:"temporary_range"`
 	TemporaryAccessStartTime types.String `tfsdk:"temporary_access_start_time"`
 }
@@ -87,32 +83,16 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 							Required:    true,
 						},
 						"is_temporary": schema.BoolAttribute{
-							Description:   "Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.",
-							Optional:      true,
-							Default:       booldefault.StaticBool(false),
-							Computed:      true,
-							PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
-						},
-						"temporary_mode": schema.StringAttribute{
-							Description:   "Type of temporary access given. Types: relative. Default: relative",
-							Optional:      true,
-							Default:       stringdefault.StaticString(""),
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+							Description: "Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.",
+							Optional:    true,
 						},
 						"temporary_range": schema.StringAttribute{
-							Description:   "TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h",
-							Optional:      true,
-							Default:       stringdefault.StaticString(""),
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+							Description: "TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h",
+							Optional:    true,
 						},
 						"temporary_access_start_time": schema.StringAttribute{
-							Description:   "ISO time for which temporary access should begin. The current time is used by default.",
-							Optional:      true,
-							Default:       stringdefault.StaticString(""),
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+							Description: "ISO time for which temporary access should begin. The current time is used by default.",
+							Optional:    true,
 						},
 					},
 				},
@@ -163,7 +143,6 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	var hasAtleastOnePermanentRole bool
 	for _, el := range plan.Roles {
 		isTemporary := el.IsTemporary.ValueBool()
-		temporaryMode := el.TemporaryMode.ValueString()
 		temporaryRange := el.TemporaryRange.ValueString()
 		TemporaryAccessStartTime := time.Now().UTC()
 
@@ -184,11 +163,12 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		}
 
 		// default values
-		if isTemporary && temporaryMode == "" {
+		temporaryMode := ""
+		if isTemporary {
 			temporaryMode = TEMPORARY_MODE_RELATIVE
 		}
 		if isTemporary && temporaryRange == "" {
-			temporaryRange = "1h"
+			temporaryRange = TEMPORARY_RANGE_DEFAULT
 		}
 
 		roles = append(roles, infisical.CreateProjectGroupRequestRoles{
@@ -281,12 +261,16 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		}
 	}
 
+	stateRoleMap := make(map[string]ProjectGroupRole)
+	for _, role := range state.Roles {
+		stateRoleMap[role.RoleSlug.ValueString()] = role
+	}
+
 	planRoles := make([]ProjectGroupRole, 0, len(projectGroupMembership.Membership.Roles))
 	for _, el := range projectGroupMembership.Membership.Roles {
 		val := ProjectGroupRole{
 			RoleSlug:                 types.StringValue(el.Role),
 			TemporaryRange:           types.StringValue(el.TemporaryRange),
-			TemporaryMode:            types.StringValue(el.TemporaryMode),
 			IsTemporary:              types.BoolValue(el.IsTemporary),
 			TemporaryAccessStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
@@ -295,10 +279,27 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 
+		/*
+			We do the following because we want to maintain the state when the API returns these properties
+			with default values. We cannot use the computed property because it breaks the Set. Thus we
+			handle this manually.
+		*/
+		previousRoleState, ok := stateRoleMap[val.RoleSlug.ValueString()]
+		if ok {
+			if previousRoleState.IsTemporary.ValueBool() && el.IsTemporary {
+				if previousRoleState.TemporaryRange.IsNull() && el.TemporaryRange == TEMPORARY_RANGE_DEFAULT {
+					val.TemporaryRange = types.StringNull()
+				}
+			}
+
+			if previousRoleState.IsTemporary.IsNull() && !el.IsTemporary {
+				val.IsTemporary = types.BoolNull()
+			}
+		}
+
 		if !el.IsTemporary {
-			val.TemporaryMode = types.StringValue("")
-			val.TemporaryRange = types.StringValue("")
-			val.TemporaryAccessStartTime = types.StringValue("")
+			val.TemporaryRange = types.StringNull()
+			val.TemporaryAccessStartTime = types.StringNull()
 		}
 
 		planRoles = append(planRoles, val)
@@ -346,7 +347,6 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 	var hasAtleastOnePermanentRole bool
 	for _, el := range plan.Roles {
 		isTemporary := el.IsTemporary.ValueBool()
-		temporaryMode := el.TemporaryMode.ValueString()
 		temporaryRange := el.TemporaryRange.ValueString()
 		TemporaryAccessStartTime := time.Now().UTC()
 
@@ -367,7 +367,8 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 
 		// default values
-		if isTemporary && temporaryMode == "" {
+		temporaryMode := ""
+		if isTemporary {
 			temporaryMode = TEMPORARY_MODE_RELATIVE
 		}
 		if isTemporary && temporaryRange == "" {
