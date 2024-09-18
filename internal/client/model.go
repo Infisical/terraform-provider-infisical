@@ -263,6 +263,10 @@ type ProjectWithEnvironments struct {
 	Environments       []ProjectEnvironment `json:"environments"`
 }
 
+type GetProjectByIdResponse struct {
+	Workspace ProjectWithEnvironments `json:"workspace"`
+}
+
 type ProjectMemberships struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -508,6 +512,10 @@ type DeleteProjectRequest struct {
 
 type GetProjectRequest struct {
 	Slug string `json:"slug"`
+}
+
+type GetProjectByIdRequest struct {
+	ID string `json:"id"`
 }
 
 type UpdateProjectRequest struct {
@@ -778,6 +786,101 @@ type GetProjectIdentitySpecificPrivilegeRequest struct {
 
 type GetProjectIdentitySpecificPrivilegeResponse struct {
 	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type ProjectGroupRole struct {
+	ID                       string    `json:"id"`
+	Role                     string    `json:"role"`
+	CustomRoleSlug           string    `json:"customRoleSlug"`
+	CustomRoleId             string    `json:"customRoleId"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
+}
+
+type ProjectGroup struct {
+	ID      string `json:"id"`
+	GroupID string `json:"groupId"`
+	Roles   []ProjectGroupRole
+}
+
+type CreateProjectGroupRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type CreateProjectGroupRequest struct {
+	ProjectSlug string                           `json:"projectSlug"`
+	GroupSlug   string                           `json:"groupSlug"`
+	Roles       []CreateProjectGroupRequestRoles `json:"roles"`
+}
+
+type CreateProjectGroupResponseMembers struct {
+	ID      string `json:"id"`
+	GroupID string `json:"groupId"`
+}
+
+type CreateProjectGroupResponse struct {
+	Membership CreateProjectGroupResponseMembers `json:"groupMembership"`
+}
+
+type GetProjectGroupMembershipRequest struct {
+	ProjectSlug string `json:"projectSlug"`
+	GroupSlug   string `json:"groupSlug"`
+}
+
+type GetProjectGroupMembershipResponse struct {
+	Membership ProjectGroup `json:"groupMembership"`
+}
+
+type UpdateProjectGroupRequestRoles struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type UpdateProjectGroupRequest struct {
+	ProjectSlug string                           `json:"projectSlug"`
+	GroupSlug   string                           `json:"groupSlug"`
+	Roles       []UpdateProjectGroupRequestRoles `json:"roles"`
+}
+
+type UpdateProjectGroupResponse struct {
+	Roles []struct {
+		ID                       string    `json:"id"`
+		Role                     string    `json:"role"`
+		CustomRoleId             string    `json:"customRoleId"`
+		IsTemporary              bool      `json:"isTemporary"`
+		TemporaryMode            string    `json:"temporaryMode"`
+		TemporaryRange           string    `json:"temporaryRange"`
+		TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+		TemporaryAccessEndTime   time.Time `json:"temporaryAccessEndTime"`
+		CreatedAt                time.Time `json:"createdAt"`
+		UpdatedAt                time.Time `json:"updatedAt"`
+	} `json:"roles"`
+}
+
+type DeleteProjectGroupRequest struct {
+	ProjectSlug string `json:"projectSlug"`
+	GroupSlug   string `json:"groupSlug"`
+}
+
+type DeleteProjectGroupResponseMembers struct {
+	ID      string `json:"id"`
+	GroupID string `json:"groupId"`
+}
+
+type DeleteProjectGroupResponse struct {
+	Membership DeleteProjectGroupResponseMembers `json:"groupMembership"`
 }
 
 type GetProjectTagsResponse struct {
