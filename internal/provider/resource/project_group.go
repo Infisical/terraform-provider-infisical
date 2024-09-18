@@ -281,8 +281,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 
 		/*
 			We do the following because we want to maintain the state when the API returns these properties
-			with default values. We cannot use the computed property because it breaks the Set. Thus we
-			handle this manually.
+			with default values. Without this, there will be unlimited drift because of the optional values.
 		*/
 		previousRoleState, ok := stateRoleMap[val.RoleSlug.ValueString()]
 		if ok {
