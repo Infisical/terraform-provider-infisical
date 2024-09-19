@@ -91,7 +91,7 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 							Optional:    true,
 						},
 						"temporary_access_start_time": schema.StringAttribute{
-							Description: "ISO time for which temporary access should begin. The current time is used by default.",
+							Description: "ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ.",
 							Optional:    true,
 						},
 					},
@@ -150,6 +150,23 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 			hasAtleastOnePermanentRole = true
 		}
 
+		temporaryMode := ""
+		if isTemporary {
+			temporaryMode = TEMPORARY_MODE_RELATIVE
+
+			if el.TemporaryAccessStartTime.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field temporary_access_start_time is required for temporary roles",
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+				)
+				return
+			}
+		}
+
+		if isTemporary && temporaryRange == "" {
+			temporaryRange = TEMPORARY_RANGE_DEFAULT
+		}
+
 		if el.TemporaryAccessStartTime.ValueString() != "" {
 			var err error
 			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
@@ -160,15 +177,6 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 				)
 				return
 			}
-		}
-
-		// default values
-		temporaryMode := ""
-		if isTemporary {
-			temporaryMode = TEMPORARY_MODE_RELATIVE
-		}
-		if isTemporary && temporaryRange == "" {
-			temporaryRange = TEMPORARY_RANGE_DEFAULT
 		}
 
 		roles = append(roles, infisical.CreateProjectGroupRequestRoles{
@@ -353,25 +361,32 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 			hasAtleastOnePermanentRole = true
 		}
 
+		temporaryMode := ""
+		if isTemporary {
+			temporaryMode = TEMPORARY_MODE_RELATIVE
+
+			if el.TemporaryAccessStartTime.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field temporary_access_start_time is required for temporary roles",
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+				)
+				return
+			}
+		}
+		if isTemporary && temporaryRange == "" {
+			temporaryRange = "1h"
+		}
+
 		if el.TemporaryAccessStartTime.ValueString() != "" {
 			var err error
 			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field TemporaryAccessStartTime %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+					fmt.Sprintf("Must provider valid ISO timestamp for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
 				)
 				return
 			}
-		}
-
-		// default values
-		temporaryMode := ""
-		if isTemporary {
-			temporaryMode = TEMPORARY_MODE_RELATIVE
-		}
-		if isTemporary && temporaryRange == "" {
-			temporaryRange = "1h"
 		}
 
 		roles = append(roles, infisical.UpdateProjectGroupRequestRoles{
