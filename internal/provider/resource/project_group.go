@@ -157,7 +157,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 			if el.TemporaryAccessStartTime.IsNull() {
 				resp.Diagnostics.AddError(
 					"Field temporary_access_start_time is required for temporary roles",
-					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time, role %s", el.RoleSlug.ValueString()),
 				)
 				return
 			}
@@ -172,8 +172,8 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
-					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field TemporaryAccessStartTime %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+					"Error parsing field temporary_access_start_time",
+					fmt.Sprintf("Must provider valid ISO timestamp for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
 				)
 				return
 			}
@@ -368,7 +368,7 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 			if el.TemporaryAccessStartTime.IsNull() {
 				resp.Diagnostics.AddError(
 					"Field temporary_access_start_time is required for temporary roles",
-					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time, role %s", el.RoleSlug.ValueString()),
 				)
 				return
 			}
@@ -382,7 +382,7 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
-					"Error parsing field TemporaryAccessStartTime",
+					"Error parsing field temporary_access_start_time",
 					fmt.Sprintf("Must provider valid ISO timestamp for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
 				)
 				return
