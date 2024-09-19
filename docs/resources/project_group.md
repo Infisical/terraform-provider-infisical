@@ -40,8 +40,8 @@ resource "infisical_project_group" "group" {
     {
       role_slug                   = "admin",
       is_temporary                = true,
-      temporary_access_start_time = "<>",
-      temporary_range             = "<>"
+      temporary_access_start_time = "2024-09-19T12:43:13Z",
+      temporary_range             = "1y"
     },
     {
       role_slug = "my-custom-role",
