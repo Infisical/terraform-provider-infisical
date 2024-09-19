@@ -91,7 +91,7 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 							Optional:    true,
 						},
 						"temporary_access_start_time": schema.StringAttribute{
-							Description: "ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ.",
+							Description: "ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ e.g. 2024-09-19T12:43:13Z",
 							Optional:    true,
 						},
 					},

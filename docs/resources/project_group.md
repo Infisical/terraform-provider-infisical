@@ -74,5 +74,5 @@ Required:
 Optional:
 
 - `is_temporary` (Boolean) Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
-- `temporary_access_start_time` (String) ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ.
+- `temporary_access_start_time` (String) ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ e.g. 2024-09-19T12:43:13Z
 - `temporary_range` (String) TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h
