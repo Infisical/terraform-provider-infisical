@@ -55,7 +55,7 @@ resource "infisical_project_group" "group" {
 
 ### Required
 
-- `group_slug` (String) The slug of the group.
+- `group_id` (String) The id of the group.
 - `project_id` (String) The id of the project.
 - `roles` (Attributes Set) The roles assigned to the project group (see [below for nested schema](#nestedatt--roles))
 
