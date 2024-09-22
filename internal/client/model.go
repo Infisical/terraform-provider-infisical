@@ -832,8 +832,8 @@ type CreateProjectGroupResponse struct {
 }
 
 type GetProjectGroupMembershipRequest struct {
-	ProjectSlug string `json:"projectSlug"`
-	GroupSlug   string `json:"groupSlug"`
+	ProjectId string `json:"projectId"`
+	GroupId   string `json:"groupId"`
 }
 
 type GetProjectGroupMembershipResponse struct {

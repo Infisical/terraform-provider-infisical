@@ -32,7 +32,7 @@ func (client Client) GetProjectGroupMembership(request GetProjectGroupMembership
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Get(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectSlug, request.GroupSlug))
+		Get(fmt.Sprintf("api/v3/workspaces/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if response.StatusCode() == http.StatusNotFound {
 		return GetProjectGroupMembershipResponse{}, ErrNotFound

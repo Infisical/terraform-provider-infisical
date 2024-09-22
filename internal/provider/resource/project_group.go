@@ -264,26 +264,11 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	groupResponse, err := r.client.GetGroupById(infisical.GetGroupByIdRequest{
-		ID: state.GroupId.ValueString(),
-	})
-
-	if err != nil {
-		if err == infisicalclient.ErrNotFound {
-			resp.State.RemoveResource(ctx)
-			return
-		}
-		resp.Diagnostics.AddError(
-			"Error reading project group membership",
-			"Couldn't fetch group, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
 	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   groupResponse.Slug,
+		ProjectId: state.ProjectID.ValueString(),
+		GroupId:   state.GroupId.ValueString(),
 	})
+
 	if err != nil {
 		if err == infisicalclient.ErrNotFound {
 			resp.State.RemoveResource(ctx)
