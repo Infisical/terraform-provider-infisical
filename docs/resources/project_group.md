@@ -62,7 +62,6 @@ resource "infisical_project_group" "group" {
 ### Read-Only
 
 - `membership_id` (String) The membership Id of the project group
-- `project_slug` (String) The slug of the project.
 
 <a id="nestedatt--roles"></a>
 ### Nested Schema for `roles`

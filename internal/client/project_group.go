@@ -12,7 +12,7 @@ func (client Client) CreateProjectGroup(request CreateProjectGroupRequest) (Crea
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectSlug, request.GroupSlug))
+		Post(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if err != nil {
 		return CreateProjectGroupResponse{}, fmt.Errorf("CallCreateProjectGroup: Unable to complete api request [err=%s]", err)
@@ -32,7 +32,7 @@ func (client Client) GetProjectGroupMembership(request GetProjectGroupMembership
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Get(fmt.Sprintf("api/v3/workspaces/%s/groups/%s", request.ProjectId, request.GroupId))
+		Get(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if response.StatusCode() == http.StatusNotFound {
 		return GetProjectGroupMembershipResponse{}, ErrNotFound
@@ -56,7 +56,7 @@ func (client Client) UpdateProjectGroup(request UpdateProjectGroupRequest) (Upda
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectSlug, request.GroupSlug))
+		Patch(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if err != nil {
 		return UpdateProjectGroupResponse{}, fmt.Errorf("CallUpdateProjectGroup: Unable to complete api request [err=%s]", err)
@@ -76,7 +76,7 @@ func (client Client) DeleteProjectGroup(request DeleteProjectGroupRequest) (Dele
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Delete(fmt.Sprintf("/api/v2/workspace/%s/groups/%s", request.ProjectSlug, request.GroupSlug))
+		Delete(fmt.Sprintf("/api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if err != nil {
 		return DeleteProjectGroupResponse{}, fmt.Errorf("CallDeleteProjectGroup: Unable to complete api request [err=%s]", err)

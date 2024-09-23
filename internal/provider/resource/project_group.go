@@ -32,8 +32,7 @@ type ProjectGroupResource struct {
 // projectResourceSourceModel describes the data source data model.
 type ProjectGroupResourceModel struct {
 	ProjectID    types.String       `tfsdk:"project_id"`
-	ProjectSlug  types.String       `tfsdk:"project_slug"`
-	GroupId      types.String       `tfsdk:"group_id"`
+	GroupID      types.String       `tfsdk:"group_id"`
 	Roles        []ProjectGroupRole `tfsdk:"roles"`
 	MembershipID types.String       `tfsdk:"membership_id"`
 }
@@ -58,11 +57,6 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 			"project_id": schema.StringAttribute{
 				Description: "The id of the project.",
 				Required:    true,
-			},
-			"project_slug": schema.StringAttribute{
-				Description:   "The slug of the project.",
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"group_id": schema.StringAttribute{
 				Description: "The id of the group.",
@@ -193,34 +187,10 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	projectDetail, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
-		ID: plan.ProjectID.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error attaching group to project",
-			"Couldn't fetch project details, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	groupResponse, err := r.client.GetGroupById(infisical.GetGroupByIdRequest{
-		ID: plan.GroupId.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error attaching group to project",
-			"Couldn't fetch group, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
 	projectGroupResponse, err := r.client.CreateProjectGroup(infisical.CreateProjectGroupRequest{
-		ProjectSlug: projectDetail.Slug,
-		GroupSlug:   groupResponse.Slug,
-		Roles:       roles,
+		ProjectId: plan.ProjectID.ValueString(),
+		GroupId:   plan.GroupID.ValueString(),
+		Roles:     roles,
 	})
 
 	if err != nil {
@@ -231,7 +201,6 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	plan.ProjectSlug = types.StringValue(projectDetail.Slug)
 	plan.MembershipID = types.StringValue(projectGroupResponse.Membership.ID)
 
 	if err != nil {
@@ -266,7 +235,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 
 	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
 		ProjectId: state.ProjectID.ValueString(),
-		GroupId:   state.GroupId.ValueString(),
+		GroupId:   state.GroupID.ValueString(),
 	})
 
 	if err != nil {
@@ -363,10 +332,10 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	if plan.GroupId != state.GroupId {
+	if plan.GroupID != state.GroupID {
 		resp.Diagnostics.AddError(
 			"Unable to update project group",
-			fmt.Sprintf("Cannot change group ID, previous group: %s, new group: %s", state.GroupId, plan.GroupId),
+			fmt.Sprintf("Cannot change group ID, previous group: %s, new group: %s", state.GroupID, plan.GroupID),
 		)
 		return
 	}
@@ -424,22 +393,10 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	groupResponse, err := r.client.GetGroupById(infisical.GetGroupByIdRequest{
-		ID: plan.GroupId.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to group",
-			"Couldn't fetch group, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.UpdateProjectGroup(infisical.UpdateProjectGroupRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   groupResponse.Slug,
-		Roles:       roles,
+	_, err := r.client.UpdateProjectGroup(infisical.UpdateProjectGroupRequest{
+		ProjectId: state.ProjectID.ValueString(),
+		GroupId:   state.GroupID.ValueString(),
+		Roles:     roles,
 	})
 
 	if err != nil {
@@ -471,21 +428,9 @@ func (r *ProjectGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	groupResponse, err := r.client.GetGroupById(infisical.GetGroupByIdRequest{
-		ID: state.GroupId.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting project group",
-			"Couldn't fetch group, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteProjectGroup(infisical.DeleteProjectGroupRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   groupResponse.Slug,
+	_, err := r.client.DeleteProjectGroup(infisical.DeleteProjectGroupRequest{
+		ProjectId: state.ProjectID.ValueString(),
+		GroupId:   state.GroupID.ValueString(),
 	})
 
 	if err != nil {

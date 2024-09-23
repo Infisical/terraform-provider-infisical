@@ -817,9 +817,9 @@ type CreateProjectGroupRequestRoles struct {
 }
 
 type CreateProjectGroupRequest struct {
-	ProjectSlug string                           `json:"projectSlug"`
-	GroupSlug   string                           `json:"groupSlug"`
-	Roles       []CreateProjectGroupRequestRoles `json:"roles"`
+	ProjectId string                           `json:"projectId"`
+	GroupId   string                           `json:"groupId"`
+	Roles     []CreateProjectGroupRequestRoles `json:"roles"`
 }
 
 type CreateProjectGroupResponseMembers struct {
@@ -849,9 +849,9 @@ type UpdateProjectGroupRequestRoles struct {
 }
 
 type UpdateProjectGroupRequest struct {
-	ProjectSlug string                           `json:"projectSlug"`
-	GroupSlug   string                           `json:"groupSlug"`
-	Roles       []UpdateProjectGroupRequestRoles `json:"roles"`
+	ProjectId string                           `json:"projectId"`
+	GroupId   string                           `json:"groupId"`
+	Roles     []UpdateProjectGroupRequestRoles `json:"roles"`
 }
 
 type UpdateProjectGroupResponse struct {
@@ -870,8 +870,8 @@ type UpdateProjectGroupResponse struct {
 }
 
 type DeleteProjectGroupRequest struct {
-	ProjectSlug string `json:"projectSlug"`
-	GroupSlug   string `json:"groupSlug"`
+	ProjectId string `json:"projectId"`
+	GroupId   string `json:"groupId"`
 }
 
 type DeleteProjectGroupResponseMembers struct {
