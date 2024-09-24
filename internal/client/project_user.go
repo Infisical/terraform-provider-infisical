@@ -1,6 +1,9 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 func (client Client) InviteUsersToProject(request InviteUsersToProjectRequest) ([]ProjectMemberships, error) {
 	var inviteUsersToProjectResponse InviteUsersToProjectResponse
@@ -76,6 +79,11 @@ func (client Client) GetProjectUserByUsername(request GetProjectUserByUserNameRe
 	}
 
 	if response.IsError() {
+
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectUserByUserNameResponse{}, ErrNotFound
+		}
+
 		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallGetProjectUserByUsername: Unsuccessful response. [response=%s]", response)
 	}
 

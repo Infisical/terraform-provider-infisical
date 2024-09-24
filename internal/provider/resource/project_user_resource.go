@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
@@ -348,8 +347,7 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 	})
 
 	if err != nil {
-		// If the membership isn't found for whatever reason (user left the project, etc), remove the resource so we can re-create it, and fix the state.
-		if strings.Contains(err.Error(), "Project membership not found") {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}
