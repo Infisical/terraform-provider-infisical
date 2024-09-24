@@ -345,11 +345,18 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 		ProjectID: state.ProjectID.ValueString(),
 		Username:  state.Username.ValueString(),
 	})
+
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error fetching user",
 			"Couldn't find user in project, unexpected error: "+err.Error(),
 		)
+
 		return
 	}
 
