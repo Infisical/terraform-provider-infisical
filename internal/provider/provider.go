@@ -225,6 +225,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectDataSource,
 		infisicalDatasource.NewSecretTagDataSource,
 		infisicalDatasource.NewSecretFolderDataSource,
+		infisicalDatasource.NewGroupsDataSource,
 	}
 }
 
@@ -237,6 +238,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectIdentityResource,
 		infisicalResource.NewProjectRoleResource,
 		infisicalResource.NewProjectIdentitySpecificPrivilegeResource,
+		infisicalResource.NewProjectGroupResource,
 		infisicalResource.NewProjectSecretTagResource,
 		infisicalResource.NewProjectSecretFolderResource,
 		infisicalResource.NewProjectEnvironmentResource,
