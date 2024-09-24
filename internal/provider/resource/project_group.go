@@ -32,8 +32,7 @@ type ProjectGroupResource struct {
 // projectResourceSourceModel describes the data source data model.
 type ProjectGroupResourceModel struct {
 	ProjectID    types.String       `tfsdk:"project_id"`
-	ProjectSlug  types.String       `tfsdk:"project_slug"`
-	GroupSlug    types.String       `tfsdk:"group_slug"`
+	GroupID      types.String       `tfsdk:"group_id"`
 	Roles        []ProjectGroupRole `tfsdk:"roles"`
 	MembershipID types.String       `tfsdk:"membership_id"`
 }
@@ -59,13 +58,8 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "The id of the project.",
 				Required:    true,
 			},
-			"project_slug": schema.StringAttribute{
-				Description:   "The slug of the project.",
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"group_slug": schema.StringAttribute{
-				Description: "The slug of the group.",
+			"group_id": schema.StringAttribute{
+				Description: "The id of the group.",
 				Required:    true,
 			},
 			"membership_id": schema.StringAttribute{
@@ -91,7 +85,7 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 							Optional:    true,
 						},
 						"temporary_access_start_time": schema.StringAttribute{
-							Description: "ISO time for which temporary access should begin. The current time is used by default.",
+							Description: "ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ e.g. 2024-09-19T12:43:13Z",
 							Optional:    true,
 						},
 					},
@@ -150,25 +144,33 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 			hasAtleastOnePermanentRole = true
 		}
 
-		if el.TemporaryAccessStartTime.ValueString() != "" {
-			var err error
-			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
-			if err != nil {
+		temporaryMode := ""
+		if isTemporary {
+			temporaryMode = TEMPORARY_MODE_RELATIVE
+
+			if el.TemporaryAccessStartTime.IsNull() {
 				resp.Diagnostics.AddError(
-					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field TemporaryAccessStartTime %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+					"Field temporary_access_start_time is required for temporary roles",
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time, role %s", el.RoleSlug.ValueString()),
 				)
 				return
 			}
 		}
 
-		// default values
-		temporaryMode := ""
-		if isTemporary {
-			temporaryMode = TEMPORARY_MODE_RELATIVE
-		}
 		if isTemporary && temporaryRange == "" {
 			temporaryRange = TEMPORARY_RANGE_DEFAULT
+		}
+
+		if el.TemporaryAccessStartTime.ValueString() != "" {
+			var err error
+			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error parsing field temporary_access_start_time",
+					fmt.Sprintf("Must provider valid ISO timestamp for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+				)
+				return
+			}
 		}
 
 		roles = append(roles, infisical.CreateProjectGroupRequestRoles{
@@ -185,22 +187,10 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	projectDetail, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
-		ID: plan.ProjectID.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error attaching group to project",
-			"Couldn't fetch project details, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
 	projectGroupResponse, err := r.client.CreateProjectGroup(infisical.CreateProjectGroupRequest{
-		ProjectSlug: projectDetail.Slug,
-		GroupSlug:   plan.GroupSlug.ValueString(),
-		Roles:       roles,
+		ProjectId: plan.ProjectID.ValueString(),
+		GroupId:   plan.GroupID.ValueString(),
+		Roles:     roles,
 	})
 
 	if err != nil {
@@ -211,7 +201,6 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	plan.ProjectSlug = types.StringValue(projectDetail.Slug)
 	plan.MembershipID = types.StringValue(projectGroupResponse.Membership.ID)
 
 	if err != nil {
@@ -245,9 +234,10 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   state.GroupSlug.ValueString(),
+		ProjectId: state.ProjectID.ValueString(),
+		GroupId:   state.GroupID.ValueString(),
 	})
+
 	if err != nil {
 		if err == infisicalclient.ErrNotFound {
 			resp.State.RemoveResource(ctx)
@@ -334,10 +324,18 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	if plan.GroupSlug != state.GroupSlug {
+	if plan.ProjectID != state.ProjectID {
+		resp.Diagnostics.AddError(
+			"Unable to update project ID",
+			fmt.Sprintf("Cannot change project ID, previous project: %s, new project: %s", state.ProjectID, plan.ProjectID),
+		)
+		return
+	}
+
+	if plan.GroupID != state.GroupID {
 		resp.Diagnostics.AddError(
 			"Unable to update project group",
-			fmt.Sprintf("Cannot change group slug, previous group: %s, new group: %s", state.GroupSlug, plan.GroupSlug),
+			fmt.Sprintf("Cannot change group ID, previous group: %s, new group: %s", state.GroupID, plan.GroupID),
 		)
 		return
 	}
@@ -353,25 +351,32 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 			hasAtleastOnePermanentRole = true
 		}
 
+		temporaryMode := ""
+		if isTemporary {
+			temporaryMode = TEMPORARY_MODE_RELATIVE
+
+			if el.TemporaryAccessStartTime.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field temporary_access_start_time is required for temporary roles",
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time, role %s", el.RoleSlug.ValueString()),
+				)
+				return
+			}
+		}
+		if isTemporary && temporaryRange == "" {
+			temporaryRange = "1h"
+		}
+
 		if el.TemporaryAccessStartTime.ValueString() != "" {
 			var err error
 			TemporaryAccessStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccessStartTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
-					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field TemporaryAccessStartTime %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
+					"Error parsing field temporary_access_start_time",
+					fmt.Sprintf("Must provider valid ISO timestamp for field temporary_access_start_time %s, role %s", el.TemporaryAccessStartTime.ValueString(), el.RoleSlug.ValueString()),
 				)
 				return
 			}
-		}
-
-		// default values
-		temporaryMode := ""
-		if isTemporary {
-			temporaryMode = TEMPORARY_MODE_RELATIVE
-		}
-		if isTemporary && temporaryRange == "" {
-			temporaryRange = "1h"
 		}
 
 		roles = append(roles, infisical.UpdateProjectGroupRequestRoles{
@@ -389,9 +394,9 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	_, err := r.client.UpdateProjectGroup(infisical.UpdateProjectGroupRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   plan.GroupSlug.ValueString(),
-		Roles:       roles,
+		ProjectId: state.ProjectID.ValueString(),
+		GroupId:   state.GroupID.ValueString(),
+		Roles:     roles,
 	})
 
 	if err != nil {
@@ -424,8 +429,8 @@ func (r *ProjectGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	_, err := r.client.DeleteProjectGroup(infisical.DeleteProjectGroupRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		GroupSlug:   state.GroupSlug.ValueString(),
+		ProjectId: state.ProjectID.ValueString(),
+		GroupId:   state.GroupID.ValueString(),
 	})
 
 	if err != nil {

@@ -40,8 +40,8 @@ resource "infisical_project_group" "group" {
     {
       role_slug                   = "admin",
       is_temporary                = true,
-      temporary_access_start_time = "<>",
-      temporary_range             = "<>"
+      temporary_access_start_time = "2024-09-19T12:43:13Z",
+      temporary_range             = "1y"
     },
     {
       role_slug = "my-custom-role",
@@ -55,14 +55,13 @@ resource "infisical_project_group" "group" {
 
 ### Required
 
-- `group_slug` (String) The slug of the group.
+- `group_id` (String) The id of the group.
 - `project_id` (String) The id of the project.
 - `roles` (Attributes Set) The roles assigned to the project group (see [below for nested schema](#nestedatt--roles))
 
 ### Read-Only
 
 - `membership_id` (String) The membership Id of the project group
-- `project_slug` (String) The slug of the project.
 
 <a id="nestedatt--roles"></a>
 ### Nested Schema for `roles`
@@ -74,5 +73,5 @@ Required:
 Optional:
 
 - `is_temporary` (Boolean) Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
-- `temporary_access_start_time` (String) ISO time for which temporary access should begin. The current time is used by default.
+- `temporary_access_start_time` (String) ISO time for which temporary access should begin. This is in the format YYYY-MM-DDTHH:MM:SSZ e.g. 2024-09-19T12:43:13Z
 - `temporary_range` (String) TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h

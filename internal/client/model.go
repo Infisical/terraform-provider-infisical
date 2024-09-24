@@ -817,9 +817,9 @@ type CreateProjectGroupRequestRoles struct {
 }
 
 type CreateProjectGroupRequest struct {
-	ProjectSlug string                           `json:"projectSlug"`
-	GroupSlug   string                           `json:"groupSlug"`
-	Roles       []CreateProjectGroupRequestRoles `json:"roles"`
+	ProjectId string                           `json:"projectId"`
+	GroupId   string                           `json:"groupId"`
+	Roles     []CreateProjectGroupRequestRoles `json:"roles"`
 }
 
 type CreateProjectGroupResponseMembers struct {
@@ -832,8 +832,8 @@ type CreateProjectGroupResponse struct {
 }
 
 type GetProjectGroupMembershipRequest struct {
-	ProjectSlug string `json:"projectSlug"`
-	GroupSlug   string `json:"groupSlug"`
+	ProjectId string `json:"projectId"`
+	GroupId   string `json:"groupId"`
 }
 
 type GetProjectGroupMembershipResponse struct {
@@ -849,9 +849,9 @@ type UpdateProjectGroupRequestRoles struct {
 }
 
 type UpdateProjectGroupRequest struct {
-	ProjectSlug string                           `json:"projectSlug"`
-	GroupSlug   string                           `json:"groupSlug"`
-	Roles       []UpdateProjectGroupRequestRoles `json:"roles"`
+	ProjectId string                           `json:"projectId"`
+	GroupId   string                           `json:"groupId"`
+	Roles     []UpdateProjectGroupRequestRoles `json:"roles"`
 }
 
 type UpdateProjectGroupResponse struct {
@@ -870,8 +870,8 @@ type UpdateProjectGroupResponse struct {
 }
 
 type DeleteProjectGroupRequest struct {
-	ProjectSlug string `json:"projectSlug"`
-	GroupSlug   string `json:"groupSlug"`
+	ProjectId string `json:"projectId"`
+	GroupId   string `json:"groupId"`
 }
 
 type DeleteProjectGroupResponseMembers struct {
@@ -882,6 +882,21 @@ type DeleteProjectGroupResponseMembers struct {
 type DeleteProjectGroupResponse struct {
 	Membership DeleteProjectGroupResponseMembers `json:"groupMembership"`
 }
+
+type GetGroupByIdRequest struct {
+	ID string `json:"id"`
+}
+
+type Group struct {
+	ID     string `json:"id"`
+	OrgID  string `json:"orgId"`
+	Name   string `json:"name"`
+	Slug   string `json:"slug"`
+	Role   string `json:"role"`
+	RoleId string `json:"roleId"`
+}
+
+type GetGroupsResponse []Group
 
 type GetProjectTagsResponse struct {
 	Tags []ProjectTag `json:"workspaceTags"`
