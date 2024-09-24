@@ -72,11 +72,11 @@ func (client Client) GetProjectUserByUsername(request GetProjectUserByUserNameRe
 		Post(fmt.Sprintf("api/v1/workspace/%s/memberships/details", request.ProjectID))
 
 	if err != nil {
-		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallCreateProject: Unable to complete api request [err=%s]", err)
+		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallGetProjectUserByUsername: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallCreateProject: Unsuccessful response. [response=%s]", response)
+		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallGetProjectUserByUsername: Unsuccessful response. [response=%s]", response)
 	}
 
 	return projectUserResponse, nil
