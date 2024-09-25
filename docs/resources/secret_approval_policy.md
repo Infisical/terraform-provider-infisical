@@ -34,11 +34,19 @@ resource "infisical_project" "example" {
 }
 
 resource "infisical_secret_approval_policy" "prod-policy" {
-  project_id         = infisical_project.example.id
-  name               = "my-prod-policy"
-  environment_slug   = "prod"
-  secret_path        = "/"
-  approvers          = ["name@infisical.com", "name-1@infisical.com"]
+  project_id       = infisical_project.example.id
+  name             = "my-prod-policy"
+  environment_slug = "prod"
+  secret_path      = "/"
+  approvers = [
+    {
+      type = "group"
+      id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
+    },
+    {
+      type = "user"
+      name = "name@infisical.com"
+  }]
   required_approvals = 1
   enforcement_level  = "hard"
 }
@@ -49,7 +57,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 
 ### Required
 
-- `approvers` (Set of String) The usernames of the required approvers. By default, this refers to the emails of the users
+- `approvers` (Attributes Set) The required approvers (see [below for nested schema](#nestedatt--approvers))
 - `environment_slug` (String) The environment to apply the secret approval policy to
 - `project_id` (String) The ID of the project to add the secret approval policy
 - `required_approvals` (Number) The number of required approvers
@@ -63,3 +71,15 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 ### Read-Only
 
 - `id` (String) The ID of the secret approval policy
+
+<a id="nestedatt--approvers"></a>
+### Nested Schema for `approvers`
+
+Required:
+
+- `type` (String) The type of approver. Either group or user
+
+Optional:
+
+- `id` (String) The ID of the approver
+- `name` (String) The name of the approver. By default, this is the email

@@ -19,11 +19,19 @@ resource "infisical_project" "example" {
 }
 
 resource "infisical_secret_approval_policy" "prod-policy" {
-  project_id         = infisical_project.example.id
-  name               = "my-prod-policy"
-  environment_slug   = "prod"
-  secret_path        = "/"
-  approvers          = ["name@infisical.com", "name-1@infisical.com"]
+  project_id       = infisical_project.example.id
+  name             = "my-prod-policy"
+  environment_slug = "prod"
+  secret_path      = "/"
+  approvers = [
+    {
+      type = "group"
+      id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
+    },
+    {
+      type = "user"
+      name = "name@infisical.com"
+  }]
   required_approvals = 1
   enforcement_level  = "hard"
 }

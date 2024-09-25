@@ -88,7 +88,7 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 							Optional:    true,
 						},
 						"name": schema.StringAttribute{
-							Description: "The name of the approver",
+							Description: "The name of the approver. By default, this is the email",
 							Optional:    true,
 						},
 					},
@@ -148,6 +148,40 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 
 	var approvers []infisical.CreateSecretApprovalPolicyApprover
 	for _, el := range plan.Approvers {
+		if el.Type.ValueString() == "user" {
+			if el.Name.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field name is required for user approvers",
+					"Must provide name for user approvers. By default, this is the email",
+				)
+				return
+			}
+			if !el.ID.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field ID cannot be used for user approvers",
+					"Must provide name for user approvers. By default, this is the email",
+				)
+				return
+			}
+		}
+
+		if el.Type.ValueString() == "group" {
+			if el.ID.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field ID is required for group approvers",
+					"Must provide ID for group approvers",
+				)
+				return
+			}
+			if !el.Name.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field name cannot be used for group approvers",
+					"Must provide ID for group approvers",
+				)
+				return
+			}
+		}
+
 		approvers = append(approvers, infisical.CreateSecretApprovalPolicyApprover{
 			ID:   el.ID.ValueString(),
 			Name: el.Name.ValueString(),
@@ -289,6 +323,40 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 
 	var approvers []infisical.UpdateSecretApprovalPolicyApprover
 	for _, el := range plan.Approvers {
+		if el.Type.ValueString() == "user" {
+			if el.Name.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field name is required for user approvers",
+					"Must provide name for user approvers. By default, this is the email",
+				)
+				return
+			}
+			if !el.ID.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field ID cannot be used for user approvers",
+					"Must provide name for user approvers. By default, this is the email",
+				)
+				return
+			}
+		}
+
+		if el.Type.ValueString() == "group" {
+			if el.ID.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field ID is required for group approvers",
+					"Must provide ID for group approvers",
+				)
+				return
+			}
+			if !el.Name.IsNull() {
+				resp.Diagnostics.AddError(
+					"Field name cannot be used for group approvers",
+					"Must provide ID for group approvers",
+				)
+				return
+			}
+		}
+
 		approvers = append(approvers, infisical.UpdateSecretApprovalPolicyApprover{
 			ID:   el.ID.ValueString(),
 			Name: el.Name.ValueString(),
