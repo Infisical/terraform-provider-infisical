@@ -23,7 +23,7 @@ type secretApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
-type Approver struct {
+type SecretApprover struct {
 	Type types.String `tfsdk:"type"`
 	ID   types.String `tfsdk:"id"`
 	Name types.String `tfsdk:"name"`
@@ -31,14 +31,14 @@ type Approver struct {
 
 // secretApprovalPolicyResourceModel describes the data source data model.
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	ProjectID         types.String `tfsdk:"project_id"`
-	Name              types.String `tfsdk:"name"`
-	EnvironmentSlug   types.String `tfsdk:"environment_slug"`
-	SecretPath        types.String `tfsdk:"secret_path"`
-	Approvers         []Approver   `tfsdk:"approvers"`
-	RequiredApprovals types.Int64  `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String `tfsdk:"enforcement_level"`
+	ID                types.String     `tfsdk:"id"`
+	ProjectID         types.String     `tfsdk:"project_id"`
+	Name              types.String     `tfsdk:"name"`
+	EnvironmentSlug   types.String     `tfsdk:"environment_slug"`
+	SecretPath        types.String     `tfsdk:"secret_path"`
+	Approvers         []SecretApprover `tfsdk:"approvers"`
+	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
+	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
 }
 
 // Metadata returns the resource type name.
@@ -223,15 +223,15 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.EnforcementLevel)
 
-	approvers := make([]Approver, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
+	approvers := make([]SecretApprover, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
 	for i, el := range secretApprovalPolicy.SecretApprovalPolicy.Approvers {
 		if el.Type == "user" {
-			approvers[i] = Approver{
+			approvers[i] = SecretApprover{
 				Name: types.StringValue(el.Name),
 				Type: types.StringValue(el.Type),
 			}
 		} else {
-			approvers[i] = Approver{
+			approvers[i] = SecretApprover{
 				ID:   types.StringValue(el.ID),
 				Type: types.StringValue(el.Type),
 			}
