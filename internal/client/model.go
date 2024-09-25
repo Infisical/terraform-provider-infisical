@@ -1480,7 +1480,7 @@ type DeleteSecretApprovalPolicyResponse struct {
 }
 
 type AccessApprovalPolicyApprover struct {
-	ID   string `json:"userId"`
+	ID   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
