@@ -23,6 +23,12 @@ type secretApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
+type Approver struct {
+	Type types.String `tfsdk:"type"`
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+}
+
 // secretApprovalPolicyResourceModel describes the data source data model.
 type secretApprovalPolicyResourceModel struct {
 	ID                types.String `tfsdk:"id"`
@@ -30,7 +36,7 @@ type secretApprovalPolicyResourceModel struct {
 	Name              types.String `tfsdk:"name"`
 	EnvironmentSlug   types.String `tfsdk:"environment_slug"`
 	SecretPath        types.String `tfsdk:"secret_path"`
-	Approvers         []string     `tfsdk:"approvers"`
+	Approvers         []Approver   `tfsdk:"approvers"`
 	RequiredApprovals types.Int64  `tfsdk:"required_approvals"`
 	EnforcementLevel  types.String `tfsdk:"enforcement_level"`
 }
@@ -68,10 +74,25 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Description: "The secret path to apply the secret approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.SetAttribute{
-				Description: "The usernames of the required approvers. By default, this refers to the emails of the users",
+			"approvers": schema.SetNestedAttribute{
 				Required:    true,
-				ElementType: types.StringType,
+				Description: "The required approvers",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{
+							Description: "The type of approver. Either group or user",
+							Required:    true,
+						},
+						"id": schema.StringAttribute{
+							Description: "The ID of the approver",
+							Optional:    true,
+						},
+						"name": schema.StringAttribute{
+							Description: "The name of the approver",
+							Optional:    true,
+						},
+					},
+				},
 			},
 			"required_approvals": schema.Int64Attribute{
 				Description: "The number of required approvers",
@@ -125,12 +146,21 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
+	var approvers []infisical.CreateSecretApprovalPolicyApprover
+	for _, el := range plan.Approvers {
+		approvers = append(approvers, infisical.CreateSecretApprovalPolicyApprover{
+			ID:   el.ID.ValueString(),
+			Name: el.Name.ValueString(),
+			Type: el.Type.ValueString(),
+		})
+	}
+
 	secretApprovalPolicy, err := r.client.CreateSecretApprovalPolicy(infisical.CreateSecretApprovalPolicyRequest{
 		Name:              plan.Name.ValueString(),
 		ProjectID:         plan.ProjectID.ValueString(),
 		Environment:       plan.EnvironmentSlug.ValueString(),
 		SecretPath:        plan.SecretPath.ValueString(),
-		Approvers:         plan.Approvers,
+		Approvers:         approvers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
 	})
@@ -193,10 +223,21 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.EnforcementLevel)
 
-	approvers := make([]string, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
+	approvers := make([]Approver, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
 	for i, el := range secretApprovalPolicy.SecretApprovalPolicy.Approvers {
-		approvers[i] = el.Username
+		if el.Type == "user" {
+			approvers[i] = Approver{
+				Name: types.StringValue(el.Name),
+				Type: types.StringValue(el.Type),
+			}
+		} else {
+			approvers[i] = Approver{
+				ID:   types.StringValue(el.ID),
+				Type: types.StringValue(el.Type),
+			}
+		}
 	}
+
 	state.Approvers = approvers
 
 	diags = resp.State.Set(ctx, &state)
@@ -246,11 +287,20 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
+	var approvers []infisical.UpdateSecretApprovalPolicyApprover
+	for _, el := range plan.Approvers {
+		approvers = append(approvers, infisical.UpdateSecretApprovalPolicyApprover{
+			ID:   el.ID.ValueString(),
+			Name: el.Name.ValueString(),
+			Type: el.Type.ValueString(),
+		})
+	}
+
 	_, err := r.client.UpdateSecretApprovalPolicy(infisical.UpdateSecretApprovalPolicyRequest{
 		ID:                plan.ID.ValueString(),
 		Name:              plan.Name.ValueString(),
 		SecretPath:        plan.SecretPath.ValueString(),
-		Approvers:         plan.Approvers,
+		Approvers:         approvers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
 	})

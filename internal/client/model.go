@@ -1408,8 +1408,9 @@ type SecretApprovalPolicyEnvironment struct {
 }
 
 type SecretApprovalPolicyApprover struct {
-	ID       string `json:"userId"`
-	Username string `json:"username"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 type SecretApprovalPolicy struct {
@@ -1418,19 +1419,25 @@ type SecretApprovalPolicy struct {
 	Name              string                          `json:"name"`
 	Environment       SecretApprovalPolicyEnvironment `json:"environment"`
 	SecretPath        string                          `json:"secretPath"`
-	Approvers         []SecretApprovalPolicyApprover  `json:"userApprovers"`
+	Approvers         []SecretApprovalPolicyApprover  `json:"approvers"`
 	RequiredApprovals int64                           `json:"approvals"`
 	EnforcementLevel  string                          `json:"enforcementLevel"`
 }
 
+type CreateSecretApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type CreateSecretApprovalPolicyRequest struct {
-	ProjectID         string   `json:"workspaceId"`
-	Name              string   `json:"name,omitempty"`
-	Environment       string   `json:"environment"`
-	SecretPath        string   `json:"secretPath"`
-	Approvers         []string `json:"approverUsernames"`
-	RequiredApprovals int64    `json:"approvals"`
-	EnforcementLevel  string   `json:"enforcementLevel"`
+	ProjectID         string                               `json:"workspaceId"`
+	Name              string                               `json:"name,omitempty"`
+	Environment       string                               `json:"environment"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []CreateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
 }
 
 type CreateSecretApprovalPolicyResponse struct {
@@ -1445,13 +1452,19 @@ type GetSecretApprovalPolicyByIDResponse struct {
 	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
 }
 
+type UpdateSecretApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type UpdateSecretApprovalPolicyRequest struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	SecretPath        string   `json:"secretPath"`
-	Approvers         []string `json:"approverUsernames"`
-	RequiredApprovals int64    `json:"approvals"`
-	EnforcementLevel  string   `json:"enforcementLevel"`
+	ID                string                               `json:"id"`
+	Name              string                               `json:"name"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []UpdateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
 }
 
 type UpdateSecretApprovalPolicyResponse struct {
