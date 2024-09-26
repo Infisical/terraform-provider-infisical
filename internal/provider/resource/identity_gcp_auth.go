@@ -196,10 +196,10 @@ func updateGcpAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pla
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *IdentityGcpAuthResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create identity gcp auth",
-			"Only Machine IdentityGcpAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -249,10 +249,10 @@ func (r *IdentityGcpAuthResource) Create(ctx context.Context, req resource.Creat
 
 // Read refreshes the Terraform state with the latest data.
 func (r *IdentityGcpAuthResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read identity gcp auth role",
-			"Only Machine IdentityGcpAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -293,10 +293,10 @@ func (r *IdentityGcpAuthResource) Read(ctx context.Context, req resource.ReadReq
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *IdentityGcpAuthResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update identity gcp auth",
-			"Only Machine IdentityGcpAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -352,10 +352,10 @@ func (r *IdentityGcpAuthResource) Update(ctx context.Context, req resource.Updat
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *IdentityGcpAuthResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete identity gcp auth",
-			"Only Machine IdentityGcpAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}

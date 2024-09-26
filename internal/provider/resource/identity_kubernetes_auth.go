@@ -200,10 +200,10 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create identity kubernetes auth",
-			"Only Machine IdentityKubernetesAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -253,10 +253,10 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 
 // Read refreshes the Terraform state with the latest data.
 func (r *IdentityKubernetesAuthResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read identity kubernetes auth role",
-			"Only Machine IdentityKubernetesAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -297,10 +297,10 @@ func (r *IdentityKubernetesAuthResource) Read(ctx context.Context, req resource.
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update identity kubernetes auth",
-			"Only Machine IdentityKubernetesAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -358,10 +358,10 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *IdentityKubernetesAuthResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete identity kubernetes auth",
-			"Only Machine IdentityKubernetesAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
