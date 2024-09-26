@@ -178,10 +178,10 @@ func updateAzureAuthTerraformStateByApi(ctx context.Context, diagnose diag.Diagn
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *IdentityAzureAuthResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to create identity azure auth",
-			"Only Machine IdentityAzureAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -227,10 +227,10 @@ func (r *IdentityAzureAuthResource) Create(ctx context.Context, req resource.Cre
 
 // Read refreshes the Terraform state with the latest data.
 func (r *IdentityAzureAuthResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read identity azure auth role",
-			"Only Machine IdentityAzureAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -271,10 +271,10 @@ func (r *IdentityAzureAuthResource) Read(ctx context.Context, req resource.ReadR
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *IdentityAzureAuthResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to update identity azure auth",
-			"Only Machine IdentityAzureAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
@@ -327,10 +327,10 @@ func (r *IdentityAzureAuthResource) Update(ctx context.Context, req resource.Upd
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *IdentityAzureAuthResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
-	if r.client.Config.AuthStrategy != infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete identity azure auth",
-			"Only Machine IdentityAzureAuth authentication is supported for this operation",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
