@@ -14,7 +14,7 @@ type DecodedSymmetricEncryptionDetails = struct {
 	Key    []byte
 }
 
-// Define a generic not found error type
+// Define a generic not found error type.
 type NotFoundError struct {
 	Resource string
 	ID       string
@@ -62,7 +62,7 @@ func (e *NotFoundError) Error() string {
 	return fmt.Sprintf("%s with ID %s not found", e.Resource, e.ID)
 }
 
-// A helper function to create a new NotFoundError
+// A helper function to create a new NotFoundError.
 func NewNotFoundError(resource, id string) error {
 	return &NotFoundError{
 		Resource: resource,
