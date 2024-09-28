@@ -1013,9 +1013,55 @@ type CreateProjectEnvironmentRequest struct {
 	Slug      string `json:"slug"`
 	ProjectID string `json:"workspaceId"`
 }
-
 type CreateProjectEnvironmentResponse struct {
 	Environment ProjectEnvironment `json:"environment"`
+}
+
+type BasicEnvironment struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type BasicEnvironmentUpdate struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type CreateBatchProjectEnvironmentsRequest struct {
+	Environments []BasicEnvironment `json:"environments"`
+	ProjectID    string             `json:"projectId"`
+}
+
+type CreateBatchProjectEnvironmentsResponse struct {
+	Environments []ProjectEnvironment `json:"environments"`
+}
+
+type UpdateBatchProjectEnvironmentsRequest struct {
+	Environments []BasicEnvironmentUpdate `json:"environments"`
+	ProjectID    string                   `json:"-"`
+}
+
+type UpdateBatchProjectEnvironmentsResponse struct {
+	Environments []ProjectEnvironment `json:"environments"`
+}
+
+type DeleteBatchProjectEnvironmentsRequest struct {
+	EnvironmentIds []string `json:"environmentIds"`
+	ProjectID      string   `json:"projectId"`
+}
+
+type DeleteBatchProjectEnvironmentsResponse struct {
+	Environments []ProjectEnvironment `json:"environments"`
+}
+
+type GetBatchProjectEnvironmentsRequest struct {
+	ProjectID      string   `json:"projectId"`
+	EnvironmentIds []string `json:"environmentIds"`
+}
+
+type GetBatchProjectEnvironmentsResponse struct {
+	Environments []ProjectEnvironment `json:"environments"`
 }
 
 type DeleteProjectEnvironmentRequest struct {

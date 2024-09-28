@@ -242,6 +242,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectSecretTagResource,
 		infisicalResource.NewProjectSecretFolderResource,
 		infisicalResource.NewProjectEnvironmentResource,
+		infisicalResource.NewProjectBatchEnvironmentsResource,
 		infisicalResource.NewIdentityResource,
 		infisicalResource.NewIdentityUniversalAuthResource,
 		infisicalResource.NewIdentityUniversalAuthClientSecretResource,
