@@ -26,7 +26,7 @@ type secretApprovalPolicyResource struct {
 type SecretApprover struct {
 	Type types.String `tfsdk:"type"`
 	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
+	Name types.String `tfsdk:"username"`
 }
 
 // secretApprovalPolicyResourceModel describes the data source data model.
@@ -87,8 +87,8 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 							Description: "The ID of the approver",
 							Optional:    true,
 						},
-						"name": schema.StringAttribute{
-							Description: "The name of the approver. By default, this is the email",
+						"username": schema.StringAttribute{
+							Description: "The username of the approver. By default, this is the email",
 							Optional:    true,
 						},
 					},
@@ -151,15 +151,15 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		if el.Type.ValueString() == "user" {
 			if el.Name.IsNull() {
 				resp.Diagnostics.AddError(
-					"Field name is required for user approvers",
-					"Must provide name for user approvers. By default, this is the email",
+					"Field username is required for user approvers",
+					"Must provide username for user approvers. By default, this is the email",
 				)
 				return
 			}
 			if !el.ID.IsNull() {
 				resp.Diagnostics.AddError(
 					"Field ID cannot be used for user approvers",
-					"Must provide name for user approvers. By default, this is the email",
+					"Must provide username for user approvers. By default, this is the email",
 				)
 				return
 			}
@@ -326,15 +326,15 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		if el.Type.ValueString() == "user" {
 			if el.Name.IsNull() {
 				resp.Diagnostics.AddError(
-					"Field name is required for user approvers",
-					"Must provide name for user approvers. By default, this is the email",
+					"Field username is required for user approvers",
+					"Must provide username for user approvers. By default, this is the email",
 				)
 				return
 			}
 			if !el.ID.IsNull() {
 				resp.Diagnostics.AddError(
 					"Field ID cannot be used for user approvers",
-					"Must provide name for user approvers. By default, this is the email",
+					"Must provide username for user approvers. By default, this is the email",
 				)
 				return
 			}
@@ -350,7 +350,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 			}
 			if !el.Name.IsNull() {
 				resp.Diagnostics.AddError(
-					"Field name cannot be used for group approvers",
+					"Field username cannot be used for group approvers",
 					"Must provide ID for group approvers",
 				)
 				return

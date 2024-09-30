@@ -29,8 +29,8 @@ resource "infisical_access_approval_policy" "prod-policy" {
       id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
     },
     {
-      type = "user"
-      name = "name@infisical.com"
+      type     = "user"
+      username = "name@infisical.com"
   }]
   required_approvals = 1
   enforcement_level  = "soft"

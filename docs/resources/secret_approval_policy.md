@@ -44,8 +44,8 @@ resource "infisical_secret_approval_policy" "prod-policy" {
       id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
     },
     {
-      type = "user"
-      name = "name@infisical.com"
+      type     = "user"
+      username = "name@infisical.com"
   }]
   required_approvals = 1
   enforcement_level  = "hard"
@@ -82,4 +82,4 @@ Required:
 Optional:
 
 - `id` (String) The ID of the approver
-- `name` (String) The name of the approver. By default, this is the email
+- `username` (String) The username of the approver. By default, this is the email
