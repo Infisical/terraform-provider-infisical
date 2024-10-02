@@ -1445,7 +1445,7 @@ type CreateSecretApprovalPolicyResponse struct {
 }
 
 type GetSecretApprovalPolicyByIDRequest struct {
-	ID string `json:"id"`
+	ID string
 }
 
 type GetSecretApprovalPolicyByIDResponse struct {
@@ -1459,7 +1459,7 @@ type UpdateSecretApprovalPolicyApprover struct {
 }
 
 type UpdateSecretApprovalPolicyRequest struct {
-	ID                string                               `json:"id"`
+	ID                string
 	Name              string                               `json:"name"`
 	SecretPath        string                               `json:"secretPath"`
 	Approvers         []UpdateSecretApprovalPolicyApprover `json:"approvers"`
@@ -1472,7 +1472,7 @@ type UpdateSecretApprovalPolicyResponse struct {
 }
 
 type DeleteSecretApprovalPolicyRequest struct {
-	ID string `json:"id"`
+	ID string
 }
 
 type DeleteSecretApprovalPolicyResponse struct {
@@ -1521,7 +1521,7 @@ type CreateAccessApprovalPolicyResponse struct {
 }
 
 type GetAccessApprovalPolicyByIDRequest struct {
-	ID string `json:"id"`
+	ID string
 }
 
 type GetAccessApprovalPolicyByIDResponse struct {
@@ -1535,7 +1535,7 @@ type UpdateAccessApprovalPolicyApprover struct {
 }
 
 type UpdateAccessApprovalPolicyRequest struct {
-	ID                string                               `json:"id"`
+	ID                string
 	Name              string                               `json:"name"`
 	SecretPath        string                               `json:"secretPath"`
 	Approvers         []UpdateAccessApprovalPolicyApprover `json:"approvers"`
@@ -1548,7 +1548,7 @@ type UpdateAccessApprovalPolicyResponse struct {
 }
 
 type DeleteAccessApprovalPolicyRequest struct {
-	ID string `json:"id"`
+	ID string
 }
 
 type DeleteAccessApprovalPolicyResponse struct {

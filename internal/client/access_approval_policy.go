@@ -70,8 +70,8 @@ func (client Client) UpdateAccessApprovalPolicy(request UpdateAccessApprovalPoli
 	return body, nil
 }
 
-func (client Client) DeleteAccessApprovalPolicy(request DeleteAccessApprovalPolicyRequest) (DeleteAccessApprovalPolicyRequest, error) {
-	var responseData DeleteAccessApprovalPolicyRequest
+func (client Client) DeleteAccessApprovalPolicy(request DeleteAccessApprovalPolicyRequest) (DeleteAccessApprovalPolicyResponse, error) {
+	var responseData DeleteAccessApprovalPolicyResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&responseData).
@@ -80,11 +80,11 @@ func (client Client) DeleteAccessApprovalPolicy(request DeleteAccessApprovalPoli
 		Delete(fmt.Sprintf("/api/v1/access-approvals/policies/%s", request.ID))
 
 	if err != nil {
-		return DeleteAccessApprovalPolicyRequest{}, fmt.Errorf("CallDeleteAccessApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return DeleteAccessApprovalPolicyResponse{}, fmt.Errorf("CallDeleteAccessApprovalPolicy: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return DeleteAccessApprovalPolicyRequest{}, fmt.Errorf("CallDeleteAccessApprovalPolicy: Unsuccessful response. [response=%s]", response)
+		return DeleteAccessApprovalPolicyResponse{}, fmt.Errorf("CallDeleteAccessApprovalPolicy: Unsuccessful response. [response=%s]", response)
 	}
 
 	return responseData, nil

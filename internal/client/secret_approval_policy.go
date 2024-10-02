@@ -40,11 +40,11 @@ func (client Client) GetSecretApprovalPolicyByID(request GetSecretApprovalPolicy
 	}
 
 	if err != nil {
-		return GetSecretApprovalPolicyByIDResponse{}, fmt.Errorf("GetSecretApprovalPolicyByID: Unable to complete api request [err=%s]", err)
+		return GetSecretApprovalPolicyByIDResponse{}, fmt.Errorf("CallGetSecretApprovalPolicyByID: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return GetSecretApprovalPolicyByIDResponse{}, fmt.Errorf("GetSecretApprovalPolicyByID: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretApprovalPolicyByIDResponse{}, fmt.Errorf("CallGetSecretApprovalPolicyByID: Unsuccessful response. [response=%v]", string(response.Body()))
 	}
 
 	return body, nil
@@ -70,8 +70,8 @@ func (client Client) UpdateSecretApprovalPolicy(request UpdateSecretApprovalPoli
 	return body, nil
 }
 
-func (client Client) DeleteSecretApprovalPolicy(request DeleteSecretApprovalPolicyRequest) (DeleteSecretApprovalPolicyRequest, error) {
-	var responseData DeleteSecretApprovalPolicyRequest
+func (client Client) DeleteSecretApprovalPolicy(request DeleteSecretApprovalPolicyRequest) (DeleteSecretApprovalPolicyResponse, error) {
+	var responseData DeleteSecretApprovalPolicyResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&responseData).
@@ -80,11 +80,11 @@ func (client Client) DeleteSecretApprovalPolicy(request DeleteSecretApprovalPoli
 		Delete(fmt.Sprintf("/api/v1/secret-approvals/%s", request.ID))
 
 	if err != nil {
-		return DeleteSecretApprovalPolicyRequest{}, fmt.Errorf("CallDeleteSecretApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return DeleteSecretApprovalPolicyResponse{}, fmt.Errorf("CallDeleteSecretApprovalPolicy: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return DeleteSecretApprovalPolicyRequest{}, fmt.Errorf("CallDeleteSecretApprovalPolicy: Unsuccessful response. [response=%s]", response)
+		return DeleteSecretApprovalPolicyResponse{}, fmt.Errorf("CallDeleteSecretApprovalPolicy: Unsuccessful response. [response=%s]", response)
 	}
 
 	return responseData, nil
