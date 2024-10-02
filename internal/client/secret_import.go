@@ -99,7 +99,7 @@ func (client Client) UpdateSecretImport(request UpdateSecretImportRequest) (Upda
 	}
 
 	if response.IsError() {
-		if response.StatusCode() == http.StatusBadRequest {
+		if response.StatusCode() == http.StatusNotFound {
 			return UpdateSecretImportResponse{}, NewNotFoundError("SecretImport", request.SecretPath)
 		}
 
@@ -123,7 +123,7 @@ func (client Client) DeleteSecretImport(request DeleteSecretImportRequest) (Dele
 	}
 
 	if response.IsError() {
-		if response.StatusCode() == http.StatusBadRequest {
+		if response.StatusCode() == http.StatusNotFound {
 			return DeleteSecretImportResponse{}, NewNotFoundError("SecretImport", request.SecretPath)
 		}
 
