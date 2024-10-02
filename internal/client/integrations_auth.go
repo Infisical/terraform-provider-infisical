@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// enum containing the possible values for the `type` field in the CreateIntegrationAuthRequest
+// Enum containing the possible values for the `type` field in the CreateIntegrationAuthRequest.
 type IntegrationAuthType string
 
 const (
