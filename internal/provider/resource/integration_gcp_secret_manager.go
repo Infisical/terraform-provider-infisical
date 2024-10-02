@@ -15,21 +15,21 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &IntegrationGcpSecretManagerResource{}
+	_ resource.Resource = &IntegrationGCPSecretManagerResource{}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
-func NewIntegrationResource() resource.Resource {
-	return &IntegrationGcpSecretManagerResource{}
+func NewIntegrationGcpSecretManagerResource() resource.Resource {
+	return &IntegrationGCPSecretManagerResource{}
 }
 
-// ProjectUserResource is the resource implementation.
-type IntegrationGcpSecretManagerResource struct {
+// IntegrationGcpSecretManager is the resource implementation.
+type IntegrationGCPSecretManagerResource struct {
 	client *infisical.Client
 }
 
 // projectResourceSourceModel describes the data source data model.
-type IntegrationSecretManagerResourceModel struct {
+type IntegrationGCPSecretManagerResourceModel struct {
 	EnvironmentID      types.String `tfsdk:"env_id"`
 	IntegrationAuthID  types.String `tfsdk:"integration_auth_id"`
 	IntegrationID      types.String `tfsdk:"integration_id"`
@@ -43,14 +43,14 @@ type IntegrationSecretManagerResourceModel struct {
 }
 
 // Metadata returns the resource type name.
-func (r *IntegrationGcpSecretManagerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *IntegrationGCPSecretManagerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_integration_gcp_secret_manager"
 }
 
 // Schema defines the schema for the resource.
-func (r *IntegrationGcpSecretManagerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "Create GCP Secret Manager integration & save to Infisical. Only Machine Identity authentication is supported for this data source",
 		Attributes: map[string]schema.Attribute{
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",
@@ -103,19 +103,19 @@ func (r *IntegrationGcpSecretManagerResource) Schema(_ context.Context, _ resour
 
 			"secret_path": schema.StringAttribute{
 				Required:    true,
-				Description: "The path to the secret in GCP Secret Manager.",
+				Description: "The secret path in Infisical to sync secrets from.",
 			},
 
 			"gcp_project_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The slug of the GCP project.",
+				Description: "The ID of the GCP project.",
 			},
 		},
 	}
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *IntegrationGcpSecretManagerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *IntegrationGCPSecretManagerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -135,17 +135,17 @@ func (r *IntegrationGcpSecretManagerResource) Configure(_ context.Context, req r
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *IntegrationGcpSecretManagerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create identity aws auth",
+			"Unable to create integration",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan IntegrationSecretManagerResourceModel
+	var plan IntegrationGCPSecretManagerResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -153,8 +153,7 @@ func (r *IntegrationGcpSecretManagerResource) Create(ctx context.Context, req re
 	}
 
 	// Create integration auth first
-
-	auth, err := r.client.CallCreateIntegrationAuth(infisical.CreateIntegrationAuthRequest{
+	auth, err := r.client.CreateIntegrationAuth(infisical.CreateIntegrationAuthRequest{
 		RefreshToken: plan.ServiceAccountJson.ValueString(),
 		ProjectID:    plan.ProjectID.ValueString(),
 		Integration:  infisical.IntegrationAuthTypeGcpSecretManager,
@@ -191,7 +190,7 @@ func (r *IntegrationGcpSecretManagerResource) Create(ctx context.Context, req re
 	}
 
 	// Create the integration
-	integration, err := r.client.CallCreateIntegration(infisical.CreateIntegrationRequest{
+	integration, err := r.client.CreateIntegration(infisical.CreateIntegrationRequest{
 		IntegrationAuthID: auth.IntegrationAuth.ID,
 		App:               plan.GCPProjectID.ValueString(),
 		AppID:             plan.GCPProjectID.ValueString(),
@@ -222,24 +221,24 @@ func (r *IntegrationGcpSecretManagerResource) Create(ctx context.Context, req re
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *IntegrationGcpSecretManagerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *IntegrationGCPSecretManagerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read identity role",
+			"Unable to create integration",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Get current state
-	var state IntegrationSecretManagerResourceModel
+	var state IntegrationGCPSecretManagerResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	integration, err := r.client.CallGetIntegration(infisical.GetIntegrationRequest{
+	integration, err := r.client.GetIntegration(infisical.GetIntegrationRequest{
 		ID: state.IntegrationID.ValueString(),
 	})
 
@@ -265,25 +264,25 @@ func (r *IntegrationGcpSecretManagerResource) Read(ctx context.Context, req reso
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *IntegrationGcpSecretManagerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update identity",
+			"Unable to update integration",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan IntegrationSecretManagerResourceModel
+	var plan IntegrationGCPSecretManagerResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state IntegrationSecretManagerResourceModel
+	var state IntegrationGCPSecretManagerResourceModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -320,7 +319,7 @@ func (r *IntegrationGcpSecretManagerResource) Update(ctx context.Context, req re
 		}
 	}
 
-	updatedIntegration, err := r.client.CallUpdateIntegration(infisical.UpdateIntegrationRequest{
+	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		IsActive:    true,
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
@@ -349,7 +348,7 @@ func (r *IntegrationGcpSecretManagerResource) Update(ctx context.Context, req re
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *IntegrationGcpSecretManagerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *IntegrationGCPSecretManagerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete GCP Secret Manager integration",
@@ -358,14 +357,14 @@ func (r *IntegrationGcpSecretManagerResource) Delete(ctx context.Context, req re
 		return
 	}
 
-	var state IntegrationSecretManagerResourceModel
+	var state IntegrationGCPSecretManagerResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err := r.client.CallDeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
+	_, err := r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
 		ID: state.IntegrationAuthID.ValueString(),
 	})
 

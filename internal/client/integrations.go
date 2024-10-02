@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func (client Client) CallCreateIntegration(request CreateIntegrationRequest) (CreateIntegrationResponse, error) {
+func (client Client) CreateIntegration(request CreateIntegrationRequest) (CreateIntegrationResponse, error) {
 	var body CreateIntegrationResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -14,17 +14,17 @@ func (client Client) CallCreateIntegration(request CreateIntegrationRequest) (Cr
 		Post("api/v1/integration")
 
 	if err != nil {
-		return CreateIntegrationResponse{}, fmt.Errorf("CallCreateIntegration: Unable to complete api request [err=%s]", err)
+		return CreateIntegrationResponse{}, fmt.Errorf("CreateIntegration: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return CreateIntegrationResponse{}, fmt.Errorf("CallCreateIntegration: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateIntegrationResponse{}, fmt.Errorf("CreateIntegration: Unsuccessful response. [response=%s]", string(response.Body()))
 	}
 
 	return body, nil
 }
 
-func (client Client) CallGetIntegration(request GetIntegrationRequest) (GetIntegrationResponse, error) {
+func (client Client) GetIntegration(request GetIntegrationRequest) (GetIntegrationResponse, error) {
 	var body GetIntegrationResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -43,7 +43,7 @@ func (client Client) CallGetIntegration(request GetIntegrationRequest) (GetInteg
 	return body, nil
 }
 
-func (client Client) CallUpdateIntegration(request UpdateIntegrationRequest) (UpdateIntegrationResponse, error) {
+func (client Client) UpdateIntegration(request UpdateIntegrationRequest) (UpdateIntegrationResponse, error) {
 	var body UpdateIntegrationResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -53,11 +53,11 @@ func (client Client) CallUpdateIntegration(request UpdateIntegrationRequest) (Up
 		Patch(fmt.Sprintf("api/v1/integration/%s", request.ID))
 
 	if err != nil {
-		return UpdateIntegrationResponse{}, fmt.Errorf("CallUpdateIntegration: Unable to complete api request [err=%s]", err)
+		return UpdateIntegrationResponse{}, fmt.Errorf("UpdateIntegration: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return UpdateIntegrationResponse{}, fmt.Errorf("CallUpdateIntegration: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateIntegrationResponse{}, fmt.Errorf("UpdateIntegration: Unsuccessful response. [response=%s]", string(response.Body()))
 	}
 
 	return body, nil

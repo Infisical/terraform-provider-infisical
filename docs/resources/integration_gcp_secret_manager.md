@@ -3,12 +3,12 @@
 page_title: "infisical_integration_gcp_secret_manager Resource - terraform-provider-infisical"
 subcategory: ""
 description: |-
-  Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source
+  Create GCP Secret Manager integration & save to Infisical. Only Machine Identity authentication is supported for this data source
 ---
 
 # infisical_integration_gcp_secret_manager (Resource)
 
-Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source
+Create GCP Secret Manager integration & save to Infisical. Only Machine Identity authentication is supported for this data source
 
 
 
@@ -18,9 +18,9 @@ Create project users & save to Infisical. Only Machine Identity authentication i
 ### Required
 
 - `environment` (String) The slug of the environment to sync to GCP Secret Manager (prod, dev, staging, etc).
-- `gcp_project_id` (String) The slug of the GCP project.
+- `gcp_project_id` (String) The ID of the GCP project.
 - `project_id` (String) The ID of your Infisical project.
-- `secret_path` (String) The path to the secret in GCP Secret Manager.
+- `secret_path` (String) The secret path in Infisical to sync secrets from.
 - `service_account_json` (String, Sensitive) Service account json for the GCP project.
 
 ### Optional
