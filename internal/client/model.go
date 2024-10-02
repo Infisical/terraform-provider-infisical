@@ -1402,3 +1402,155 @@ type RevokeIdentityKubernetesAuthRequest struct {
 type RevokeIdentityKubernetesAuthResponse struct {
 	IdentityKubernetesAuth IdentityKubernetesAuth `json:"identityKubernetesAuth"`
 }
+
+type SecretApprovalPolicyEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type SecretApprovalPolicyApprover struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type SecretApprovalPolicy struct {
+	ID                string                          `json:"id"`
+	ProjectID         string                          `json:"projectId"`
+	Name              string                          `json:"name"`
+	Environment       SecretApprovalPolicyEnvironment `json:"environment"`
+	SecretPath        string                          `json:"secretPath"`
+	Approvers         []SecretApprovalPolicyApprover  `json:"approvers"`
+	RequiredApprovals int64                           `json:"approvals"`
+	EnforcementLevel  string                          `json:"enforcementLevel"`
+}
+
+type CreateSecretApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CreateSecretApprovalPolicyRequest struct {
+	ProjectID         string                               `json:"workspaceId"`
+	Name              string                               `json:"name,omitempty"`
+	Environment       string                               `json:"environment"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []CreateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type CreateSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type GetSecretApprovalPolicyByIDRequest struct {
+	ID string
+}
+
+type GetSecretApprovalPolicyByIDResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type UpdateSecretApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UpdateSecretApprovalPolicyRequest struct {
+	ID                string
+	Name              string                               `json:"name"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []UpdateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type UpdateSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type DeleteSecretApprovalPolicyRequest struct {
+	ID string
+}
+
+type DeleteSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type AccessApprovalPolicyApprover struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type AccessApprovalPolicyEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type AccessApprovalPolicy struct {
+	ID                string                          `json:"id"`
+	ProjectID         string                          `json:"projectId"`
+	Name              string                          `json:"name"`
+	Environment       AccessApprovalPolicyEnvironment `json:"environment"`
+	SecretPath        string                          `json:"secretPath"`
+	Approvers         []AccessApprovalPolicyApprover  `json:"approvers"`
+	RequiredApprovals int64                           `json:"approvals"`
+	EnforcementLevel  string                          `json:"enforcementLevel"`
+}
+
+type CreateAccessApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CreateAccessApprovalPolicyRequest struct {
+	ProjectSlug       string                               `json:"projectSlug"`
+	Name              string                               `json:"name,omitempty"`
+	Environment       string                               `json:"environment"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []CreateAccessApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type CreateAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type GetAccessApprovalPolicyByIDRequest struct {
+	ID string
+}
+
+type GetAccessApprovalPolicyByIDResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type UpdateAccessApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UpdateAccessApprovalPolicyRequest struct {
+	ID                string
+	Name              string                               `json:"name"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []UpdateAccessApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type UpdateAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type DeleteAccessApprovalPolicyRequest struct {
+	ID string
+}
+
+type DeleteAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
