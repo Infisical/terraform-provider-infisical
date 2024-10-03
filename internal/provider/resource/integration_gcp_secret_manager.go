@@ -356,7 +356,7 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		SecretPrefix types.String `tfsdk:"secret_prefix"`
 		SecretSuffix types.String `tfsdk:"secret_suffix"`
 	}
-	diags = plan.Options.As(ctx, &options, basetypes.ObjectAsOptions{})
+	plan.Options.As(ctx, &options, basetypes.ObjectAsOptions{})
 
 	metadata := infisical.IntegrationMetadata{}
 	metadata.SecretPrefix = options.SecretPrefix.ValueString()
