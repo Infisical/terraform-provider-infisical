@@ -1409,6 +1409,118 @@ type RevokeIdentityKubernetesAuthResponse struct {
 	IdentityKubernetesAuth IdentityKubernetesAuth `json:"identityKubernetesAuth"`
 }
 
+type CreateIntegrationAuthRequest struct {
+	RefreshToken string              `json:"refreshToken"`
+	ProjectID    string              `json:"workspaceId"`
+	Integration  IntegrationAuthType `json:"integration"`
+}
+
+type CreateIntegrationAuthResponse struct {
+	IntegrationAuth struct {
+		ID string `json:"id"`
+	} `json:"integrationAuth"`
+}
+
+type DeleteIntegrationAuthRequest struct {
+	ID string `json:"id"`
+}
+
+type DeleteIntegrationAuthResponse struct {
+	IntegrationAuth struct {
+		ID string `json:"id"`
+	} `json:"integrationAuth"`
+}
+
+type IntegrationMetadata struct {
+	InitialSyncBehavior string `json:"initialSyncBehavior,omitempty"`
+	SecretPrefix        string `json:"secretPrefix"`
+	SecretSuffix        string `json:"secretSuffix"`
+	MappingBehavior     string `json:"mappingBehavior,omitempty"`
+	ShouldAutoRedeploy  bool   `json:"shouldAutoRedeploy,omitempty"`
+	SecretGCPLabel      []struct {
+		LabelName  string `json:"labelName,omitempty"`
+		LabelValue string `json:"labelValue,omitempty"`
+	} `json:"secretGCPLabel,omitempty"`
+	SecretAWSTag []struct {
+		Key   string `json:"key,omitempty"`
+		Value string `json:"value,omitempty"`
+	} `json:"secretAWSTag,omitempty"`
+
+	GithubVisibility        string   `json:"githubVisibility,omitempty"`
+	GithubVisibilityRepoIDs []string `json:"githubVisibilityRepoIds,omitempty"`
+	KMSKeyID                string   `json:"kmsKeyId,omitempty"`
+	ShouldDisableDelete     bool     `json:"shouldDisableDelete,omitempty"`
+	ShouldEnableDelete      bool     `json:"shouldEnableDelete,omitempty"`
+	ShouldMaskSecrets       bool     `json:"shouldMaskSecrets,omitempty"`
+	ShouldProtectSecrets    bool     `json:"shouldProtectSecrets,omitempty"`
+}
+type CreateIntegrationRequest struct {
+	IntegrationAuthID   string `json:"integrationAuthId"`
+	App                 string `json:"app,omitempty"`
+	AppID               string `json:"appId,omitempty"`
+	SecretPath          string `json:"secretPath,omitempty"`
+	SourceEnvironment   string `json:"sourceEnvironment,omitempty"`
+	TargetEnvironment   string `json:"targetEnvironment,omitempty"`
+	TargetEnvironmentID string `json:"targetEnvironmentId,omitempty"`
+	TargetService       string `json:"targetService,omitempty"`
+	TargetServiceID     string `json:"targetServiceId,omitempty"`
+	Owner               string `json:"owner,omitempty"`
+	URL                 string `json:"url,omitempty"`
+	Path                string `json:"path,omitempty"`
+	Region              string `json:"region,omitempty"`
+	Scope               string `json:"scope,omitempty"`
+
+	Metadata IntegrationMetadata `json:"metadata,omitempty"`
+}
+
+type Integration struct {
+	ID                  string              `json:"id"`
+	IsActive            bool                `json:"isActive"`
+	URL                 string              `json:"url"`
+	App                 string              `json:"app"`
+	AppID               string              `json:"appId"`
+	TargetEnvironment   string              `json:"targetEnvironment"`
+	TargetEnvironmentID string              `json:"targetEnvironmentId"`
+	TargetService       string              `json:"targetService"`
+	TargetServiceID     string              `json:"targetServiceId"`
+	Owner               string              `json:"owner"`
+	Path                string              `json:"path"`
+	Region              string              `json:"region"`
+	Scope               string              `json:"scope"`
+	Integration         string              `json:"integration"`
+	Metadata            IntegrationMetadata `json:"metadata,omitempty"`
+	IntegrationAuthID   string              `json:"integrationAuthId"`
+	EnvID               string              `json:"envId"`
+	SecretPath          string              `json:"secretPath"`
+}
+
+type CreateIntegrationResponse struct {
+	Integration Integration `json:"integration"`
+}
+
+type GetIntegrationRequest struct {
+	ID string
+}
+
+type GetIntegrationResponse struct {
+	Integration Integration `json:"integration"`
+}
+
+type UpdateIntegrationRequest struct {
+	ID                string
+	App               string              `json:"app,omitempty"`
+	AppID             string              `json:"appId,omitempty"`
+	SecretPath        string              `json:"secretPath,omitempty"`
+	TargetEnvironment string              `json:"targetEnvironment,omitempty"`
+	Owner             string              `json:"owner,omitempty"`
+	Environment       string              `json:"environment,omitempty"`
+	Metadata          IntegrationMetadata `json:"metadata,omitempty"`
+	IsActive          bool                `json:"isActive"`
+}
+
+type UpdateIntegrationResponse struct {
+	Integration Integration `json:"integration"`
+}
 type SecretApprovalPolicyEnvironment struct {
 	Slug string `json:"slug"`
 }

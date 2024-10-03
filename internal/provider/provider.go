@@ -250,6 +250,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityGcpAuthResource,
 		infisicalResource.NewIdentityAzureAuthResource,
 		infisicalResource.NewIdentityOidcAuthResource,
+		infisicalResource.NewIntegrationGcpSecretManagerResource,
 		infisicalResource.NewSecretApprovalPolicyResource,
 		infisicalResource.NewAccessApprovalPolicyResource,
 		infisicalResource.NewProjectSecretImportResource,
