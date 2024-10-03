@@ -1433,8 +1433,8 @@ type DeleteIntegrationAuthResponse struct {
 
 type IntegrationMetadata struct {
 	InitialSyncBehavior string `json:"initialSyncBehavior,omitempty"`
-	SecretPrefix        string `json:"secretPrefix,omitempty"`
-	SecretSuffix        string `json:"secretSuffix,omitempty"`
+	SecretPrefix        string `json:"secretPrefix"`
+	SecretSuffix        string `json:"secretSuffix"`
 	MappingBehavior     string `json:"mappingBehavior,omitempty"`
 	ShouldAutoRedeploy  bool   `json:"shouldAutoRedeploy,omitempty"`
 	SecretGCPLabel      []struct {

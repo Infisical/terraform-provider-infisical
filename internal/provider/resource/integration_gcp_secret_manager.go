@@ -5,6 +5,7 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -254,6 +255,56 @@ func (r *IntegrationGCPSecretManagerResource) Read(ctx context.Context, req reso
 		return
 	}
 
+	var planOptions struct {
+		SecretPrefix types.String `tfsdk:"secret_prefix"`
+		SecretSuffix types.String `tfsdk:"secret_suffix"`
+	}
+
+	if !state.Options.IsNull() {
+		diags := state.Options.As(ctx, &planOptions, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	updateNeeded := false
+
+	if integration.Integration.Metadata.SecretPrefix != planOptions.SecretPrefix.ValueString() {
+		planOptions.SecretPrefix = types.StringValue(integration.Integration.Metadata.SecretPrefix)
+		updateNeeded = true
+	}
+
+	if planOptions.SecretSuffix.ValueString() != integration.Integration.Metadata.SecretSuffix {
+		planOptions.SecretSuffix = types.StringValue(integration.Integration.Metadata.SecretSuffix)
+		updateNeeded = true
+	}
+
+	if updateNeeded {
+		// Create a map of the updated options
+		optionsMap := map[string]attr.Value{
+			"secret_prefix": planOptions.SecretPrefix,
+			"secret_suffix": planOptions.SecretSuffix,
+		}
+
+		// Create a new types.Object with the updated options
+		newOptions, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"secret_prefix": types.StringType,
+				"secret_suffix": types.StringType,
+			},
+			optionsMap,
+		)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Set the new options in the state
+		state.Options = newOptions
+	}
+
+	// Set the state.Options.
 	state.GCPProjectID = types.StringValue(integration.Integration.AppID)
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
 	state.EnvironmentID = types.StringValue(integration.Integration.EnvID)
@@ -301,27 +352,15 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		return
 	}
 
-	metadata := infisical.IntegrationMetadata{}
-
-	if !plan.Options.IsNull() && !plan.Options.IsUnknown() {
-		var options struct {
-			SecretPrefix types.String `tfsdk:"secret_prefix"`
-			SecretSuffix types.String `tfsdk:"secret_suffix"`
-		}
-		diags := plan.Options.As(ctx, &options, basetypes.ObjectAsOptions{})
-
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		if !options.SecretPrefix.IsNull() && !options.SecretPrefix.IsUnknown() {
-			metadata.SecretPrefix = options.SecretPrefix.ValueString()
-		}
-		if !options.SecretSuffix.IsNull() && !options.SecretSuffix.IsUnknown() {
-			metadata.SecretSuffix = options.SecretSuffix.ValueString()
-		}
+	var options struct {
+		SecretPrefix types.String `tfsdk:"secret_prefix"`
+		SecretSuffix types.String `tfsdk:"secret_suffix"`
 	}
+	diags = plan.Options.As(ctx, &options, basetypes.ObjectAsOptions{})
+
+	metadata := infisical.IntegrationMetadata{}
+	metadata.SecretPrefix = options.SecretPrefix.ValueString()
+	metadata.SecretSuffix = options.SecretSuffix.ValueString()
 
 	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		IsActive:    true,
