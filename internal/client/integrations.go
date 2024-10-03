@@ -2,6 +2,7 @@ package infisicalclient
 
 import (
 	"fmt"
+	"net/http"
 )
 
 func (client Client) CreateIntegration(request CreateIntegrationRequest) (CreateIntegrationResponse, error) {
@@ -37,6 +38,9 @@ func (client Client) GetIntegration(request GetIntegrationRequest) (GetIntegrati
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetIntegrationResponse{}, ErrNotFound
+		}
 		return GetIntegrationResponse{}, fmt.Errorf("CallGetIntegration: Unsuccessful response. [response=%s]", string(response.Body()))
 	}
 

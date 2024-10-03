@@ -243,10 +243,14 @@ func (r *IntegrationGCPSecretManagerResource) Read(ctx context.Context, req reso
 	})
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Unable to get integration",
-			err.Error(),
-		)
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Unable to get integration",
+				err.Error(),
+			)
+		}
 		return
 	}
 
