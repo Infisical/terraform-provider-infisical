@@ -287,6 +287,12 @@ type SecretFolder struct {
 	EnvID string `json:"envId"`
 }
 
+type SecretImport struct {
+	ID         string `json:"id"`
+	SecretPath string `json:"secretPath"`
+	ImportPath string `json:"importPath"`
+}
+
 type CreateProjectResponse struct {
 	Project Project `json:"project"`
 }
@@ -1514,4 +1520,217 @@ type UpdateIntegrationRequest struct {
 
 type UpdateIntegrationResponse struct {
 	Integration Integration `json:"integration"`
+}
+type SecretApprovalPolicyEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type SecretApprovalPolicyApprover struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type SecretApprovalPolicy struct {
+	ID                string                          `json:"id"`
+	ProjectID         string                          `json:"projectId"`
+	Name              string                          `json:"name"`
+	Environment       SecretApprovalPolicyEnvironment `json:"environment"`
+	SecretPath        string                          `json:"secretPath"`
+	Approvers         []SecretApprovalPolicyApprover  `json:"approvers"`
+	RequiredApprovals int64                           `json:"approvals"`
+	EnforcementLevel  string                          `json:"enforcementLevel"`
+}
+
+type CreateSecretApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CreateSecretApprovalPolicyRequest struct {
+	ProjectID         string                               `json:"workspaceId"`
+	Name              string                               `json:"name,omitempty"`
+	Environment       string                               `json:"environment"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []CreateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type CreateSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type GetSecretApprovalPolicyByIDRequest struct {
+	ID string
+}
+
+type GetSecretApprovalPolicyByIDResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type UpdateSecretApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UpdateSecretApprovalPolicyRequest struct {
+	ID                string
+	Name              string                               `json:"name"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []UpdateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type UpdateSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type DeleteSecretApprovalPolicyRequest struct {
+	ID string
+}
+
+type DeleteSecretApprovalPolicyResponse struct {
+	SecretApprovalPolicy SecretApprovalPolicy `json:"approval"`
+}
+
+type AccessApprovalPolicyApprover struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type AccessApprovalPolicyEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type AccessApprovalPolicy struct {
+	ID                string                          `json:"id"`
+	ProjectID         string                          `json:"projectId"`
+	Name              string                          `json:"name"`
+	Environment       AccessApprovalPolicyEnvironment `json:"environment"`
+	SecretPath        string                          `json:"secretPath"`
+	Approvers         []AccessApprovalPolicyApprover  `json:"approvers"`
+	RequiredApprovals int64                           `json:"approvals"`
+	EnforcementLevel  string                          `json:"enforcementLevel"`
+}
+
+type CreateAccessApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CreateAccessApprovalPolicyRequest struct {
+	ProjectSlug       string                               `json:"projectSlug"`
+	Name              string                               `json:"name,omitempty"`
+	Environment       string                               `json:"environment"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []CreateAccessApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type CreateAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type GetAccessApprovalPolicyByIDRequest struct {
+	ID string
+}
+
+type GetAccessApprovalPolicyByIDResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type UpdateAccessApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UpdateAccessApprovalPolicyRequest struct {
+	ID                string
+	Name              string                               `json:"name"`
+	SecretPath        string                               `json:"secretPath"`
+	Approvers         []UpdateAccessApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals int64                                `json:"approvals"`
+	EnforcementLevel  string                               `json:"enforcementLevel"`
+}
+
+type UpdateAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+
+type DeleteAccessApprovalPolicyRequest struct {
+	ID string
+}
+
+type DeleteAccessApprovalPolicyResponse struct {
+	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
+}
+type CreateSecretImportRequest struct {
+	ProjectID     string `json:"workspaceId"`
+	Environment   string `json:"environment"`
+	SecretPath    string `json:"path"`
+	IsReplication bool   `json:"isReplication"`
+	ImportFrom    struct {
+		Environment string `json:"environment"`
+		SecretPath  string `json:"path"`
+	} `json:"import"`
+}
+
+type CreateSecretImportResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type UpdateSecretImportRequest struct {
+	ID            string `json:"id"`
+	ProjectID     string `json:"workspaceId"`
+	Environment   string `json:"environment"`
+	SecretPath    string `json:"path"`
+	IsReplication bool   `json:"isReplication"`
+	ImportFrom    struct {
+		Environment string `json:"environment"`
+		SecretPath  string `json:"path"`
+	} `json:"import"`
+}
+
+type UpdateSecretImportResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type DeleteSecretImportRequest struct {
+	ID          string `json:"id"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type DeleteSecretImportResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type GetSecretImportByIDRequest struct {
+	ID          string `json:"id"`
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type GetSecretImportByIDResponse struct {
+	SecretImport SecretImport `json:"secretImport"`
+}
+
+type ListSecretImportRequest struct {
+	Environment string `json:"environment"`
+	ProjectID   string `json:"workspaceId"`
+	SecretPath  string `json:"path"`
+}
+
+type ListSecretImportResponse struct {
+	SecretImports []SecretImport `json:"secretImports"`
 }
