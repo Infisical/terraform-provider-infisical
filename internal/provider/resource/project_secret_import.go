@@ -6,6 +6,7 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -174,7 +175,7 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 	}
 
 	// Get the latest data from the API
-	_, err := r.client.GetSecretImportByID(infisical.GetSecretImportByIDRequest{
+	_, err := r.client.GetSecretImport(infisical.GetSecretImportRequest{
 		ID:          state.ID.ValueString(),
 		ProjectID:   state.ProjectID.ValueString(),
 		Environment: state.EnvironmentSlug.ValueString(),
@@ -282,4 +283,33 @@ func (r *projectSecretImportResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
+}
+
+func (r *projectSecretImportResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	secretImport, err := r.client.GetSecretImportByID(infisical.GetSecretImportByIDRequest{
+		ID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Secret Import not found",
+				"The secret import with the given ID was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching secret import",
+				"Couldn't fetch secret import from Infiscial, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), secretImport.SecretImport.ProjectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretImport.SecretImport.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_slug"), secretImport.SecretImport.Environment.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), secretImport.SecretImport.SecretPath)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_folder_path"), secretImport.SecretImport.ImportPath)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_environment_slug"), secretImport.SecretImport.ImportEnvironment.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("is_replication"), secretImport.SecretImport.IsReplication)...)
 }

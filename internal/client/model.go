@@ -281,16 +281,59 @@ type ProjectEnvironment struct {
 	ID   string `json:"id"`
 }
 
+type ProjectEnvironmentByID struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	Position  int    `json:"position"`
+	ProjectID string `json:"projectId"`
+}
+
 type SecretFolder struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	EnvID string `json:"envId"`
 }
 
+type SecretFolderByID struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	EnvID       string `json:"envId"`
+	ProjectID   string `json:"projectId"`
+	Path        string `json:"path"`
+	Environment struct {
+		EnvID   string `json:"envId"`
+		EnvName string `json:"envName"`
+		EnvSlug string `json:"envSlug"`
+	} `json:"environment"`
+}
+
 type SecretImport struct {
 	ID         string `json:"id"`
 	SecretPath string `json:"secretPath"`
 	ImportPath string `json:"importPath"`
+}
+
+type SecretImportByID struct {
+	ID            string `json:"id"`
+	SecretPath    string `json:"secretPath"`
+	ImportPath    string `json:"importPath"`
+	ProjectID     string `json:"projectId"`
+	IsReplication bool   `json:"isReplication"`
+
+	// Imported from
+	ImportEnvironment struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Slug string `json:"slug"`
+	} `json:"importEnv"`
+
+	// Imported into
+	Environment struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Slug string `json:"slug"`
+	} `json:"environment"`
 }
 
 type CreateProjectResponse struct {
@@ -1001,6 +1044,16 @@ type GetSecretFolderByIDRequest struct {
 }
 
 type GetSecretFolderByIDResponse struct {
+	Folder SecretFolderByID `json:"folder"`
+}
+
+type GetSecretFolderByPathRequest struct {
+	ProjectID   string
+	Environment string
+	SecretPath  string
+}
+
+type GetSecretFolderByPathResponse struct {
 	Folder SecretFolder `json:"folder"`
 }
 
@@ -1034,12 +1087,11 @@ type DeleteProjectEnvironmentResponse struct {
 }
 
 type GetProjectEnvironmentByIDRequest struct {
-	ID        string `json:"id"`
-	ProjectID string `json:"workspaceId"`
+	ID string
 }
 
 type GetProjectEnvironmentByIDResponse struct {
-	Environment ProjectEnvironment `json:"environment"`
+	Environment ProjectEnvironmentByID `json:"environment"`
 }
 
 type UpdateProjectEnvironmentRequest struct {
@@ -1714,15 +1766,23 @@ type DeleteSecretImportResponse struct {
 	SecretImport SecretImport `json:"secretImport"`
 }
 
-type GetSecretImportByIDRequest struct {
+type GetSecretImportRequest struct {
 	ID          string `json:"id"`
 	Environment string `json:"environment"`
 	ProjectID   string `json:"workspaceId"`
 	SecretPath  string `json:"path"`
 }
 
-type GetSecretImportByIDResponse struct {
+type GetSecretImportResponse struct {
 	SecretImport SecretImport `json:"secretImport"`
+}
+
+type GetSecretImportByIDRequest struct {
+	ID string
+}
+
+type GetSecretImportByIDResponse struct {
+	SecretImport SecretImportByID `json:"secretImport"`
 }
 
 type ListSecretImportRequest struct {

@@ -6,17 +6,17 @@ import (
 )
 
 // Workaround to getSecretImportById API call.
-func findSecretImportByID(secretImports []SecretImport, id string) (GetSecretImportByIDResponse, error) {
+func findSecretImportByID(secretImports []SecretImport, id string) (GetSecretImportResponse, error) {
 	for _, secretImport := range secretImports {
 		if secretImport.ID == id {
-			return GetSecretImportByIDResponse{SecretImport: secretImport}, nil
+			return GetSecretImportResponse{SecretImport: secretImport}, nil
 		}
 	}
 
-	return GetSecretImportByIDResponse{}, NewNotFoundError("SecretImport", id)
+	return GetSecretImportResponse{}, NewNotFoundError("SecretImport", id)
 }
 
-func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (GetSecretImportByIDResponse, error) {
+func (client Client) GetSecretImport(request GetSecretImportRequest) (GetSecretImportResponse, error) {
 	var body ListSecretImportResponse
 
 	httpRequest := client.Config.HttpClient.
@@ -30,15 +30,39 @@ func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (Ge
 	response, err := httpRequest.Get("api/v1/secret-imports")
 
 	if err != nil {
-		return GetSecretImportByIDResponse{}, fmt.Errorf("GetSecretImportByID: Unable to complete api request [err=%s]", err)
+		return GetSecretImportResponse{}, fmt.Errorf("GetSecretImport: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return GetSecretImportByIDResponse{}, fmt.Errorf("GetSecretImportByID: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretImportResponse{}, fmt.Errorf("GetSecretImport: Unsuccessful response. [response=%v]", string(response.Body()))
 	}
 
 	return findSecretImportByID(body.SecretImports, request.ID)
 
+}
+
+func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (GetSecretImportByIDResponse, error) {
+	var body GetSecretImportByIDResponse
+
+	httpRequest := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT)
+
+	response, err := httpRequest.Get("api/v1/secret-imports/" + request.ID)
+
+	if err != nil {
+		return GetSecretImportByIDResponse{}, fmt.Errorf("GetSecretImportByID: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSecretImportByIDResponse{}, ErrNotFound
+		}
+		return GetSecretImportByIDResponse{}, fmt.Errorf("GetSecretImportByID: Unsuccessful response. [response=%v]", string(response.Body()))
+	}
+
+	return body, nil
 }
 
 func (client Client) GetSecretImportList(request ListSecretImportRequest) (ListSecretImportResponse, error) {

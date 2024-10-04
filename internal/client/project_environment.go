@@ -53,7 +53,7 @@ func (client Client) GetProjectEnvironmentByID(request GetProjectEnvironmentByID
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT)
 
-	response, err := httpRequest.Get(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
+	response, err := httpRequest.Get(fmt.Sprintf("api/v1/workspace/environments/%s", request.ID))
 
 	if response.StatusCode() == http.StatusNotFound {
 		return GetProjectEnvironmentByIDResponse{}, ErrNotFound
