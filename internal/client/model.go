@@ -1094,15 +1094,6 @@ type GetProjectEnvironmentByIDResponse struct {
 	Environment ProjectEnvironmentByID `json:"environment"`
 }
 
-type GetProjectEnvironmentBySlugRequest struct {
-	Slug      string
-	ProjectID string
-}
-
-type GetProjectEnvironmentBySlugResponse struct {
-	Environment ProjectEnvironment `json:"environment"`
-}
-
 type UpdateProjectEnvironmentRequest struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
