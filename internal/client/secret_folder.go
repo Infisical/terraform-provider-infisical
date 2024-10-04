@@ -2,6 +2,8 @@ package infisicalclient
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 )
 
 func (client Client) GetSecretFolderByID(request GetSecretFolderByIDRequest) (GetSecretFolderByIDResponse, error) {
@@ -104,6 +106,29 @@ func (client Client) DeleteSecretFolder(request DeleteSecretFolderRequest) (Dele
 
 	if response.IsError() {
 		return DeleteSecretFolderResponse{}, fmt.Errorf("CallDeleteSecretFolder: Unsuccessful response. [response=%s]", string(response.Body()))
+	}
+
+	return body, nil
+}
+
+func (client Client) GetFolderByPath(request GetSecretFolderByPathRequest) (GetSecretFolderByPathResponse, error) {
+	var body GetSecretFolderByPathResponse
+
+	httpRequest := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT)
+	response, err := httpRequest.Get(fmt.Sprintf("api/v1/folders/%s/%s/%s", request.ProjectID, request.Environment, url.PathEscape(request.SecretPath)))
+
+	if err != nil {
+		return GetSecretFolderByPathResponse{}, fmt.Errorf("GetFolderByPath: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSecretFolderByPathResponse{}, ErrNotFound
+		}
+		return GetSecretFolderByPathResponse{}, fmt.Errorf("GetFolderByPath: Unsuccessful response. [response=%v]", string(response.Body()))
 	}
 
 	return body, nil

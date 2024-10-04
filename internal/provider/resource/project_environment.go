@@ -5,6 +5,7 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -176,8 +177,7 @@ func (r *projectEnvironmentResource) Read(ctx context.Context, req resource.Read
 	}
 
 	projectEnvironment, err := r.client.GetProjectEnvironmentByID(infisical.GetProjectEnvironmentByIDRequest{
-		ID:        state.ID.ValueString(),
-		ProjectID: state.ProjectID.ValueString(),
+		ID: state.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -252,4 +252,30 @@ func (r *projectEnvironmentResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
+}
+
+func (r *projectEnvironmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+
+	projectEnvironment, err := r.client.GetProjectEnvironmentByID(infisical.GetProjectEnvironmentByIDRequest{
+		ID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Project environment not found",
+				"The project environment with the given slug was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching project environment",
+				"Couldn't fetch project environment from Infiscial, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	// Set the attributes in the state
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectEnvironment.Environment.ProjectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), projectEnvironment.Environment.ID)...)
 }

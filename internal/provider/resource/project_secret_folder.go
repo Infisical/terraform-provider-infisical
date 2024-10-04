@@ -3,9 +3,11 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -266,4 +268,44 @@ func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
+}
+
+func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+
+	// secret_folder_id
+
+	folder, err := r.client.GetSecretFolderByID(infisical.GetSecretFolderByIDRequest{
+		ID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Secrets folder not found",
+				"The secrets folder with the given ID was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching secrets folder",
+				"Couldn't fetch secrets folder from Infiscial, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	// Remove leading and trailing slashes.
+	trimmedPath := strings.Trim(folder.Folder.Path, "/")
+	var name string
+
+	if trimmedPath != "" {
+		// Split the path and get the last element as the name.
+		pathParts := strings.Split(trimmedPath, "/")
+		name = pathParts[len(pathParts)-1]
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), folder.Folder.Path)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), folder.Folder.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_slug"), folder.Folder.Environment.EnvSlug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), folder.Folder.ProjectID)...)
 }

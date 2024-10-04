@@ -53,7 +53,7 @@ func (client Client) GetProjectEnvironmentByID(request GetProjectEnvironmentByID
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT)
 
-	response, err := httpRequest.Get(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
+	response, err := httpRequest.Get(fmt.Sprintf("api/v1/workspace/environments/%s", request.ID))
 
 	if response.StatusCode() == http.StatusNotFound {
 		return GetProjectEnvironmentByIDResponse{}, ErrNotFound
@@ -65,6 +65,31 @@ func (client Client) GetProjectEnvironmentByID(request GetProjectEnvironmentByID
 
 	if response.IsError() {
 		return GetProjectEnvironmentByIDResponse{}, fmt.Errorf("GetProjectEnvironmentByID: Unsuccessful response. [response=%v]", string(response.Body()))
+	}
+
+	return body, nil
+}
+
+func (client Client) GetProjectEnvironmentBySlug(request GetProjectEnvironmentBySlugRequest) (GetProjectEnvironmentBySlugResponse, error) {
+	var body GetProjectEnvironmentBySlugResponse
+
+	httpRequest := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT)
+
+	response, err := httpRequest.Get(fmt.Sprintf("api/v1/workspace/%s/environments/slug/%s", request.ProjectID, request.Slug))
+
+	if response.StatusCode() == http.StatusNotFound {
+		return GetProjectEnvironmentBySlugResponse{}, ErrNotFound
+	}
+
+	if err != nil {
+		return GetProjectEnvironmentBySlugResponse{}, fmt.Errorf("GetProjectEnvironmentBySlug: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return GetProjectEnvironmentBySlugResponse{}, fmt.Errorf("GetProjectEnvironmentBySlug: Unsuccessful response. [response=%v]", string(response.Body()))
 	}
 
 	return body, nil
