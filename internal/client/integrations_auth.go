@@ -8,7 +8,9 @@ import (
 type IntegrationAuthType string
 
 const (
-	IntegrationAuthTypeGcpSecretManager IntegrationAuthType = "gcp-secret-manager"
+	IntegrationAuthTypeGcpSecretManager  IntegrationAuthType = "gcp-secret-manager"
+	IntegrationAuthTypeAwsParameterStore IntegrationAuthType = "aws-parameter-store"
+	IntegrationAuthTypeAwsSecretsManager IntegrationAuthType = "aws-secret-manager"
 )
 
 func (client Client) CreateIntegrationAuth(request CreateIntegrationAuthRequest) (CreateIntegrationAuthResponse, error) {

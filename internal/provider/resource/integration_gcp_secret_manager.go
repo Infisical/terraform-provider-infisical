@@ -43,6 +43,11 @@ type IntegrationGCPSecretManagerResourceModel struct {
 	Options types.Object `tfsdk:"options"`
 }
 
+type GcpIntegrationMetadataStruct struct {
+	SecretPrefix string `json:"secretPrefix,omitempty"`
+	SecretSuffix string `json:"secretSuffix,omitempty"`
+}
+
 // Metadata returns the resource type name.
 func (r *IntegrationGCPSecretManagerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_integration_gcp_secret_manager"
@@ -168,7 +173,7 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 		return
 	}
 
-	metadata := infisical.IntegrationMetadata{}
+	metadata := GcpIntegrationMetadataStruct{}
 
 	if !plan.Options.IsNull() && !plan.Options.IsUnknown() {
 		var options struct {
@@ -190,6 +195,11 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 		}
 	}
 
+	metadataMap := map[string]interface{}{
+		"secretPrefix": metadata.SecretPrefix,
+		"secretSuffix": metadata.SecretSuffix,
+	}
+
 	// Create the integration
 	integration, err := r.client.CreateIntegration(infisical.CreateIntegrationRequest{
 		IntegrationAuthID: auth.IntegrationAuth.ID,
@@ -197,7 +207,7 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 		AppID:             plan.GCPProjectID.ValueString(),
 		SecretPath:        plan.SecretPath.ValueString(),
 		SourceEnvironment: plan.Environment.ValueString(),
-		Metadata:          metadata,
+		Metadata:          metadataMap,
 	})
 
 	if err != nil {
@@ -358,9 +368,10 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 	}
 	plan.Options.As(ctx, &options, basetypes.ObjectAsOptions{})
 
-	metadata := infisical.IntegrationMetadata{}
-	metadata.SecretPrefix = options.SecretPrefix.ValueString()
-	metadata.SecretSuffix = options.SecretSuffix.ValueString()
+	metadataMap := map[string]interface{}{
+		"secretPrefix": options.SecretPrefix.ValueString(),
+		"secretSuffix": options.SecretSuffix.ValueString(),
+	}
 
 	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		IsActive:    true,
@@ -369,7 +380,7 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		App:         plan.GCPProjectID.ValueString(),
 		AppID:       plan.GCPProjectID.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
-		Metadata:    metadata,
+		Metadata:    metadataMap,
 	})
 
 	if err != nil {
