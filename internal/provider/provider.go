@@ -253,6 +253,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIntegrationGcpSecretManagerResource,
 		infisicalResource.NewIntegrationAwsParameterStoreResource,
 		infisicalResource.NewIntegrationAwsSecretsManagerResource,
+		infisicalResource.NewIntegrationCircleCiResource,
 		infisicalResource.NewSecretApprovalPolicyResource,
 		infisicalResource.NewAccessApprovalPolicyResource,
 		infisicalResource.NewProjectSecretImportResource,

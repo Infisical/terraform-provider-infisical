@@ -11,6 +11,7 @@ const (
 	IntegrationAuthTypeGcpSecretManager  IntegrationAuthType = "gcp-secret-manager"
 	IntegrationAuthTypeAwsParameterStore IntegrationAuthType = "aws-parameter-store"
 	IntegrationAuthTypeAwsSecretsManager IntegrationAuthType = "aws-secret-manager"
+	IntegrationAuthTypeCircleCi          IntegrationAuthType = "circleci"
 )
 
 func (client Client) CreateIntegrationAuth(request CreateIntegrationAuthRequest) (CreateIntegrationAuthResponse, error) {
