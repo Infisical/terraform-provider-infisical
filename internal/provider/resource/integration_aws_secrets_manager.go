@@ -56,7 +56,6 @@ type IntegrationAWSSecretsManagerResourceModel struct {
 	SecretAccessKey types.String `tfsdk:"secret_access_key"`
 	ProjectID       types.String `tfsdk:"project_id"`
 
-	EnvironmentID     types.String `tfsdk:"env_id"`
 	IntegrationAuthID types.String `tfsdk:"integration_auth_id"`
 	IntegrationID     types.String `tfsdk:"integration_id"`
 
@@ -145,12 +144,6 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 			"integration_auth_id": schema.StringAttribute{
 				Computed:      true,
 				Description:   "The ID of the integration auth, used internally by Infisical.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-
-			"env_id": schema.StringAttribute{
-				Computed:      true,
-				Description:   "The ID of the environment, used internally by Infisical.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 
@@ -321,7 +314,6 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 
 	plan.IntegrationAuthID = types.StringValue(auth.IntegrationAuth.ID)
 	plan.IntegrationID = types.StringValue(integration.Integration.ID)
-	plan.EnvironmentID = types.StringValue(integration.Integration.EnvID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -447,7 +439,6 @@ func (r *IntegrationAWSSecretsManagerResource) Read(ctx context.Context, req res
 
 	// Set the state.Options.
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
-	state.EnvironmentID = types.StringValue(integration.Integration.EnvID)
 	state.IntegrationAuthID = types.StringValue(integration.Integration.IntegrationAuthID)
 
 	diags = resp.State.Set(ctx, state)

@@ -24,11 +24,11 @@ terraform {
 
 provider "infisical" {
   host          = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  client_id     = "<machine-identity-client-id"
+  client_id     = "<machine-identity-client-id>"
   client_secret = "<machine-identity-client-secret>"
 }
 
-resource "infisical_integration_aws_secrets_manager" "sm" {
+resource "infisical_integration_aws_secrets_manager" "secrets-manager-integration" {
   project_id  = "<project-id>"
   aws_region  = "<aws-region>" // example, us-east-2
   environment = "<env-slug>"   // example, dev
@@ -73,7 +73,6 @@ resource "infisical_integration_aws_secrets_manager" "sm" {
 
 ### Read-Only
 
-- `env_id` (String) The ID of the environment, used internally by Infisical.
 - `integration_auth_id` (String) The ID of the integration auth, used internally by Infisical.
 - `integration_id` (String) The ID of the integration, used internally by Infisical.
 

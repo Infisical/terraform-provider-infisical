@@ -72,7 +72,6 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
 
 ### Read-Only
 
-- `env_id` (String) The ID of the environment, used internally by Infisical.
 - `integration_auth_id` (String) The ID of the integration auth, used internally by Infisical.
 - `integration_id` (String) The ID of the integration, used internally by Infisical.
 

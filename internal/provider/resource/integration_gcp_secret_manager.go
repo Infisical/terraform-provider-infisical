@@ -31,7 +31,6 @@ type IntegrationGCPSecretManagerResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type IntegrationGCPSecretManagerResourceModel struct {
-	EnvironmentID      types.String `tfsdk:"env_id"`
 	IntegrationAuthID  types.String `tfsdk:"integration_auth_id"`
 	IntegrationID      types.String `tfsdk:"integration_id"`
 	ServiceAccountJson types.String `tfsdk:"service_account_json"`
@@ -79,12 +78,6 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 
-			"env_id": schema.StringAttribute{
-				Computed:      true,
-				Description:   "The ID of the environment, used internally by Infisical.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-
 			"integration_id": schema.StringAttribute{
 				Computed:      true,
 				Description:   "The ID of the integration, used internally by Infisical.",
@@ -92,14 +85,16 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 			},
 
 			"service_account_json": schema.StringAttribute{
-				Sensitive:   true,
-				Required:    true,
-				Description: "Service account json for the GCP project.",
+				Sensitive:     true,
+				Required:      true,
+				Description:   "Service account json for the GCP project.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of your Infisical project.",
+				Required:      true,
+				Description:   "The ID of your Infisical project.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"environment": schema.StringAttribute{
@@ -113,8 +108,9 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 			},
 
 			"gcp_project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of the GCP project.",
+				Required:      true,
+				Description:   "The ID of the GCP project.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
 	}
@@ -222,7 +218,6 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 
 	plan.IntegrationAuthID = types.StringValue(auth.IntegrationAuth.ID)
 	plan.IntegrationID = types.StringValue(integration.Integration.ID)
-	plan.EnvironmentID = types.StringValue(integration.Integration.EnvID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -317,7 +312,6 @@ func (r *IntegrationGCPSecretManagerResource) Read(ctx context.Context, req reso
 	// Set the state.Options.
 	state.GCPProjectID = types.StringValue(integration.Integration.AppID)
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
-	state.EnvironmentID = types.StringValue(integration.Integration.EnvID)
 	state.IntegrationAuthID = types.StringValue(integration.Integration.IntegrationAuthID)
 
 	diags = resp.State.Set(ctx, state)
@@ -373,7 +367,7 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		"secretSuffix": options.SecretSuffix.ValueString(),
 	}
 
-	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		IsActive:    true,
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
@@ -390,8 +384,6 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		)
 		return
 	}
-
-	plan.EnvironmentID = types.StringValue(updatedIntegration.Integration.EnvID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
