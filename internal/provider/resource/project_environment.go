@@ -25,6 +25,7 @@ type projectEnvironmentResource struct {
 
 type projectEnvironmentResourceModel struct {
 	ID        types.String `tfsdk:"id"`
+	Position  types.Int64  `tfsdk:"position"`
 	Slug      types.String `tfsdk:"slug"`
 	Name      types.String `tfsdk:"name"`
 	ProjectID types.String `tfsdk:"project_id"`
@@ -57,6 +58,11 @@ func (r *projectEnvironmentResource) Schema(_ context.Context, _ resource.Schema
 				Description:   "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"position": schema.Int64Attribute{
+				Description: "The position of the environment",
+				Optional:    true,
+				Computed:    true,
 			},
 		},
 	}
@@ -100,11 +106,25 @@ func (r *projectEnvironmentResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	newProjectEnvironment, err := r.client.CreateProjectEnvironment(infisical.CreateProjectEnvironmentRequest{
+	request := infisical.CreateProjectEnvironmentRequest{
 		Name:      plan.Name.ValueString(),
 		ProjectID: plan.ProjectID.ValueString(),
 		Slug:      plan.Slug.ValueString(),
-	})
+	}
+
+	if !plan.Position.IsNull() {
+		if plan.Position.ValueInt64() < 0 {
+			resp.Diagnostics.AddError(
+				"Invalid position",
+				"The position must be a positive integer",
+			)
+			return
+		}
+
+		request.Position = plan.Position.ValueInt64()
+	}
+
+	newProjectEnvironment, err := r.client.CreateProjectEnvironment(request)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -115,8 +135,7 @@ func (r *projectEnvironmentResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	plan.ID = types.StringValue(newProjectEnvironment.Environment.ID)
-	plan.Name = types.StringValue(newProjectEnvironment.Environment.Name)
-	plan.Slug = types.StringValue(newProjectEnvironment.Environment.Slug)
+	plan.Position = types.Int64Value(newProjectEnvironment.Environment.Position)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -195,6 +214,7 @@ func (r *projectEnvironmentResource) Read(ctx context.Context, req resource.Read
 
 	state.Name = types.StringValue(projectEnvironment.Environment.Name)
 	state.Slug = types.StringValue(projectEnvironment.Environment.Slug)
+	state.Position = types.Int64Value(projectEnvironment.Environment.Position)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -233,6 +253,7 @@ func (r *projectEnvironmentResource) Update(ctx context.Context, req resource.Up
 		Name:      plan.Name.ValueString(),
 		ID:        plan.ID.ValueString(),
 		Slug:      plan.Slug.ValueString(),
+		Position:  plan.Position.ValueInt64(),
 	})
 
 	if err != nil {
