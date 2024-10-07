@@ -5,11 +5,9 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -21,7 +19,7 @@ var (
 	_ resource.Resource = &IntegrationAWSParameterStoreResource{}
 )
 
-// NewProjectResource is a helper function to simplify the provider implementation.
+// IntegrationAWSParameterStoreResource is a helper function to simplify the provider implementation.
 func NewIntegrationAwsParameterStoreResource() resource.Resource {
 	return &IntegrationAWSParameterStoreResource{}
 }
@@ -32,24 +30,16 @@ type IntegrationAWSParameterStoreResource struct {
 }
 
 type AwsParameterStoreMetadataStruct struct {
-	SecretAWSTag []struct {
-		Key   string `json:"key,omitempty"`
-		Value string `json:"value,omitempty"`
-	} `json:"secretAWSTag,omitempty"`
-	ShouldDisableDelete bool `json:"shouldDisableDelete,omitempty"`
+	SecretAWSTag        []infisical.AwsTag `json:"secretAWSTag,omitempty"`
+	ShouldDisableDelete bool               `json:"shouldDisableDelete,omitempty"`
 }
 
 type AwsParameterStoreOptions struct {
-	AwsTags             []awsTag `tfsdk:"aws_tags"`
-	ShouldDisableDelete bool     `tfsdk:"should_disable_delete"`
+	AwsTags             []infisical.AwsTag `tfsdk:"aws_tags" json:"secretAWSTag,omitempty"`
+	ShouldDisableDelete bool               `tfsdk:"should_disable_delete" json:"shouldDisableDelete,omitempty"`
 }
 
-type awsTag struct {
-	Key   types.String `tfsdk:"key"`
-	Value types.String `tfsdk:"value"`
-}
-
-// projectResourceSourceModel describes the data source data model.
+// IntegrationAWSParameterStoreResourceModel describes the data source data model.
 type IntegrationAWSParameterStoreResourceModel struct {
 	AccessKeyID     types.String `tfsdk:"access_key_id"`
 	SecretAccessKey types.String `tfsdk:"secret_access_key"`
@@ -78,12 +68,9 @@ func extractOptionsParameterStore(ctx context.Context, diagnostics *diag.Diagnos
 
 		// Load AWS tags into metadata
 		for _, tag := range options.AwsTags {
-			metadata.SecretAWSTag = append(metadata.SecretAWSTag, struct {
-				Key   string `json:"key,omitempty"`
-				Value string `json:"value,omitempty"`
-			}{
-				Key:   tag.Key.ValueString(),
-				Value: tag.Value.ValueString(),
+			metadata.SecretAWSTag = append(metadata.SecretAWSTag, infisical.AwsTag{
+				Key:   tag.Key,
+				Value: tag.Value,
 			})
 		}
 
@@ -112,21 +99,18 @@ func (r *IntegrationAWSParameterStoreResource) Schema(_ context.Context, _ resou
 						Description: "Whether to disable deletion of existing secrets in AWS Parameter Store.",
 					},
 
-					"aws_tags": schema.ListNestedAttribute{
-						Description:   "Tags to attach to the AWS parameter store secrets.",
-						Optional:      true,
-						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+					"aws_tags": schema.SetNestedAttribute{
+						Description: "Tags to attach to the AWS parameter store secrets.",
+						Optional:    true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"key": schema.StringAttribute{
-									Description:   "The key of the tag.",
-									Optional:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+									Description: "The key of the tag.",
+									Optional:    true,
 								},
 								"value": schema.StringAttribute{
-									Description:   "The value of the tag.",
-									Optional:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+									Description: "The value of the tag.",
+									Optional:    true,
 								},
 							},
 						},
@@ -148,21 +132,21 @@ func (r *IntegrationAWSParameterStoreResource) Schema(_ context.Context, _ resou
 
 			"aws_region": schema.StringAttribute{
 				Required:      true,
-				Description:   "The AWS region to sync secrets to.",
+				Description:   "The AWS region to sync secrets to. (us-east-1, us-east-2, etc)",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"access_key_id": schema.StringAttribute{
 				Sensitive:     true,
 				Required:      true,
-				Description:   "The AWS access key ID.",
+				Description:   "The AWS access key ID. Used to authenticate with AWS Secrets Manager.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"secret_access_key": schema.StringAttribute{
 				Sensitive:     true,
 				Required:      true,
-				Description:   "The AWS secret access key.",
+				Description:   "The AWS secret access key. Used to authenticate with AWS Secrets Manager.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
@@ -245,16 +229,20 @@ func (r *IntegrationAWSParameterStoreResource) Create(ctx context.Context, req r
 		return
 	}
 
-	parsedOptions, hasError := extractOptionsParameterStore(ctx, &resp.Diagnostics, plan.Options)
+	var planOptions AwsParameterStoreOptions
 
-	if hasError {
-		return
+	if !plan.Options.IsNull() {
+		diags := plan.Options.As(ctx, &planOptions, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// Convert metadata to map[string]interface{} if needed
 	metadataMap := map[string]interface{}{
-		"secretAWSTag":        parsedOptions.SecretAWSTag,
-		"shouldDisableDelete": parsedOptions.ShouldDisableDelete,
+		"secretAWSTag":        planOptions.AwsTags,
+		"shouldDisableDelete": planOptions.ShouldDisableDelete,
 	}
 
 	// Create the integration
@@ -277,6 +265,7 @@ func (r *IntegrationAWSParameterStoreResource) Create(ctx context.Context, req r
 
 	plan.IntegrationAuthID = types.StringValue(auth.IntegrationAuth.ID)
 	plan.IntegrationID = types.StringValue(integration.Integration.ID)
+	plan.Environment = types.StringValue(integration.Integration.Environment.Slug)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -290,7 +279,7 @@ func (r *IntegrationAWSParameterStoreResource) Read(ctx context.Context, req res
 
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create integration",
+			"Unable to read integration",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -330,77 +319,18 @@ func (r *IntegrationAWSParameterStoreResource) Read(ctx context.Context, req res
 		}
 	}
 
-	updateNeeded := false
+	planOptions.ShouldDisableDelete = integration.Integration.Metadata.ShouldDisableDelete
+	planOptions.AwsTags = integration.Integration.Metadata.SecretAWSTag
 
-	if integration.Integration.Metadata.ShouldDisableDelete != planOptions.ShouldDisableDelete {
-		planOptions.ShouldDisableDelete = integration.Integration.Metadata.ShouldDisableDelete
-		updateNeeded = true
+	// Create a new types.Object from the modified planOptions
+	optionsObj, diags := types.ObjectValueFrom(ctx, state.Options.AttributeTypes(ctx), planOptions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	found := false
-	for _, tag := range integration.Integration.Metadata.SecretAWSTag {
-		for _, planTag := range planOptions.AwsTags {
-			if tag.Key == planTag.Key.ValueString() && tag.Value == planTag.Value.ValueString() {
-				found = true
-				break
-			}
-		}
-		if !found {
-			break
-		}
-	}
-
-	if !found {
-		// Create a new list of tags
-		newTags := make([]awsTag, 0, len(integration.Integration.Metadata.SecretAWSTag))
-		for _, tag := range integration.Integration.Metadata.SecretAWSTag {
-			newTags = append(newTags, awsTag{
-				Key:   types.StringValue(tag.Key),
-				Value: types.StringValue(tag.Value),
-			})
-		}
-
-		planOptions.AwsTags = newTags
-		updateNeeded = true
-	}
-
-	if updateNeeded {
-		// Convert AwsTags to types.List
-		awsTagsValue, diags := types.ListValueFrom(ctx, types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"key":   types.StringType,
-				"value": types.StringType,
-			},
-		}, planOptions.AwsTags)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// Create a map of the updated options
-		optionsMap := map[string]attr.Value{
-			"aws_tags":              awsTagsValue,
-			"should_disable_delete": types.BoolValue(planOptions.ShouldDisableDelete),
-		}
-
-		// Create a new types.Object with the updated options
-		newOptions, diags := types.ObjectValue(
-			map[string]attr.Type{
-				"aws_tags":              types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}},
-				"should_disable_delete": types.BoolType,
-			},
-			optionsMap,
-		)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// Set the new options in the state
-		state.Options = newOptions
-	}
-
-	// Set the state.Options.
+	// Set the state
+	state.Options = optionsObj
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
 	state.IntegrationAuthID = types.StringValue(integration.Integration.IntegrationAuthID)
 
@@ -437,18 +367,24 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		return
 	}
 
-	parsedPlanOptions, hasError := extractOptionsParameterStore(ctx, &resp.Diagnostics, plan.Options)
-	if hasError {
-		return
+	var planOptions AwsParameterStoreOptions
+
+	if !plan.Options.IsNull() {
+		diags := plan.Options.As(ctx, &planOptions, basetypes.ObjectAsOptions{})
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// Convert metadata to map[string]interface{} if needed
 	metadataMap := map[string]interface{}{
-		"shouldDisableDelete": parsedPlanOptions.ShouldDisableDelete,
+		"shouldDisableDelete": planOptions.ShouldDisableDelete,
+		"secretAWSTag":        planOptions.AwsTags,
 	}
 
 	// Update the integration
-	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		ID:          state.IntegrationID.ValueString(),
 		Metadata:    metadataMap,
 		Environment: plan.Environment.ValueString(),
@@ -462,6 +398,10 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		)
 		return
 	}
+
+	state.SecretPath = types.StringValue(updatedIntegration.Integration.SecretPath)
+	state.IntegrationAuthID = types.StringValue(updatedIntegration.Integration.IntegrationAuthID)
+	state.Environment = types.StringValue(updatedIntegration.Integration.Environment.Slug)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

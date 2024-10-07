@@ -1433,6 +1433,11 @@ type DeleteIntegrationAuthResponse struct {
 	} `json:"integrationAuth"`
 }
 
+type AwsTag struct {
+	Key   string `tfsdk:"key" json:"key,omitempty"`
+	Value string `tfsdk:"value" json:"value,omitempty"`
+}
+
 type IntegrationMetadata struct {
 	InitialSyncBehavior string `json:"initialSyncBehavior,omitempty"`
 	SecretPrefix        string `json:"secretPrefix"`
@@ -1443,10 +1448,7 @@ type IntegrationMetadata struct {
 		LabelName  string `json:"labelName,omitempty"`
 		LabelValue string `json:"labelValue,omitempty"`
 	} `json:"secretGCPLabel,omitempty"`
-	SecretAWSTag []struct {
-		Key   string `json:"key,omitempty"`
-		Value string `json:"value,omitempty"`
-	} `json:"secretAWSTag,omitempty"`
+	SecretAWSTag []AwsTag `json:"secretAWSTag,omitempty"`
 
 	GithubVisibility        string   `json:"githubVisibility,omitempty"`
 	GithubVisibilityRepoIDs []string `json:"githubVisibilityRepoIds,omitempty"`
@@ -1494,6 +1496,12 @@ type Integration struct {
 	IntegrationAuthID   string              `json:"integrationAuthId"`
 	EnvID               string              `json:"envId"`
 	SecretPath          string              `json:"secretPath"`
+
+	Environment struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Slug string `json:"slug"`
+	} `json:"environment"`
 }
 
 type CreateIntegrationResponse struct {

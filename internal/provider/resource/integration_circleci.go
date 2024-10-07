@@ -17,7 +17,7 @@ var (
 	_ resource.Resource = &IntegrationCircleCIResource{}
 )
 
-// NewProjectResource is a helper function to simplify the provider implementation.
+// NewIntegrationCircleCiResource is a helper function to simplify the provider implementation.
 func NewIntegrationCircleCiResource() resource.Resource {
 	return &IntegrationCircleCIResource{}
 }
@@ -175,6 +175,7 @@ func (r *IntegrationCircleCIResource) Create(ctx context.Context, req resource.C
 
 	plan.IntegrationAuthID = types.StringValue(auth.IntegrationAuth.ID)
 	plan.IntegrationID = types.StringValue(integration.Integration.ID)
+	plan.Environment = types.StringValue(integration.Integration.Environment.Slug)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -220,6 +221,7 @@ func (r *IntegrationCircleCIResource) Read(ctx context.Context, req resource.Rea
 
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
 	state.IntegrationAuthID = types.StringValue(integration.Integration.IntegrationAuthID)
+	state.Environment = types.StringValue(integration.Integration.Environment.Slug)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)

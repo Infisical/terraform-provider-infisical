@@ -19,7 +19,7 @@ var (
 	_ resource.Resource = &IntegrationGCPSecretManagerResource{}
 )
 
-// NewProjectResource is a helper function to simplify the provider implementation.
+// NewIntegrationGcpSecretManagerResource is a helper function to simplify the provider implementation.
 func NewIntegrationGcpSecretManagerResource() resource.Resource {
 	return &IntegrationGCPSecretManagerResource{}
 }
