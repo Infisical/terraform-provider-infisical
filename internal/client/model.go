@@ -281,11 +281,11 @@ type ProjectEnvironment struct {
 	ID   string `json:"id"`
 }
 
-type ProjectEnvironmentByID struct {
+type ProjectEnvironmentWithPosition struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Slug      string `json:"slug"`
-	Position  int    `json:"position"`
+	Position  int64  `json:"position"`
 	ProjectID string `json:"projectId"`
 }
 
@@ -1071,10 +1071,11 @@ type CreateProjectEnvironmentRequest struct {
 	Name      string `json:"name"`
 	Slug      string `json:"slug"`
 	ProjectID string `json:"workspaceId"`
+	Position  int64  `json:"position"`
 }
 
 type CreateProjectEnvironmentResponse struct {
-	Environment ProjectEnvironment `json:"environment"`
+	Environment ProjectEnvironmentWithPosition `json:"environment"`
 }
 
 type DeleteProjectEnvironmentRequest struct {
@@ -1083,7 +1084,7 @@ type DeleteProjectEnvironmentRequest struct {
 }
 
 type DeleteProjectEnvironmentResponse struct {
-	Environment ProjectEnvironment `json:"environment"`
+	Environment ProjectEnvironmentWithPosition `json:"environment"`
 }
 
 type GetProjectEnvironmentByIDRequest struct {
@@ -1091,18 +1092,19 @@ type GetProjectEnvironmentByIDRequest struct {
 }
 
 type GetProjectEnvironmentByIDResponse struct {
-	Environment ProjectEnvironmentByID `json:"environment"`
+	Environment ProjectEnvironmentWithPosition `json:"environment"`
 }
 
 type UpdateProjectEnvironmentRequest struct {
-	ID        string `json:"id"`
+	ID        string
+	ProjectID string
 	Name      string `json:"name"`
 	Slug      string `json:"slug"`
-	ProjectID string `json:"workspaceId"`
+	Position  int64  `json:"position"`
 }
 
 type UpdateProjectEnvironmentResponse struct {
-	Environment ProjectEnvironment `json:"environment"`
+	Environment ProjectEnvironmentWithPosition `json:"environment"`
 }
 
 type CreateIdentityRequest struct {
