@@ -5,7 +5,6 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -53,31 +52,6 @@ type IntegrationAWSParameterStoreResourceModel struct {
 	AWSRegion         types.String `tfsdk:"aws_region"`
 
 	Options types.Object `tfsdk:"options"`
-}
-
-func extractOptionsParameterStore(ctx context.Context, diagnostics *diag.Diagnostics, inputOptions types.Object) (parsedOptions AwsParameterStoreMetadataStruct, hasError bool) {
-	metadata := AwsParameterStoreMetadataStruct{}
-
-	if !inputOptions.IsNull() && !inputOptions.IsUnknown() {
-		var options AwsParameterStoreOptions
-		diags := inputOptions.As(ctx, &options, basetypes.ObjectAsOptions{})
-		diagnostics.Append(diags...)
-		if diagnostics.HasError() {
-			return AwsParameterStoreMetadataStruct{}, true
-		}
-
-		// Load AWS tags into metadata
-		for _, tag := range options.AwsTags {
-			metadata.SecretAWSTag = append(metadata.SecretAWSTag, infisical.AwsTag{
-				Key:   tag.Key,
-				Value: tag.Value,
-			})
-		}
-
-		metadata.ShouldDisableDelete = options.ShouldDisableDelete
-	}
-
-	return metadata, false
 }
 
 // Metadata returns the resource type name.
