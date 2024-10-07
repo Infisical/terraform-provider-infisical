@@ -29,14 +29,16 @@ provider "infisical" {
 }
 
 resource "infisical_project" "example" {
-  name = "example"
-  slug = "example"
+  name     = "example"
+  slug     = "example"
+  position = 1 # Optional
 }
 
 resource "infisical_project_environment" "pre-prod" {
   name       = "pre-prod"
   project_id = infisical_project.example.id
   slug       = "preprod"
+  position   = 2 # Optional
 }
 ```
 
@@ -48,6 +50,10 @@ resource "infisical_project_environment" "pre-prod" {
 - `name` (String) The name of the environment
 - `project_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 - `slug` (String) The slug of the environment
+
+### Optional
+
+- `position` (Number) The position of the environment
 
 ### Read-Only
 

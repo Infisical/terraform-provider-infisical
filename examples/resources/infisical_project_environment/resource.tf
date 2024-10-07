@@ -14,12 +14,14 @@ provider "infisical" {
 }
 
 resource "infisical_project" "example" {
-  name = "example"
-  slug = "example"
+  name     = "example"
+  slug     = "example"
+  position = 1 # Optional
 }
 
 resource "infisical_project_environment" "pre-prod" {
   name       = "pre-prod"
   project_id = infisical_project.example.id
   slug       = "preprod"
+  position   = 2 # Optional
 }
