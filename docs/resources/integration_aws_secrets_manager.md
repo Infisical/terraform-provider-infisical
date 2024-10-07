@@ -58,11 +58,11 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
 
 ### Required
 
-- `access_key_id` (String, Sensitive) The AWS access key ID.
-- `aws_region` (String) The AWS region to sync secrets to.
+- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager.
+- `aws_region` (String) The AWS region to sync secrets to. (us-east-1, us-east-2, etc)
 - `environment` (String) The slug of the environment to sync to AWS Secrets Manager (prod, dev, staging, etc).
 - `project_id` (String) The ID of your Infisical project.
-- `secret_access_key` (String, Sensitive) The AWS secret access key.
+- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager.
 - `secret_path` (String) The secret path in Infisical to sync secrets from.
 
 ### Optional
@@ -81,7 +81,7 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
 
 Optional:
 
-- `aws_tags` (Attributes List) Tags to attach to the AWS Secrets Manager secrets. (see [below for nested schema](#nestedatt--options--aws_tags))
+- `aws_tags` (Attributes Set) Tags to attach to the AWS Secrets Manager secrets. (see [below for nested schema](#nestedatt--options--aws_tags))
 - `secret_prefix` (String) The prefix to add to the secret name in AWS Secrets Manager.
 
 <a id="nestedatt--options--aws_tags"></a>

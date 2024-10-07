@@ -58,12 +58,12 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
 
 ### Required
 
-- `access_key_id` (String, Sensitive) The AWS access key ID.
-- `aws_region` (String) The AWS region to sync secrets to.
+- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager.
+- `aws_region` (String) The AWS region to sync secrets to. (us-east-1, us-east-2, etc)
 - `environment` (String) The slug of the environment to sync to AWS Parameter Store (prod, dev, staging, etc).
 - `parameter_store_path` (String) The path in AWS Parameter Store to sync secrets to.
 - `project_id` (String) The ID of your Infisical project.
-- `secret_access_key` (String, Sensitive) The AWS secret access key.
+- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager.
 - `secret_path` (String) The secret path in Infisical to sync secrets from.
 
 ### Optional
@@ -80,7 +80,7 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
 
 Optional:
 
-- `aws_tags` (Attributes List) Tags to attach to the AWS parameter store secrets. (see [below for nested schema](#nestedatt--options--aws_tags))
+- `aws_tags` (Attributes Set) Tags to attach to the AWS parameter store secrets. (see [below for nested schema](#nestedatt--options--aws_tags))
 - `should_disable_delete` (Boolean) Whether to disable deletion of existing secrets in AWS Parameter Store.
 
 <a id="nestedatt--options--aws_tags"></a>
