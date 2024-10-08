@@ -5,9 +5,10 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -37,7 +38,7 @@ type AwsSecretsManagerMetadataStruct struct {
 
 type AwsSecretsManagerOptions struct {
 	AwsTags      []infisical.AwsTag `tfsdk:"aws_tags" json:"secretAWSTag,omitempty"`
-	SecretPrefix string             `tfsdk:"secret_prefix"`
+	SecretPrefix *string            `tfsdk:"secret_prefix"`
 }
 
 // projectResourceSourceModel describes the data source data model.
@@ -62,24 +63,6 @@ type IntegrationAWSSecretsManagerResourceModel struct {
 const MAPPING_BEHAVIOR_MANY_TO_ONE = "many-to-one"
 const MAPPING_BEHAVIOR_ONE_TO_ONE = "one-to-one"
 
-func extractSecretsManagerMetadata(ctx context.Context, diagnostics *diag.Diagnostics, inputOptions types.Object) (parsedOptions AwsSecretsManagerMetadataStruct, hasError bool) {
-	metadata := AwsSecretsManagerMetadataStruct{}
-
-	if !inputOptions.IsNull() && !inputOptions.IsUnknown() {
-		var options AwsSecretsManagerOptions
-		diags := inputOptions.As(ctx, &options, basetypes.ObjectAsOptions{})
-		diagnostics.Append(diags...)
-		if diagnostics.HasError() {
-			return AwsSecretsManagerMetadataStruct{}, true
-		}
-
-		metadata.SecretAWSTag = options.AwsTags
-		metadata.SecretPrefix = options.SecretPrefix
-	}
-
-	return metadata, false
-}
-
 // Metadata returns the resource type name.
 func (r *IntegrationAWSSecretsManagerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_integration_aws_secrets_manager"
@@ -93,6 +76,19 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",
 				Optional:    true,
+				Computed:    true,
+				Default: objectdefault.StaticValue(
+					types.ObjectValueMust(
+						map[string]attr.Type{
+							"secret_prefix": types.StringType,
+							"aws_tags":      types.SetType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}},
+						},
+						map[string]attr.Value{
+							"secret_prefix": types.StringValue(""),
+							"aws_tags":      types.SetNull(types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}),
+						},
+					),
+				),
 				Attributes: map[string]schema.Attribute{
 					"secret_prefix": schema.StringAttribute{
 						Optional:    true,
@@ -252,12 +248,6 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		return
 	}
 
-	parsedOptions, hasError := extractSecretsManagerMetadata(ctx, &resp.Diagnostics, plan.Options)
-
-	if hasError {
-		return
-	}
-
 	var planOptions AwsSecretsManagerOptions
 
 	if !plan.Options.IsNull() {
@@ -269,10 +259,20 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 	}
 
 	// Convert metadata to map[string]interface{} if needed
-	metadataMap := map[string]interface{}{
-		"secretAWSTag":    planOptions.AwsTags,
-		"mappingBehavior": plan.MappingBehavior.ValueString(),
-		"secretPrefix":    parsedOptions.SecretPrefix,
+	metadataMap := map[string]interface{}{}
+
+	metadataMap["mappingBehavior"] = plan.MappingBehavior.ValueString()
+
+	if planOptions.SecretPrefix != nil {
+		metadataMap["secretPrefix"] = *planOptions.SecretPrefix
+	} else {
+		metadataMap["secretPrefix"] = ""
+	}
+
+	if planOptions.AwsTags != nil {
+		metadataMap["secretAWSTag"] = planOptions.AwsTags
+	} else {
+		metadataMap["secretAWSTag"] = []infisical.AwsTag{}
 	}
 
 	request := infisical.CreateIntegrationRequest{
@@ -354,8 +354,13 @@ func (r *IntegrationAWSSecretsManagerResource) Read(ctx context.Context, req res
 		}
 	}
 
-	planOptions.SecretPrefix = integration.Integration.Metadata.SecretPrefix
-	planOptions.AwsTags = integration.Integration.Metadata.SecretAWSTag
+	if (planOptions.SecretPrefix != nil && integration.Integration.Metadata.SecretPrefix != *planOptions.SecretPrefix) || integration.Integration.Metadata.SecretPrefix != "" {
+		planOptions.SecretPrefix = &integration.Integration.Metadata.SecretPrefix
+	}
+
+	if integration.Integration.Metadata.SecretAWSTag != nil && len(integration.Integration.Metadata.SecretAWSTag) > 0 {
+		planOptions.AwsTags = integration.Integration.Metadata.SecretAWSTag
+	}
 
 	// Create a new types.Object from the modified planOptions
 	optionsObj, diags := types.ObjectValueFrom(ctx, state.Options.AttributeTypes(ctx), planOptions)
@@ -414,13 +419,21 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 	}
 
 	// Convert metadata to map[string]interface{} if needed
-	metadataMap := map[string]interface{}{
-		"secretPrefix": planOptions.SecretPrefix,
-		"secretAWSTag": planOptions.AwsTags,
+	metadataMap := map[string]interface{}{}
+
+	if planOptions.SecretPrefix != nil {
+		metadataMap["secretPrefix"] = planOptions.SecretPrefix
+	} else {
+		metadataMap["secretPrefix"] = ""
+	}
+	if planOptions.AwsTags != nil {
+		metadataMap["secretAWSTag"] = planOptions.AwsTags
+	} else {
+		metadataMap["secretAWSTag"] = []infisical.AwsTag{}
 	}
 
 	// Update the integration
-	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		ID:          state.IntegrationID.ValueString(),
 		Metadata:    metadataMap,
 		Environment: plan.Environment.ValueString(),
@@ -434,6 +447,13 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		)
 		return
 	}
+
+	plan.Options = plan.Options
+	plan.SecretPath = types.StringValue(updatedIntegration.Integration.SecretPath)
+	plan.IntegrationAuthID = types.StringValue(updatedIntegration.Integration.IntegrationAuthID)
+	plan.Environment = types.StringValue(updatedIntegration.Integration.Environment.Slug)
+
+	diags = resp.State.Set(ctx, plan)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

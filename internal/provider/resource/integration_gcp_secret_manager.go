@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -60,6 +61,19 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",
 				Optional:    true,
+				Computed:    true,
+				Default: objectdefault.StaticValue(
+					types.ObjectValueMust(
+						map[string]attr.Type{
+							"secret_prefix": types.StringType,
+							"secret_suffix": types.StringType,
+						},
+						map[string]attr.Value{
+							"secret_prefix": types.StringValue(""),
+							"secret_suffix": types.StringValue(""),
+						},
+					),
+				),
 				Attributes: map[string]schema.Attribute{
 					"secret_prefix": schema.StringAttribute{
 						Description: "The prefix to add to the secret name in GCP Secret Manager.",
@@ -273,46 +287,41 @@ func (r *IntegrationGCPSecretManagerResource) Read(ctx context.Context, req reso
 		}
 	}
 
-	updateNeeded := false
-
 	if integration.Integration.Metadata.SecretPrefix != planOptions.SecretPrefix.ValueString() {
 		planOptions.SecretPrefix = types.StringValue(integration.Integration.Metadata.SecretPrefix)
-		updateNeeded = true
 	}
 
 	if planOptions.SecretSuffix.ValueString() != integration.Integration.Metadata.SecretSuffix {
 		planOptions.SecretSuffix = types.StringValue(integration.Integration.Metadata.SecretSuffix)
-		updateNeeded = true
 	}
 
-	if updateNeeded {
-		// Create a map of the updated options
-		optionsMap := map[string]attr.Value{
-			"secret_prefix": planOptions.SecretPrefix,
-			"secret_suffix": planOptions.SecretSuffix,
-		}
-
-		// Create a new types.Object with the updated options
-		newOptions, diags := types.ObjectValue(
-			map[string]attr.Type{
-				"secret_prefix": types.StringType,
-				"secret_suffix": types.StringType,
-			},
-			optionsMap,
-		)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// Set the new options in the state
-		state.Options = newOptions
+	// Create a map of the updated options
+	optionsMap := map[string]attr.Value{
+		"secret_prefix": planOptions.SecretPrefix,
+		"secret_suffix": planOptions.SecretSuffix,
 	}
+
+	// Create a new types.Object with the updated options
+	newOptions, diags := types.ObjectValue(
+		map[string]attr.Type{
+			"secret_prefix": types.StringType,
+			"secret_suffix": types.StringType,
+		},
+		optionsMap,
+	)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Set the new options in the state
+	state.Options = newOptions
 
 	// Set the state.Options.
 	state.GCPProjectID = types.StringValue(integration.Integration.AppID)
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
 	state.IntegrationAuthID = types.StringValue(integration.Integration.IntegrationAuthID)
+	state.Environment = types.StringValue(integration.Integration.Environment.Slug)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
