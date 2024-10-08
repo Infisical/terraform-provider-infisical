@@ -317,7 +317,7 @@ func (r *IntegrationAWSParameterStoreResource) Read(ctx context.Context, req res
 		planOptions.ShouldDisableDelete = &integration.Integration.Metadata.ShouldDisableDelete
 	}
 
-	if integration.Integration.Metadata.SecretAWSTag != nil && len(integration.Integration.Metadata.SecretAWSTag) > 0 {
+	if len(integration.Integration.Metadata.SecretAWSTag) > 0 {
 		planOptions.AwsTags = integration.Integration.Metadata.SecretAWSTag
 	}
 
@@ -403,7 +403,6 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		return
 	}
 
-	plan.Options = plan.Options
 	plan.SecretPath = types.StringValue(updatedIntegration.Integration.SecretPath)
 	plan.IntegrationAuthID = types.StringValue(updatedIntegration.Integration.IntegrationAuthID)
 	plan.Environment = types.StringValue(updatedIntegration.Integration.Environment.Slug)

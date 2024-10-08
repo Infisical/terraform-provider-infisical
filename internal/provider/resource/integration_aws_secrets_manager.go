@@ -358,7 +358,7 @@ func (r *IntegrationAWSSecretsManagerResource) Read(ctx context.Context, req res
 		planOptions.SecretPrefix = &integration.Integration.Metadata.SecretPrefix
 	}
 
-	if integration.Integration.Metadata.SecretAWSTag != nil && len(integration.Integration.Metadata.SecretAWSTag) > 0 {
+	if len(integration.Integration.Metadata.SecretAWSTag) > 0 {
 		planOptions.AwsTags = integration.Integration.Metadata.SecretAWSTag
 	}
 
@@ -448,12 +448,9 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		return
 	}
 
-	plan.Options = plan.Options
 	plan.SecretPath = types.StringValue(updatedIntegration.Integration.SecretPath)
 	plan.IntegrationAuthID = types.StringValue(updatedIntegration.Integration.IntegrationAuthID)
 	plan.Environment = types.StringValue(updatedIntegration.Integration.Environment.Slug)
-
-	diags = resp.State.Set(ctx, plan)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
