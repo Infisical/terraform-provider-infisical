@@ -303,13 +303,13 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 
 		conditions := &projectRoleResourcePermissionCondition{}
 
-		if environment != "" || secretPath != "" {
+		if el["conditions"] == nil {
+			conditions = nil
+		} else {
 			conditions = &projectRoleResourcePermissionCondition{
 				Environment: types.StringValue(environment),
 				SecretPath:  types.StringValue(secretPath),
 			}
-		} else if el["conditions"] == nil {
-			conditions = nil
 		}
 
 		permissionPlan = append(permissionPlan, projectRoleResourcePermissions{
