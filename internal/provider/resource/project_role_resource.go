@@ -301,13 +301,21 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 			}
 		}
 
-		permissionPlan = append(permissionPlan, projectRoleResourcePermissions{
-			Action:  types.StringValue(action),
-			Subject: types.StringValue(subject),
-			Conditions: &projectRoleResourcePermissionCondition{
+		conditions := &projectRoleResourcePermissionCondition{}
+
+		if environment != "" || secretPath != "" {
+			conditions = &projectRoleResourcePermissionCondition{
 				Environment: types.StringValue(environment),
 				SecretPath:  types.StringValue(secretPath),
-			},
+			}
+		} else if el["conditions"] == nil {
+			conditions = nil
+		}
+
+		permissionPlan = append(permissionPlan, projectRoleResourcePermissions{
+			Action:     types.StringValue(action),
+			Subject:    types.StringValue(subject),
+			Conditions: conditions,
 		})
 	}
 
