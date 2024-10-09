@@ -301,7 +301,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 			}
 		}
 
-		conditions := &projectRoleResourcePermissionCondition{}
+		var conditions *projectRoleResourcePermissionCondition
 
 		if el["conditions"] == nil {
 			conditions = nil
