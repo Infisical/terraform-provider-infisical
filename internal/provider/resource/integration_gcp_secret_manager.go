@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -19,7 +20,7 @@ var (
 	_ resource.Resource = &IntegrationGCPSecretManagerResource{}
 )
 
-// NewProjectResource is a helper function to simplify the provider implementation.
+// NewIntegrationGcpSecretManagerResource is a helper function to simplify the provider implementation.
 func NewIntegrationGcpSecretManagerResource() resource.Resource {
 	return &IntegrationGCPSecretManagerResource{}
 }
@@ -31,7 +32,6 @@ type IntegrationGCPSecretManagerResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type IntegrationGCPSecretManagerResourceModel struct {
-	EnvironmentID      types.String `tfsdk:"env_id"`
 	IntegrationAuthID  types.String `tfsdk:"integration_auth_id"`
 	IntegrationID      types.String `tfsdk:"integration_id"`
 	ServiceAccountJson types.String `tfsdk:"service_account_json"`
@@ -41,6 +41,11 @@ type IntegrationGCPSecretManagerResourceModel struct {
 	GCPProjectID       types.String `tfsdk:"gcp_project_id"`
 
 	Options types.Object `tfsdk:"options"`
+}
+
+type GcpIntegrationMetadataStruct struct {
+	SecretPrefix string `json:"secretPrefix,omitempty"`
+	SecretSuffix string `json:"secretSuffix,omitempty"`
 }
 
 // Metadata returns the resource type name.
@@ -56,6 +61,19 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",
 				Optional:    true,
+				Computed:    true,
+				Default: objectdefault.StaticValue(
+					types.ObjectValueMust(
+						map[string]attr.Type{
+							"secret_prefix": types.StringType,
+							"secret_suffix": types.StringType,
+						},
+						map[string]attr.Value{
+							"secret_prefix": types.StringValue(""),
+							"secret_suffix": types.StringValue(""),
+						},
+					),
+				),
 				Attributes: map[string]schema.Attribute{
 					"secret_prefix": schema.StringAttribute{
 						Description: "The prefix to add to the secret name in GCP Secret Manager.",
@@ -74,12 +92,6 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 
-			"env_id": schema.StringAttribute{
-				Computed:      true,
-				Description:   "The ID of the environment, used internally by Infisical.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-
 			"integration_id": schema.StringAttribute{
 				Computed:      true,
 				Description:   "The ID of the integration, used internally by Infisical.",
@@ -87,14 +99,16 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 			},
 
 			"service_account_json": schema.StringAttribute{
-				Sensitive:   true,
-				Required:    true,
-				Description: "Service account json for the GCP project.",
+				Sensitive:     true,
+				Required:      true,
+				Description:   "Service account json for the GCP project.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of your Infisical project.",
+				Required:      true,
+				Description:   "The ID of your Infisical project.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"environment": schema.StringAttribute{
@@ -108,8 +122,9 @@ func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resour
 			},
 
 			"gcp_project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of the GCP project.",
+				Required:      true,
+				Description:   "The ID of the GCP project.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
 	}
@@ -168,7 +183,7 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 		return
 	}
 
-	metadata := infisical.IntegrationMetadata{}
+	metadata := GcpIntegrationMetadataStruct{}
 
 	if !plan.Options.IsNull() && !plan.Options.IsUnknown() {
 		var options struct {
@@ -190,6 +205,11 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 		}
 	}
 
+	metadataMap := map[string]interface{}{
+		"secretPrefix": metadata.SecretPrefix,
+		"secretSuffix": metadata.SecretSuffix,
+	}
+
 	// Create the integration
 	integration, err := r.client.CreateIntegration(infisical.CreateIntegrationRequest{
 		IntegrationAuthID: auth.IntegrationAuth.ID,
@@ -197,7 +217,7 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 		AppID:             plan.GCPProjectID.ValueString(),
 		SecretPath:        plan.SecretPath.ValueString(),
 		SourceEnvironment: plan.Environment.ValueString(),
-		Metadata:          metadata,
+		Metadata:          metadataMap,
 	})
 
 	if err != nil {
@@ -212,7 +232,6 @@ func (r *IntegrationGCPSecretManagerResource) Create(ctx context.Context, req re
 
 	plan.IntegrationAuthID = types.StringValue(auth.IntegrationAuth.ID)
 	plan.IntegrationID = types.StringValue(integration.Integration.ID)
-	plan.EnvironmentID = types.StringValue(integration.Integration.EnvID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -268,47 +287,41 @@ func (r *IntegrationGCPSecretManagerResource) Read(ctx context.Context, req reso
 		}
 	}
 
-	updateNeeded := false
-
 	if integration.Integration.Metadata.SecretPrefix != planOptions.SecretPrefix.ValueString() {
 		planOptions.SecretPrefix = types.StringValue(integration.Integration.Metadata.SecretPrefix)
-		updateNeeded = true
 	}
 
 	if planOptions.SecretSuffix.ValueString() != integration.Integration.Metadata.SecretSuffix {
 		planOptions.SecretSuffix = types.StringValue(integration.Integration.Metadata.SecretSuffix)
-		updateNeeded = true
 	}
 
-	if updateNeeded {
-		// Create a map of the updated options
-		optionsMap := map[string]attr.Value{
-			"secret_prefix": planOptions.SecretPrefix,
-			"secret_suffix": planOptions.SecretSuffix,
-		}
-
-		// Create a new types.Object with the updated options
-		newOptions, diags := types.ObjectValue(
-			map[string]attr.Type{
-				"secret_prefix": types.StringType,
-				"secret_suffix": types.StringType,
-			},
-			optionsMap,
-		)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// Set the new options in the state
-		state.Options = newOptions
+	// Create a map of the updated options
+	optionsMap := map[string]attr.Value{
+		"secret_prefix": planOptions.SecretPrefix,
+		"secret_suffix": planOptions.SecretSuffix,
 	}
+
+	// Create a new types.Object with the updated options
+	newOptions, diags := types.ObjectValue(
+		map[string]attr.Type{
+			"secret_prefix": types.StringType,
+			"secret_suffix": types.StringType,
+		},
+		optionsMap,
+	)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Set the new options in the state
+	state.Options = newOptions
 
 	// Set the state.Options.
 	state.GCPProjectID = types.StringValue(integration.Integration.AppID)
 	state.SecretPath = types.StringValue(integration.Integration.SecretPath)
-	state.EnvironmentID = types.StringValue(integration.Integration.EnvID)
 	state.IntegrationAuthID = types.StringValue(integration.Integration.IntegrationAuthID)
+	state.Environment = types.StringValue(integration.Integration.Environment.Slug)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -358,18 +371,19 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 	}
 	plan.Options.As(ctx, &options, basetypes.ObjectAsOptions{})
 
-	metadata := infisical.IntegrationMetadata{}
-	metadata.SecretPrefix = options.SecretPrefix.ValueString()
-	metadata.SecretSuffix = options.SecretSuffix.ValueString()
+	metadataMap := map[string]interface{}{
+		"secretPrefix": options.SecretPrefix.ValueString(),
+		"secretSuffix": options.SecretSuffix.ValueString(),
+	}
 
-	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		IsActive:    true,
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
 		App:         plan.GCPProjectID.ValueString(),
 		AppID:       plan.GCPProjectID.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
-		Metadata:    metadata,
+		Metadata:    metadataMap,
 	})
 
 	if err != nil {
@@ -379,8 +393,6 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		)
 		return
 	}
-
-	plan.EnvironmentID = types.StringValue(updatedIntegration.Integration.EnvID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

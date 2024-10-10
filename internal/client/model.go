@@ -1464,6 +1464,8 @@ type RevokeIdentityKubernetesAuthResponse struct {
 }
 
 type CreateIntegrationAuthRequest struct {
+	AccessId     string              `json:"accessId"`
+	AccessToken  string              `json:"accessToken"`
 	RefreshToken string              `json:"refreshToken"`
 	ProjectID    string              `json:"workspaceId"`
 	Integration  IntegrationAuthType `json:"integration"`
@@ -1485,6 +1487,11 @@ type DeleteIntegrationAuthResponse struct {
 	} `json:"integrationAuth"`
 }
 
+type AwsTag struct {
+	Key   string `tfsdk:"key" json:"key,omitempty"`
+	Value string `tfsdk:"value" json:"value,omitempty"`
+}
+
 type IntegrationMetadata struct {
 	InitialSyncBehavior string `json:"initialSyncBehavior,omitempty"`
 	SecretPrefix        string `json:"secretPrefix"`
@@ -1495,10 +1502,7 @@ type IntegrationMetadata struct {
 		LabelName  string `json:"labelName,omitempty"`
 		LabelValue string `json:"labelValue,omitempty"`
 	} `json:"secretGCPLabel,omitempty"`
-	SecretAWSTag []struct {
-		Key   string `json:"key,omitempty"`
-		Value string `json:"value,omitempty"`
-	} `json:"secretAWSTag,omitempty"`
+	SecretAWSTag []AwsTag `json:"secretAWSTag,omitempty"`
 
 	GithubVisibility        string   `json:"githubVisibility,omitempty"`
 	GithubVisibilityRepoIDs []string `json:"githubVisibilityRepoIds,omitempty"`
@@ -1524,7 +1528,7 @@ type CreateIntegrationRequest struct {
 	Region              string `json:"region,omitempty"`
 	Scope               string `json:"scope,omitempty"`
 
-	Metadata IntegrationMetadata `json:"metadata,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type Integration struct {
@@ -1546,6 +1550,12 @@ type Integration struct {
 	IntegrationAuthID   string              `json:"integrationAuthId"`
 	EnvID               string              `json:"envId"`
 	SecretPath          string              `json:"secretPath"`
+
+	Environment struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Slug string `json:"slug"`
+	} `json:"environment"`
 }
 
 type CreateIntegrationResponse struct {
@@ -1562,14 +1572,14 @@ type GetIntegrationResponse struct {
 
 type UpdateIntegrationRequest struct {
 	ID                string
-	App               string              `json:"app,omitempty"`
-	AppID             string              `json:"appId,omitempty"`
-	SecretPath        string              `json:"secretPath,omitempty"`
-	TargetEnvironment string              `json:"targetEnvironment,omitempty"`
-	Owner             string              `json:"owner,omitempty"`
-	Environment       string              `json:"environment,omitempty"`
-	Metadata          IntegrationMetadata `json:"metadata,omitempty"`
-	IsActive          bool                `json:"isActive"`
+	App               string                 `json:"app,omitempty"`
+	AppID             string                 `json:"appId,omitempty"`
+	SecretPath        string                 `json:"secretPath,omitempty"`
+	TargetEnvironment string                 `json:"targetEnvironment,omitempty"`
+	Owner             string                 `json:"owner,omitempty"`
+	Environment       string                 `json:"environment,omitempty"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+	IsActive          bool                   `json:"isActive"`
 }
 
 type UpdateIntegrationResponse struct {
