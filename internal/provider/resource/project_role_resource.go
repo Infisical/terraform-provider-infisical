@@ -6,12 +6,15 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -66,6 +69,9 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"slug": schema.StringAttribute{
 				Description: "The slug for the new role",
 				Required:    true,
+				Validators: []validator.String{
+					infisicaltf.LowercaseRegexValidator,
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name for the new role",

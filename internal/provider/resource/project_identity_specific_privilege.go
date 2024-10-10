@@ -6,6 +6,8 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
+
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -14,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -82,6 +85,9 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 				Description: "The slug for the new privilege",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					infisicaltf.LowercaseRegexValidator,
+				},
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the privilege",

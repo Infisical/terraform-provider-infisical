@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -53,6 +55,9 @@ func (r *projectEnvironmentResource) Schema(_ context.Context, _ resource.Schema
 			"slug": schema.StringAttribute{
 				Description: "The slug of the environment",
 				Required:    true,
+				Validators: []validator.String{
+					infisicaltf.LowercaseRegexValidator,
+				},
 			},
 			"project_id": schema.StringAttribute{
 				Description:   "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
