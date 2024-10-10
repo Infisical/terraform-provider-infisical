@@ -56,7 +56,7 @@ func (r *projectEnvironmentResource) Schema(_ context.Context, _ resource.Schema
 				Description: "The slug of the environment",
 				Required:    true,
 				Validators: []validator.String{
-					infisicaltf.LowercaseRegexValidator,
+					infisicaltf.SlugRegexValidator,
 				},
 			},
 			"project_id": schema.StringAttribute{

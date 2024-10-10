@@ -70,7 +70,7 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The slug for the new role",
 				Required:    true,
 				Validators: []validator.String{
-					infisicaltf.LowercaseRegexValidator,
+					infisicaltf.SlugRegexValidator,
 				},
 			},
 			"name": schema.StringAttribute{

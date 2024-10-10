@@ -53,7 +53,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The slug of the project",
 				Required:    true,
 				Validators: []validator.String{
-					infisicaltf.LowercaseRegexValidator,
+					infisicaltf.SlugRegexValidator,
 				},
 			},
 			"name": schema.StringAttribute{

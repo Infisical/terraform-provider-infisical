@@ -48,7 +48,7 @@ func (r *projectSecretTagResource) Schema(_ context.Context, _ resource.SchemaRe
 				Description: "The slug for the new tag",
 				Required:    true,
 				Validators: []validator.String{
-					infisicaltf.LowercaseRegexValidator,
+					infisicaltf.SlugRegexValidator,
 				},
 			},
 			"name": schema.StringAttribute{

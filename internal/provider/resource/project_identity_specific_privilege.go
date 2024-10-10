@@ -86,7 +86,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
-					infisicaltf.LowercaseRegexValidator,
+					infisicaltf.SlugRegexValidator,
 				},
 			},
 			"id": schema.StringAttribute{

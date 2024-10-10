@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 )
 
-var LowercaseRegexValidator = stringvalidator.RegexMatches(
-	regexp.MustCompile(`^(([^a-zA-Z0-9])|([a-z0-9]))*$`),
-	"alphanumeric characters must be lowercase",
+var SlugRegexValidator = stringvalidator.RegexMatches(
+	regexp.MustCompile(`^[a-z0-9_-]*$`),
+	"invalid slug, slugs must be lowercase alphanumeric characters and hyphens only (example-slug-1)",
 )
