@@ -5,11 +5,13 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -45,6 +47,9 @@ func (r *projectSecretTagResource) Schema(_ context.Context, _ resource.SchemaRe
 			"slug": schema.StringAttribute{
 				Description: "The slug for the new tag",
 				Required:    true,
+				Validators: []validator.String{
+					infisicaltf.SlugRegexValidator,
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name for the new tag",
