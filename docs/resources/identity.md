@@ -115,7 +115,7 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 
 ### Optional
 
-- `auth_mode` (String) The authentication type of the identity
+- `auth_modes` (List of String) The authentication types of the identity
 
 ### Read-Only
 

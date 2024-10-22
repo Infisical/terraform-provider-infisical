@@ -84,6 +84,6 @@ Read-Only:
 
 Read-Only:
 
-- `auth_method` (String) The auth method for the identity
+- `auth_methods` (List of String) The auth methods for the identity
 - `id` (String) The ID of the identity
 - `name` (String) The name of the identity
