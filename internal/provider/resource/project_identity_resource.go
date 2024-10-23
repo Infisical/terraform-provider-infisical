@@ -6,6 +6,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -40,9 +41,9 @@ type ProjectIdentityResourceModel struct {
 }
 
 type ProjectIdentityDetails struct {
-	ID         types.String `tfsdk:"id"`
-	Name       types.String `tfsdk:"name"`
-	AuthMethod types.String `tfsdk:"auth_method"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	AuthMethods types.List   `tfsdk:"auth_methods"`
 }
 
 type ProjectIdentityRole struct {
@@ -92,8 +93,9 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 						Description: "The name of the identity",
 						Computed:    true,
 					},
-					"auth_method": schema.StringAttribute{
-						Description: "The auth method for the identity",
+					"auth_methods": schema.ListAttribute{
+						ElementType: types.StringType,
+						Description: "The auth methods for the identity",
 						Computed:    true,
 					},
 				},
@@ -290,10 +292,16 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	identityDetails := ProjectIdentityDetails{
-		ID:         types.StringValue(projectIdentityDetails.Membership.Identity.Id),
-		Name:       types.StringValue(projectIdentityDetails.Membership.Identity.Name),
-		AuthMethod: types.StringValue(projectIdentityDetails.Membership.Identity.AuthMethod),
+		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
 	}
+
+	elements := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
+	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
+		elements[i] = types.StringValue(method)
+	}
+	identityDetails.AuthMethods = types.ListValueMust(types.StringType, elements)
+
 	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -363,10 +371,16 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	identityDetails := ProjectIdentityDetails{
-		ID:         types.StringValue(projectIdentityDetails.Membership.Identity.Id),
-		Name:       types.StringValue(projectIdentityDetails.Membership.Identity.Name),
-		AuthMethod: types.StringValue(projectIdentityDetails.Membership.Identity.AuthMethod),
+		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
 	}
+
+	elements := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
+	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
+		elements[i] = types.StringValue(method)
+	}
+	identityDetails.AuthMethods = types.ListValueMust(types.StringType, elements)
+
 	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -512,10 +526,16 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	identityDetails := ProjectIdentityDetails{
-		ID:         types.StringValue(projectIdentityDetails.Membership.Identity.Id),
-		Name:       types.StringValue(projectIdentityDetails.Membership.Identity.Name),
-		AuthMethod: types.StringValue(projectIdentityDetails.Membership.Identity.AuthMethod),
+		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
 	}
+
+	elements := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
+	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
+		elements[i] = types.StringValue(method)
+	}
+	identityDetails.AuthMethods = types.ListValueMust(types.StringType, elements)
+
 	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

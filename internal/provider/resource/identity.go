@@ -6,6 +6,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -25,11 +26,11 @@ type IdentityResource struct {
 
 // IdentityResourceSourceModel describes the data source data model.
 type IdentityResourceModel struct {
-	ID       types.String `tfsdk:"id"`
-	Name     types.String `tfsdk:"name"`
-	AuthMode types.String `tfsdk:"auth_mode"`
-	Role     types.String `tfsdk:"role"`
-	OrgID    types.String `tfsdk:"org_id"`
+	ID        types.String `tfsdk:"id"`
+	Name      types.String `tfsdk:"name"`
+	AuthModes types.List   `tfsdk:"auth_modes"`
+	Role      types.String `tfsdk:"role"`
+	OrgID     types.String `tfsdk:"org_id"`
 }
 
 // Metadata returns the resource type name.
@@ -61,10 +62,10 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 
-			"auth_mode": schema.StringAttribute{
-				Description: "The authentication type of the identity",
+			"auth_modes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The authentication types of the identity",
 				Computed:    true,
-				Optional:    true,
 			},
 		},
 	}
@@ -123,10 +124,14 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.ID = types.StringValue(newIdentity.Identity.ID)
-	if newIdentity.Identity.AuthMethod != "" {
-		plan.AuthMode = types.StringValue(newIdentity.Identity.AuthMethod)
+	if len(newIdentity.Identity.AuthMethods) > 0 {
+		elements := make([]attr.Value, len(newIdentity.Identity.AuthMethods))
+		for i, method := range newIdentity.Identity.AuthMethods {
+			elements[i] = types.StringValue(method)
+		}
+		plan.AuthModes = types.ListValueMust(types.StringType, elements)
 	} else {
-		plan.AuthMode = types.StringNull()
+		plan.AuthModes = types.ListNull(types.StringType)
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -174,10 +179,14 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	state.Name = types.StringValue(orgIdentity.Identity.Name)
-	if orgIdentity.Identity.AuthMethod != "" {
-		state.AuthMode = types.StringValue(orgIdentity.Identity.AuthMethod)
+	if len(orgIdentity.Identity.AuthMethods) > 0 {
+		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
+		for i, method := range orgIdentity.Identity.AuthMethods {
+			elements[i] = types.StringValue(method)
+		}
+		state.AuthModes = types.ListValueMust(types.StringType, elements)
 	} else {
-		state.AuthMode = types.StringNull()
+		state.AuthModes = types.ListNull(types.StringType)
 	}
 
 	if orgIdentity.CustomRole != nil {
@@ -232,10 +241,14 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	if orgIdentity.Identity.AuthMethod != "" {
-		plan.AuthMode = types.StringValue(orgIdentity.Identity.AuthMethod)
+	if len(orgIdentity.Identity.AuthMethods) > 0 {
+		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
+		for i, method := range orgIdentity.Identity.AuthMethods {
+			elements[i] = types.StringValue(method)
+		}
+		plan.AuthModes = types.ListValueMust(types.StringType, elements)
 	} else {
-		plan.AuthMode = types.StringNull()
+		plan.AuthModes = types.ListNull(types.StringType)
 	}
 
 	diags = resp.State.Set(ctx, plan)
