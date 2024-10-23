@@ -66,7 +66,6 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				ElementType: types.StringType,
 				Description: "The authentication types of the identity",
 				Computed:    true,
-				Optional:    true,
 			},
 		},
 	}
