@@ -296,14 +296,20 @@ func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resou
 	// Remove leading and trailing slashes.
 	trimmedPath := strings.Trim(folder.Folder.Path, "/")
 	var name string
+	parentFolderPath := "/"
 
 	if trimmedPath != "" {
 		// Split the path and get the last element as the name.
 		pathParts := strings.Split(trimmedPath, "/")
 		name = pathParts[len(pathParts)-1]
+		if len(pathParts) > 1 {
+			// At the moment, the folder path returned by GetByID includes the folder being queried.
+			// We want to be consistent with the create conventions, so we remove the last part
+			parentFolderPath += strings.Join(pathParts[:len(pathParts)-1], "/")
+		}
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), folder.Folder.Path)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), parentFolderPath)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), folder.Folder.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_slug"), folder.Folder.Environment.EnvSlug)...)
