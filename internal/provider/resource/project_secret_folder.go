@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
@@ -293,20 +294,18 @@ func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resou
 		return
 	}
 
+	// At the moment, the folder path returned by GetByID includes the folder being queried.
+	// We want to be consistent with the create conventions, so we remove the last part
+	parentFolderPath := filepath.Dir(folder.Folder.Path)
+
 	// Remove leading and trailing slashes.
 	trimmedPath := strings.Trim(folder.Folder.Path, "/")
 	var name string
-	parentFolderPath := "/"
 
 	if trimmedPath != "" {
 		// Split the path and get the last element as the name.
 		pathParts := strings.Split(trimmedPath, "/")
 		name = pathParts[len(pathParts)-1]
-		if len(pathParts) > 1 {
-			// At the moment, the folder path returned by GetByID includes the folder being queried.
-			// We want to be consistent with the create conventions, so we remove the last part
-			parentFolderPath += strings.Join(pathParts[:len(pathParts)-1], "/")
-		}
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), parentFolderPath)...)
