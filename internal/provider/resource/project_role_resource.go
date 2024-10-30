@@ -253,7 +253,26 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 	for _, el := range projectRole.Role.Permissions {
 		action, isValid := el["action"].(string)
 		if el["action"] != nil && !isValid {
-			action, isValid = el["action"].([]any)[0].(string)
+			actions, isValid := el["action"].([]any)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error reading project role",
+					"Couldn't read project role from Infiscial, invalid action field in permission",
+				)
+				return
+			}
+
+			if len(actions) > 1 {
+				resp.Diagnostics.AddWarning(
+					"Drift detected",
+					"Multiple actions are not supported on 'infisical_project_role', use 'infisical_project_role_v2'.",
+				)
+				state.Permissions = nil
+				resp.State.Set(ctx, state)
+				return
+			}
+
+			action, isValid = actions[0].(string)
 			if !isValid {
 				resp.Diagnostics.AddError(
 					"Error reading project role",
@@ -274,6 +293,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				return
 			}
 		}
+
 		var secretPath, environment string
 		if el["conditions"] != nil {
 			conditions, isValid := el["conditions"].(map[string]any)
@@ -287,21 +307,30 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 
 			environment, isValid = conditions["environment"].(string)
 			if !isValid {
-				resp.Diagnostics.AddError(
-					"Error reading project role",
-					"Couldn't read project role from Infiscial, invalid environment field in permission",
-				)
-				return
+				if permissionV2Environment, isValid := conditions["environment"].(map[string]any); isValid {
+					environment, isValid = permissionV2Environment["$eq"].(string)
+					if !isValid {
+						resp.Diagnostics.AddWarning(
+							"Drift detected",
+							"Enviroment condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
+						)
+						state.Permissions = nil
+						resp.State.Set(ctx, state)
+						return
+					}
+				}
 			}
 
 			// secret path parsing.
 			if val, isValid := conditions["secretPath"].(map[string]any); isValid {
 				secretPath, isValid = val["$glob"].(string)
 				if !isValid {
-					resp.Diagnostics.AddError(
-						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid secret path field in permission",
+					resp.Diagnostics.AddWarning(
+						"Drift detected",
+						"Secret path condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
 					)
+					state.Permissions = nil
+					resp.State.Set(ctx, state)
 					return
 				}
 			}
