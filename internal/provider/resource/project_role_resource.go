@@ -312,7 +312,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 					if !isValid {
 						resp.Diagnostics.AddWarning(
 							"Drift detected",
-							"Enviroment condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
+							"Environment condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
 						)
 						state.Permissions = nil
 						resp.State.Set(ctx, state)
