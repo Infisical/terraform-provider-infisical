@@ -2,12 +2,10 @@ package resource
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
-	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -38,15 +36,22 @@ type projectRoleResource struct {
 	client *infisical.Client
 }
 
+type PermissionV2Entry struct {
+	Action     []string                     `tfsdk:"action"`
+	Subject    string                       `tfsdk:"subject"`
+	Inverted   bool                         `tfsdk:"inverted"`
+	Conditions map[string]map[string]string `tfsdk:"conditions"`
+}
+
 // projectRoleResourceSourceModel describes the data source data model.
 type projectRoleResourceModel struct {
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	Slug          types.String `tfsdk:"slug"`
-	ProjectSlug   types.String `tfsdk:"project_slug"`
-	ID            types.String `tfsdk:"id"`
-	Permissions   types.List   `tfsdk:"permissions"`
-	PermissionsV2 types.String `tfsdk:"permissions_v2"`
+	Name          types.String        `tfsdk:"name"`
+	Description   types.String        `tfsdk:"description"`
+	Slug          types.String        `tfsdk:"slug"`
+	ProjectSlug   types.String        `tfsdk:"project_slug"`
+	ID            types.String        `tfsdk:"id"`
+	Permissions   types.List          `tfsdk:"permissions"`
+	PermissionsV2 []PermissionV2Entry `tfsdk:"permissions_v2"`
 }
 
 type projectRoleResourcePermissions struct {
@@ -146,13 +151,32 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"permissions_v2": schema.StringAttribute{
-				Optional: true,
-				PlanModifiers: []planmodifier.String{
-					pkg.JsonEquivalentModifier{},
-				},
-				Validators: []validator.String{
-					infisicaltf.JsonStringValidator,
+			"permissions_v2": schema.SetNestedAttribute{
+				Optional:    true,
+				Description: "The permissions assigned to the project role",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"action": schema.SetAttribute{
+							ElementType: types.StringType,
+							Description: fmt.Sprintf("Describe what actions an entity can take. Enum: %s", strings.Join(PERMISSION_ACTIONS, ",")),
+							Required:    true,
+						},
+						"subject": schema.StringAttribute{
+							Description: fmt.Sprintf("Describe the entity the permission pertains to. Enum: %s", strings.Join(PERMISSION_SUBJECTS, ",")),
+							Required:    true,
+						},
+						"inverted": schema.BoolAttribute{
+							Description: "Whether rule forbids. Set this to true if permission forbids.",
+							Required:    true,
+						},
+						"conditions": schema.MapAttribute{
+							Optional:    true,
+							Description: "When specified, only matching conditions will be allowed to access given resource.",
+							ElementType: types.MapType{
+								ElemType: types.StringType,
+							},
+						},
+					},
 				},
 			},
 			"permissions": schema.ListNestedAttribute{
@@ -227,7 +251,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	if (!plan.Permissions.IsNull() && !plan.PermissionsV2.IsNull()) || (plan.Permissions.IsNull() && plan.PermissionsV2.IsNull()) {
+	if (!plan.Permissions.IsNull() && plan.PermissionsV2 != nil) || (plan.Permissions.IsNull() && plan.PermissionsV2 == nil) {
 		resp.Diagnostics.AddError(
 			"Error creating project role",
 			"Define either the permissions or permissions_v2 property but not both.",
@@ -286,15 +310,6 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 
 		plan.ID = types.StringValue(newProjectRole.Role.ID)
 	} else {
-		var permissionsArray []map[string]interface{}
-		if err := json.Unmarshal([]byte(plan.PermissionsV2.ValueString()), &permissionsArray); err != nil {
-			resp.Diagnostics.AddError(
-				"Error creating project role",
-				"Error parsing permissions_v2 property: "+err.Error(),
-			)
-			return
-		}
-
 		project, err := r.client.GetProject(infisical.GetProjectRequest{
 			Slug: plan.ProjectSlug.ValueString(),
 		})
@@ -307,12 +322,19 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 			return
 		}
 
-		if err = validatePermissionV2Array(permissionsArray); err != nil {
-			resp.Diagnostics.AddError(
-				"Error creating project role",
-				err.Error(),
-			)
-			return
+		permissions := make([]map[string]any, len(plan.PermissionsV2))
+		for i, perm := range plan.PermissionsV2 {
+			permMap := map[string]any{
+				"action":   perm.Action,
+				"subject":  perm.Subject,
+				"inverted": perm.Inverted,
+			}
+
+			if perm.Conditions != nil {
+				permMap["conditions"] = perm.Conditions
+			}
+
+			permissions[i] = permMap
 		}
 
 		newProjectRole, err := r.client.CreateProjectRoleV2(infisical.CreateProjectRoleV2Request{
@@ -320,7 +342,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 			Slug:        plan.Slug.ValueString(),
 			Name:        plan.Name.ValueString(),
 			Description: plan.Description.ValueString(),
-			Permissions: permissionsArray,
+			Permissions: permissions,
 		})
 
 		if err != nil {
@@ -521,15 +543,46 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		state.ID = types.StringValue(projectRole.Role.ID)
 		state.Name = types.StringValue(projectRole.Role.Name)
 
-		permissionBytes, err := json.Marshal(projectRole.Role.Permissions)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error reading project role",
-				"Couldn't parse permission property, unexpected error: "+err.Error(),
-			)
-			return
+		permissions := make([]PermissionV2Entry, len(projectRole.Role.Permissions))
+		for i, permMap := range projectRole.Role.Permissions {
+			entry := PermissionV2Entry{}
+
+			if actionRaw, ok := permMap["action"].([]interface{}); ok {
+				actions := make([]string, len(actionRaw))
+				for i, v := range actionRaw {
+					actions[i] = v.(string)
+				}
+				entry.Action = actions
+			}
+
+			if subject, ok := permMap["subject"].(string); ok {
+				entry.Subject = subject
+			}
+
+			if inverted, ok := permMap["inverted"].(bool); ok {
+				entry.Inverted = inverted
+			}
+
+			if conditions, ok := permMap["conditions"].(map[string]any); ok {
+				entry.Conditions = make(map[string]map[string]string)
+
+				for field, ops := range conditions {
+					if opsMap, ok := ops.(map[string]any); ok {
+						entry.Conditions[field] = make(map[string]string)
+
+						for op, value := range opsMap {
+							if strValue, ok := value.(string); ok {
+								entry.Conditions[field][op] = strValue
+							}
+						}
+					}
+				}
+			}
+
+			permissions[i] = entry
 		}
-		state.PermissionsV2 = types.StringValue(string(permissionBytes))
+
+		state.PermissionsV2 = permissions
 	}
 
 	diags = resp.State.Set(ctx, state)
@@ -573,7 +626,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	if (!plan.Permissions.IsNull() && !plan.PermissionsV2.IsNull()) || (plan.Permissions.IsNull() && plan.PermissionsV2.IsNull()) {
+	if (!plan.Permissions.IsNull() && plan.PermissionsV2 != nil) || (plan.Permissions.IsNull() && plan.PermissionsV2 == nil) {
 		resp.Diagnostics.AddError(
 			"Error updating project role",
 			"Define either the permissions or permissions_v2 property but not both.",
@@ -641,21 +694,19 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 			return
 		}
 
-		var permissionsArray []map[string]interface{}
-		if err := json.Unmarshal([]byte(plan.PermissionsV2.ValueString()), &permissionsArray); err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating project role",
-				"Error parsing permissions_v2 property: "+err.Error(),
-			)
-			return
-		}
+		permissions := make([]map[string]any, len(plan.PermissionsV2))
+		for i, perm := range plan.PermissionsV2 {
+			permMap := map[string]any{
+				"action":   perm.Action,
+				"subject":  perm.Subject,
+				"inverted": perm.Inverted,
+			}
 
-		if err = validatePermissionV2Array(permissionsArray); err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating project role",
-				err.Error(),
-			)
-			return
+			if perm.Conditions != nil {
+				permMap["conditions"] = perm.Conditions
+			}
+
+			permissions[i] = permMap
 		}
 
 		_, err = r.client.UpdateProjectRoleV2(infisical.UpdateProjectRoleV2Request{
@@ -664,7 +715,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 			Slug:        plan.Slug.ValueString(),
 			Name:        plan.Name.ValueString(),
 			Description: plan.Description.ValueString(),
-			Permissions: permissionsArray,
+			Permissions: permissions,
 		})
 
 		if err != nil {
