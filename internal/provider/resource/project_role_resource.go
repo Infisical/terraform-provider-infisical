@@ -2,12 +2,15 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -37,12 +40,13 @@ type projectRoleResource struct {
 
 // projectRoleResourceSourceModel describes the data source data model.
 type projectRoleResourceModel struct {
-	Name        types.String                     `tfsdk:"name"`
-	Description types.String                     `tfsdk:"description"`
-	Slug        types.String                     `tfsdk:"slug"`
-	ProjectSlug types.String                     `tfsdk:"project_slug"`
-	ID          types.String                     `tfsdk:"id"`
-	Permissions []projectRoleResourcePermissions `tfsdk:"permissions"`
+	Name          types.String `tfsdk:"name"`
+	Description   types.String `tfsdk:"description"`
+	Slug          types.String `tfsdk:"slug"`
+	ProjectSlug   types.String `tfsdk:"project_slug"`
+	ID            types.String `tfsdk:"id"`
+	Permissions   types.List   `tfsdk:"permissions"`
+	PermissionsV2 types.String `tfsdk:"permissions_v2"`
 }
 
 type projectRoleResourcePermissions struct {
@@ -56,9 +60,59 @@ type projectRoleResourcePermissionCondition struct {
 	SecretPath  types.String `tfsdk:"secret_path"`
 }
 
+func validatePermissionV2Array(permissions []map[string]any) error {
+	for _, permission := range permissions {
+		subject, exists := permission["subject"]
+		if !exists {
+			return fmt.Errorf("Error parsing permissions_v2: subject property should be defined")
+		}
+
+		_, ok := subject.(string)
+		if !ok {
+			return fmt.Errorf("Error parsing permissions_v2: subject property should be a string")
+		}
+
+		action, exists := permission["action"]
+		if !exists {
+			return fmt.Errorf("Error parsing permissions_v2: action property should be defined")
+		}
+
+		_, ok = action.([]interface{})
+		if !ok {
+			return fmt.Errorf("Error parsing permissions_v2: action property should be an array")
+		}
+
+		inverted, exists := permission["inverted"]
+		if !exists {
+			return fmt.Errorf("Error parsing permissions_v2: inverted property should be defined")
+		}
+
+		_, ok = inverted.(bool)
+		if !ok {
+			return fmt.Errorf("Error parsing permissions_v2: inverted property should be a boolean")
+		}
+
+	}
+
+	return nil
+}
+
 // Metadata returns the resource type name.
 func (r *projectRoleResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_project_role"
+}
+
+var permissionsObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"action":  types.StringType,
+		"subject": types.StringType,
+		"conditions": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"environment": types.StringType,
+				"secret_path": types.StringType,
+			},
+		},
+	},
 }
 
 // Schema defines the schema for the resource.
@@ -92,8 +146,17 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"permissions_v2": schema.StringAttribute{
+				Optional: true,
+				PlanModifiers: []planmodifier.String{
+					pkg.JsonEquivalentModifier{},
+				},
+				Validators: []validator.String{
+					infisicaltf.JsonStringValidator,
+				},
+			},
 			"permissions": schema.ListNestedAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The permissions assigned to the project role",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -164,53 +227,118 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	projectRolePermissions := make([]infisicalclient.ProjectRolePermissionRequest, 0, len(plan.Permissions))
-	for _, el := range plan.Permissions {
-		condition := make(map[string]any)
-		if el.Conditions != nil {
-			environment := el.Conditions.Environment.ValueString()
-			secretPath := el.Conditions.SecretPath.ValueString()
-			if environment != "" {
-				condition["environment"] = environment
-			}
-			if secretPath != "" {
-				condition["secretPath"] = map[string]string{"$glob": secretPath}
-			}
-		} else {
-			condition = nil
-		}
-
-		projectRolePermissions = append(projectRolePermissions, infisicalclient.ProjectRolePermissionRequest{
-			Action:     el.Action.ValueString(),
-			Subject:    el.Subject.ValueString(),
-			Conditions: condition,
-		})
-	}
-
-	newProjectRole, err := r.client.CreateProjectRole(infisical.CreateProjectRoleRequest{
-		ProjectSlug: plan.ProjectSlug.ValueString(),
-		Slug:        plan.Slug.ValueString(),
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
-		Permissions: projectRolePermissions,
-	})
-
-	if err != nil {
+	if (!plan.Permissions.IsNull() && !plan.PermissionsV2.IsNull()) || (plan.Permissions.IsNull() && plan.PermissionsV2.IsNull()) {
 		resp.Diagnostics.AddError(
 			"Error creating project role",
-			"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+			"Define either the permissions or permissions_v2 property but not both.",
 		)
 		return
 	}
 
-	plan.ID = types.StringValue(newProjectRole.Role.ID)
+	// Permissions V1
+	if !plan.Permissions.IsNull() {
+		permissions := []projectRoleResourcePermissions{}
+		diags = plan.Permissions.ElementsAs(ctx, &permissions, true)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		projectRolePermissions := make([]infisicalclient.ProjectRolePermissionRequest, 0, len(permissions))
+
+		for _, el := range permissions {
+			condition := make(map[string]any)
+			if el.Conditions != nil {
+				environment := el.Conditions.Environment.ValueString()
+				secretPath := el.Conditions.SecretPath.ValueString()
+				if environment != "" {
+					condition["environment"] = environment
+				}
+				if secretPath != "" {
+					condition["secretPath"] = map[string]string{"$glob": secretPath}
+				}
+			} else {
+				condition = nil
+			}
+
+			projectRolePermissions = append(projectRolePermissions, infisicalclient.ProjectRolePermissionRequest{
+				Action:     el.Action.ValueString(),
+				Subject:    el.Subject.ValueString(),
+				Conditions: condition,
+			})
+		}
+
+		newProjectRole, err := r.client.CreateProjectRole(infisical.CreateProjectRoleRequest{
+			ProjectSlug: plan.ProjectSlug.ValueString(),
+			Slug:        plan.Slug.ValueString(),
+			Name:        plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
+			Permissions: projectRolePermissions,
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating project role",
+				"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		plan.ID = types.StringValue(newProjectRole.Role.ID)
+	} else {
+		var permissionsArray []map[string]interface{}
+		if err := json.Unmarshal([]byte(plan.PermissionsV2.ValueString()), &permissionsArray); err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating project role",
+				"Error parsing permissions_v2 property: "+err.Error(),
+			)
+			return
+		}
+
+		project, err := r.client.GetProject(infisical.GetProjectRequest{
+			Slug: plan.ProjectSlug.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating project role",
+				"Unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		if err = validatePermissionV2Array(permissionsArray); err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating project role",
+				err.Error(),
+			)
+			return
+		}
+
+		newProjectRole, err := r.client.CreateProjectRoleV2(infisical.CreateProjectRoleV2Request{
+			ProjectId:   project.ID,
+			Slug:        plan.Slug.ValueString(),
+			Name:        plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
+			Permissions: permissionsArray,
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating project role",
+				"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		plan.ID = types.StringValue(newProjectRole.Role.ID)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -231,130 +359,179 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// Get the latest data from the API
-	projectRole, err := r.client.GetProjectRoleBySlug(infisical.GetProjectRoleBySlugRequest{
-		RoleSlug:    state.Slug.ValueString(),
-		ProjectSlug: state.ProjectSlug.ValueString(),
-	})
+	// Permissions V1
+	if !state.Permissions.IsNull() {
+		// Get the latest data from the API
+		projectRole, err := r.client.GetProjectRoleBySlug(infisical.GetProjectRoleBySlugRequest{
+			RoleSlug:    state.Slug.ValueString(),
+			ProjectSlug: state.ProjectSlug.ValueString(),
+		})
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project role",
-			"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	state.Description = types.StringValue(projectRole.Role.Description)
-	state.ID = types.StringValue(projectRole.Role.ID)
-	state.Name = types.StringValue(projectRole.Role.Name)
-
-	permissionPlan := make([]projectRoleResourcePermissions, 0, len(projectRole.Role.Permissions))
-	for _, el := range projectRole.Role.Permissions {
-		action, isValid := el["action"].(string)
-		if el["action"] != nil && !isValid {
-			actions, isValid := el["action"].([]any)
-			if !isValid {
-				resp.Diagnostics.AddError(
-					"Error reading project role",
-					"Couldn't read project role from Infiscial, invalid action field in permission",
-				)
-				return
-			}
-
-			if len(actions) > 1 {
-				resp.Diagnostics.AddWarning(
-					"Drift detected",
-					"Multiple actions are not supported on 'infisical_project_role', use 'infisical_project_role_v2'.",
-				)
-				state.Permissions = nil
-				resp.State.Set(ctx, state)
-				return
-			}
-
-			action, isValid = actions[0].(string)
-			if !isValid {
-				resp.Diagnostics.AddError(
-					"Error reading project role",
-					"Couldn't read project role from Infiscial, invalid action field in permission",
-				)
-				return
-			}
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading project role",
+				"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
 		}
 
-		subject, isValid := el["subject"].(string)
-		if el["subject"] != nil && !isValid {
-			subject, isValid = el["subject"].([]any)[0].(string)
-			if !isValid {
-				resp.Diagnostics.AddError(
-					"Error reading project role",
-					"Couldn't read project role from Infiscial, invalid subject field in permission",
-				)
-				return
-			}
-		}
+		state.Description = types.StringValue(projectRole.Role.Description)
+		state.ID = types.StringValue(projectRole.Role.ID)
+		state.Name = types.StringValue(projectRole.Role.Name)
 
-		var secretPath, environment string
-		if el["conditions"] != nil {
-			conditions, isValid := el["conditions"].(map[string]any)
-			if !isValid {
-				resp.Diagnostics.AddError(
-					"Error reading project role",
-					"Couldn't read project role from Infiscial, invalid conditions field in permission",
-				)
-				return
+		permissionPlan := make([]projectRoleResourcePermissions, 0, len(projectRole.Role.Permissions))
+		for _, el := range projectRole.Role.Permissions {
+			action, isValid := el["action"].(string)
+			if el["action"] != nil && !isValid {
+				actions, isValid := el["action"].([]any)
+				if !isValid {
+					resp.Diagnostics.AddError(
+						"Error reading project role",
+						"Couldn't read project role from Infiscial, invalid action field in permission",
+					)
+					return
+				}
+
+				if len(actions) > 1 {
+					resp.Diagnostics.AddWarning(
+						"Drift detected",
+						"Multiple actions are not supported on 'infisical_project_role', use 'infisical_project_role_v2'.",
+					)
+					state.Permissions = types.ListNull(permissionsObjectType)
+					resp.State.Set(ctx, state)
+					return
+				}
+
+				action, isValid = actions[0].(string)
+				if !isValid {
+					resp.Diagnostics.AddError(
+						"Error reading project role",
+						"Couldn't read project role from Infiscial, invalid action field in permission",
+					)
+					return
+				}
 			}
 
-			environment, isValid = conditions["environment"].(string)
-			if !isValid {
-				if permissionV2Environment, isValid := conditions["environment"].(map[string]any); isValid {
-					environment, isValid = permissionV2Environment["$eq"].(string)
+			subject, isValid := el["subject"].(string)
+			if el["subject"] != nil && !isValid {
+				subject, isValid = el["subject"].([]any)[0].(string)
+				if !isValid {
+					resp.Diagnostics.AddError(
+						"Error reading project role",
+						"Couldn't read project role from Infiscial, invalid subject field in permission",
+					)
+					return
+				}
+			}
+
+			var secretPath, environment string
+			if el["conditions"] != nil {
+				conditions, isValid := el["conditions"].(map[string]any)
+				if !isValid {
+					resp.Diagnostics.AddError(
+						"Error reading project role",
+						"Couldn't read project role from Infiscial, invalid conditions field in permission",
+					)
+					return
+				}
+
+				environment, isValid = conditions["environment"].(string)
+				if !isValid {
+					if permissionV2Environment, isValid := conditions["environment"].(map[string]any); isValid {
+						environment, isValid = permissionV2Environment["$eq"].(string)
+						if !isValid {
+							resp.Diagnostics.AddWarning(
+								"Drift detected",
+								"Environment condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
+							)
+							state.Permissions = types.ListNull(permissionsObjectType)
+							resp.State.Set(ctx, state)
+							return
+						}
+					}
+				}
+
+				// secret path parsing.
+				if val, isValid := conditions["secretPath"].(map[string]any); isValid {
+					secretPath, isValid = val["$glob"].(string)
 					if !isValid {
 						resp.Diagnostics.AddWarning(
 							"Drift detected",
-							"Environment condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
+							"Secret path condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
 						)
-						state.Permissions = nil
+						state.Permissions = types.ListNull(permissionsObjectType)
 						resp.State.Set(ctx, state)
 						return
 					}
 				}
 			}
 
-			// secret path parsing.
-			if val, isValid := conditions["secretPath"].(map[string]any); isValid {
-				secretPath, isValid = val["$glob"].(string)
-				if !isValid {
-					resp.Diagnostics.AddWarning(
-						"Drift detected",
-						"Secret path condition provided are not compatible on 'infisical_project_role', use 'infisical_project_role_v2'.",
-					)
-					state.Permissions = nil
-					resp.State.Set(ctx, state)
-					return
+			var conditions *projectRoleResourcePermissionCondition
+
+			if el["conditions"] == nil {
+				conditions = nil
+			} else {
+				conditions = &projectRoleResourcePermissionCondition{
+					Environment: types.StringValue(environment),
+					SecretPath:  types.StringValue(secretPath),
 				}
 			}
+
+			permissionPlan = append(permissionPlan, projectRoleResourcePermissions{
+				Action:     types.StringValue(action),
+				Subject:    types.StringValue(subject),
+				Conditions: conditions,
+			})
 		}
 
-		var conditions *projectRoleResourcePermissionCondition
-
-		if el["conditions"] == nil {
-			conditions = nil
-		} else {
-			conditions = &projectRoleResourcePermissionCondition{
-				Environment: types.StringValue(environment),
-				SecretPath:  types.StringValue(secretPath),
-			}
+		permissionListValue, diags := types.ListValueFrom(ctx, permissionsObjectType, permissionPlan)
+		resp.Diagnostics.Append(diags...)
+		if diags.HasError() {
+			return
 		}
 
-		permissionPlan = append(permissionPlan, projectRoleResourcePermissions{
-			Action:     types.StringValue(action),
-			Subject:    types.StringValue(subject),
-			Conditions: conditions,
+		state.Permissions = permissionListValue
+	} else {
+		project, err := r.client.GetProject(infisical.GetProjectRequest{
+			Slug: state.ProjectSlug.ValueString(),
 		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading project role",
+				"Unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		projectRole, err := r.client.GetProjectRoleBySlugV2(infisical.GetProjectRoleBySlugV2Request{
+			ProjectId: project.ID,
+			RoleSlug:  state.Slug.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading project role",
+				"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		state.Description = types.StringValue(projectRole.Role.Description)
+		state.ID = types.StringValue(projectRole.Role.ID)
+		state.Name = types.StringValue(projectRole.Role.Name)
+
+		permissionBytes, err := json.Marshal(projectRole.Role.Permissions)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading project role",
+				"Couldn't parse permission property, unexpected error: "+err.Error(),
+			)
+			return
+		}
+		state.PermissionsV2 = types.StringValue(string(permissionBytes))
 	}
 
-	state.Permissions = permissionPlan
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -396,43 +573,107 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	projectRolePermissions := make([]infisicalclient.ProjectRolePermissionRequest, 0, len(plan.Permissions))
-	for _, el := range plan.Permissions {
-		condition := make(map[string]any)
-		if el.Conditions != nil {
-			environment := el.Conditions.Environment.ValueString()
-			secretPath := el.Conditions.SecretPath.ValueString()
-			if environment != "" {
-				condition["environment"] = environment
-			}
-			if secretPath != "" {
-				condition["secretPath"] = map[string]string{"$glob": secretPath}
-			}
-		} else {
-			condition = nil
-		}
-		projectRolePermissions = append(projectRolePermissions, infisicalclient.ProjectRolePermissionRequest{
-			Action:     el.Action.ValueString(),
-			Subject:    el.Subject.ValueString(),
-			Conditions: condition,
-		})
-	}
-
-	_, err := r.client.UpdateProjectRole(infisical.UpdateProjectRoleRequest{
-		ProjectSlug: plan.ProjectSlug.ValueString(),
-		RoleId:      plan.ID.ValueString(),
-		Slug:        plan.Slug.ValueString(),
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
-		Permissions: projectRolePermissions,
-	})
-
-	if err != nil {
+	if (!plan.Permissions.IsNull() && !plan.PermissionsV2.IsNull()) || (plan.Permissions.IsNull() && plan.PermissionsV2.IsNull()) {
 		resp.Diagnostics.AddError(
 			"Error updating project role",
-			"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+			"Define either the permissions or permissions_v2 property but not both.",
 		)
 		return
+	}
+
+	// Permissions V1
+	if !plan.Permissions.IsNull() {
+		permissions := []projectRoleResourcePermissions{}
+		diags = plan.Permissions.ElementsAs(ctx, &permissions, true)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		projectRolePermissions := make([]infisicalclient.ProjectRolePermissionRequest, 0, len(permissions))
+		for _, el := range permissions {
+			condition := make(map[string]any)
+			if el.Conditions != nil {
+				environment := el.Conditions.Environment.ValueString()
+				secretPath := el.Conditions.SecretPath.ValueString()
+				if environment != "" {
+					condition["environment"] = environment
+				}
+				if secretPath != "" {
+					condition["secretPath"] = map[string]string{"$glob": secretPath}
+				}
+			} else {
+				condition = nil
+			}
+			projectRolePermissions = append(projectRolePermissions, infisicalclient.ProjectRolePermissionRequest{
+				Action:     el.Action.ValueString(),
+				Subject:    el.Subject.ValueString(),
+				Conditions: condition,
+			})
+		}
+
+		_, err := r.client.UpdateProjectRole(infisical.UpdateProjectRoleRequest{
+			ProjectSlug: plan.ProjectSlug.ValueString(),
+			RoleId:      plan.ID.ValueString(),
+			Slug:        plan.Slug.ValueString(),
+			Name:        plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
+			Permissions: projectRolePermissions,
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project role",
+				"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	} else {
+		project, err := r.client.GetProject(infisical.GetProjectRequest{
+			Slug: plan.ProjectSlug.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project role",
+				"Unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		var permissionsArray []map[string]interface{}
+		if err := json.Unmarshal([]byte(plan.PermissionsV2.ValueString()), &permissionsArray); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project role",
+				"Error parsing permissions_v2 property: "+err.Error(),
+			)
+			return
+		}
+
+		if err = validatePermissionV2Array(permissionsArray); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project role",
+				err.Error(),
+			)
+			return
+		}
+
+		_, err = r.client.UpdateProjectRoleV2(infisical.UpdateProjectRoleV2Request{
+			ProjectId:   project.ID,
+			RoleId:      plan.ID.ValueString(),
+			Slug:        plan.Slug.ValueString(),
+			Name:        plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
+			Permissions: permissionsArray,
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project role",
+				"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -440,7 +681,6 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
