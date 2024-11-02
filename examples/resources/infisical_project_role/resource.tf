@@ -23,14 +23,22 @@ resource "infisical_project_role" "biller" {
   name         = "Tester"
   description  = "A test role"
   slug         = "tester"
-  permissions = [
+  permissions_v2 = [
     {
-      action  = "read"
-      subject = "secrets",
-      conditions = {
-        environment = "dev"
-        secret_path = "/dev"
-      }
+      subject  = "integrations"
+      action   = ["read", "create"]
+      inverted = true
+    },
+    {
+      subject = "secrets"
+      action  = ["read", "edit"]
+      conditions = jsonencode({
+        environment = {
+          "$in" = ["dev", "prod"]
+          "$eq" = "dev"
+        }
+      })
+      inverted = false
     },
   ]
 }

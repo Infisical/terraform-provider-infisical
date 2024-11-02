@@ -39,10 +39,10 @@ type projectRoleResource struct {
 }
 
 type PermissionV2Entry struct {
-	Action     []string `tfsdk:"action"`
-	Subject    string   `tfsdk:"subject"`
-	Inverted   bool     `tfsdk:"inverted"`
-	Conditions string   `tfsdk:"conditions"`
+	Action     types.Set    `tfsdk:"action"`
+	Subject    types.String `tfsdk:"subject"`
+	Inverted   types.Bool   `tfsdk:"inverted"`
+	Conditions types.String `tfsdk:"conditions"`
 }
 
 // projectRoleResourceSourceModel describes the data source data model.
@@ -65,43 +65,6 @@ type projectRoleResourcePermissions struct {
 type projectRoleResourcePermissionCondition struct {
 	Environment types.String `tfsdk:"environment"`
 	SecretPath  types.String `tfsdk:"secret_path"`
-}
-
-func validatePermissionV2Array(permissions []map[string]any) error {
-	for _, permission := range permissions {
-		subject, exists := permission["subject"]
-		if !exists {
-			return fmt.Errorf("Error parsing permissions_v2: subject property should be defined")
-		}
-
-		_, ok := subject.(string)
-		if !ok {
-			return fmt.Errorf("Error parsing permissions_v2: subject property should be a string")
-		}
-
-		action, exists := permission["action"]
-		if !exists {
-			return fmt.Errorf("Error parsing permissions_v2: action property should be defined")
-		}
-
-		_, ok = action.([]interface{})
-		if !ok {
-			return fmt.Errorf("Error parsing permissions_v2: action property should be an array")
-		}
-
-		inverted, exists := permission["inverted"]
-		if !exists {
-			return fmt.Errorf("Error parsing permissions_v2: inverted property should be defined")
-		}
-
-		_, ok = inverted.(bool)
-		if !ok {
-			return fmt.Errorf("Error parsing permissions_v2: inverted property should be a boolean")
-		}
-
-	}
-
-	return nil
 }
 
 // Metadata returns the resource type name.
@@ -155,16 +118,16 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"permissions_v2": schema.SetNestedAttribute{
 				Optional:    true,
-				Description: "The permissions assigned to the project role",
+				Description: "The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.SetAttribute{
 							ElementType: types.StringType,
-							Description: fmt.Sprintf("Describe what actions an entity can take. Enum: %s", strings.Join(PERMISSION_ACTIONS, ",")),
+							Description: fmt.Sprintf("Describe what actions an entity can take."),
 							Required:    true,
 						},
 						"subject": schema.StringAttribute{
-							Description: fmt.Sprintf("Describe the entity the permission pertains to. Enum: %s", strings.Join(PERMISSION_SUBJECTS, ",")),
+							Description: fmt.Sprintf("Describe the entity the permission pertains to."),
 							Required:    true,
 						},
 						"inverted": schema.BoolAttribute{
@@ -185,8 +148,9 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"permissions": schema.ListNestedAttribute{
-				Optional:    true,
-				Description: "The permissions assigned to the project role",
+				Optional:           true,
+				DeprecationMessage: "Use permissions_v2 instead as it allows you to be more granular with access control",
+				Description:        "(DEPRECATED, USE permissions_v2) The permissions assigned to the project role",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.StringAttribute{
@@ -336,9 +300,9 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 			}
 
 			// parse as object
-			if perm.Conditions != "" {
+			if !perm.Conditions.IsNull() {
 				var conditionsMap map[string]interface{}
-				if err := json.Unmarshal([]byte(perm.Conditions), &conditionsMap); err != nil {
+				if err := json.Unmarshal([]byte(perm.Conditions.ValueString()), &conditionsMap); err != nil {
 					resp.Diagnostics.AddError(
 						"Error creating project role",
 						"Error parsing conditions property: "+err.Error(),
@@ -567,15 +531,19 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				for i, v := range actionRaw {
 					actions[i] = v.(string)
 				}
-				entry.Action = actions
+				entry.Action, diags = types.SetValueFrom(ctx, types.StringType, actions)
+				resp.Diagnostics.Append(diags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
 			}
 
 			if subject, ok := permMap["subject"].(string); ok {
-				entry.Subject = subject
+				entry.Subject = types.StringValue(subject)
 			}
 
 			if inverted, ok := permMap["inverted"].(bool); ok {
-				entry.Inverted = inverted
+				entry.Inverted = types.BoolValue(inverted)
 			}
 
 			if conditions, ok := permMap["conditions"].(map[string]any); ok {
@@ -588,7 +556,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 					return
 				}
 
-				entry.Conditions = string(conditionsBytes)
+				entry.Conditions = types.StringValue(string(conditionsBytes))
 			}
 
 			permissions[i] = entry
@@ -714,9 +682,9 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 				"inverted": perm.Inverted,
 			}
 
-			if perm.Conditions != "" {
+			if !perm.Conditions.IsNull() {
 				var conditionsMap map[string]interface{}
-				if err := json.Unmarshal([]byte(perm.Conditions), &conditionsMap); err != nil {
+				if err := json.Unmarshal([]byte(perm.Conditions.ValueString()), &conditionsMap); err != nil {
 					resp.Diagnostics.AddError(
 						"Error updating project role",
 						"Error parsing conditions property: "+err.Error(),
