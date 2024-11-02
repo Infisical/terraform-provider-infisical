@@ -293,10 +293,18 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 
 		permissions := make([]map[string]any, len(plan.PermissionsV2))
 		for i, perm := range plan.PermissionsV2 {
+			actionValues := perm.Action.Elements()
+			actionStrings := make([]string, 0, len(actionValues))
+			for _, v := range actionValues {
+				if strVal, ok := v.(types.String); ok {
+					actionStrings = append(actionStrings, strVal.ValueString())
+				}
+			}
+
 			permMap := map[string]any{
-				"action":   perm.Action,
-				"subject":  perm.Subject,
-				"inverted": perm.Inverted,
+				"action":   actionStrings,
+				"subject":  perm.Subject.ValueString(),
+				"inverted": perm.Inverted.ValueBool(),
 			}
 
 			// parse as object
@@ -531,6 +539,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				for i, v := range actionRaw {
 					actions[i] = v.(string)
 				}
+
 				entry.Action, diags = types.SetValueFrom(ctx, types.StringType, actions)
 				resp.Diagnostics.Append(diags...)
 				if resp.Diagnostics.HasError() {
@@ -676,10 +685,18 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 
 		permissions := make([]map[string]any, len(plan.PermissionsV2))
 		for i, perm := range plan.PermissionsV2 {
+			actionValues := perm.Action.Elements()
+			actionStrings := make([]string, 0, len(actionValues))
+			for _, v := range actionValues {
+				if strVal, ok := v.(types.String); ok {
+					actionStrings = append(actionStrings, strVal.ValueString())
+				}
+			}
+
 			permMap := map[string]any{
-				"action":   perm.Action,
-				"subject":  perm.Subject,
-				"inverted": perm.Inverted,
+				"action":   actionStrings,
+				"subject":  perm.Subject.ValueString(),
+				"inverted": perm.Inverted.ValueBool(),
 			}
 
 			if !perm.Conditions.IsNull() {
