@@ -2,10 +2,12 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -37,10 +39,10 @@ type projectRoleResource struct {
 }
 
 type PermissionV2Entry struct {
-	Action     []string                     `tfsdk:"action"`
-	Subject    string                       `tfsdk:"subject"`
-	Inverted   bool                         `tfsdk:"inverted"`
-	Conditions map[string]map[string]string `tfsdk:"conditions"`
+	Action     []string `tfsdk:"action"`
+	Subject    string   `tfsdk:"subject"`
+	Inverted   bool     `tfsdk:"inverted"`
+	Conditions string   `tfsdk:"conditions"`
 }
 
 // projectRoleResourceSourceModel describes the data source data model.
@@ -169,11 +171,14 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 							Description: "Whether rule forbids. Set this to true if permission forbids.",
 							Required:    true,
 						},
-						"conditions": schema.MapAttribute{
+						"conditions": schema.StringAttribute{
 							Optional:    true,
 							Description: "When specified, only matching conditions will be allowed to access given resource.",
-							ElementType: types.MapType{
-								ElemType: types.StringType,
+							PlanModifiers: []planmodifier.String{
+								pkg.JsonEquivalentModifier{},
+							},
+							Validators: []validator.String{
+								infisicaltf.JsonStringValidator,
 							},
 						},
 					},
@@ -330,8 +335,18 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 				"inverted": perm.Inverted,
 			}
 
-			if perm.Conditions != nil {
-				permMap["conditions"] = perm.Conditions
+			// parse as object
+			if perm.Conditions != "" {
+				var conditionsMap map[string]interface{}
+				if err := json.Unmarshal([]byte(perm.Conditions), &conditionsMap); err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating project role",
+						"Error parsing conditions property: "+err.Error(),
+					)
+					return
+				}
+
+				permMap["conditions"] = conditionsMap
 			}
 
 			permissions[i] = permMap
@@ -564,19 +579,16 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 			}
 
 			if conditions, ok := permMap["conditions"].(map[string]any); ok {
-				entry.Conditions = make(map[string]map[string]string)
-
-				for field, ops := range conditions {
-					if opsMap, ok := ops.(map[string]any); ok {
-						entry.Conditions[field] = make(map[string]string)
-
-						for op, value := range opsMap {
-							if strValue, ok := value.(string); ok {
-								entry.Conditions[field][op] = strValue
-							}
-						}
-					}
+				conditionsBytes, err := json.Marshal(conditions)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error reading project role",
+						"Couldn't parse conditions property, unexpected error: "+err.Error(),
+					)
+					return
 				}
+
+				entry.Conditions = string(conditionsBytes)
 			}
 
 			permissions[i] = entry
@@ -702,8 +714,17 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 				"inverted": perm.Inverted,
 			}
 
-			if perm.Conditions != nil {
-				permMap["conditions"] = perm.Conditions
+			if perm.Conditions != "" {
+				var conditionsMap map[string]interface{}
+				if err := json.Unmarshal([]byte(perm.Conditions), &conditionsMap); err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating project role",
+						"Error parsing conditions property: "+err.Error(),
+					)
+					return
+				}
+
+				permMap["conditions"] = conditionsMap
 			}
 
 			permissions[i] = permMap
