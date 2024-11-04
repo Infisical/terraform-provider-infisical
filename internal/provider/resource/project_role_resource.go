@@ -123,11 +123,11 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 					Attributes: map[string]schema.Attribute{
 						"action": schema.SetAttribute{
 							ElementType: types.StringType,
-							Description: fmt.Sprintf("Describe what actions an entity can take."),
+							Description: "Describe what actions an entity can take.",
 							Required:    true,
 						},
 						"subject": schema.StringAttribute{
-							Description: fmt.Sprintf("Describe the entity the permission pertains to."),
+							Description: "Describe the entity the permission pertains to.",
 							Required:    true,
 						},
 						"inverted": schema.BoolAttribute{
@@ -537,7 +537,15 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 			if actionRaw, ok := permMap["action"].([]interface{}); ok {
 				actions := make([]string, len(actionRaw))
 				for i, v := range actionRaw {
-					actions[i] = v.(string)
+					if strValue, ok := v.(string); ok {
+						actions[i] = strValue
+					} else {
+						resp.Diagnostics.AddError(
+							"Invalid Action Type",
+							fmt.Sprintf("Expected string type for action at index %d, got %T", i, v),
+						)
+						return
+					}
 				}
 
 				entry.Action, diags = types.SetValueFrom(ctx, types.StringType, actions)
