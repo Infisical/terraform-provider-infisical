@@ -42,6 +42,26 @@ func (client Client) CreateTemporaryProjectIdentitySpecificPrivilege(request Cre
 	return responeData, nil
 }
 
+func (client Client) CreateProjectIdentitySpecificPrivilegeV2(request CreateProjectIdentitySpecificPrivilegeV2Request) (CreateProjectIdentitySpecificPrivilegeV2Response, error) {
+	var responeData CreateProjectIdentitySpecificPrivilegeV2Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&responeData).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post("/api/v2/identity-project-additional-privilege")
+
+	if err != nil {
+		return CreateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("CreateProjectIdentitySpecificPrivilegeV2: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return CreateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("CreateProjectIdentitySpecificPrivilegeV2: Unsuccessful response. [response=%s]", response)
+	}
+
+	return responeData, nil
+}
+
 func (client Client) DeleteProjectIdentitySpecificPrivilege(request DeleteProjectIdentitySpecificPrivilegeRequest) (DeleteProjectIdentitySpecificPrivilegeResponse, error) {
 	var responseData DeleteProjectIdentitySpecificPrivilegeResponse
 	response, err := client.Config.HttpClient.
@@ -82,6 +102,26 @@ func (client Client) UpdateProjectIdentitySpecificPrivilege(request UpdateProjec
 	return responseData, nil
 }
 
+func (client Client) UpdateProjectIdentitySpecificPrivilegeV2(request UpdateProjectIdentitySpecificPrivilegeV2Request) (UpdateProjectIdentitySpecificPrivilegeV2Response, error) {
+	var responseData UpdateProjectIdentitySpecificPrivilegeV2Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&responseData).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("/api/v2/identity-project-additional-privilege/%s", request.ID))
+
+	if err != nil {
+		return UpdateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("UpdateProjectIdentitySpecificPrivilegeV2: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return UpdateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("UpdateProjectIdentitySpecificPrivilegeV2: Unsuccessful response. [response=%s]", response)
+	}
+
+	return responseData, nil
+}
+
 func (client Client) GetProjectIdentitySpecificPrivilegeBySlug(request GetProjectIdentitySpecificPrivilegeRequest) (GetProjectIdentitySpecificPrivilegeResponse, error) {
 	var responseData GetProjectIdentitySpecificPrivilegeResponse
 	response, err := client.Config.HttpClient.
@@ -97,6 +137,26 @@ func (client Client) GetProjectIdentitySpecificPrivilegeBySlug(request GetProjec
 
 	if response.IsError() {
 		return GetProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeBySlug: Unsuccessful response. [response=%s]", response)
+	}
+
+	return responseData, nil
+}
+
+func (client Client) GetProjectIdentitySpecificPrivilegeV2(request GetProjectIdentitySpecificPrivilegeV2Request) (GetProjectIdentitySpecificPrivilegeV2Response, error) {
+	var responseData GetProjectIdentitySpecificPrivilegeV2Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&responseData).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Get(fmt.Sprintf("/api/v2/identity-project-additional-privilege/%s", request.ID))
+
+	if err != nil {
+		return GetProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeV2: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return GetProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeV2: Unsuccessful response. [response=%s]", response)
 	}
 
 	return responseData, nil

@@ -827,7 +827,26 @@ type CreateTemporaryProjectIdentitySpecificPrivilegeRequest struct {
 	TemporaryAccessStartTime time.Time                                 `json:"temporaryAccessStartTime"`
 }
 
+type CreateProjectIdentitySpecificPrivilegeV2Type struct {
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode"`
+	TemporaryRange           string    `json:"temporaryRange"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime"`
+}
+
+type CreateProjectIdentitySpecificPrivilegeV2Request struct {
+	ProjectId   string                                       `json:"projectId"`
+	IdentityId  string                                       `json:"identityId"`
+	Slug        string                                       `json:"slug,omitempty"`
+	Permissions []map[string]interface{}                     `json:"permissions"`
+	Type        CreateProjectIdentitySpecificPrivilegeV2Type `json:"type"`
+}
+
 type CreateProjectIdentitySpecificPrivilegeResponse struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type CreateProjectIdentitySpecificPrivilegeV2Response struct {
 	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
 }
 
@@ -845,6 +864,24 @@ type UpdateProjectIdentitySpecificPrivilegeDataRequest struct {
 	TemporaryMode            string                                    `json:"temporaryMode,omitempty"`
 	TemporaryRange           string                                    `json:"temporaryRange,omitempty"`
 	TemporaryAccessStartTime time.Time                                 `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type UpdateProjectIdentitySpecificPrivilegeV2Type struct {
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode,omitempty"`
+	TemporaryRange           string    `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type UpdateProjectIdentitySpecificPrivilegeV2Request struct {
+	ID          string
+	Slug        string                                       `json:"slug,omitempty"`
+	Permissions []map[string]interface{}                     `json:"permissions"`
+	Type        UpdateProjectIdentitySpecificPrivilegeV2Type `json:"type"`
+}
+
+type UpdateProjectIdentitySpecificPrivilegeV2Response struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
 }
 
 type UpdateProjectIdentitySpecificPrivilegeResponse struct {
@@ -867,7 +904,15 @@ type GetProjectIdentitySpecificPrivilegeRequest struct {
 	PrivilegeSlug string `json:"privilegeSlug,omitempty"`
 }
 
+type GetProjectIdentitySpecificPrivilegeV2Request struct {
+	ID string
+}
+
 type GetProjectIdentitySpecificPrivilegeResponse struct {
+	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
+}
+
+type GetProjectIdentitySpecificPrivilegeV2Response struct {
 	Privilege ProjectIdentitySpecificPrivilege `json:"privilege"`
 }
 

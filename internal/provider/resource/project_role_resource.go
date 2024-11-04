@@ -38,7 +38,7 @@ type projectRoleResource struct {
 	client *infisical.Client
 }
 
-type PermissionV2Entry struct {
+type ProjectRolePermissionV2Entry struct {
 	Action     types.Set    `tfsdk:"action"`
 	Subject    types.String `tfsdk:"subject"`
 	Inverted   types.Bool   `tfsdk:"inverted"`
@@ -47,13 +47,13 @@ type PermissionV2Entry struct {
 
 // projectRoleResourceSourceModel describes the data source data model.
 type projectRoleResourceModel struct {
-	Name          types.String        `tfsdk:"name"`
-	Description   types.String        `tfsdk:"description"`
-	Slug          types.String        `tfsdk:"slug"`
-	ProjectSlug   types.String        `tfsdk:"project_slug"`
-	ID            types.String        `tfsdk:"id"`
-	Permissions   types.List          `tfsdk:"permissions"`
-	PermissionsV2 []PermissionV2Entry `tfsdk:"permissions_v2"`
+	Name          types.String                   `tfsdk:"name"`
+	Description   types.String                   `tfsdk:"description"`
+	Slug          types.String                   `tfsdk:"slug"`
+	ProjectSlug   types.String                   `tfsdk:"project_slug"`
+	ID            types.String                   `tfsdk:"id"`
+	Permissions   types.List                     `tfsdk:"permissions"`
+	PermissionsV2 []ProjectRolePermissionV2Entry `tfsdk:"permissions_v2"`
 }
 
 type projectRoleResourcePermissions struct {
@@ -530,9 +530,9 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		state.ID = types.StringValue(projectRole.Role.ID)
 		state.Name = types.StringValue(projectRole.Role.Name)
 
-		permissions := make([]PermissionV2Entry, len(projectRole.Role.Permissions))
+		permissions := make([]ProjectRolePermissionV2Entry, len(projectRole.Role.Permissions))
 		for i, permMap := range projectRole.Role.Permissions {
-			entry := PermissionV2Entry{}
+			entry := ProjectRolePermissionV2Entry{}
 
 			if actionRaw, ok := permMap["action"].([]interface{}); ok {
 				actions := make([]string, len(actionRaw))
