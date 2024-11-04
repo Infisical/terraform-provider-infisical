@@ -136,8 +136,9 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"permission": schema.SingleNestedAttribute{
-				Optional:    true,
-				Description: "The permissions assigned to the project identity specific privilege",
+				Optional:           true,
+				Description:        "(DEPRECATED, USE permissions_v2) The permissions assigned to the project identity specific privilege",
+				DeprecationMessage: "Use permissions_v2 instead as it allows you to be more granular with access control",
 				Attributes: map[string]schema.Attribute{
 					"actions": schema.ListAttribute{
 						ElementType: types.StringType,

@@ -31,12 +31,25 @@ resource "infisical_project_identity" "test-identity" {
 resource "infisical_project_identity_specific_privilege" "test-privilege" {
   project_slug = infisical_project.example.slug
   identity_id  = infisical_project_identity.test-identity.identity_id
-  permission = {
-    actions = ["read", "edit"]
-    subject = "secrets",
-    conditions = {
-      environment = "dev"
-      secret_path = "/dev"
-    }
-  }
+  permissions_v2 = [
+    {
+      action   = ["read", "edit"]
+      subject  = "secret-folders",
+      inverted = true,
+    },
+    {
+      action   = ["read", "edit"]
+      subject  = "secrets",
+      inverted = false,
+      conditions = jsonencode({
+        environment = {
+          "$in" = ["dev", "prod"]
+          "$eq" = "dev"
+        }
+        secretPath = {
+          "$eq" = "/"
+        }
+      })
+    },
+  ]
 }
