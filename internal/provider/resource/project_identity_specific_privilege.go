@@ -137,8 +137,8 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 			},
 			"permission": schema.SingleNestedAttribute{
 				Optional:           true,
-				Description:        "(DEPRECATED, USE permissions_v2) The permissions assigned to the project identity specific privilege",
-				DeprecationMessage: "Use permissions_v2 instead as it allows you to be more granular with access control",
+				Description:        "(DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege",
+				DeprecationMessage: "Use permissions_v2 instead as it allows you to be more granular with access control. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2",
 				Attributes: map[string]schema.Attribute{
 					"actions": schema.ListAttribute{
 						ElementType: types.StringType,
