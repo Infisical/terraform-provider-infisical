@@ -113,10 +113,7 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 - `org_id` (String) The ID of the organization for the identity
 - `role` (String) The role for the identity. Available default role options are 'admin', 'member', and 'no-access'. If you've created custom roles, you can use their slugs as well.
 
-### Optional
-
-- `auth_mode` (String) The authentication type of the identity
-
 ### Read-Only
 
+- `auth_modes` (List of String) The authentication types of the identity
 - `id` (String) The ID of the identity

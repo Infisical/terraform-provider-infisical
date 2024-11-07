@@ -87,4 +87,3 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
   token_reviewer_jwt = "ey<example>"
   allowed_namespaces = ["namespace-a", "namespace-b"]
 }
-

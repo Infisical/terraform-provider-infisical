@@ -77,9 +77,9 @@ type ProjectIdentity struct {
 	IdentityID string `json:"identityId"`
 	Roles      []ProjectMemberRole
 	Identity   struct {
-		Name       string `json:"name"`
-		Id         string `json:"id"`
-		AuthMethod string `json:"authMethod"`
+		Name        string   `json:"name"`
+		Id          string   `json:"id"`
+		AuthMethods []string `json:"authMethods"`
 	} `json:"identity"`
 }
 
@@ -110,11 +110,11 @@ type OrgIdentity struct {
 }
 
 type Identity struct {
-	Name       string    `json:"name"`
-	ID         string    `json:"id"`
-	AuthMethod string    `json:"authMethod"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	Name        string    `json:"name"`
+	ID          string    `json:"id"`
+	AuthMethods []string  `json:"authMethods"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type IdentityUniversalAuth struct {
