@@ -46,14 +46,26 @@ resource "infisical_project_identity" "test-identity" {
 resource "infisical_project_identity_specific_privilege" "test-privilege" {
   project_slug = infisical_project.example.slug
   identity_id  = infisical_project_identity.test-identity.identity_id
-  permission = {
-    actions = ["read", "edit"]
-    subject = "secrets",
-    conditions = {
-      environment = "dev"
-      secret_path = "/dev"
-    }
-  }
+  permissions_v2 = [
+    {
+      action   = ["edit"]
+      subject  = "secret-folders",
+      inverted = true,
+    },
+    {
+      action  = ["read", "edit"]
+      subject = "secrets",
+      conditions = jsonencode({
+        environment = {
+          "$in" = ["dev", "prod"]
+          "$eq" = "dev"
+        }
+        secretPath = {
+          "$eq" = "/"
+        }
+      })
+    },
+  ]
 }
 ```
 
@@ -63,12 +75,13 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
 ### Required
 
 - `identity_id` (String) The identity id to create identity specific privilege
-- `permission` (Attributes) The permissions assigned to the project identity specific privilege (see [below for nested schema](#nestedatt--permission))
 - `project_slug` (String) The slug of the project to create identity specific privilege
 
 ### Optional
 
 - `is_temporary` (Boolean) Flag to indicate the assigned specific privilege is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
+- `permission` (Attributes) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege (see [below for nested schema](#nestedatt--permission))
+- `permissions_v2` (Attributes Set) The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 - `slug` (String) The slug for the new privilege
 - `temporary_access_end_time` (String) ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time
 - `temporary_access_start_time` (String) ISO time for which temporary access should begin. The current time is used by default.
@@ -98,3 +111,18 @@ Required:
 Optional:
 
 - `secret_path` (String) The secret path this permission should be scoped to
+
+
+
+<a id="nestedatt--permissions_v2"></a>
+### Nested Schema for `permissions_v2`
+
+Required:
+
+- `action` (Set of String) Describe what actions an entity can take.
+- `subject` (String) Describe the entity the permission pertains to.
+
+Optional:
+
+- `conditions` (String) When specified, only matching conditions will be allowed to access given resource.
+- `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.

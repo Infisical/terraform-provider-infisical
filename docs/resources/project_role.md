@@ -38,14 +38,20 @@ resource "infisical_project_role" "biller" {
   name         = "Tester"
   description  = "A test role"
   slug         = "tester"
-  permissions = [
+  permissions_v2 = [
     {
-      action  = "read"
-      subject = "secrets",
-      conditions = {
-        environment = "dev"
-        secret_path = "/dev"
-      }
+      subject = "integrations"
+      action  = ["read", "create"]
+    },
+    {
+      subject = "secrets"
+      action  = ["read", "edit"]
+      conditions = jsonencode({
+        environment = {
+          "$in" = ["dev", "prod"]
+          "$eq" = "dev"
+        }
+      })
     },
   ]
 }
@@ -57,13 +63,14 @@ resource "infisical_project_role" "biller" {
 ### Required
 
 - `name` (String) The name for the new role
-- `permissions` (Attributes List) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
 - `project_slug` (String) The slug of the project to create role
 - `slug` (String) The slug for the new role
 
 ### Optional
 
 - `description` (String) The description for the new role. Defaults to an empty string.
+- `permissions` (Attributes List) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
+- `permissions_v2` (Attributes Set) The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 
 ### Read-Only
 
@@ -88,3 +95,18 @@ Optional:
 
 - `environment` (String) The environment slug this permission should allow.
 - `secret_path` (String) The secret path this permission should be scoped to
+
+
+
+<a id="nestedatt--permissions_v2"></a>
+### Nested Schema for `permissions_v2`
+
+Required:
+
+- `action` (Set of String) Describe what actions an entity can take.
+- `subject` (String) Describe the entity the permission pertains to.
+
+Optional:
+
+- `conditions` (String) When specified, only matching conditions will be allowed to access given resource.
+- `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.

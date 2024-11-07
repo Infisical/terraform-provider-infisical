@@ -10,3 +10,8 @@ var SlugRegexValidator = stringvalidator.RegexMatches(
 	regexp.MustCompile(`^[a-z0-9_-]*$`),
 	"invalid slug, slugs must be lowercase alphanumeric characters and hyphens only (example-slug-1)",
 )
+
+var JsonStringValidator = stringvalidator.RegexMatches(
+	regexp.MustCompile(`^[\[{].*[\]}]$`),
+	"must be a valid JSON string",
+)
