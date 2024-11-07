@@ -40,9 +40,8 @@ resource "infisical_project_role" "biller" {
   slug         = "tester"
   permissions_v2 = [
     {
-      subject  = "integrations"
-      action   = ["read", "create"]
-      inverted = true
+      subject = "integrations"
+      action  = ["read", "create"]
     },
     {
       subject = "secrets"
@@ -53,7 +52,6 @@ resource "infisical_project_role" "biller" {
           "$eq" = "dev"
         }
       })
-      inverted = false
     },
   ]
 }
@@ -71,7 +69,7 @@ resource "infisical_project_role" "biller" {
 ### Optional
 
 - `description` (String) The description for the new role. Defaults to an empty string.
-- `permissions` (Attributes List, Deprecated) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
+- `permissions` (Attributes List) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
 - `permissions_v2` (Attributes Set) The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 
 ### Read-Only
@@ -106,9 +104,9 @@ Optional:
 Required:
 
 - `action` (Set of String) Describe what actions an entity can take.
-- `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.
 - `subject` (String) Describe the entity the permission pertains to.
 
 Optional:
 
 - `conditions` (String) When specified, only matching conditions will be allowed to access given resource.
+- `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.

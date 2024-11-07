@@ -48,14 +48,13 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
   identity_id  = infisical_project_identity.test-identity.identity_id
   permissions_v2 = [
     {
-      action   = ["read", "edit"]
+      action   = ["edit"]
       subject  = "secret-folders",
       inverted = true,
     },
     {
-      action   = ["read", "edit"]
-      subject  = "secrets",
-      inverted = false,
+      action  = ["read", "edit"]
+      subject = "secrets",
       conditions = jsonencode({
         environment = {
           "$in" = ["dev", "prod"]
@@ -81,7 +80,7 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
 ### Optional
 
 - `is_temporary` (Boolean) Flag to indicate the assigned specific privilege is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
-- `permission` (Attributes, Deprecated) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege (see [below for nested schema](#nestedatt--permission))
+- `permission` (Attributes) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege (see [below for nested schema](#nestedatt--permission))
 - `permissions_v2` (Attributes Set) The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 - `slug` (String) The slug for the new privilege
 - `temporary_access_end_time` (String) ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time
@@ -121,9 +120,9 @@ Optional:
 Required:
 
 - `action` (Set of String) Describe what actions an entity can take.
-- `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.
 - `subject` (String) Describe the entity the permission pertains to.
 
 Optional:
 
 - `conditions` (String) When specified, only matching conditions will be allowed to access given resource.
+- `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.

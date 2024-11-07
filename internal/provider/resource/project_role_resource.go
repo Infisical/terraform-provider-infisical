@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -132,7 +133,9 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 						},
 						"inverted": schema.BoolAttribute{
 							Description: "Whether rule forbids. Set this to true if permission forbids.",
-							Required:    true,
+							Optional:    true,
+							Default:     booldefault.StaticBool(false),
+							Computed:    true,
 						},
 						"conditions": schema.StringAttribute{
 							Optional:    true,
@@ -148,9 +151,8 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"permissions": schema.ListNestedAttribute{
-				Optional:           true,
-				DeprecationMessage: "Use permissions_v2 instead as it allows you to be more granular with access control. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2",
-				Description:        "(DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role",
+				Optional:    true,
+				Description: "(DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.StringAttribute{

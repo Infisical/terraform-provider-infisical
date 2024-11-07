@@ -33,14 +33,13 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
   identity_id  = infisical_project_identity.test-identity.identity_id
   permissions_v2 = [
     {
-      action   = ["read", "edit"]
+      action   = ["edit"]
       subject  = "secret-folders",
       inverted = true,
     },
     {
-      action   = ["read", "edit"]
-      subject  = "secrets",
-      inverted = false,
+      action  = ["read", "edit"]
+      subject = "secrets",
       conditions = jsonencode({
         environment = {
           "$in" = ["dev", "prod"]

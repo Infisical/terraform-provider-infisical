@@ -25,9 +25,8 @@ resource "infisical_project_role" "biller" {
   slug         = "tester"
   permissions_v2 = [
     {
-      subject  = "integrations"
-      action   = ["read", "create"]
-      inverted = true
+      subject = "integrations"
+      action  = ["read", "create"]
     },
     {
       subject = "secrets"
@@ -38,7 +37,6 @@ resource "infisical_project_role" "biller" {
           "$eq" = "dev"
         }
       })
-      inverted = false
     },
   ]
 }

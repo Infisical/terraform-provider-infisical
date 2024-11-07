@@ -136,9 +136,8 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"permission": schema.SingleNestedAttribute{
-				Optional:           true,
-				Description:        "(DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege",
-				DeprecationMessage: "Use permissions_v2 instead as it allows you to be more granular with access control. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2",
+				Optional:    true,
+				Description: "(DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege",
 				Attributes: map[string]schema.Attribute{
 					"actions": schema.ListAttribute{
 						ElementType: types.StringType,
@@ -181,7 +180,9 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 						},
 						"inverted": schema.BoolAttribute{
 							Description: "Whether rule forbids. Set this to true if permission forbids.",
-							Required:    true,
+							Optional:    true,
+							Default:     booldefault.StaticBool(false),
+							Computed:    true,
 						},
 						"conditions": schema.StringAttribute{
 							Optional:    true,
