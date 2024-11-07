@@ -71,7 +71,7 @@ resource "infisical_project_role" "biller" {
 ### Optional
 
 - `description` (String) The description for the new role. Defaults to an empty string.
-- `permissions` (Attributes List, Deprecated) (DEPRECATED, USE permissions_v2) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
+- `permissions` (Attributes List, Deprecated) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
 - `permissions_v2` (Attributes Set) The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 
 ### Read-Only
