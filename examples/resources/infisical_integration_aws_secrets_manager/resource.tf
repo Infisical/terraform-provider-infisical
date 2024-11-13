@@ -23,8 +23,11 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
   secrets_manager_path = "/example/secrets" # Only required if mapping_behavior is one-to-one
   mapping_behavior     = "one-to-one"       # Optional, default is many-to-one
 
+  # AWS Authentication
   access_key_id     = "<aws-access-key-id>"
   secret_access_key = "<aws-secret-access-key>"
+  # OR
+  assume_role_arn = "arn:aws:iam::<aws-account-id>:role/<role-name>"
 
   options = {
     secret_prefix = "<optional-prefix>"

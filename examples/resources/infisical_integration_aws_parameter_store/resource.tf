@@ -21,9 +21,14 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
   secret_path          = "<infisical-secrets-path>" // example, /folder, or /
   parameter_store_path = "/example/secrets"
 
-  aws_region        = "<aws-region>" // example, us-east-2
+  aws_region = "<aws-region>" // example, us-east-2
+
+  # AWS Authentication
   access_key_id     = "<aws-access-key-id>"
   secret_access_key = "<aws-secret-access-key>"
+  # OR
+  assume_role_arn = "arn:aws:iam::<aws-account-id>:role/<role-name>"
+
 
   // Optional
   options = {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/input"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -45,7 +46,9 @@ type AwsSecretsManagerOptions struct {
 type IntegrationAWSSecretsManagerResourceModel struct {
 	AccessKeyID     types.String `tfsdk:"access_key_id"`
 	SecretAccessKey types.String `tfsdk:"secret_access_key"`
-	ProjectID       types.String `tfsdk:"project_id"`
+	AssumeRoleArn   types.String `tfsdk:"assume_role_arn"`
+
+	ProjectID types.String `tfsdk:"project_id"`
 
 	IntegrationAuthID types.String `tfsdk:"integration_auth_id"`
 	IntegrationID     types.String `tfsdk:"integration_id"`
@@ -134,15 +137,21 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 
 			"access_key_id": schema.StringAttribute{
 				Sensitive:     true,
-				Required:      true,
-				Description:   "The AWS access key ID. Used to authenticate with AWS Secrets Manager.",
+				Optional:      true,
+				Description:   "The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"secret_access_key": schema.StringAttribute{
 				Sensitive:     true,
-				Required:      true,
-				Description:   "The AWS secret access key. Used to authenticate with AWS Secrets Manager.",
+				Optional:      true,
+				Description:   "The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+
+			"assume_role_arn": schema.StringAttribute{
+				Optional:      true,
+				Description:   "The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
@@ -232,13 +241,30 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		return
 	}
 
-	// Create integration auth first
-	auth, err := r.client.CreateIntegrationAuth(infisical.CreateIntegrationAuthRequest{
-		AccessId:    plan.AccessKeyID.ValueString(),
-		AccessToken: plan.SecretAccessKey.ValueString(),
+	authMethod, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error validating AWS credentials",
+			err.Error(),
+		)
+		return
+	}
+
+	createIntegrationAuthRequest := infisical.CreateIntegrationAuthRequest{
 		ProjectID:   plan.ProjectID.ValueString(),
 		Integration: infisical.IntegrationAuthTypeAwsSecretsManager,
-	})
+	}
+
+	if authMethod == pkg.AwsAuthMethodAccessKey {
+		createIntegrationAuthRequest.AccessId = plan.AccessKeyID.ValueString()
+		createIntegrationAuthRequest.AccessToken = plan.SecretAccessKey.ValueString()
+	} else if authMethod == pkg.AwsAuthMethodAssumeRole {
+		createIntegrationAuthRequest.AWSAssumeIamRoleArn = plan.AssumeRoleArn.ValueString()
+	}
+
+	// Create integration auth first
+	auth, err := r.client.CreateIntegrationAuth(createIntegrationAuthRequest)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -328,6 +354,16 @@ func (r *IntegrationAWSSecretsManagerResource) Read(ctx context.Context, req res
 		return
 	}
 
+	_, err := pkg.ValidateAwsInputCredentials(state.AccessKeyID, state.SecretAccessKey, state.AssumeRoleArn)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error validating AWS credentials",
+			err.Error(),
+		)
+		return
+	}
+
 	integration, err := r.client.GetIntegration(infisical.GetIntegrationRequest{
 		ID: state.IntegrationID.ValueString(),
 	})
@@ -408,6 +444,16 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		return
 	}
 
+	_, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error validating AWS credentials",
+			err.Error(),
+		)
+		return
+	}
+
 	var planOptions AwsSecretsManagerOptions
 
 	if !plan.Options.IsNull() {
@@ -476,7 +522,17 @@ func (r *IntegrationAWSSecretsManagerResource) Delete(ctx context.Context, req r
 		return
 	}
 
-	_, err := r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
+	_, err := pkg.ValidateAwsInputCredentials(state.AccessKeyID, state.SecretAccessKey, state.AssumeRoleArn)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error validating AWS credentials",
+			err.Error(),
+		)
+		return
+	}
+
+	_, err = r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
 		ID: state.IntegrationAuthID.ValueString(),
 	})
 

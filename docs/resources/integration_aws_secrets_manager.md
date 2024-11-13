@@ -38,8 +38,11 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
   secrets_manager_path = "/example/secrets" # Only required if mapping_behavior is one-to-one
   mapping_behavior     = "one-to-one"       # Optional, default is many-to-one
 
+  # AWS Authentication
   access_key_id     = "<aws-access-key-id>"
   secret_access_key = "<aws-secret-access-key>"
+  # OR
+  assume_role_arn = "arn:aws:iam::<aws-account-id>:role/<role-name>"
 
   options = {
     secret_prefix = "<optional-prefix>"
@@ -58,17 +61,18 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
 
 ### Required
 
-- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager.
 - `aws_region` (String) The AWS region to sync secrets to. (us-east-1, us-east-2, etc)
 - `environment` (String) The slug of the environment to sync to AWS Secrets Manager (prod, dev, staging, etc).
 - `project_id` (String) The ID of your Infisical project.
-- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager.
 - `secret_path` (String) The secret path in Infisical to sync secrets from.
 
 ### Optional
 
+- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
+- `assume_role_arn` (String) The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 - `mapping_behavior` (String) The behavior of the mapping. Can be 'many-to-one' or 'one-to-one'. Many to One: All Infisical secrets will be mapped to a single AWS secret. One to One: Each Infisical secret will be mapped to its own AWS secret.
 - `options` (Attributes) Integration options (see [below for nested schema](#nestedatt--options))
+- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 - `secrets_manager_path` (String) The path in AWS Secrets Manager to sync secrets to. This is required if mapping_behavior is 'many-to-one'.
 
 ### Read-Only
