@@ -30,6 +30,10 @@ func TestAccProject(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				ConfigFile: config.StaticFile("./testdata/project_resource/project_1.tf"),
+				ConfigVariables: config.Variables{
+					"project_name": config.StringVariable(randomName),
+					"project_slug": config.StringVariable(slug),
+				},
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectNonEmptyPlan(),
@@ -65,14 +69,14 @@ func TestAccProject(t *testing.T) {
 						},
 					),
 				},
-				ConfigVariables: config.Variables{
-					"project_name": config.StringVariable(randomName),
-					"project_slug": config.StringVariable(slug),
-				},
 			},
 			// check for drift
 			{
 				ConfigFile: config.StaticFile("./testdata/project_resource/project_1.tf"),
+				ConfigVariables: config.Variables{
+					"project_name": config.StringVariable(randomName),
+					"project_slug": config.StringVariable(slug),
+				},
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectEmptyPlan(),
@@ -86,13 +90,13 @@ func TestAccProject(t *testing.T) {
 					statecheck.ExpectKnownValue(projectResource, tfjsonpath.New("name"), knownvalue.StringExact(randomName)),
 					statecheck.ExpectKnownValue(projectResource, tfjsonpath.New("slug"), knownvalue.StringExact(slug)),
 				},
-				ConfigVariables: config.Variables{
-					"project_name": config.StringVariable(randomName),
-					"project_slug": config.StringVariable(slug),
-				},
 			},
 			{
 				ConfigFile: config.StaticFile("./testdata/project_resource/project_1.tf"),
+				ConfigVariables: config.Variables{
+					"project_name": config.StringVariable(changedRandomName),
+					"project_slug": config.StringVariable(slug),
+				},
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectNonEmptyPlan(),
@@ -125,10 +129,6 @@ func TestAccProject(t *testing.T) {
 							return nil
 						},
 					),
-				},
-				ConfigVariables: config.Variables{
-					"project_name": config.StringVariable(changedRandomName),
-					"project_slug": config.StringVariable(slug),
 				},
 			},
 		},
