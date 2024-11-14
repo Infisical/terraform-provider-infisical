@@ -36,9 +36,14 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
   secret_path          = "<infisical-secrets-path>" // example, /folder, or /
   parameter_store_path = "/example/secrets"
 
-  aws_region        = "<aws-region>" // example, us-east-2
+  aws_region = "<aws-region>" // example, us-east-2
+
+  # AWS Authentication
   access_key_id     = "<aws-access-key-id>"
   secret_access_key = "<aws-secret-access-key>"
+  # OR
+  assume_role_arn = "arn:aws:iam::<aws-account-id>:role/<role-name>"
+
 
   // Optional
   options = {
@@ -58,17 +63,18 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
 
 ### Required
 
-- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager.
 - `aws_region` (String) The AWS region to sync secrets to. (us-east-1, us-east-2, etc)
 - `environment` (String) The slug of the environment to sync to AWS Parameter Store (prod, dev, staging, etc).
 - `parameter_store_path` (String) The path in AWS Parameter Store to sync secrets to.
 - `project_id` (String) The ID of your Infisical project.
-- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager.
 - `secret_path` (String) The secret path in Infisical to sync secrets from.
 
 ### Optional
 
+- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
+- `assume_role_arn` (String) The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 - `options` (Attributes) Integration options (see [below for nested schema](#nestedatt--options))
+- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 
 ### Read-Only
 
