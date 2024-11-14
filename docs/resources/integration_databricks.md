@@ -48,7 +48,7 @@ resource "infisical_integration_databricks" "db-integration" {
 
 - `databricks_host` (String) The Databricks host URL.
 - `databricks_secret_scope` (String) The Databricks secret scope. Example: your-secret-scope
-- `databricks_token` (String) The Databricks access token.
+- `databricks_token` (String, Sensitive) The Databricks access token.
 - `environment` (String) The slug of the environment to sync to Databricks (prod, dev, staging, etc).
 - `project_id` (String) The ID of your Infisical project.
 - `secret_path` (String) The secret path in Infisical to sync secrets from.

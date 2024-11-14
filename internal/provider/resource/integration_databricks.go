@@ -87,6 +87,7 @@ func (r *IntegrationDatabricksResource) Schema(_ context.Context, _ resource.Sch
 
 			"databricks_token": schema.StringAttribute{
 				Required:      true,
+				Sensitive:     true,
 				Description:   "The Databricks access token.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
