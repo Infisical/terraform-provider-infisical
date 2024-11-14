@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,15 +22,15 @@ import (
 var infisicalApiClient *infisicalclient.Client
 
 func init() {
+	log.SetOutput(os.Stderr)
 	rootDir, err := findProjectRoot()
 	if err != nil {
-		fmt.Errorf("Could not find root directory: %v", err)
+		log.Fatalf("Could not find root directory: %v", err)
 		os.Exit(1)
 	}
 
 	if err := loadEnvFile(filepath.Join(rootDir, ".env")); err != nil {
-		fmt.Errorf("Could not load .env file: %v", err)
-		os.Exit(1)
+		log.Fatalf("Could not load .env file: %v", err)
 	}
 
 	env_values := []string{}
@@ -39,7 +40,6 @@ func init() {
 			env_values = append(env_values, v)
 		} else {
 			fmt.Errorf("%s must be set for acceptance tests", err)
-			os.Exit(1)
 		}
 	}
 
@@ -50,8 +50,7 @@ func init() {
 		ClientSecret: env_values[2],
 	})
 	if err != nil {
-		fmt.Errorf("Failed to initialize infisical api client: %v", err)
-		os.Exit(1)
+		log.Fatalf("Failed to initialize infisical api client: %v", err)
 	}
 }
 

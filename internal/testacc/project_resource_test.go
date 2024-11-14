@@ -49,6 +49,7 @@ func TestAccProject(t *testing.T) {
 							if err != nil {
 								return err
 							}
+
 							projectDetail, err := infisicalApiClient.GetProjectById(infisicalclient.GetProjectByIdRequest{
 								ID: id.(string),
 							})

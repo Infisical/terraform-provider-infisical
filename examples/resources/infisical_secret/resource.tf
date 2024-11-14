@@ -8,44 +8,19 @@ terraform {
 }
 
 provider "infisical" {
-  host          = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  client_id     = "<>"
-  client_secret = "<>"
+  host          = "http://localhost:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
+  client_id     = "8c1dcb47-e351-4898-b23f-377eb9a6fc1b"
+  client_secret = "2d40c95991774ad60a8b64ef68859a79a00df322bc78da002976a12fbafcecf2"
 }
 
-resource "infisical_secret" "mongo_secret" {
-  name         = "MONGO_DB"
-  value        = "<some-key>"
+resource "infisical_secret" "test_secret" {
+  name         = "HELLO2"
+  value        = "world"
   env_slug     = "dev"
-  workspace_id = "PROJECT_ID"
+  workspace_id = "1e5341db-401a-4044-997c-7f229246a178"
   folder_path  = "/"
-}
-
-resource "infisical_secret" "smtp_secret" {
-  name         = "SMTP"
-  value        = "<some key>"
-  env_slug     = "dev"
-  workspace_id = "PROJECT_ID"
-  folder_path  = "/mail-service"
   secret_reminder = {
     note        = "Rotate this secret using X API"
     repeat_days = 30
   }
-}
-
-
-resource "infisical_secret_tag" "terraform" {
-  name       = "terraform"
-  slug       = "terraform"
-  color      = "#fff"
-  project_id = "PROJECT_ID"
-}
-
-resource "infisical_secret" "github_action_secret" {
-  name         = "GITHUB_ACTION"
-  value        = "<some value>"
-  env_slug     = "dev"
-  workspace_id = "PROJECT_ID"
-  folder_path  = "/"
-  tag_ids      = [infisical_secret_tag.terraform.id]
 }
