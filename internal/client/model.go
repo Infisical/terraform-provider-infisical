@@ -1543,11 +1543,12 @@ type RevokeIdentityKubernetesAuthResponse struct {
 }
 
 type CreateIntegrationAuthRequest struct {
-	AccessId     string              `json:"accessId"`
-	AccessToken  string              `json:"accessToken"`
-	RefreshToken string              `json:"refreshToken"`
-	ProjectID    string              `json:"workspaceId"`
-	Integration  IntegrationAuthType `json:"integration"`
+	AccessId            string              `json:"accessId,omitempty"`
+	AccessToken         string              `json:"accessToken,omitempty"`
+	AWSAssumeIamRoleArn string              `json:"awsAssumeIamRoleArn,omitempty"`
+	RefreshToken        string              `json:"refreshToken,omitempty"`
+	ProjectID           string              `json:"workspaceId"`
+	Integration         IntegrationAuthType `json:"integration"`
 }
 
 type CreateIntegrationAuthResponse struct {
