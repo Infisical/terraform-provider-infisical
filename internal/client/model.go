@@ -1549,6 +1549,7 @@ type CreateIntegrationAuthRequest struct {
 	RefreshToken        string              `json:"refreshToken,omitempty"`
 	ProjectID           string              `json:"workspaceId"`
 	Integration         IntegrationAuthType `json:"integration"`
+	URL                 string              `json:"url"`
 }
 
 type CreateIntegrationAuthResponse struct {

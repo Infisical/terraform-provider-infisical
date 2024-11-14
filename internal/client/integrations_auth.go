@@ -10,6 +10,7 @@ type IntegrationAuthType string
 const (
 	IntegrationAuthTypeGcpSecretManager  IntegrationAuthType = "gcp-secret-manager"
 	IntegrationAuthTypeAwsParameterStore IntegrationAuthType = "aws-parameter-store"
+	IntegrationAuthTypeDatabricks        IntegrationAuthType = "databricks"
 	IntegrationAuthTypeAwsSecretsManager IntegrationAuthType = "aws-secret-manager"
 	IntegrationAuthTypeCircleCi          IntegrationAuthType = "circleci"
 )
