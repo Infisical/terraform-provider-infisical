@@ -17,7 +17,8 @@ import (
 )
 
 func TestAccSecret_Simple(t *testing.T) {
-	projectName := "test-project"
+	projectName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+
 	type SecretResourceData struct {
 		ResourceName    string
 		Name            string
@@ -189,7 +190,7 @@ func TestAccSecret_Simple(t *testing.T) {
 }
 
 func TestAccSecret_WithNestedPath(t *testing.T) {
-	projectName := "test-project"
+	projectName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	type SecretResourceData struct {
 		ResourceName    string
 		Name            string
@@ -340,7 +341,7 @@ func TestAccSecret_WithNestedPath(t *testing.T) {
 }
 
 func TestAccSecret_WithSecretTag(t *testing.T) {
-	projectName := "test-project"
+	projectName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	type SecretResourceData struct {
 		ResourceName    string
 		Name            string

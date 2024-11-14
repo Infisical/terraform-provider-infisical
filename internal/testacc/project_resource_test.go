@@ -20,7 +20,7 @@ func TestAccProject(t *testing.T) {
 	randomName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	changedRandomName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 
-	slug := "test-project"
+	slug := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 
 	projectResource := "infisical_project.test_project"
 

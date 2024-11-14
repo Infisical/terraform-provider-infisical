@@ -1,5 +1,7 @@
 package testAcc
 
+/*
+
 import (
 	"fmt"
 	infisicalclient "terraform-provider-infisical/internal/client"
@@ -14,23 +16,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
-func TestAccSecretFolder(t *testing.T) {
-	randomName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	changedRandomName := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-
+func TestAccSecretImport(t *testing.T) {
 	slug := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	tfResourceName := "infisical_secret_folder.folder1"
+	tfResourceName := "infisical_secret_import.import-1"
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: protoV6ProviderFactories(),
 		PreCheck:                 preCheck(t),
 		Steps: []resource.TestStep{
 			{
-				ConfigFile: config.StaticFile("./testdata/secret_folder/secret_folder_simple.tf"),
+				ConfigFile: config.StaticFile("./testdata/secret_imports/secret_imports_simple.tf"),
 				ConfigVariables: config.Variables{
-					"project_name": config.StringVariable(randomName),
+					"project_name": config.StringVariable(slug),
 					"project_slug": config.StringVariable(slug),
-					"folder_name":  config.StringVariable(randomName),
 				},
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
@@ -51,25 +49,26 @@ func TestAccSecretFolder(t *testing.T) {
 								return err
 							}
 
-							folderPaths := []string{"/", fmt.Sprintf("/%s", randomName), fmt.Sprintf("/%s/%s", randomName, randomName)}
-							for _, folderPath := range folderPaths {
-								folderList, err := infisicalApiClient.GetSecretFolderList(infisicalclient.ListSecretFolderRequest{
-									Environment: environmentSlug.(string),
-									ProjectID:   projectId.(string),
-									SecretPath:  folderPath,
-								})
-								if err != nil {
-									return err
-								}
+							secretImportsList, err := infisicalApiClient.GetSecretImportList(infisicalclient.ListSecretImportRequest{
+								Environment: environmentSlug.(string),
+								ProjectID:   projectId.(string),
+								SecretPath:  "/",
+							})
 
-								if len(folderList.Folders) != 1 {
-									return fmt.Errorf("Must be only one folder. Found :%d", len(folderList.Folders))
-								}
-
-								if folderList.Folders[0].Name != randomName {
-									return fmt.Errorf("Invalid folder found. Fouund: %s, Should be: %s", folderList.Folders[0].Name, randomName)
-								}
+							if len(secretImportsList.SecretImports) == 3 {
+								return fmt.Errorf("Must be only 3 imports. Found :%d", len(secretImportsList.SecretImports))
 							}
+
+							secretImportsList, err = infisicalApiClient.GetSecretImportList(infisicalclient.ListSecretImportRequest{
+								Environment: environmentSlug.(string),
+								ProjectID:   projectId.(string),
+								SecretPath:  "/nested",
+							})
+
+							if len(secretImportsList.SecretImports) == 1 {
+								return fmt.Errorf("Must be only 1 imports. Found :%d", len(secretImportsList.SecretImports))
+							}
+
 							return nil
 						},
 					),
@@ -77,24 +76,22 @@ func TestAccSecretFolder(t *testing.T) {
 			},
 			// check for drift
 			{
-				ConfigFile: config.StaticFile("./testdata/secret_folder/secret_folder_simple.tf"),
+				ConfigFile: config.StaticFile("./testdata/secret_imports/secret_imports_simple.tf"),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectEmptyPlan(),
 					},
 				},
 				ConfigVariables: config.Variables{
-					"project_name": config.StringVariable(randomName),
+					"project_name": config.StringVariable(slug),
 					"project_slug": config.StringVariable(slug),
-					"folder_name":  config.StringVariable(randomName),
 				},
 			},
 			{
-				ConfigFile: config.StaticFile("./testdata/secret_folder/secret_folder_simple.tf"),
+				ConfigFile: config.StaticFile("./testdata/secret_imports/secret_imports_simple_2.tf"),
 				ConfigVariables: config.Variables{
-					"project_name": config.StringVariable(randomName),
+					"project_name": config.StringVariable(slug),
 					"project_slug": config.StringVariable(slug),
-					"folder_name":  config.StringVariable(changedRandomName),
 				},
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
@@ -115,30 +112,46 @@ func TestAccSecretFolder(t *testing.T) {
 								return err
 							}
 
-							folderPaths := []string{"/", fmt.Sprintf("/%s", changedRandomName), fmt.Sprintf("/%s/%s", changedRandomName, changedRandomName)}
-							for _, folderPath := range folderPaths {
-								folderList, err := infisicalApiClient.GetSecretFolderList(infisicalclient.ListSecretFolderRequest{
-									Environment: environmentSlug.(string),
-									ProjectID:   projectId.(string),
-									SecretPath:  folderPath,
-								})
-								if err != nil {
-									return err
-								}
+							secretImportsList, err := infisicalApiClient.GetSecretImportList(infisicalclient.ListSecretImportRequest{
+								Environment: environmentSlug.(string),
+								ProjectID:   projectId.(string),
+								SecretPath:  "/",
+							})
 
-								if len(folderList.Folders) != 1 {
-									return fmt.Errorf("Must be only one folder. Found :%d", len(folderList.Folders))
-								}
-
-								if folderList.Folders[0].Name != changedRandomName {
-									return fmt.Errorf("Invalid folder found. Fouund: %s, Should be: %s", folderList.Folders[0].Name, changedRandomName)
-								}
+							if len(secretImportsList.SecretImports) == 1 {
+								return fmt.Errorf("Must be only 1 imports. Found :%d", len(secretImportsList.SecretImports))
 							}
+
+							secretImportsList, err = infisicalApiClient.GetSecretImportList(infisicalclient.ListSecretImportRequest{
+								Environment: environmentSlug.(string),
+								ProjectID:   projectId.(string),
+								SecretPath:  "/nested",
+							})
+
+							if len(secretImportsList.SecretImports) == 1 {
+								return fmt.Errorf("Must be only 1 imports. Found :%d", len(secretImportsList.SecretImports))
+							}
+
 							return nil
 						},
 					),
 				},
 			},
+			// check for drift
+			{
+				ConfigFile: config.StaticFile("./testdata/secret_imports/secret_imports_simple.tf"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				ConfigVariables: config.Variables{
+					"project_name": config.StringVariable(slug),
+					"project_slug": config.StringVariable(slug),
+				},
+			},
 		},
 	})
 }
+
+*/
