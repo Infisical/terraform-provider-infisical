@@ -1547,9 +1547,9 @@ type CreateIntegrationAuthRequest struct {
 	AccessToken         string              `json:"accessToken,omitempty"`
 	AWSAssumeIamRoleArn string              `json:"awsAssumeIamRoleArn,omitempty"`
 	RefreshToken        string              `json:"refreshToken,omitempty"`
+	URL                 string              `json:"url,omitempty"`
 	ProjectID           string              `json:"workspaceId"`
 	Integration         IntegrationAuthType `json:"integration"`
-	URL                 string              `json:"url"`
 }
 
 type CreateIntegrationAuthResponse struct {
