@@ -21,6 +21,10 @@ import (
 
 var infisicalApiClient *infisicalclient.Client
 
+const IDENTITY_TEST_ORG_ID_ENV = "INFISICAL_TEST_ORG_ID"
+
+var testEnvironmentVariables = []string{infisicalclient.INFISICAL_HOST_NAME, infisicalclient.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME, infisicalclient.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME, IDENTITY_TEST_ORG_ID_ENV}
+
 func init() {
 	log.SetOutput(os.Stderr)
 	rootDir, err := findProjectRoot()
@@ -34,8 +38,7 @@ func init() {
 	}
 
 	env_values := []string{}
-	envs := []string{infisicalclient.INFISICAL_HOST_NAME, infisicalclient.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME, infisicalclient.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME}
-	for _, env := range envs {
+	for _, env := range testEnvironmentVariables {
 		if v := os.Getenv(env); v != "" {
 			env_values = append(env_values, v)
 		} else {
@@ -99,8 +102,7 @@ func preCheck(t *testing.T) func() {
 			t.Fatalf("Could not load .env file: %v", err)
 		}
 
-		envs := []string{infisicalclient.INFISICAL_HOST_NAME, infisicalclient.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME, infisicalclient.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME}
-		for _, env := range envs {
+		for _, env := range testEnvironmentVariables {
 			if v := os.Getenv(env); v == "" {
 				t.Fatalf("%s must be set for acceptance tests", env)
 			}
@@ -170,4 +172,12 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getIdentityOrgId() string {
+	if v := os.Getenv(IDENTITY_TEST_ORG_ID_ENV); v != "" {
+		return v
+	}
+	log.Fatalf("Missing org id environment variable")
+	return ""
 }
