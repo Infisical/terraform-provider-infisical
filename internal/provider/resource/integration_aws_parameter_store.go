@@ -133,14 +133,14 @@ func (r *IntegrationAWSParameterStoreResource) Schema(_ context.Context, _ resou
 			"access_key_id": schema.StringAttribute{
 				Sensitive:     true,
 				Optional:      true,
-				Description:   "The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
+				Description:   "The AWS access key ID. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"secret_access_key": schema.StringAttribute{
 				Sensitive:     true,
 				Optional:      true,
-				Description:   "The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
+				Description:   "The AWS secret access key. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
@@ -311,15 +311,6 @@ func (r *IntegrationAWSParameterStoreResource) Read(ctx context.Context, req res
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	_, err := pkg.ValidateAwsInputCredentials(state.AccessKeyID, state.SecretAccessKey, state.AssumeRoleArn)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error validating AWS credentials",
-			err.Error(),
-		)
-		return
-	}
 
 	integration, err := r.client.GetIntegration(infisical.GetIntegrationRequest{
 		ID: state.IntegrationID.ValueString(),
@@ -475,17 +466,7 @@ func (r *IntegrationAWSParameterStoreResource) Delete(ctx context.Context, req r
 		return
 	}
 
-	_, err := pkg.ValidateAwsInputCredentials(state.AccessKeyID, state.SecretAccessKey, state.AssumeRoleArn)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error validating AWS credentials",
-			err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
+	_, err := r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
 		ID: state.IntegrationAuthID.ValueString(),
 	})
 

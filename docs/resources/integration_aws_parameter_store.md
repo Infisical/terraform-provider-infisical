@@ -71,10 +71,10 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
 
 ### Optional
 
-- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
+- `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 - `assume_role_arn` (String) The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 - `options` (Attributes) Integration options (see [below for nested schema](#nestedatt--options))
-- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
+- `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 
 ### Read-Only
 

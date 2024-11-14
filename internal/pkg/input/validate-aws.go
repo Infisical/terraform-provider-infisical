@@ -9,7 +9,7 @@ import (
 func ValidateAwsInputCredentials(accessKeyId basetypes.StringValue, secretAccessKey basetypes.StringValue, assumeRoleArn basetypes.StringValue) (AwsAuthenticationMethod, error) {
 
 	// No credentials provided at all
-	if assumeRoleArn.ValueString() == "" && (accessKeyId.ValueString() == "" || secretAccessKey.ValueString() == "") {
+	if assumeRoleArn.ValueString() == "" && (accessKeyId.ValueString() == "" && secretAccessKey.ValueString() == "") {
 		return "", fmt.Errorf("No credentials provided. Either set access_key_id and secret_access_key, or assume_role_arn.")
 	}
 

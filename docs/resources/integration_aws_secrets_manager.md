@@ -69,7 +69,7 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
 ### Optional
 
 - `access_key_id` (String, Sensitive) The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
-- `assume_role_arn` (String) The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
+- `assume_role_arn` (String) The ARN of the role to assume when syncing secrets to AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.
 - `mapping_behavior` (String) The behavior of the mapping. Can be 'many-to-one' or 'one-to-one'. Many to One: All Infisical secrets will be mapped to a single AWS secret. One to One: Each Infisical secret will be mapped to its own AWS secret.
 - `options` (Attributes) Integration options (see [below for nested schema](#nestedatt--options))
 - `secret_access_key` (String, Sensitive) The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.

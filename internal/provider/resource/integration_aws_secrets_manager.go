@@ -151,7 +151,7 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 
 			"assume_role_arn": schema.StringAttribute{
 				Optional:      true,
-				Description:   "The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
+				Description:   "The ARN of the role to assume when syncing secrets to AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
@@ -354,16 +354,6 @@ func (r *IntegrationAWSSecretsManagerResource) Read(ctx context.Context, req res
 		return
 	}
 
-	_, err := pkg.ValidateAwsInputCredentials(state.AccessKeyID, state.SecretAccessKey, state.AssumeRoleArn)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error validating AWS credentials",
-			err.Error(),
-		)
-		return
-	}
-
 	integration, err := r.client.GetIntegration(infisical.GetIntegrationRequest{
 		ID: state.IntegrationID.ValueString(),
 	})
@@ -522,17 +512,7 @@ func (r *IntegrationAWSSecretsManagerResource) Delete(ctx context.Context, req r
 		return
 	}
 
-	_, err := pkg.ValidateAwsInputCredentials(state.AccessKeyID, state.SecretAccessKey, state.AssumeRoleArn)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error validating AWS credentials",
-			err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
+	_, err := r.client.DeleteIntegrationAuth(infisical.DeleteIntegrationAuthRequest{
 		ID: state.IntegrationAuthID.ValueString(),
 	})
 
