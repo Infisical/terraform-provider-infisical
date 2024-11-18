@@ -35,6 +35,7 @@ func TestAccIdentity_UniversalAuth(t *testing.T) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectNonEmptyPlan(),
+						plancheck.ExpectUnknownOutputValue("client_secret"),
 					},
 				},
 				ConfigStateChecks: []statecheck.StateCheck{
