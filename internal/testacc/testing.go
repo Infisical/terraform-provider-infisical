@@ -42,7 +42,7 @@ func init() {
 		if v := os.Getenv(env); v != "" {
 			env_values = append(env_values, v)
 		} else {
-			fmt.Errorf("%s must be set for acceptance tests", err)
+			log.Fatalf("%v must be set for acceptance tests", err)
 		}
 	}
 
@@ -91,7 +91,7 @@ func protoV6ProviderFactories() map[string]func() (tfprotov6.ProviderServer, err
 	}
 }
 
-// preCheck checks if all conditions for an acceptance test are
+// preCheck checks if all conditions for an acceptance test are.
 func preCheck(t *testing.T) func() {
 	return func() {
 		rootDir, err := findProjectRoot()
@@ -167,12 +167,12 @@ func loadEnvFile(filename string) error {
 	return godotenv.Load(filename)
 }
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
+// func getEnv(key, fallback string) string {
+// 	if value, ok := os.LookupEnv(key); ok {
+// 		return value
+// 	}
+// 	return fallback
+// }
 
 func getIdentityOrgId() string {
 	if v := os.Getenv(IDENTITY_TEST_ORG_ID_ENV); v != "" {

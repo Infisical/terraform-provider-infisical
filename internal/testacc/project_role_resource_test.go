@@ -51,6 +51,9 @@ func TestAccProjectRole(t *testing.T) {
 								ProjectSlug: projectSlug.(string),
 								RoleSlug:    roleName,
 							})
+							if err != nil {
+								return err
+							}
 
 							slug, err := tfjsonpath.Traverse(resource.AttributeValues, tfjsonpath.New("slug"))
 							if err != nil {
@@ -109,6 +112,9 @@ func TestAccProjectRole(t *testing.T) {
 								ProjectSlug: projectSlug.(string),
 								RoleSlug:    roleName,
 							})
+							if err != nil {
+								return err
+							}
 
 							slug, err := tfjsonpath.Traverse(resource.AttributeValues, tfjsonpath.New("slug"))
 							if err != nil {

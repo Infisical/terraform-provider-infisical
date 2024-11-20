@@ -56,6 +56,9 @@ func TestAccProjectUser(t *testing.T) {
 								ProjectID: projectId.(string),
 								Username:  email,
 							})
+							if err != nil {
+								return err
+							}
 
 							membershipId, err := tfjsonpath.Traverse(resource.AttributeValues, tfjsonpath.New("membership_id"))
 							if err != nil {

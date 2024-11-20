@@ -57,6 +57,9 @@ func TestAccProject(t *testing.T) {
 							projectDetail, err := infisicalApiClient.GetProjectById(infisicalclient.GetProjectByIdRequest{
 								ID: id.(string),
 							})
+							if err != nil {
+								return err
+							}
 
 							slug, err := tfjsonpath.Traverse(resource.AttributeValues, tfjsonpath.New("slug"))
 							if err != nil {
@@ -119,6 +122,10 @@ func TestAccProject(t *testing.T) {
 							projectDetail, err := infisicalApiClient.GetProjectById(infisicalclient.GetProjectByIdRequest{
 								ID: id.(string),
 							})
+							if err != nil {
+								return err
+							}
+
 							slug, err := tfjsonpath.Traverse(resource.AttributeValues, tfjsonpath.New("slug"))
 							if err != nil {
 								return err
