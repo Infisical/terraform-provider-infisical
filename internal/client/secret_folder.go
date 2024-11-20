@@ -91,6 +91,26 @@ func (client Client) UpdateSecretFolder(request UpdateSecretFolderRequest) (Upda
 	return body, nil
 }
 
+func (client Client) MoveSecretFolder(request MoveSecretFolderRequest) (UpdateSecretFolderResponse, error) {
+	var body UpdateSecretFolderResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("api/v1/folders/%s/move", request.ID))
+
+	if err != nil {
+		return UpdateSecretFolderResponse{}, fmt.Errorf("CallMoveSecretFolder: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return UpdateSecretFolderResponse{}, fmt.Errorf("CallMoveSecretFolder: Unsuccessful response. [response=%s]", string(response.Body()))
+	}
+
+	return body, nil
+}
+
 func (client Client) DeleteSecretFolder(request DeleteSecretFolderRequest) (DeleteSecretFolderResponse, error) {
 	var body DeleteSecretFolderResponse
 	response, err := client.Config.HttpClient.
