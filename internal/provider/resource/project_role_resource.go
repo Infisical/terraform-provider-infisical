@@ -117,7 +117,7 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"permissions_v2": schema.SetNestedAttribute{
+			"permissions_v2": schema.ListNestedAttribute{
 				Optional:    true,
 				Description: "The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
 				NestedObject: schema.NestedAttributeObject{
