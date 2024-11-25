@@ -83,5 +83,5 @@ jobs:
           INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
           INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
           INFISICAL_TEST_ORG_ID: ${{ secrets.INFISICAL_TEST_ORG_ID }}
-        run: go test ./... -v $(TESTARGS) -timeout 120m
+        run: make testacc
         timeout-minutes: 10

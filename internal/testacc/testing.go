@@ -42,7 +42,7 @@ func init() {
 		if v := os.Getenv(env); v != "" {
 			env_values = append(env_values, v)
 		} else {
-			log.Fatalf("%v must be set for acceptance tests", err)
+			log.Fatalf("%s must be set for acceptance tests", env)
 		}
 	}
 
