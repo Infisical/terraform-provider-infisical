@@ -6,7 +6,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 # Releases need permissions to read and write the repository contents.
 # GitHub considers creating releases and uploading assets as writing contents.
@@ -14,8 +14,14 @@ permissions:
   contents: write
 
 jobs:
+  tests:
+    name: Run tests before release
+    # https://docs.github.com/en/actions/using-workflows/reusing-workflows#overview
+    uses: ./.github/workflows/test.yml
+
   goreleaser:
     runs-on: ubuntu-latest
+    needs: [tests]
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
         with:
@@ -23,7 +29,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753 # v4.0.1
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           cache: true
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@72b6676b71ab476b77e676928516f6982eef7a41 # v5.3.0

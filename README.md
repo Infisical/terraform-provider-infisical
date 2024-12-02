@@ -1,6 +1,6 @@
-# Infisical Terraform Provider 
+# Infisical Terraform Provider
 
-# Usage 
+# Usage
 
 ```
 terraform {
@@ -39,7 +39,8 @@ output "single-secret" {
 }
 ```
 
-# Development  
+# Development
+
 Tutorials for creating Terraform providers can be found on the [HashiCorp Learn](https://learn.hashicorp.com/collections/terraform/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
 
 ## Requirements
@@ -55,9 +56,12 @@ To compile the provider, run `go install`. This will build the provider and put 
 
 To generate or update documentation, run `go generate`.
 
-In order to run the full suite of Acceptance tests, run `make testacc`.
+## Testing
 
-*Note:* Acceptance tests create real resources, and often cost money to run.
+In order to run the full suite of Acceptance tests
+
+- Set the following environment variables or save them in a .env file at the root. You can refer to the [example environment variable](./.env.test.example).
+- Run the following command from root
 
 ```shell
 make testacc
