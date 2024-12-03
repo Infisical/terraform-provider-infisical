@@ -1150,7 +1150,7 @@ type CreateProjectEnvironmentRequest struct {
 	Name      string `json:"name"`
 	Slug      string `json:"slug"`
 	ProjectID string `json:"workspaceId"`
-	Position  int64  `json:"position"`
+	Position  int64  `json:"position,omitempty"`
 }
 
 type CreateProjectEnvironmentResponse struct {
