@@ -1552,6 +1552,16 @@ type CreateIntegrationAuthRequest struct {
 	Integration         IntegrationAuthType `json:"integration"`
 }
 
+type UpdateIntegrationAuthRequest struct {
+	AccessId            string              `json:"accessId,omitempty"`
+	AccessToken         string              `json:"accessToken,omitempty"`
+	AWSAssumeIamRoleArn string              `json:"awsAssumeIamRoleArn,omitempty"`
+	RefreshToken        string              `json:"refreshToken,omitempty"`
+	URL                 string              `json:"url,omitempty"`
+	Integration         IntegrationAuthType `json:"integration"`
+	IntegrationAuthId   string              `json:"integrationAuthId"`
+}
+
 type CreateIntegrationAuthResponse struct {
 	IntegrationAuth struct {
 		ID string `json:"id"`
@@ -1661,6 +1671,8 @@ type UpdateIntegrationRequest struct {
 	Environment       string                 `json:"environment,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 	IsActive          bool                   `json:"isActive"`
+	Region            string                 `json:"region,omitempty"`
+	Path              string                 `json:"path,omitempty"`
 }
 
 type UpdateIntegrationResponse struct {

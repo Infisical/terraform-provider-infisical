@@ -253,11 +253,26 @@ func (r *IntegrationDatabricksResource) Update(ctx context.Context, req resource
 		return
 	}
 
+	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeDatabricks,
+		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		AccessToken:       plan.DatabricksAccessToken.ValueString(),
+		URL:               plan.DatabricksHostURL.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
+
 	// Update the integration
 	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
+		App:         plan.DatabricksSecretScope.ValueString(),
 	})
 
 	if err != nil {
