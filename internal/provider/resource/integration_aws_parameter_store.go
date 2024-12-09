@@ -214,7 +214,6 @@ func (r *IntegrationAWSParameterStoreResource) Create(ctx context.Context, req r
 	}
 
 	authMethod, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error validating AWS credentials",
@@ -392,8 +391,7 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		return
 	}
 
-	_, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
-
+	authMethod, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error validating AWS credentials",
@@ -412,6 +410,19 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		}
 	}
 
+	updateIntegrationAuthRequest := infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeAwsSecretsManager,
+		IntegrationAuthId: plan.IntegrationAuthID.String(),
+	}
+	if authMethod == pkg.AwsAuthMethodAccessKey {
+		updateIntegrationAuthRequest.AccessId = plan.AccessKeyID.ValueString()
+		updateIntegrationAuthRequest.AccessToken = plan.SecretAccessKey.ValueString()
+	} else if authMethod == pkg.AwsAuthMethodAssumeRole {
+		updateIntegrationAuthRequest.AWSAssumeIamRoleArn = plan.AssumeRoleArn.ValueString()
+	}
+
+	_, err = r.client.UpdateIntegrationAuth(updateIntegrationAuthRequest)
+
 	// Convert metadata to map[string]interface{} if needed
 	metadataMap := map[string]interface{}{}
 
@@ -428,6 +439,8 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		Metadata:    metadataMap,
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
+		Region:      plan.AWSRegion.ValueString(),
+		Path:        plan.AWSPath.String(),
 	})
 
 	if err != nil {

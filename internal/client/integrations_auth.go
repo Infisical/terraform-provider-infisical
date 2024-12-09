@@ -35,6 +35,26 @@ func (client Client) CreateIntegrationAuth(request CreateIntegrationAuthRequest)
 	return body, nil
 }
 
+func (client Client) UpdateIntegrationAuth(request UpdateIntegrationAuthRequest) (CreateIntegrationAuthResponse, error) {
+	var body CreateIntegrationAuthResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch("api/v1/integration-auth/" + request.IntegrationAuthId)
+
+	if err != nil {
+		return CreateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return CreateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+	}
+
+	return body, nil
+}
+
 // Deleting integration auth triggers a cascade effect, that will also delete the associated integration.
 func (client Client) DeleteIntegrationAuth(request DeleteIntegrationAuthRequest) (DeleteIntegrationAuthResponse, error) {
 	var body DeleteIntegrationAuthResponse

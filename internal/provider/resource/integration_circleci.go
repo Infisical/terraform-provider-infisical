@@ -256,11 +256,27 @@ func (r *IntegrationCircleCIResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
+	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeCircleCi,
+		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		AccessToken:       plan.CircleCIToken.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
+
 	// Update the integration
-	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	_, err = r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
+		App:         plan.CircleCIProjectID.ValueString(), // Needs to be the project slug
+		AppID:       plan.CircleCIProjectID.ValueString(), // Needs to be the project ID
+		Owner:       plan.CircleCIOrgSlug.ValueString(),   // Needs to be the organization slug
 	})
 
 	if err != nil {
