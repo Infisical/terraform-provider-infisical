@@ -422,6 +422,13 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 	}
 
 	_, err = r.client.UpdateIntegrationAuth(updateIntegrationAuthRequest)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
 
 	// Convert metadata to map[string]interface{} if needed
 	metadataMap := map[string]interface{}{}
