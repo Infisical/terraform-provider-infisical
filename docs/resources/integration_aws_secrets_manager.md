@@ -35,8 +35,8 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
 
   secret_path = "<infisical-secrets-path>" // example, /folder, or /
 
-  secrets_manager_path = "/example/secrets" # Only required if mapping_behavior is one-to-one
-  mapping_behavior     = "one-to-one"       # Optional, default is many-to-one
+  secrets_manager_path = "/example/secrets/" # Only required if mapping_behavior is one-to-one
+  mapping_behavior     = "one-to-one"        # Optional, default is many-to-one
 
   # AWS Authentication
   access_key_id     = "<aws-access-key-id>"
