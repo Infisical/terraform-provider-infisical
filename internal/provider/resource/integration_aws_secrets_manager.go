@@ -444,6 +444,22 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		}
 	}
 
+	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
+		resp.Diagnostics.AddError(
+			"Invalid plan",
+			"secrets_manager_path is required when mapping_behavior is 'many-to-one'",
+		)
+		return
+	}
+
+	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_ONE_TO_ONE && (!plan.AWSPath.IsNull() && plan.AWSPath.ValueString() != "") {
+		resp.Diagnostics.AddError(
+			"Invalid plan",
+			"secrets_manager_path should not be used when mapping_behavior is 'one-to-one'",
+		)
+		return
+	}
+
 	updateIntegrationAuthRequest := infisical.UpdateIntegrationAuthRequest{
 		Integration:       infisical.IntegrationAuthTypeAwsSecretsManager,
 		IntegrationAuthId: plan.IntegrationAuthID.String(),
@@ -470,22 +486,6 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		resp.Diagnostics.AddError(
 			"Error updating integration auth",
 			err.Error(),
-		)
-		return
-	}
-
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
-		resp.Diagnostics.AddError(
-			"Invalid plan",
-			"secrets_manager_path is required when mapping_behavior is 'many-to-one'",
-		)
-		return
-	}
-
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_ONE_TO_ONE && (!plan.AWSPath.IsNull() && plan.AWSPath.ValueString() != "") {
-		resp.Diagnostics.AddError(
-			"Invalid plan",
-			"secrets_manager_path should not be used when mapping_behavior is 'one-to-one'",
 		)
 		return
 	}

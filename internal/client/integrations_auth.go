@@ -35,8 +35,8 @@ func (client Client) CreateIntegrationAuth(request CreateIntegrationAuthRequest)
 	return body, nil
 }
 
-func (client Client) UpdateIntegrationAuth(request UpdateIntegrationAuthRequest) (CreateIntegrationAuthResponse, error) {
-	var body CreateIntegrationAuthResponse
+func (client Client) UpdateIntegrationAuth(request UpdateIntegrationAuthRequest) (UpdateIntegrationAuthResponse, error) {
+	var body UpdateIntegrationAuthResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
@@ -45,11 +45,11 @@ func (client Client) UpdateIntegrationAuth(request UpdateIntegrationAuthRequest)
 		Patch("api/v1/integration-auth/" + request.IntegrationAuthId)
 
 	if err != nil {
-		return CreateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unable to complete api request [err=%s]", err)
+		return UpdateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unable to complete api request [err=%s]", err)
 	}
 
 	if response.IsError() {
-		return CreateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unsuccessful response. [response=%s]", string(response.Body()))
 	}
 
 	return body, nil

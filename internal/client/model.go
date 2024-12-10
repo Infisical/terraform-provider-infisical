@@ -1568,6 +1568,12 @@ type CreateIntegrationAuthResponse struct {
 	} `json:"integrationAuth"`
 }
 
+type UpdateIntegrationAuthResponse struct {
+	IntegrationAuth struct {
+		ID string `json:"id"`
+	} `json:"integrationAuth"`
+}
+
 type DeleteIntegrationAuthRequest struct {
 	ID string `json:"id"`
 }
