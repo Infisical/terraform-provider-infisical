@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"terraform-provider-infisical/internal/pkg/terraform"
 
@@ -88,11 +88,14 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"bound_claims": schema.MapAttribute{
-				Description:   "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
-				Optional:      true,
-				Computed:      true,
-				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				Description: "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+					pkg.CommaSpaceMapModifier{},
+				},
 			},
 			"bound_subject": schema.StringAttribute{
 				Description:   "The expected principal that is the subject of the JWT.",
@@ -163,7 +166,7 @@ func (r *IdentityOidcAuthResource) Configure(_ context.Context, req resource.Con
 	r.client = client
 }
 
-func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityOidcAuthResourceModel, newIdentityOidcAuth *infisicalclient.IdentityOidcAuth) {
+func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityOidcAuthResourceModel, newIdentityOidcAuth *infisical.IdentityOidcAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityOidcAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityOidcAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityOidcAuth.AccessTokenNumUsesLimit)
@@ -309,7 +312,7 @@ func (r *IdentityOidcAuthResource) Read(ctx context.Context, req resource.ReadRe
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {
