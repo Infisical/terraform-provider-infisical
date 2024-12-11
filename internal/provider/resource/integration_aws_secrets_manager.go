@@ -130,29 +130,25 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 			},
 
 			"aws_region": schema.StringAttribute{
-				Required:      true,
-				Description:   "The AWS region to sync secrets to. (us-east-1, us-east-2, etc)",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The AWS region to sync secrets to. (us-east-1, us-east-2, etc)",
 			},
 
 			"access_key_id": schema.StringAttribute{
-				Sensitive:     true,
-				Optional:      true,
-				Description:   "The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Sensitive:   true,
+				Optional:    true,
+				Description: "The AWS access key ID. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 			},
 
 			"secret_access_key": schema.StringAttribute{
-				Sensitive:     true,
-				Optional:      true,
-				Description:   "The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Sensitive:   true,
+				Optional:    true,
+				Description: "The AWS secret access key. Used to authenticate with AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 			},
 
 			"assume_role_arn": schema.StringAttribute{
-				Optional:      true,
-				Description:   "The ARN of the role to assume when syncing secrets to AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:    true,
+				Description: "The ARN of the role to assume when syncing secrets to AWS Secrets Manager. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 			},
 
 			"project_id": schema.StringAttribute{
@@ -174,9 +170,8 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 			},
 
 			"secrets_manager_path": schema.StringAttribute{
-				Optional:      true,
-				Description:   "The path in AWS Secrets Manager to sync secrets to. This is required if mapping_behavior is 'many-to-one'.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:    true,
+				Description: "The path in AWS Secrets Manager to sync secrets to. This is required if mapping_behavior is 'many-to-one'.",
 			},
 
 			"secret_path": schema.StringAttribute{

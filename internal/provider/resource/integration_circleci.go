@@ -65,10 +65,9 @@ func (r *IntegrationCircleCIResource) Schema(_ context.Context, _ resource.Schem
 			},
 
 			"circleci_token": schema.StringAttribute{
-				Required:      true,
-				Sensitive:     true,
-				Description:   "Your personal CircleCI token to authenticate with.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Sensitive:   true,
+				Description: "Your personal CircleCI token to authenticate with.",
 			},
 
 			"project_id": schema.StringAttribute{
@@ -88,15 +87,13 @@ func (r *IntegrationCircleCIResource) Schema(_ context.Context, _ resource.Schem
 			},
 
 			"circleci_org_slug": schema.StringAttribute{
-				Required:      true,
-				Description:   "The organization slug of your CircleCI organization.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The organization slug of your CircleCI organization.",
 			},
 
 			"circleci_project_id": schema.StringAttribute{
-				Required:      true,
-				Description:   "The project ID of your CircleCI project.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The project ID of your CircleCI project.",
 			},
 		},
 	}

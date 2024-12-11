@@ -80,22 +80,19 @@ func (r *IntegrationDatabricksResource) Schema(_ context.Context, _ resource.Sch
 			},
 
 			"databricks_host": schema.StringAttribute{
-				Required:      true,
-				Description:   "The Databricks host URL.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The Databricks host URL.",
 			},
 
 			"databricks_token": schema.StringAttribute{
-				Required:      true,
-				Sensitive:     true,
-				Description:   "The Databricks access token.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Sensitive:   true,
+				Description: "The Databricks access token.",
 			},
 
 			"databricks_secret_scope": schema.StringAttribute{
-				Required:      true,
-				Description:   "The Databricks secret scope. Example: your-secret-scope",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The Databricks secret scope. Example: your-secret-scope",
 			},
 		},
 	}
