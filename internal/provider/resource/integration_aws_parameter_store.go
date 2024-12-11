@@ -407,7 +407,7 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 
 	updateIntegrationAuthRequest := infisical.UpdateIntegrationAuthRequest{
 		Integration:       infisical.IntegrationAuthTypeAwsSecretsManager,
-		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
 	}
 	if authMethod == pkg.AwsAuthMethodAccessKey {
 		updateIntegrationAuthRequest.AccessId = plan.AccessKeyID.ValueString()
@@ -442,7 +442,7 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
 		Region:      plan.AWSRegion.ValueString(),
-		Path:        plan.AWSPath.String(),
+		Path:        plan.AWSPath.ValueString(),
 	})
 
 	if err != nil {

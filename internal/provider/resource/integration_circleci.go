@@ -255,7 +255,7 @@ func (r *IntegrationCircleCIResource) Update(ctx context.Context, req resource.U
 
 	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
 		Integration:       infisical.IntegrationAuthTypeCircleCi,
-		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
 		AccessToken:       plan.CircleCIToken.ValueString(),
 	})
 	if err != nil {

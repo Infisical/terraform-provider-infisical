@@ -457,7 +457,7 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 
 	updateIntegrationAuthRequest := infisical.UpdateIntegrationAuthRequest{
 		Integration:       infisical.IntegrationAuthTypeAwsSecretsManager,
-		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
 	}
 
 	authMethod, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)

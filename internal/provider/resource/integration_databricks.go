@@ -252,7 +252,7 @@ func (r *IntegrationDatabricksResource) Update(ctx context.Context, req resource
 
 	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
 		Integration:       infisical.IntegrationAuthTypeDatabricks,
-		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
 		AccessToken:       plan.DatabricksAccessToken.ValueString(),
 		URL:               plan.DatabricksHostURL.ValueString(),
 	})

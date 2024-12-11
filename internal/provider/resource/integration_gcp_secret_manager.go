@@ -367,7 +367,7 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 
 	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
 		Integration:       infisical.IntegrationAuthTypeGcpSecretManager,
-		IntegrationAuthId: plan.IntegrationAuthID.String(),
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
 		RefreshToken:      plan.ServiceAccountJson.ValueString(),
 	})
 
