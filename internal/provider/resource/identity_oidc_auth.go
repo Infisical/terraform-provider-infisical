@@ -7,6 +7,7 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"terraform-provider-infisical/internal/pkg/terraform"
 
@@ -88,11 +89,14 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"bound_claims": schema.MapAttribute{
-				Description:   "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
-				Optional:      true,
-				Computed:      true,
-				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				Description: "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+					pkg.CommaSpaceMapModifier{},
+				},
 			},
 			"bound_subject": schema.StringAttribute{
 				Description:   "The expected principal that is the subject of the JWT.",
@@ -175,7 +179,28 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 
 	boundClaimsElements := make(map[string]attr.Value)
 	for key, value := range newIdentityOidcAuth.BoundClaims {
-		boundClaimsElements[key] = types.StringValue(value)
+		// Check plan format
+		useSpaces := false
+		if !plan.BoundClaims.IsNull() {
+			if planValue, ok := plan.BoundClaims.Elements()[key]; ok {
+				if planStr, ok := planValue.(types.String); ok {
+					useSpaces = strings.Contains(planStr.ValueString(), ", ")
+				}
+			}
+		}
+
+		// Split and normalize
+		parts := strings.Split(value, ",")
+		for i, part := range parts {
+			parts[i] = strings.TrimSpace(part)
+		}
+
+		// Use the same format as the plan
+		if useSpaces {
+			boundClaimsElements[key] = types.StringValue(strings.Join(parts, ", "))
+		} else {
+			boundClaimsElements[key] = types.StringValue(strings.Join(parts, ","))
+		}
 	}
 
 	boundClaimsMapValue, diags := types.MapValue(types.StringType, boundClaimsElements)
