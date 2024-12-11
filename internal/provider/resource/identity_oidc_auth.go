@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicalclient "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"terraform-provider-infisical/internal/pkg/terraform"
@@ -166,7 +167,7 @@ func (r *IdentityOidcAuthResource) Configure(_ context.Context, req resource.Con
 	r.client = client
 }
 
-func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityOidcAuthResourceModel, newIdentityOidcAuth *infisical.IdentityOidcAuth) {
+func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityOidcAuthResourceModel, newIdentityOidcAuth *infisicalclient.IdentityOidcAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityOidcAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityOidcAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityOidcAuth.AccessTokenNumUsesLimit)
@@ -178,7 +179,27 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 
 	boundClaimsElements := make(map[string]attr.Value)
 	for key, value := range newIdentityOidcAuth.BoundClaims {
-		boundClaimsElements[key] = types.StringValue(value)
+		// Check plan format
+		useSpaces := false
+		if !plan.BoundClaims.IsNull() {
+			if planValue, ok := plan.BoundClaims.Elements()[key]; ok {
+				planStr := planValue.(types.String).ValueString()
+				useSpaces = strings.Contains(planStr, ", ")
+			}
+		}
+
+		// Split and normalize
+		parts := strings.Split(value, ",")
+		for i, part := range parts {
+			parts[i] = strings.TrimSpace(part)
+		}
+
+		// Use the same format as the plan
+		if useSpaces {
+			boundClaimsElements[key] = types.StringValue(strings.Join(parts, ", "))
+		} else {
+			boundClaimsElements[key] = types.StringValue(strings.Join(parts, ","))
+		}
 	}
 
 	boundClaimsMapValue, diags := types.MapValue(types.StringType, boundClaimsElements)
@@ -312,7 +333,7 @@ func (r *IdentityOidcAuthResource) Read(ctx context.Context, req resource.ReadRe
 	})
 
 	if err != nil {
-		if err == infisical.ErrNotFound {
+		if err == infisicalclient.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {

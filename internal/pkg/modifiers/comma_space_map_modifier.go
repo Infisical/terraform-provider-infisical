@@ -27,21 +27,36 @@ func (m CommaSpaceMapModifier) PlanModifyMap(ctx context.Context, req planmodifi
 	planElements := req.PlanValue.Elements()
 	newElements := make(map[string]types.String)
 
+	// Check config format if available
+	var configFormat bool // true = spaces, false = no spaces
+	if !req.ConfigValue.IsNull() {
+		configElements := req.ConfigValue.Elements()
+		// Look at first value to determine format
+		for _, v := range configElements {
+			if str, ok := v.(types.String); ok && !str.IsNull() {
+				configFormat = strings.Contains(str.ValueString(), ", ")
+				break
+			}
+		}
+	}
+
 	for key, value := range planElements {
 		strValue := value.(types.String)
 		if !strValue.IsNull() && !strValue.IsUnknown() {
 			parts := strings.Split(strValue.ValueString(), ",")
-
-			// Trim spaces from each part and rejoin with ", "
 			for i, part := range parts {
 				parts[i] = strings.TrimSpace(part)
 			}
 
-			formattedValue := strings.Join(parts, ", ")
+			var formattedValue string
+			if configFormat {
+				formattedValue = strings.Join(parts, ", ")
+			} else {
+				formattedValue = strings.Join(parts, ",")
+			}
 
 			newElements[key] = types.StringValue(formattedValue)
 		} else {
-			// Preserve null/unknown values
 			newElements[key] = strValue
 		}
 	}
@@ -55,6 +70,7 @@ func (m CommaSpaceMapModifier) PlanModifyMap(ctx context.Context, req planmodifi
 	resp.PlanValue = newMapValue
 }
 
+// CommaSpaceMap returns a new instance of CommaSpaceMapModifier
 func CommaSpaceMap() CommaSpaceMapModifier {
 	return CommaSpaceMapModifier{}
 }
