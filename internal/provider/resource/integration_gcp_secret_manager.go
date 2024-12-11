@@ -365,6 +365,20 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		return
 	}
 
+	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeGcpSecretManager,
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
+		RefreshToken:      plan.ServiceAccountJson.ValueString(),
+	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
+
 	var options struct {
 		SecretPrefix types.String `tfsdk:"secret_prefix"`
 		SecretSuffix types.String `tfsdk:"secret_suffix"`
@@ -376,7 +390,7 @@ func (r *IntegrationGCPSecretManagerResource) Update(ctx context.Context, req re
 		"secretSuffix": options.SecretSuffix.ValueString(),
 	}
 
-	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	_, err = r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		IsActive:    true,
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),

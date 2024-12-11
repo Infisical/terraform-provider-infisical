@@ -80,22 +80,19 @@ func (r *IntegrationDatabricksResource) Schema(_ context.Context, _ resource.Sch
 			},
 
 			"databricks_host": schema.StringAttribute{
-				Required:      true,
-				Description:   "The Databricks host URL.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The Databricks host URL.",
 			},
 
 			"databricks_token": schema.StringAttribute{
-				Required:      true,
-				Sensitive:     true,
-				Description:   "The Databricks access token.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Sensitive:   true,
+				Description: "The Databricks access token.",
 			},
 
 			"databricks_secret_scope": schema.StringAttribute{
-				Required:      true,
-				Description:   "The Databricks secret scope. Example: your-secret-scope",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The Databricks secret scope. Example: your-secret-scope",
 			},
 		},
 	}
@@ -253,11 +250,26 @@ func (r *IntegrationDatabricksResource) Update(ctx context.Context, req resource
 		return
 	}
 
+	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeDatabricks,
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
+		AccessToken:       plan.DatabricksAccessToken.ValueString(),
+		URL:               plan.DatabricksHostURL.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
+
 	// Update the integration
 	updatedIntegration, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
+		App:         plan.DatabricksSecretScope.ValueString(),
 	})
 
 	if err != nil {

@@ -65,10 +65,9 @@ func (r *IntegrationCircleCIResource) Schema(_ context.Context, _ resource.Schem
 			},
 
 			"circleci_token": schema.StringAttribute{
-				Required:      true,
-				Sensitive:     true,
-				Description:   "Your personal CircleCI token to authenticate with.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Sensitive:   true,
+				Description: "Your personal CircleCI token to authenticate with.",
 			},
 
 			"project_id": schema.StringAttribute{
@@ -88,15 +87,13 @@ func (r *IntegrationCircleCIResource) Schema(_ context.Context, _ resource.Schem
 			},
 
 			"circleci_org_slug": schema.StringAttribute{
-				Required:      true,
-				Description:   "The organization slug of your CircleCI organization.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The organization slug of your CircleCI organization.",
 			},
 
 			"circleci_project_id": schema.StringAttribute{
-				Required:      true,
-				Description:   "The project ID of your CircleCI project.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The project ID of your CircleCI project.",
 			},
 		},
 	}
@@ -256,11 +253,27 @@ func (r *IntegrationCircleCIResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
+	_, err := r.client.UpdateIntegrationAuth(infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeCircleCi,
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
+		AccessToken:       plan.CircleCIToken.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
+
 	// Update the integration
-	_, err := r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
+	_, err = r.client.UpdateIntegration(infisical.UpdateIntegrationRequest{
 		ID:          state.IntegrationID.ValueString(),
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
+		App:         plan.CircleCIProjectID.ValueString(), // Needs to be the project slug
+		AppID:       plan.CircleCIProjectID.ValueString(), // Needs to be the project ID
+		Owner:       plan.CircleCIOrgSlug.ValueString(),   // Needs to be the organization slug
 	})
 
 	if err != nil {

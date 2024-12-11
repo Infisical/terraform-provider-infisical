@@ -125,29 +125,25 @@ func (r *IntegrationAWSParameterStoreResource) Schema(_ context.Context, _ resou
 			},
 
 			"aws_region": schema.StringAttribute{
-				Required:      true,
-				Description:   "The AWS region to sync secrets to. (us-east-1, us-east-2, etc)",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The AWS region to sync secrets to. (us-east-1, us-east-2, etc)",
 			},
 
 			"access_key_id": schema.StringAttribute{
-				Sensitive:     true,
-				Optional:      true,
-				Description:   "The AWS access key ID. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Sensitive:   true,
+				Optional:    true,
+				Description: "The AWS access key ID. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 			},
 
 			"secret_access_key": schema.StringAttribute{
-				Sensitive:     true,
-				Optional:      true,
-				Description:   "The AWS secret access key. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Sensitive:   true,
+				Optional:    true,
+				Description: "The AWS secret access key. Used to authenticate with AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 			},
 
 			"assume_role_arn": schema.StringAttribute{
-				Optional:      true,
-				Description:   "The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:    true,
+				Description: "The ARN of the role to assume when syncing secrets to AWS Parameter Store. You must either set secret_access_key and access_key_id, or set assume_role_arn to assume a role.",
 			},
 
 			"project_id": schema.StringAttribute{
@@ -157,9 +153,8 @@ func (r *IntegrationAWSParameterStoreResource) Schema(_ context.Context, _ resou
 			},
 
 			"parameter_store_path": schema.StringAttribute{
-				Required:      true,
-				Description:   "The path in AWS Parameter Store to sync secrets to.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The path in AWS Parameter Store to sync secrets to.",
 			},
 
 			"environment": schema.StringAttribute{
@@ -214,7 +209,6 @@ func (r *IntegrationAWSParameterStoreResource) Create(ctx context.Context, req r
 	}
 
 	authMethod, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error validating AWS credentials",
@@ -392,8 +386,7 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		return
 	}
 
-	_, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
-
+	authMethod, err := pkg.ValidateAwsInputCredentials(plan.AccessKeyID, plan.SecretAccessKey, plan.AssumeRoleArn)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error validating AWS credentials",
@@ -412,6 +405,26 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		}
 	}
 
+	updateIntegrationAuthRequest := infisical.UpdateIntegrationAuthRequest{
+		Integration:       infisical.IntegrationAuthTypeAwsSecretsManager,
+		IntegrationAuthId: plan.IntegrationAuthID.ValueString(),
+	}
+	if authMethod == pkg.AwsAuthMethodAccessKey {
+		updateIntegrationAuthRequest.AccessId = plan.AccessKeyID.ValueString()
+		updateIntegrationAuthRequest.AccessToken = plan.SecretAccessKey.ValueString()
+	} else if authMethod == pkg.AwsAuthMethodAssumeRole {
+		updateIntegrationAuthRequest.AWSAssumeIamRoleArn = plan.AssumeRoleArn.ValueString()
+	}
+
+	_, err = r.client.UpdateIntegrationAuth(updateIntegrationAuthRequest)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating integration auth",
+			err.Error(),
+		)
+		return
+	}
+
 	// Convert metadata to map[string]interface{} if needed
 	metadataMap := map[string]interface{}{}
 
@@ -428,6 +441,8 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		Metadata:    metadataMap,
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
+		Region:      plan.AWSRegion.ValueString(),
+		Path:        plan.AWSPath.ValueString(),
 	})
 
 	if err != nil {

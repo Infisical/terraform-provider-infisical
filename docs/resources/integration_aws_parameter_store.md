@@ -34,7 +34,7 @@ resource "infisical_integration_aws_parameter_store" "parameter-store-integratio
   environment = "<env-slug>" // example, dev
 
   secret_path          = "<infisical-secrets-path>" // example, /folder, or /
-  parameter_store_path = "/example/secrets"
+  parameter_store_path = "/example/secrets/"
 
   aws_region = "<aws-region>" // example, us-east-2
 
