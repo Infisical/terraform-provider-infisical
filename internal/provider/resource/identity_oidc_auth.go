@@ -183,8 +183,9 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 		useSpaces := false
 		if !plan.BoundClaims.IsNull() {
 			if planValue, ok := plan.BoundClaims.Elements()[key]; ok {
-				planStr := planValue.(types.String).ValueString()
-				useSpaces = strings.Contains(planStr, ", ")
+				if planStr, ok := planValue.(types.String); ok {
+					useSpaces = strings.Contains(planStr.ValueString(), ", ")
+				}
 			}
 		}
 

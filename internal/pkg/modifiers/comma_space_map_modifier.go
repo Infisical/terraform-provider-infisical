@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// CommaSpaceMapModifier ensures consistent formatting of comma-separated strings in map values
+// CommaSpaceMapModifier ensures consistent formatting of comma-separated strings in map values.
 type CommaSpaceMapModifier struct{}
 
 func (m CommaSpaceMapModifier) Description(ctx context.Context) string {
@@ -41,7 +41,12 @@ func (m CommaSpaceMapModifier) PlanModifyMap(ctx context.Context, req planmodifi
 	}
 
 	for key, value := range planElements {
-		strValue := value.(types.String)
+		strValue, ok := value.(types.String)
+
+		if !ok {
+			continue
+		}
+
 		if !strValue.IsNull() && !strValue.IsUnknown() {
 			parts := strings.Split(strValue.ValueString(), ",")
 			for i, part := range parts {
@@ -70,7 +75,7 @@ func (m CommaSpaceMapModifier) PlanModifyMap(ctx context.Context, req planmodifi
 	resp.PlanValue = newMapValue
 }
 
-// CommaSpaceMap returns a new instance of CommaSpaceMapModifier
+// CommaSpaceMap returns a new instance of CommaSpaceMapModifier.
 func CommaSpaceMap() CommaSpaceMapModifier {
 	return CommaSpaceMapModifier{}
 }
