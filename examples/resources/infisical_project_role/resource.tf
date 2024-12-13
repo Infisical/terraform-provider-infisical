@@ -36,6 +36,9 @@ resource "infisical_project_role" "biller" {
           "$in" = ["dev", "prod"]
           "$eq" = "dev"
         }
+        secretPath = {
+          "$eq" = "/"
+        }
       })
     },
   ]
