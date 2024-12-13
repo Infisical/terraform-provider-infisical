@@ -124,5 +124,5 @@ Required:
 
 Optional:
 
-- `conditions` (String) When specified, only matching conditions will be allowed to access given resource.
+- `conditions` (String) When specified, only matching conditions will be allowed to access given resource. Refer to the documentation in https://infisical.com/docs/internals/permissions#conditions for the complete list of supported properties and operators.
 - `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.

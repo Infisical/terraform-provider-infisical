@@ -186,7 +186,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 						},
 						"conditions": schema.StringAttribute{
 							Optional:    true,
-							Description: "When specified, only matching conditions will be allowed to access given resource.",
+							Description: "When specified, only matching conditions will be allowed to access given resource. Refer to the documentation in https://infisical.com/docs/internals/permissions#conditions for the complete list of supported properties and operators.",
 							PlanModifiers: []planmodifier.String{
 								pkg.JsonEquivalentModifier{},
 							},
