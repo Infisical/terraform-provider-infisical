@@ -281,10 +281,6 @@ func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string,
 }
 
 func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, workspaceId string) ([]RawV3Secret, error) {
-	if client.Config.ClientId == "" || client.Config.ClientSecret == "" {
-		return nil, fmt.Errorf("client ID and client secret must be defined to fetch secrets with machine identity")
-	}
-
 	request := GetRawSecretsV3Request{
 		Environment:            envSlug,
 		WorkspaceId:            workspaceId,
@@ -302,7 +298,6 @@ func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, work
 	}
 
 	return secrets.Secrets, nil
-
 }
 
 func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Response) ([]SingleEnvironmentVariable, error) {
