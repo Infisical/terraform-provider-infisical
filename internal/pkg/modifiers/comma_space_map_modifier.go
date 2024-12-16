@@ -27,22 +27,33 @@ func (m CommaSpaceMapModifier) PlanModifyMap(ctx context.Context, req planmodifi
 	planElements := req.PlanValue.Elements()
 	newElements := make(map[string]types.String)
 
-	// Check config format if available
-	var configFormat bool // true = spaces, false = no spaces
+	// Track config format for each key
+	configFormats := make(map[string]bool)
+
+	// Detect config format for each key
 	if !req.ConfigValue.IsNull() {
 		configElements := req.ConfigValue.Elements()
-		// Look at first value to determine format
-		for _, v := range configElements {
+		for key, v := range configElements {
 			if str, ok := v.(types.String); ok && !str.IsNull() {
-				configFormat = strings.Contains(str.ValueString(), ", ")
-				break
+				configFormats[key] = strings.Contains(str.ValueString(), ", ")
+			}
+		}
+	}
+
+	// Fallback to state value if config format not found
+	if !req.StateValue.IsNull() {
+		stateElements := req.StateValue.Elements()
+		for key, v := range stateElements {
+			if _, exists := configFormats[key]; !exists {
+				if str, ok := v.(types.String); ok && !str.IsNull() {
+					configFormats[key] = strings.Contains(str.ValueString(), ", ")
+				}
 			}
 		}
 	}
 
 	for key, value := range planElements {
 		strValue, ok := value.(types.String)
-
 		if !ok {
 			continue
 		}
@@ -53,8 +64,13 @@ func (m CommaSpaceMapModifier) PlanModifyMap(ctx context.Context, req planmodifi
 				parts[i] = strings.TrimSpace(part)
 			}
 
+			useSpaces, found := configFormats[key]
+			if !found {
+				useSpaces = false
+			}
+
 			var formattedValue string
-			if configFormat {
+			if useSpaces {
 				formattedValue = strings.Join(parts, ", ")
 			} else {
 				formattedValue = strings.Join(parts, ",")
