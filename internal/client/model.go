@@ -245,6 +245,7 @@ type ProjectIdentitySpecificPrivilege struct {
 type ProjectRole struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
+	Slug        string `json:"slug"`
 	Description string `json:"description"`
 	// because permission can have multiple structure.
 	Permissions []map[string]any
@@ -504,6 +505,9 @@ type RawV3Secret struct {
 	SecretKey     string `json:"secretKey"`
 	SecretValue   string `json:"secretValue"`
 	SecretComment string `json:"secretComment"`
+	Tags          []struct {
+		Slug string `json:"slug"`
+	} `json:"tags"`
 }
 
 type GetRawSecretsV3Response struct {

@@ -10,6 +10,7 @@ on:
   push:
     paths-ignore:
       - "README.md"
+  workflow_call:
 
 # Testing only needs permissions to read the repository contents.
 permissions:
@@ -34,7 +35,8 @@ jobs:
         with:
           version: latest
 
-  generate:
+  test-docs-generated:
+    name: Check TF docs are generated
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
@@ -49,7 +51,7 @@ jobs:
             (echo; echo "Unexpected difference in directories after code generation. Run 'go generate ./...' command and commit."; exit 1)
 
   # Run acceptance tests in a matrix with Terraform CLI versions
-  test:
+  acceptance-test:
     name: Terraform Provider Acceptance Tests
     needs: build
     runs-on: ubuntu-latest
@@ -70,6 +72,13 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: true
+      - uses: twingate/github-action@v1
+        with:
+          # The Twingate Service Key used to connect Twingate to the proper service
+          # Learn more about [Twingate Services](https://docs.twingate.com/docs/services)
+          #
+          # Required
+          service-key: ${{ secrets.GAMMA_TWINGATE_SERVICE_KEY }}
       - uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2.0.3
         with:
           terraform_version: ${{ matrix.terraform }}
@@ -77,5 +86,9 @@ jobs:
       - run: go mod download
       - env:
           TF_ACC: "1"
-        run: go test -v -cover ./internal/provider/
+          INFISICAL_HOST: ${{ secrets.INFISICAL_HOST }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
+          INFISICAL_TEST_ORG_ID: ${{ secrets.INFISICAL_TEST_ORG_ID }}
+        run: make testacc
         timeout-minutes: 10
