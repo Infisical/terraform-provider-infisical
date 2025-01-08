@@ -1595,7 +1595,9 @@ type IntegrationMetadata struct {
 	SecretSuffix        string `json:"secretSuffix"`
 	MappingBehavior     string `json:"mappingBehavior,omitempty"`
 	ShouldAutoRedeploy  bool   `json:"shouldAutoRedeploy,omitempty"`
-	SecretGCPLabel      []struct {
+	MetadataSyncMode    string `json:"metadataSyncMode,omitempty"`
+
+	SecretGCPLabel []struct {
 		LabelName  string `json:"labelName,omitempty"`
 		LabelValue string `json:"labelValue,omitempty"`
 	} `json:"secretGCPLabel,omitempty"`
