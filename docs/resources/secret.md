@@ -67,7 +67,7 @@ resource "infisical_secret" "github_action_secret" {
 
 # Ephemeral resource (requires Terraform 1.10.0+)
 # https://www.hashicorp.com/blog/terraform-1-10-improves-handling-secrets-in-state-with-ephemeral-values
-ephemeral "infisical_secret" "mongo_secret" {
+ephemeral "infisical_secret" "ephemeral-secret" {
   name         = "SECRET-KEY"
   env_slug     = "dev"
   workspace_id = "PROJECT_ID"
