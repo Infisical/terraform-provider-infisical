@@ -443,6 +443,7 @@ func (r *IntegrationAWSParameterStoreResource) Update(ctx context.Context, req r
 		SecretPath:  plan.SecretPath.ValueString(),
 		Region:      plan.AWSRegion.ValueString(),
 		Path:        plan.AWSPath.ValueString(),
+		IsActive:    true,
 	})
 
 	if err != nil {
