@@ -5,10 +5,8 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -24,6 +22,14 @@ func NewEphemeralSecretResource() ephemeral.EphemeralResourceWithConfigure {
 // secretResource is the resource implementation.
 type ephemeralSecretResource struct {
 	client *infisical.Client
+}
+
+type ephemeralSecretResourceModel struct {
+	FolderPath  types.String `tfsdk:"folder_path"`
+	EnvSlug     types.String `tfsdk:"env_slug"`
+	Name        types.String `tfsdk:"name"`
+	Value       types.String `tfsdk:"value"`
+	WorkspaceId types.String `tfsdk:"workspace_id"`
 }
 
 // Metadata returns the resource type name.
@@ -61,32 +67,6 @@ func (r *ephemeralSecretResource) Schema(_ context.Context, _ ephemeral.SchemaRe
 				Computed:    true,
 				Sensitive:   true,
 			},
-
-			"last_updated": schema.StringAttribute{
-				Computed: true,
-			},
-			"tag_ids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Computed:    true,
-				Description: "Tag ids to be attached for the secrets.",
-			},
-			"secret_reminder": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{
-					"note": schema.StringAttribute{
-						Description: "Note for the secret rotation reminder",
-						Computed:    true,
-					},
-					"repeat_days": schema.Int64Attribute{
-						Description: "Frequency of secret rotation reminder in days",
-						Computed:    true,
-						Validators: []validator.Int64{
-							int64validator.AtLeast(1),
-							int64validator.AtMost(365),
-						},
-					},
-				},
-				Computed: true,
-			},
 		},
 	}
 }
@@ -120,7 +100,7 @@ func (r *ephemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRe
 	}
 
 	// Read configuration from the request
-	var config secretResourceModel
+	var config ephemeralSecretResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -150,27 +130,11 @@ func (r *ephemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRe
 		return
 	}
 
-	tagIds := []string{}
-	for _, tag := range res.Secret.Tags {
-		tagIds = append(tagIds, tag.ID)
-	}
-
-	tagsList, diags := types.ListValueFrom(ctx, types.StringType, tagIds)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	resp.Result.Set(ctx, secretResourceModel{
-		Value:      types.StringValue(res.Secret.SecretValue),
-		Name:       types.StringValue(res.Secret.SecretKey),
-		FolderPath: config.FolderPath,
-		EnvSlug:    config.EnvSlug,
-		SecretReminder: &SecretReminder{
-			Note:       types.StringValue(res.Secret.SecretReminderNote),
-			RepeatDays: types.Int64Value(res.Secret.SecretReminderRepeatDays),
-		},
+	resp.Result.Set(ctx, ephemeralSecretResourceModel{
+		Value:       types.StringValue(res.Secret.SecretValue),
+		Name:        types.StringValue(res.Secret.SecretKey),
+		FolderPath:  config.FolderPath,
+		EnvSlug:     config.EnvSlug,
 		WorkspaceId: config.WorkspaceId,
-		Tags:        tagsList,
 	})
 }
