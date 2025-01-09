@@ -73,15 +73,4 @@ provider "postgresql" {
 
 ### Read-Only
 
-- `last_updated` (String)
-- `secret_reminder` (Attributes) (see [below for nested schema](#nestedatt--secret_reminder))
-- `tag_ids` (List of String) Tag ids to be attached for the secrets.
 - `value` (String, Sensitive) The value of the secret
-
-<a id="nestedatt--secret_reminder"></a>
-### Nested Schema for `secret_reminder`
-
-Read-Only:
-
-- `note` (String) Note for the secret rotation reminder
-- `repeat_days` (Number) Frequency of secret rotation reminder in days
