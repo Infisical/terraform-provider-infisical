@@ -504,6 +504,15 @@ type RawV3Secret struct {
 	SecretKey     string `json:"secretKey"`
 	SecretValue   string `json:"secretValue"`
 	SecretComment string `json:"secretComment"`
+
+	SecretReminderNote       string `json:"secretReminderNote"`
+	SecretReminderRepeatDays int64  `json:"secretReminderRepeatDays"`
+	Tags                     []struct {
+		ID    string `json:"id"`
+		Slug  string `json:"slug"`
+		Color string `json:"color"`
+		Name  string `json:"name"`
+	} `json:"tags"`
 }
 
 type GetRawSecretsV3Response struct {
