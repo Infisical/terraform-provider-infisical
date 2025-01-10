@@ -1685,7 +1685,7 @@ type UpdateIntegrationRequest struct {
 	Owner             string                 `json:"owner,omitempty"`
 	Environment       string                 `json:"environment,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
-	IsActive          bool                   `json:"isActive"`
+	IsActive          bool                   `json:"isActive,omitempty"`
 	Region            string                 `json:"region,omitempty"`
 	Path              string                 `json:"path,omitempty"`
 }

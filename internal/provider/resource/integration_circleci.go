@@ -274,6 +274,7 @@ func (r *IntegrationCircleCIResource) Update(ctx context.Context, req resource.U
 		App:         plan.CircleCIProjectID.ValueString(), // Needs to be the project slug
 		AppID:       plan.CircleCIProjectID.ValueString(), // Needs to be the project ID
 		Owner:       plan.CircleCIOrgSlug.ValueString(),   // Needs to be the organization slug
+		IsActive:    true,
 	})
 
 	if err != nil {

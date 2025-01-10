@@ -505,7 +505,9 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
 		Region:      plan.AWSRegion.ValueString(),
+		IsActive:    true,
 	}
+
 	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE {
 		updateIntegrationRequest.App = plan.AWSPath.ValueString()
 	}

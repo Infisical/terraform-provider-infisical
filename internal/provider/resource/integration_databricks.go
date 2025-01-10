@@ -270,6 +270,7 @@ func (r *IntegrationDatabricksResource) Update(ctx context.Context, req resource
 		Environment: plan.Environment.ValueString(),
 		SecretPath:  plan.SecretPath.ValueString(),
 		App:         plan.DatabricksSecretScope.ValueString(),
+		IsActive:    true,
 	})
 
 	if err != nil {
