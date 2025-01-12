@@ -53,7 +53,7 @@ Optional:
 
 Optional:
 
-- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project
+- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project. Requires environment variable "INFISICAL_AUTH_JWT" from OIDC IDP.
 
 
 <a id="nestedatt--auth--universal"></a>
