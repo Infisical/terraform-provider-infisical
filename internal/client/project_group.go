@@ -12,7 +12,7 @@ func (client Client) CreateProjectGroup(request CreateProjectGroupRequest) (Crea
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
+		Post(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupIdOrName))
 
 	if err != nil {
 		return CreateProjectGroupResponse{}, fmt.Errorf("CallCreateProjectGroup: Unable to complete api request [err=%s]", err)
