@@ -363,6 +363,14 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
+	if plan.GroupName != state.GroupName {
+		resp.Diagnostics.AddError(
+			"Unable to update project group",
+			fmt.Sprintf("Cannot change group name, previous group name: %s, new group name: %s", state.GroupName, plan.GroupName),
+		)
+		return
+	}
+
 	var roles []infisical.UpdateProjectGroupRequestRoles
 	var hasAtleastOnePermanentRole bool
 	for _, el := range plan.Roles {
