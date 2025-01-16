@@ -35,7 +35,10 @@ resource "infisical_project" "example" {
 
 resource "infisical_project_group" "group" {
   project_id = infisical_project.example.id
+
+  # Either group_id or group_name is required.
   group_id   = "<>"
+  group_name = "<>"
   roles = [
     {
       role_slug                   = "admin",
@@ -55,9 +58,13 @@ resource "infisical_project_group" "group" {
 
 ### Required
 
-- `group_id` (String) The id of the group.
 - `project_id` (String) The id of the project.
 - `roles` (Attributes Set) The roles assigned to the project group (see [below for nested schema](#nestedatt--roles))
+
+### Optional
+
+- `group_id` (String) The id of the group.
+- `group_name` (String) The name of the group.
 
 ### Read-Only
 
