@@ -954,9 +954,9 @@ type CreateProjectGroupRequestRoles struct {
 }
 
 type CreateProjectGroupRequest struct {
-	ProjectId string                           `json:"projectId"`
-	GroupId   string                           `json:"groupId"`
-	Roles     []CreateProjectGroupRequestRoles `json:"roles"`
+	GroupIdOrName string
+	ProjectId     string                           `json:"projectId"`
+	Roles         []CreateProjectGroupRequestRoles `json:"roles"`
 }
 
 type CreateProjectGroupResponseMembers struct {

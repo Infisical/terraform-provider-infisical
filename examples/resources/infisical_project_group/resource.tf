@@ -20,7 +20,10 @@ resource "infisical_project" "example" {
 
 resource "infisical_project_group" "group" {
   project_id = infisical_project.example.id
+
+  # Either group_id or group_name is required.
   group_id   = "<>"
+  group_name = "<>"
   roles = [
     {
       role_slug                   = "admin",

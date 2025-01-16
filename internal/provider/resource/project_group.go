@@ -33,6 +33,7 @@ type ProjectGroupResource struct {
 type ProjectGroupResourceModel struct {
 	ProjectID    types.String       `tfsdk:"project_id"`
 	GroupID      types.String       `tfsdk:"group_id"`
+	GroupName    types.String       `tfsdk:"group_name"`
 	Roles        []ProjectGroupRole `tfsdk:"roles"`
 	MembershipID types.String       `tfsdk:"membership_id"`
 }
@@ -59,8 +60,14 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:    true,
 			},
 			"group_id": schema.StringAttribute{
-				Description: "The id of the group.",
-				Required:    true,
+				Description:   "The id of the group.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"group_name": schema.StringAttribute{
+				Description: "The name of the group.",
+				Optional:    true,
 			},
 			"membership_id": schema.StringAttribute{
 				Description:   "The membership Id of the project group",
@@ -133,6 +140,22 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	if plan.GroupID.ValueString() == "" && plan.GroupName.ValueString() == "" {
+		resp.Diagnostics.AddError(
+			"Unable to create project group",
+			"Must provide either group_id or group_name",
+		)
+		return
+	}
+
+	if plan.GroupID.ValueString() != "" && plan.GroupName.ValueString() != "" {
+		resp.Diagnostics.AddError(
+			"Unable to create project group",
+			"Must provide either group_id or group_name, not both",
+		)
+		return
+	}
+
 	var roles []infisical.CreateProjectGroupRequestRoles
 	var hasAtleastOnePermanentRole bool
 	for _, el := range plan.Roles {
@@ -187,11 +210,18 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	projectGroupResponse, err := r.client.CreateProjectGroup(infisical.CreateProjectGroupRequest{
+	request := infisical.CreateProjectGroupRequest{
 		ProjectId: plan.ProjectID.ValueString(),
-		GroupId:   plan.GroupID.ValueString(),
 		Roles:     roles,
-	})
+	}
+
+	if plan.GroupID.ValueString() != "" {
+		request.GroupIdOrName = plan.GroupID.ValueString()
+	} else {
+		request.GroupIdOrName = plan.GroupName.ValueString()
+	}
+
+	projectGroupResponse, err := r.client.CreateProjectGroup(request)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -202,14 +232,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.MembershipID = types.StringValue(projectGroupResponse.Membership.ID)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching group details",
-			"Couldn't find group in project, unexpected error: "+err.Error(),
-		)
-		return
-	}
+	plan.GroupID = types.StringValue(projectGroupResponse.Membership.GroupID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -336,6 +359,14 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.AddError(
 			"Unable to update project group",
 			fmt.Sprintf("Cannot change group ID, previous group: %s, new group: %s", state.GroupID, plan.GroupID),
+		)
+		return
+	}
+
+	if plan.GroupName != state.GroupName {
+		resp.Diagnostics.AddError(
+			"Unable to update project group",
+			fmt.Sprintf("Cannot change group name, previous group name: %s, new group name: %s", state.GroupName, plan.GroupName),
 		)
 		return
 	}
