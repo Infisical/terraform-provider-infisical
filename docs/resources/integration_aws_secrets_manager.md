@@ -86,6 +86,7 @@ resource "infisical_integration_aws_secrets_manager" "secrets-manager-integratio
 Optional:
 
 - `aws_tags` (Attributes Set) Tags to attach to the AWS Secrets Manager secrets. (see [below for nested schema](#nestedatt--options--aws_tags))
+- `metadata_sync_mode` (String) The sync mode for AWS tags. The supported options are `secret-metadata` and `custom`. If `secret-metadata` is selected, the metadata of the Infisical secrets are used as tags in AWS (only supported for one-to-one integrations). If `custom` is selected, then the key/value pairs in the `aws_tags` field is used.
 - `secret_prefix` (String) The prefix to add to the secret name in AWS Secrets Manager.
 
 <a id="nestedatt--options--aws_tags"></a>
