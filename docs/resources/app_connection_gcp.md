@@ -47,7 +47,7 @@ resource "infisical_app_connection_gcp" "app-connection-gcp" {
 ### Optional
 
 - `description` (String) An optional description for the GCP App Connection.
-- `service_account_email` (String) The service account email to connect with GCP. The service account ID (the part of the email before '@') must be suffixed with the first two sections of your organization ID. Refer to the docs here https://infisical.com/docs/integrations/app-connections/gcp#configure-service-account-for-infisical
+- `service_account_email` (String) The service account email to connect with GCP. The service account ID (the part of the email before '@') must be suffixed with the first two sections of your organization ID e.g. service-account-df92581a-0fe9@my-project.iam.gserviceaccount.com. For more details, refer to the documentation here https://infisical.com/docs/integrations/app-connections/gcp#configure-service-account-for-infisical
 
 ### Read-Only
 
