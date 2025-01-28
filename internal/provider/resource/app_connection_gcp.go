@@ -68,11 +68,11 @@ func (r *AppConnectionGcpResource) Schema(_ context.Context, _ resource.SchemaRe
 			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "An optional description for the GCP Connection.",
+				Description: "An optional description for the GCP App Connection.",
 			},
 			"credentials_hash": schema.StringAttribute{
 				Computed:    true,
-				Description: "The hash of the GCP connection credentials",
+				Description: "The hash of the GCP App Connection credentials",
 			},
 		},
 	}
