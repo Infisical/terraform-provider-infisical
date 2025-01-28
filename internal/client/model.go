@@ -1914,3 +1914,57 @@ type ListSecretImportRequest struct {
 type ListSecretImportResponse struct {
 	SecretImports []SecretImport `json:"secretImports"`
 }
+
+type AppConnection struct {
+	Id              string `json:"id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Version         int    `json:"version"`
+	OrgId           string `json:"orgId"`
+	App             string `json:"app"`
+	Method          string `json:"method"`
+	CredentialsHash string `json:"credentialsHash"`
+}
+
+type CreateAppConnectionRequest struct {
+	App         AppConnectionApp
+	Description string                 `json:"description,omitempty"`
+	Method      string                 `json:"method"`
+	Name        string                 `json:"name"`
+	Credentials map[string]interface{} `json:"credentials"`
+}
+
+type CreateAppConnectionResponse struct {
+	AppConnection AppConnection `json:"appConnection"`
+}
+
+type GetAppConnectionByIdRequest struct {
+	App AppConnectionApp
+	ID  string
+}
+
+type GetAppConnectionByIdResponse struct {
+	AppConnection AppConnection `json:"appConnection"`
+}
+
+type UpdateAppConnectionRequest struct {
+	ID          string
+	App         AppConnectionApp
+	Description string                 `json:"description,omitempty"`
+	Method      string                 `json:"method,omitempty"`
+	Name        string                 `json:"name,omitempty"`
+	Credentials map[string]interface{} `json:"credentials"`
+}
+
+type UpdateAppConnectionResponse struct {
+	AppConnection AppConnection `json:"appConnection"`
+}
+
+type DeleteAppConnectionRequest struct {
+	App AppConnectionApp
+	ID  string
+}
+
+type DeleteAppConnectionResponse struct {
+	AppConnection AppConnection `json:"appConnection"`
+}
