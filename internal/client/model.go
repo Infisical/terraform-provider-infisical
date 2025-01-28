@@ -1950,9 +1950,9 @@ type GetAppConnectionByIdResponse struct {
 type UpdateAppConnectionRequest struct {
 	ID          string
 	App         AppConnectionApp
-	Description string                 `json:"description,omitempty"`
-	Method      string                 `json:"method,omitempty"`
-	Name        string                 `json:"name,omitempty"`
+	Description string                 `json:"description"`
+	Method      string                 `json:"method"`
+	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials"`
 }
 
