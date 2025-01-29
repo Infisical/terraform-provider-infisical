@@ -1968,3 +1968,87 @@ type DeleteAppConnectionRequest struct {
 type DeleteAppConnectionResponse struct {
 	AppConnection AppConnection `json:"appConnection"`
 }
+
+type SecretSyncOptions struct {
+	InitialSyncBehavior string `json:"initialSyncBehavior"`
+}
+
+type SecretSyncConnection struct {
+	ConnectionID string `json:"id"`
+}
+
+type SecretSyncEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type SecretSyncFolder struct {
+	Path string `json:"path"`
+}
+
+type SecretSync struct {
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled"`
+	Version           int                    `json:"version"`
+	ProjectID         string                 `json:"projectId"`
+	ConnectionID      string                 `json:"connectionId"`
+	SyncOptions       SecretSyncOptions      `json:"syncOptions"`
+	Connection        SecretSyncConnection   `json:"connection"`
+	Environment       SecretSyncEnvironment  `json:"environment"`
+	SecretFolder      SecretSyncFolder       `json:"folder"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type CreateSecretSyncRequest struct {
+	App               SecretSyncApp
+	Name              string                 `json:"name"`
+	ProjectID         string                 `json:"projectId"`
+	ConnectionID      string                 `json:"connectionId"`
+	Environment       string                 `json:"environment"`
+	SecretPath        string                 `json:"secretPath"`
+	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled"`
+	Description       string                 `json:"description"`
+	SyncOptions       SecretSyncOptions      `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type CreateSecretSyncResponse struct {
+	SecretSync SecretSync `json:"secretSync"`
+}
+
+type GetSecretSyncByIdRequest struct {
+	App SecretSyncApp
+	ID  string
+}
+
+type GetSecretSyncByIdResponse struct {
+	SecretSync SecretSync `json:"secretSync"`
+}
+
+type UpdateSecretSyncRequest struct {
+	App               SecretSyncApp
+	ID                string
+	Name              string                 `json:"name,omitempty"`
+	ProjectID         string                 `json:"projectId,omitempty"`
+	ConnectionID      string                 `json:"connectionId,omitempty"`
+	Environment       string                 `json:"environment,omitempty"`
+	SecretPath        string                 `json:"secretPath,omitempty"`
+	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled,omitempty"`
+	Description       string                 `json:"description"`
+	SyncOptions       SecretSyncOptions      `json:"syncOptions,omitempty"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig,omitempty"`
+}
+
+type UpdateSecretSyncResponse struct {
+	SecretSync SecretSync `json:"secretSync"`
+}
+
+type DeleteSecretSyncRequest struct {
+	App SecretSyncApp
+	ID  string
+}
+
+type DeleteSecretSyncResponse struct {
+	SecretSync SecretSync `json:"secretSync"`
+}

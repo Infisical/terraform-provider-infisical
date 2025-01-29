@@ -261,6 +261,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewAccessApprovalPolicyResource,
 		infisicalResource.NewProjectSecretImportResource,
 		infisicalResource.NewAppConnectionGcpResource,
+		infisicalResource.NewSecretSyncGcpSecretManagerResource,
 	}
 }
 
