@@ -67,7 +67,6 @@ func (r *AppConnectionGcpResource) Schema(_ context.Context, _ resource.SchemaRe
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
-				Computed:    true,
 				Description: "An optional description for the GCP App Connection.",
 			},
 			"credentials_hash": schema.StringAttribute{
@@ -208,7 +207,11 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 		resp.Diagnostics.Append(diags...)
 		return
 	}
-	state.Description = types.StringValue(appConnection.Description)
+
+	if !(state.Description.IsNull() && appConnection.Description == "") {
+		state.Description = types.StringValue(appConnection.Description)
+	}
+
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
