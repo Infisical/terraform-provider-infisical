@@ -205,6 +205,7 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 
 		state.ServiceAccountEmail = types.StringNull()
 		diags = resp.State.Set(ctx, state)
+		resp.Diagnostics.Append(diags...)
 		return
 	}
 	state.Description = types.StringValue(appConnection.Description)
