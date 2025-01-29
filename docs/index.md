@@ -35,10 +35,10 @@ provider "infisical" {
 ### Optional
 
 - `auth` (Attributes) The configuration values for authentication (see [below for nested schema](#nestedatt--auth))
-- `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
-- `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project
-- `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host.
-- `service_token` (String, Sensitive) (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project
+- `client_id` (String, Sensitive) (DEPRECATED, Use the `auth` attribute), Machine identity client ID. Used to fetch/modify secrets for a given project.
+- `client_secret` (String, Sensitive) (DEPRECATED, use `auth` attribute), Machine identity client secret. Used to fetch/modify secrets for a given project
+- `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host. This attribute can also be set using the `INFISICAL_HOST` environment variable
+- `service_token` (String, Sensitive) (DEPRECATED, Use machine identity auth), Used to fetch/modify secrets for a given project
 
 <a id="nestedatt--auth"></a>
 ### Nested Schema for `auth`
@@ -53,7 +53,7 @@ Optional:
 
 Optional:
 
-- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project
+- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable
 
 
 <a id="nestedatt--auth--universal"></a>
@@ -61,5 +61,5 @@ Optional:
 
 Optional:
 
-- `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project
-- `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project
+- `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` environment variable
+- `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` environment variable
