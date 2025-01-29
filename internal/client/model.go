@@ -42,6 +42,7 @@ type EncryptedSecretV3 struct {
 type Project struct {
 	ID                 string    `json:"id"`
 	Name               string    `json:"name"`
+	Description        string    `json:"description"`
 	Slug               string    `json:"slug"`
 	AutoCapitalization bool      `json:"autoCapitalization"`
 	OrgID              string    `json:"orgId"`
@@ -253,6 +254,7 @@ type ProjectRole struct {
 type ProjectWithEnvironments struct {
 	ID                 string               `json:"id"`
 	Name               string               `json:"name"`
+	Description        string               `json:"description"`
 	Slug               string               `json:"slug"`
 	AutoCapitalization bool                 `json:"autoCapitalization"`
 	OrgID              string               `json:"orgId"`
@@ -559,9 +561,10 @@ type UpdateRawSecretByNameV3Request struct {
 }
 
 type CreateProjectRequest struct {
-	ProjectName      string `json:"projectName"`
-	Slug             string `json:"slug"`
-	OrganizationSlug string `json:"organizationSlug"`
+	ProjectName        string `json:"projectName"`
+	ProjectDescription string `json:"projectDescription,omitempty"`
+	Slug               string `json:"slug"`
+	OrganizationSlug   string `json:"organizationSlug"`
 }
 
 type DeleteProjectRequest struct {
@@ -577,8 +580,9 @@ type GetProjectByIdRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Slug        string `json:"slug"`
-	ProjectName string `json:"name"`
+	Slug               string `json:"slug"`
+	ProjectName        string `json:"name"`
+	ProjectDescription string `json:"description"`
 }
 
 type InviteUsersToProjectRequest struct {

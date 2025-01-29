@@ -36,6 +36,7 @@ type projectResourceModel struct {
 	Slug        types.String `tfsdk:"slug"`
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
 	LastUpdated types.String `tfsdk:"last_updated"`
 }
 
@@ -59,6 +60,10 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Description: "The name of the project",
 				Required:    true,
+			},
+			"description": schema.StringAttribute{
+				Description: "The description of the project",
+				Optional:    true,
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the project",
@@ -111,8 +116,9 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
-		ProjectName: plan.Name.ValueString(),
-		Slug:        plan.Slug.ValueString(),
+		ProjectName:        plan.Name.ValueString(),
+		ProjectDescription: plan.Description.ValueString(),
+		Slug:               plan.Slug.ValueString(),
 	})
 
 	if err != nil {
@@ -126,6 +132,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	plan.Slug = types.StringValue(plan.Slug.ValueString())
 	plan.Name = types.StringValue(plan.Name.ValueString())
+	plan.Description = types.StringValue(plan.Description.ValueString())
 	plan.ID = types.StringValue(newProject.Project.ID)
 
 	diags = resp.State.Set(ctx, plan)
@@ -167,9 +174,13 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	if state.Name.ValueString() != project.Name {
-		state.Name = types.StringValue(project.Name)
+	if project.Description == "" {
+		state.Description = types.StringNull()
+	} else {
+		state.Description = types.StringValue(project.Description)
 	}
+
+	state.Name = types.StringValue(project.Name)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -212,10 +223,16 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	_, err := r.client.UpdateProject(infisical.UpdateProjectRequest{
+	updateRequest := infisical.UpdateProjectRequest{
 		ProjectName: plan.Name.ValueString(),
 		Slug:        plan.Slug.ValueString(),
-	})
+	}
+
+	if !plan.Description.IsNull() {
+		updateRequest.ProjectDescription = plan.Description.ValueString()
+	}
+
+	updatedProject, err := r.client.UpdateProject(updateRequest)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -223,6 +240,10 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 			"Couldn't update project from Infiscial, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	if !plan.Description.IsNull() {
+		plan.Description = types.StringValue(updatedProject.Description)
 	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
