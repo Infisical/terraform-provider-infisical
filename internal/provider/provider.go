@@ -76,22 +76,22 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional:    true,
-				Description: "Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host.",
+				Description: "Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host. This attribute can also be set using the `INFISICAL_HOST` environment variable",
 			},
 			"service_token": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: " (DEPRECATED, USE MACHINE IDENTITY), Used to fetch/modify secrets for a given project",
+				Description: " (DEPRECATED, Use machine identity auth), Used to fetch/modify secrets for a given project",
 			},
 			"client_id": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Machine identity client ID. Used to fetch/modify secrets for a given project",
+				Description: "(DEPRECATED, Use the `auth` attribute), Machine identity client ID. Used to fetch/modify secrets for a given project.",
 			},
 			"client_secret": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
+				Description: "(DEPRECATED, use `auth` attribute), Machine identity client secret. Used to fetch/modify secrets for a given project",
 			},
 			"auth": schema.SingleNestedAttribute{
 				Optional:    true,
@@ -104,12 +104,12 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							"client_id": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   true,
-								Description: "Machine identity client ID. Used to fetch/modify secrets for a given project",
+								Description: "Machine identity client ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` environment variable",
 							},
 							"client_secret": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   true,
-								Description: "Machine identity client secret. Used to fetch/modify secrets for a given project",
+								Description: "Machine identity client secret. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` environment variable",
 							},
 						},
 					},
@@ -120,7 +120,7 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							"identity_id": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   true,
-								Description: "Machine identity ID. Used to fetch/modify secrets for a given project",
+								Description: "Machine identity ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
 							},
 						},
 					},
