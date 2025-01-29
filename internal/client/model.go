@@ -1953,7 +1953,7 @@ type UpdateAppConnectionRequest struct {
 	Description string                 `json:"description"`
 	Method      string                 `json:"method"`
 	Name        string                 `json:"name"`
-	Credentials map[string]interface{} `json:"credentials"`
+	Credentials map[string]interface{} `json:"credentials,omitempty"`
 }
 
 type UpdateAppConnectionResponse struct {

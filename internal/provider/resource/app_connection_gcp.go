@@ -200,11 +200,13 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
 		resp.Diagnostics.AddWarning(
 			"App connection credentials conflict",
-			fmt.Sprintf("The credentials for the GCP app connection with ID %s have been updated outside of Terraform. "+
-				"To resolve this conflict, update the resource configuration and reapply using 'terraform apply'.", state.ID.ValueString()),
+			fmt.Sprintf("The credentials for the GCP app connection with ID %s have been updated outside of Terraform.", state.ID.ValueString()),
 		)
-	}
 
+		state.ServiceAccountEmail = types.StringNull()
+		diags = resp.State.Set(ctx, state)
+		return
+	}
 	state.Description = types.StringValue(appConnection.Description)
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
@@ -256,7 +258,9 @@ func (r *AppConnectionGcpResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	credentialsMap := map[string]interface{}{}
-	credentialsMap["serviceAccountEmail"] = plan.ServiceAccountEmail.ValueString()
+	if state.ServiceAccountEmail.ValueString() != plan.ServiceAccountEmail.ValueString() {
+		credentialsMap["serviceAccountEmail"] = plan.ServiceAccountEmail.ValueString()
+	}
 
 	appConnection, err := r.client.UpdateAppConnection(infisicalclient.UpdateAppConnectionRequest{
 		ID:          state.ID.ValueString(),
