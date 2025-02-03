@@ -85,9 +85,29 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 			return destinationConfig, diags
 		},
 		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+			var diags diag.Diagnostics
+
+			scopeVal, ok := secretSync.DestinationConfig["scope"].(string)
+			if !ok {
+				diags.AddError(
+					"Invalid scope type",
+					"Expected 'scope' to be a string but got something else",
+				)
+				return types.ObjectNull(map[string]attr.Type{}), diags
+			}
+
+			projectIdVal, ok := secretSync.DestinationConfig["projectId"].(string)
+			if !ok {
+				diags.AddError(
+					"Invalid projectId type",
+					"Expected 'projectId' to be a string but got something else",
+				)
+				return types.ObjectNull(map[string]attr.Type{}), diags
+			}
+
 			destinationConfig := map[string]attr.Value{
-				"scope":      types.StringValue(secretSync.DestinationConfig["scope"].(string)),
-				"project_id": types.StringValue(secretSync.DestinationConfig["projectId"].(string)),
+				"scope":      types.StringValue(scopeVal),
+				"project_id": types.StringValue(projectIdVal),
 			}
 
 			return types.ObjectValue(map[string]attr.Type{
