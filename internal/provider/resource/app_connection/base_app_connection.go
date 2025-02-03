@@ -3,9 +3,11 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -13,40 +15,36 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// Ensure the implementation satisfies the expected interfaces.
-var (
-	_ resource.Resource = &AppConnectionGcpResource{}
-)
-
-// NewAppConnectionGcpResource is a helper function to simplify the provider implementation.
-func NewAppConnectionGcpResource() resource.Resource {
-	return &AppConnectionGcpResource{}
+// AppConnectionBaseResource is the resource implementation.
+type AppConnectionBaseResource struct {
+	App                              infisicalclient.AppConnectionApp // used for identifying secret sync route
+	ResourceTypeName                 string                           // terraform resource name suffix
+	AppConnectionName                string                           // complete descriptive name of the app connection
+	client                           *infisical.Client
+	AllowedMethods                   []string
+	CredentialsAttributes            map[string]schema.Attribute
+	ReadCredentialsForCreateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	OverwriteCredentialsFields       func(state *AppConnectionBaseResourceModel) diag.Diagnostics
 }
 
-// AppConnectionGcp is the resource implementation.
-type AppConnectionGcpResource struct {
-	client *infisical.Client
-}
-
-// AppConnectionGcpResourceModel describes the data source data model.
-type AppConnectionGcpResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	Method              types.String `tfsdk:"method"`
-	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
-	Name                types.String `tfsdk:"name"`
-	Description         types.String `tfsdk:"description"`
-	CredentialsHash     types.String `tfsdk:"credentials_hash"`
+type AppConnectionBaseResourceModel struct {
+	ID              types.String `tfsdk:"id"`
+	Name            types.String `tfsdk:"name"`
+	Method          types.String `tfsdk:"method"`
+	Description     types.String `tfsdk:"description"`
+	Credentials     types.Object `tfsdk:"credentials"`
+	CredentialsHash types.String `tfsdk:"credentials_hash"`
 }
 
 // Metadata returns the resource type name.
-func (r *AppConnectionGcpResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_app_connection_gcp"
+func (r *AppConnectionBaseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + r.ResourceTypeName
 }
 
-// Schema defines the schema for the resource.
-func (r *AppConnectionGcpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage GCP App Connection",
+		Description: fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName),
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description:   "The ID of the app connection",
@@ -55,31 +53,31 @@ func (r *AppConnectionGcpResource) Schema(_ context.Context, _ resource.SchemaRe
 			},
 			"method": schema.StringAttribute{
 				Required:    true,
-				Description: "The method used to authenticate with GCP. Possible values are: service-account-impersonation",
-			},
-			"service_account_email": schema.StringAttribute{
-				Optional:    true,
-				Description: "The service account email to connect with GCP. The service account ID (the part of the email before '@') must be suffixed with the first two sections of your organization ID e.g. service-account-df92581a-0fe9@my-project.iam.gserviceaccount.com. For more details, refer to the documentation here https://infisical.com/docs/integrations/app-connections/gcp#configure-service-account-for-infisical",
-				Sensitive:   true,
+				Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "The name of the GCP App Connection to create. Must be slug-friendly",
+				Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
-				Description: "An optional description for the GCP App Connection.",
+				Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
+			},
+			"credentials": schema.SingleNestedAttribute{
+				Required:    true,
+				Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
+				Attributes:  r.CredentialsAttributes,
 			},
 			"credentials_hash": schema.StringAttribute{
 				Computed:    true,
-				Description: "The hash of the GCP App Connection credentials",
+				Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
 			},
 		},
 	}
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *AppConnectionGcpResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *AppConnectionBaseResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -99,44 +97,47 @@ func (r *AppConnectionGcpResource) Configure(_ context.Context, req resource.Con
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *AppConnectionGcpResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create GCP app connection",
+			"Unable to create app connection",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan AppConnectionGcpResourceModel
+	var plan AppConnectionBaseResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if plan.Method.ValueString() != string(infisicalclient.AppConnectionGcpMethodServiceAccountImpersonation) {
+	methodIsValid := false
+	for _, method := range r.AllowedMethods {
+		if plan.Method.ValueString() == method {
+			methodIsValid = true
+			break
+		}
+	}
+
+	if !methodIsValid {
 		resp.Diagnostics.AddError(
-			"Unable to create GCP app connection",
-			"Invalid value for method field. Possible values are: service-account-impersonation",
+			"Unable to create app connection",
+			fmt.Sprintf("Invalid value for method field. Allowed values are: %s", strings.Join(r.AllowedMethods, ", ")),
 		)
 		return
 	}
 
-	if plan.ServiceAccountEmail.IsNull() || plan.ServiceAccountEmail.ValueString() == "" {
-		resp.Diagnostics.AddError(
-			"Unable to create GCP app connection",
-			"Service account email field must be defined",
-		)
+	credentialsMap, diags := r.ReadCredentialsForCreateFromPlan(ctx, plan)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
 		return
 	}
-
-	credentialsMap := map[string]interface{}{}
-	credentialsMap["serviceAccountEmail"] = plan.ServiceAccountEmail.ValueString()
 
 	appConnection, err := r.client.CreateAppConnection(infisicalclient.CreateAppConnectionRequest{
-		App:         infisicalclient.AppConnectionAppGCP,
+		App:         r.App,
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 		Method:      plan.Method.ValueString(),
@@ -162,17 +163,17 @@ func (r *AppConnectionGcpResource) Create(ctx context.Context, req resource.Crea
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read GCP app connection",
+			"Unable to read app connection",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Get current state
-	var state AppConnectionGcpResourceModel
+	var state AppConnectionBaseResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -180,7 +181,7 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	appConnection, err := r.client.GetAppConnectionById(infisicalclient.GetAppConnectionByIdRequest{
-		App: infisicalclient.AppConnectionAppGCP,
+		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
 
@@ -190,7 +191,7 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 			return
 		} else {
 			resp.Diagnostics.AddError(
-				"Error reading GCP app connection",
+				"Error reading app connection",
 				"Couldn't read app connection, unexpected error: "+err.Error(),
 			)
 			return
@@ -200,10 +201,16 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
 		resp.Diagnostics.AddWarning(
 			"App connection credentials conflict",
-			fmt.Sprintf("The credentials for the GCP app connection with ID %s have been updated outside of Terraform.", state.ID.ValueString()),
+			fmt.Sprintf("The credentials for the %s App Connection with ID %s have been updated outside of Terraform.", r.AppConnectionName, state.ID.ValueString()),
 		)
 
-		state.ServiceAccountEmail = types.StringNull()
+		// force TF update
+		diags = r.OverwriteCredentialsFields(&state)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
 		diags = resp.State.Set(ctx, state)
 		resp.Diagnostics.Append(diags...)
 		return
@@ -220,56 +227,55 @@ func (r *AppConnectionGcpResource) Read(ctx context.Context, req resource.ReadRe
 	resp.Diagnostics.Append(diags...)
 }
 
-// Update updates the resource and sets the updated Terraform state on success.
-func (r *AppConnectionGcpResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-
+func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update GCP app connection",
+			"Unable to update app connection",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan AppConnectionGcpResourceModel
+	var plan AppConnectionBaseResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state AppConnectionGcpResourceModel
+	var state AppConnectionBaseResourceModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if plan.Method.ValueString() != string(infisicalclient.AppConnectionGcpMethodServiceAccountImpersonation) {
+	methodIsValid := false
+	for _, method := range r.AllowedMethods {
+		if plan.Method.ValueString() == method {
+			methodIsValid = true
+			break
+		}
+	}
+
+	if !methodIsValid {
 		resp.Diagnostics.AddError(
-			"Unable to update GCP app connection",
-			"Invalid value for method field. Possible values are: service-account-impersonation",
+			"Unable to create app connection",
+			fmt.Sprintf("Invalid value for method field. Allowed values are: %s", strings.Join(r.AllowedMethods, ", ")),
 		)
 		return
 	}
 
-	if plan.ServiceAccountEmail.IsNull() || plan.ServiceAccountEmail.ValueString() == "" {
-		resp.Diagnostics.AddError(
-			"Unable to update GCP app connection",
-			"Service account email field must be defined",
-		)
+	credentialsMap, diags := r.ReadCredentialsForUpdateFromPlan(ctx, plan, state)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
 		return
-	}
-
-	credentialsMap := map[string]interface{}{}
-	if state.ServiceAccountEmail.ValueString() != plan.ServiceAccountEmail.ValueString() {
-		credentialsMap["serviceAccountEmail"] = plan.ServiceAccountEmail.ValueString()
 	}
 
 	appConnection, err := r.client.UpdateAppConnection(infisicalclient.UpdateAppConnectionRequest{
 		ID:          state.ID.ValueString(),
-		App:         infisicalclient.AppConnectionAppGCP,
+		App:         r.App,
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 		Method:      plan.Method.ValueString(),
@@ -278,7 +284,7 @@ func (r *AppConnectionGcpResource) Update(ctx context.Context, req resource.Upda
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating GCP app connection",
+			"Error updating app connection",
 			"Couldn't update app connection, unexpected error: "+err.Error(),
 		)
 		return
@@ -293,17 +299,16 @@ func (r *AppConnectionGcpResource) Update(ctx context.Context, req resource.Upda
 	}
 }
 
-// Delete deletes the resource and removes the Terraform state on success.
-func (r *AppConnectionGcpResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *AppConnectionBaseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete GCP app connection",
+			"Unable to delete app connection",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var state AppConnectionGcpResourceModel
+	var state AppConnectionBaseResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -311,13 +316,13 @@ func (r *AppConnectionGcpResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	_, err := r.client.DeleteAppConnection(infisical.DeleteAppConnectionRequest{
-		App: infisical.AppConnectionAppGCP,
+		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting GCP app connection",
+			"Error deleting app connection",
 			"Couldn't delete app connection from Infisical, unexpected error: "+err.Error(),
 		)
 	}

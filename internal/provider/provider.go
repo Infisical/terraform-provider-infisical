@@ -7,6 +7,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalDatasource "terraform-provider-infisical/internal/provider/datasource"
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
+	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -261,6 +262,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewSecretApprovalPolicyResource,
 		infisicalResource.NewAccessApprovalPolicyResource,
 		infisicalResource.NewProjectSecretImportResource,
+		appConnectionResource.NewAppConnectionGcpResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 	}
 }
