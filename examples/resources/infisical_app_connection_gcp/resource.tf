@@ -18,8 +18,10 @@ provider "infisical" {
 }
 
 resource "infisical_app_connection_gcp" "app-connection-gcp" {
-  name                  = "gcp-app-connection"
-  method                = "service-account-impersonation"
-  service_account_email = "service-account-df92581a-0fe9@my-duplicate-project.iam.gserviceaccount.com"
-  description           = "I am a default description"
+  name   = "gcp-app-connection"
+  method = "service-account-impersonation"
+  credentials = {
+    service_account_email = "service-account-df92581a-0fe9@my-duplicate-project.iam.gserviceaccount.com"
+  }
+  description = "I am a test app connection"
 }

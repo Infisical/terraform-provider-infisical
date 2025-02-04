@@ -6,69 +6,66 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-const gcpSecretManagerScopeGlobal = "global"
-
-// Ensure the implementation satisfies the expected interfaces.
-var (
-	_ resource.Resource = &SecretSyncGcpSecretManagerResource{}
-)
-
-// NewSecretSyncGcpSecretManagerResource is a helper function to simplify the provider implementation.
-func NewSecretSyncGcpSecretManagerResource() resource.Resource {
-	return &SecretSyncGcpSecretManagerResource{}
+// SecretSyncBaseResource is the resource implementation.
+type SecretSyncBaseResource struct {
+	App                                    infisicalclient.SecretSyncApp // used for identifying secret sync route
+	ResourceTypeName                       string                        // terraform resource name suffix
+	SyncName                               string                        // complete descriptive name of the secret sync
+	AppConnection                          infisicalclient.AppConnectionApp
+	client                                 *infisical.Client
+	DestinationConfigAttributes            map[string]schema.Attribute
+	ReadDestinationConfigForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadDestinationConfigForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
 }
 
-// SecretSyncGcpSecretManagerResource is the resource implementation.
-type SecretSyncGcpSecretManagerResource struct {
-	client *infisical.Client
-}
-
-// SecretSyncGcpSecretManagerResourceModel describes the data source data model.
-type SecretSyncGcpSecretManagerResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	ConnectionID        types.String `tfsdk:"connection_id"`
-	Name                types.String `tfsdk:"name"`
-	ProjectID           types.String `tfsdk:"project_id"`
-	Description         types.String `tfsdk:"description"`
-	Environment         types.String `tfsdk:"environment"`
-	SecretPath          types.String `tfsdk:"secret_path"`
+type SyncOptionsModel struct {
 	InitialSyncBehavior types.String `tfsdk:"initial_sync_behavior"`
-	AutoSyncEnabled     types.Bool   `tfsdk:"auto_sync_enabled"`
-	GcpProjectID        types.String `tfsdk:"gcp_project_id"`
-	Scope               types.String `tfsdk:"scope"`
+}
+
+type SecretSyncBaseResourceModel struct {
+	ID                types.String      `tfsdk:"id"`
+	ConnectionID      types.String      `tfsdk:"connection_id"`
+	Name              types.String      `tfsdk:"name"`
+	ProjectID         types.String      `tfsdk:"project_id"`
+	Description       types.String      `tfsdk:"description"`
+	Environment       types.String      `tfsdk:"environment"`
+	SecretPath        types.String      `tfsdk:"secret_path"`
+	SyncOptions       *SyncOptionsModel `tfsdk:"sync_options"`
+	AutoSyncEnabled   types.Bool        `tfsdk:"auto_sync_enabled"`
+	DestinationConfig types.Object      `tfsdk:"destination_config"`
 }
 
 // Metadata returns the resource type name.
-func (r *SecretSyncGcpSecretManagerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secret_sync_gcp_secret_manager"
+func (r *SecretSyncBaseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + r.ResourceTypeName
 }
 
-// Schema defines the schema for the resource.
-func (r *SecretSyncGcpSecretManagerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage GCP Secret Manager secret syncs",
+		Description: fmt.Sprintf("Create and manage %s secret syncs", r.SyncName),
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description:   "The ID of the GCP Secret Manager secret sync",
+				Description:   fmt.Sprintf("The ID of the %s secret sync", r.SyncName),
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"connection_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The ID of the GCP Connection to use for syncing.",
+				Description: fmt.Sprintf("The ID of the %s Connection to use for syncing.", r.AppConnection),
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "The name of the GCP Secret Manager sync to create. Must be slug-friendly.",
+				Description: fmt.Sprintf("The name of the %s sync to create. Must be slug-friendly.", r.SyncName),
 			},
 			"project_id": schema.StringAttribute{
 				Required:      true,
@@ -83,23 +80,9 @@ func (r *SecretSyncGcpSecretManagerResource) Schema(_ context.Context, _ resourc
 				Required:    true,
 				Description: "The folder path to sync secrets from.",
 			},
-			"gcp_project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of the GCP project to sync with",
-			},
-			"scope": schema.StringAttribute{
-				Optional:    true,
-				Description: "The scope of the sync with GCP Secret Manager. Supported options: global",
-				Default:     stringdefault.StaticString("global"),
-				Computed:    true,
-			},
 			"description": schema.StringAttribute{
 				Optional:    true,
-				Description: "An optional description for the GCP Secret Manager sync.",
-			},
-			"initial_sync_behavior": schema.StringAttribute{
-				Required:    true,
-				Description: "Specify how Infisical should resolve the initial sync to the GCP Secret Manager destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination",
+				Description: fmt.Sprintf("An optional description for the %s sync.", r.SyncName),
 			},
 			"auto_sync_enabled": schema.BoolAttribute{
 				Optional:    true,
@@ -107,12 +90,27 @@ func (r *SecretSyncGcpSecretManagerResource) Schema(_ context.Context, _ resourc
 				Default:     booldefault.StaticBool(true),
 				Computed:    true,
 			},
+			"sync_options": schema.SingleNestedAttribute{
+				Required:    true,
+				Description: "Parameters to modify how secrets are synced.",
+				Attributes: map[string]schema.Attribute{
+					"initial_sync_behavior": schema.StringAttribute{
+						Required:    true,
+						Description: fmt.Sprintf("Specify how Infisical should resolve the initial sync to the %s destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination", r.SyncName),
+					},
+				},
+			},
+			"destination_config": schema.SingleNestedAttribute{
+				Required:    true,
+				Description: "The destination configuration for the secret sync.",
+				Attributes:  r.DestinationConfigAttributes,
+			},
 		},
 	}
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *SecretSyncGcpSecretManagerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *SecretSyncBaseResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -132,37 +130,29 @@ func (r *SecretSyncGcpSecretManagerResource) Configure(_ context.Context, req re
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *SecretSyncGcpSecretManagerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create GCP Secret Manager secret sync",
+			"Unable to create secret sync",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan SecretSyncGcpSecretManagerResourceModel
+	var plan SecretSyncBaseResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if plan.Scope.ValueString() != gcpSecretManagerScopeGlobal {
-		resp.Diagnostics.AddError(
-			"Unable to create GCP secret manager secret sync",
-			"Invalid value for scope field. Possible values are: global",
-		)
-		return
-	}
-
-	switch infisical.SecretSyncBehavior(plan.InitialSyncBehavior.ValueString()) {
+	switch infisical.SecretSyncBehavior(plan.SyncOptions.InitialSyncBehavior.ValueString()) {
 	case infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination, infisical.SecretSyncBehaviorPrioritizeSource:
 		break
 	default:
 		resp.Diagnostics.AddError(
-			"Unable to create GCP secret manager secret sync",
+			"Unable to create secret sync",
 			fmt.Sprintf("Invalid value for initial_sync_behavior field. Possible values are: %s, %s, %s",
 				infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination,
 				infisical.SecretSyncBehaviorPrioritizeSource),
@@ -170,12 +160,14 @@ func (r *SecretSyncGcpSecretManagerResource) Create(ctx context.Context, req res
 		return
 	}
 
-	destinationConfigMap := map[string]interface{}{}
-	destinationConfigMap["scope"] = plan.Scope.ValueString()
-	destinationConfigMap["projectId"] = plan.GcpProjectID.ValueString()
+	destinationConfigMap, diags := r.ReadDestinationConfigForCreateFromPlan(ctx, plan)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	secretSync, err := r.client.CreateSecretSync(infisicalclient.CreateSecretSyncRequest{
-		App:             infisicalclient.SecretSyncAppGCPSecretManager,
+		App:             r.App,
 		Name:            plan.Name.ValueString(),
 		Description:     plan.Description.ValueString(),
 		ProjectID:       plan.ProjectID.ValueString(),
@@ -184,14 +176,14 @@ func (r *SecretSyncGcpSecretManagerResource) Create(ctx context.Context, req res
 		SecretPath:      plan.SecretPath.ValueString(),
 		AutoSyncEnabled: plan.AutoSyncEnabled.ValueBool(),
 		SyncOptions: infisicalclient.SecretSyncOptions{
-			InitialSyncBehavior: plan.InitialSyncBehavior.ValueString(),
+			InitialSyncBehavior: plan.SyncOptions.InitialSyncBehavior.ValueString(),
 		},
 		DestinationConfig: destinationConfigMap,
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating GCP Secret Manager secret sync",
+			"Error creating secret sync",
 			"Couldn't create secret sync, unexpected error: "+err.Error(),
 		)
 		return
@@ -207,17 +199,17 @@ func (r *SecretSyncGcpSecretManagerResource) Create(ctx context.Context, req res
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *SecretSyncGcpSecretManagerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read GCP Secret Manager secret sync",
+			"Unable to read secret sync",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Get current state
-	var state SecretSyncGcpSecretManagerResourceModel
+	var state SecretSyncBaseResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -225,7 +217,7 @@ func (r *SecretSyncGcpSecretManagerResource) Read(ctx context.Context, req resou
 	}
 
 	secretSync, err := r.client.GetSecretSyncById(infisicalclient.GetSecretSyncByIdRequest{
-		App: infisical.SecretSyncAppGCPSecretManager,
+		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
 
@@ -235,7 +227,7 @@ func (r *SecretSyncGcpSecretManagerResource) Read(ctx context.Context, req resou
 			return
 		} else {
 			resp.Diagnostics.AddError(
-				"Error reading GCP Secret Manager secret sync",
+				"Error reading secret sync",
 				"Couldn't read secret sync, unexpected error: "+err.Error(),
 			)
 			return
@@ -247,65 +239,56 @@ func (r *SecretSyncGcpSecretManagerResource) Read(ctx context.Context, req resou
 	state.ProjectID = types.StringValue(secretSync.ProjectID)
 	state.Environment = types.StringValue(secretSync.Environment.Slug)
 	state.SecretPath = types.StringValue(secretSync.SecretFolder.Path)
-	state.InitialSyncBehavior = types.StringValue(secretSync.SyncOptions.InitialSyncBehavior)
 	state.AutoSyncEnabled = types.BoolValue(secretSync.AutoSyncEnabled)
 
 	if !(state.Description.IsNull() && secretSync.Description == "") {
 		state.Description = types.StringValue(secretSync.Description)
 	}
 
-	if value, ok := secretSync.DestinationConfig["projectId"].(string); ok {
-		state.GcpProjectID = types.StringValue(value)
+	if state.SyncOptions != nil {
+		state.SyncOptions.InitialSyncBehavior = types.StringValue(secretSync.SyncOptions.InitialSyncBehavior)
 	}
 
-	if value, ok := secretSync.DestinationConfig["scope"].(string); ok {
-		state.Scope = types.StringValue(value)
+	state.DestinationConfig, diags = r.ReadDestinationConfigFromApi(ctx, secretSync)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 }
 
-// Update updates the resource and sets the updated Terraform state on success.
-func (r *SecretSyncGcpSecretManagerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-
+func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update GCP Secret Manager secret sync",
+			"Unable to update secret sync",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
 	// Retrieve values from plan
-	var plan SecretSyncGcpSecretManagerResourceModel
+	var plan SecretSyncBaseResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state SecretSyncGcpSecretManagerResourceModel
+	var state SecretSyncBaseResourceModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if plan.Scope.ValueString() != gcpSecretManagerScopeGlobal {
-		resp.Diagnostics.AddError(
-			"Unable to update GCP secret manager secret sync",
-			"Invalid value for scope field. Possible values are: global",
-		)
-		return
-	}
-
-	switch infisical.SecretSyncBehavior(plan.InitialSyncBehavior.ValueString()) {
+	switch infisical.SecretSyncBehavior(plan.SyncOptions.InitialSyncBehavior.ValueString()) {
 	case infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination, infisical.SecretSyncBehaviorPrioritizeSource:
 		break
 	default:
 		resp.Diagnostics.AddError(
-			"Unable to update GCP secret manager secret sync",
+			"Unable to update secret sync",
 			fmt.Sprintf("Invalid value for initial_sync_behavior field. Possible values are: %s, %s, %s",
 				infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination,
 				infisical.SecretSyncBehaviorPrioritizeSource),
@@ -313,12 +296,14 @@ func (r *SecretSyncGcpSecretManagerResource) Update(ctx context.Context, req res
 		return
 	}
 
-	destinationConfigMap := map[string]interface{}{}
-	destinationConfigMap["scope"] = plan.Scope.ValueString()
-	destinationConfigMap["projectId"] = plan.GcpProjectID.ValueString()
+	destinationConfigMap, diags := r.ReadDestinationConfigForUpdateFromPlan(ctx, plan, state)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	_, err := r.client.UpdateSecretSync(infisicalclient.UpdateSecretSyncRequest{
-		App:             infisicalclient.SecretSyncAppGCPSecretManager,
+		App:             r.App,
 		ID:              state.ID.ValueString(),
 		Name:            plan.Name.ValueString(),
 		Description:     plan.Description.ValueString(),
@@ -328,14 +313,14 @@ func (r *SecretSyncGcpSecretManagerResource) Update(ctx context.Context, req res
 		SecretPath:      plan.SecretPath.ValueString(),
 		AutoSyncEnabled: plan.AutoSyncEnabled.ValueBool(),
 		SyncOptions: infisicalclient.SecretSyncOptions{
-			InitialSyncBehavior: plan.InitialSyncBehavior.ValueString(),
+			InitialSyncBehavior: plan.SyncOptions.InitialSyncBehavior.ValueString(),
 		},
 		DestinationConfig: destinationConfigMap,
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating GCP Secret Manager secret sync",
+			"Error updating secret sync",
 			"Couldn't update secret sync, unexpected error: "+err.Error(),
 		)
 		return
@@ -348,17 +333,16 @@ func (r *SecretSyncGcpSecretManagerResource) Update(ctx context.Context, req res
 	}
 }
 
-// Delete deletes the resource and removes the Terraform state on success.
-func (r *SecretSyncGcpSecretManagerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *SecretSyncBaseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete GCP Secret Manager secret sync",
+			"Unable to delete secret sync",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var state SecretSyncGcpSecretManagerResourceModel
+	var state SecretSyncBaseResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -366,13 +350,13 @@ func (r *SecretSyncGcpSecretManagerResource) Delete(ctx context.Context, req res
 	}
 
 	_, err := r.client.DeleteSecretSync(infisical.DeleteSecretSyncRequest{
-		App: infisical.SecretSyncAppGCPSecretManager,
+		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting GCP Secret Manager secret sync",
+			"Error deleting secret sync",
 			"Couldn't delete secret sync from Infisical, unexpected error: "+err.Error(),
 		)
 	}

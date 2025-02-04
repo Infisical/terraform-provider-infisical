@@ -18,19 +18,26 @@ provider "infisical" {
 }
 
 resource "infisical_app_connection_gcp" "app-connection-gcp" {
-  name                  = "gcp-app-connect"
-  method                = "service-account-impersonation"
-  service_account_email = "service-account-df92581a-0fe9@my-duplicate-project.iam.gserviceaccount.com"
-  description           = "I am a test app connection"
+  name   = "gcp-app-connect"
+  method = "service-account-impersonation"
+  credentials = {
+    service_account_email = "service-account-df92581a-0fe9@my-duplicate-project.iam.gserviceaccount.com"
+  }
+  description = "I am a test app connection"
 }
 
-resource "infisical_secret_sync_gcp_secret_manager" "secret_manager" {
-  name                  = "gcp-sync"
-  environment           = "dev"
-  connection_id         = infisical_app_connection_gcp.app-connection-gcp.id
-  secret_path           = "/"
-  gcp_project_id        = "my-duplicate-project"
-  project_id            = "f4517f4c-8b61-4727-8aef-5ae2807126fb"
-  initial_sync_behavior = "overwrite-destination"
-  description           = "I am a test secret sync"
+resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_test" {
+  name          = "gcp-sync-tests"
+  description   = "I am a test secret sync"
+  project_id    = "f4517f4c-8b61-4727-8aef-5ae2807126fb"
+  environment   = "prod"
+  secret_path   = "/"
+  connection_id = infisical_app_connection_gcp.app-connection-gcp.id
+
+  sync_options = {
+    initial_sync_behavior = "import-prioritize-destination"
+  }
+  destination_config = {
+    project_id = "my-duplicate-project"
+  }
 }
