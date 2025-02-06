@@ -38,8 +38,9 @@ type AwsSecretsManagerMetadataStruct struct {
 }
 
 type AwsSecretsManagerOptions struct {
-	AwsTags      []infisical.AwsTag `tfsdk:"aws_tags" json:"secretAWSTag,omitempty"`
-	SecretPrefix *string            `tfsdk:"secret_prefix"`
+	AwsTags          []infisical.AwsTag `tfsdk:"aws_tags" json:"secretAWSTag,omitempty"`
+	SecretPrefix     *string            `tfsdk:"secret_prefix"`
+	MetadataSyncMode *string            `tfsdk:"metadata_sync_mode"`
 }
 
 // projectResourceSourceModel describes the data source data model.
@@ -66,6 +67,8 @@ type IntegrationAWSSecretsManagerResourceModel struct {
 const MAPPING_BEHAVIOR_MANY_TO_ONE = "many-to-one"
 const MAPPING_BEHAVIOR_ONE_TO_ONE = "one-to-one"
 
+const METADATA_SYNC_MODE_SECRET_METADATA = "secret-metadata"
+
 // Metadata returns the resource type name.
 func (r *IntegrationAWSSecretsManagerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_integration_aws_secrets_manager"
@@ -83,12 +86,14 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 				Default: objectdefault.StaticValue(
 					types.ObjectValueMust(
 						map[string]attr.Type{
-							"secret_prefix": types.StringType,
-							"aws_tags":      types.SetType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}},
+							"secret_prefix":      types.StringType,
+							"metadata_sync_mode": types.StringType,
+							"aws_tags":           types.SetType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}},
 						},
 						map[string]attr.Value{
-							"secret_prefix": types.StringValue(""),
-							"aws_tags":      types.SetNull(types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}),
+							"secret_prefix":      types.StringValue(""),
+							"metadata_sync_mode": types.StringValue(""),
+							"aws_tags":           types.SetNull(types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}),
 						},
 					),
 				),
@@ -97,7 +102,6 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						Description: "The prefix to add to the secret name in AWS Secrets Manager.",
 					},
-
 					"aws_tags": schema.SetNestedAttribute{
 						Description: "Tags to attach to the AWS Secrets Manager secrets.",
 						Optional:    true,
@@ -113,6 +117,10 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 								},
 							},
 						},
+					},
+					"metadata_sync_mode": schema.StringAttribute{
+						Optional:    true,
+						Description: "The sync mode for AWS tags. The supported options are `secret-metadata` and `custom`. If `secret-metadata` is selected, the metadata of the Infisical secrets are used as tags in AWS (only supported for one-to-one integrations). If `custom` is selected, then the key/value pairs in the `aws_tags` field is used.",
 					},
 				},
 			},
@@ -279,6 +287,14 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		}
 	}
 
+	if plan.MappingBehavior.ValueString() != MAPPING_BEHAVIOR_ONE_TO_ONE && planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode == METADATA_SYNC_MODE_SECRET_METADATA {
+		resp.Diagnostics.AddError(
+			"Invalid plan",
+			"cannot use secret metadata sync mode when mapping_behavior is 'many-to-one'",
+		)
+		return
+	}
+
 	// Convert metadata to map[string]interface{} if needed
 	metadataMap := map[string]interface{}{}
 
@@ -294,6 +310,10 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		metadataMap["secretAWSTag"] = planOptions.AwsTags
 	} else {
 		metadataMap["secretAWSTag"] = []infisical.AwsTag{}
+	}
+
+	if planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode != "" {
+		metadataMap["metadataSyncMode"] = planOptions.MetadataSyncMode
 	}
 
 	request := infisical.CreateIntegrationRequest{
@@ -379,6 +399,10 @@ func (r *IntegrationAWSSecretsManagerResource) Read(ctx context.Context, req res
 		planOptions.SecretPrefix = &integration.Integration.Metadata.SecretPrefix
 	}
 
+	if (planOptions.MetadataSyncMode != nil && integration.Integration.Metadata.MetadataSyncMode != *planOptions.MetadataSyncMode) || integration.Integration.Metadata.MetadataSyncMode != "" {
+		planOptions.MetadataSyncMode = &integration.Integration.Metadata.MetadataSyncMode
+	}
+
 	if len(integration.Integration.Metadata.SecretAWSTag) > 0 {
 		planOptions.AwsTags = integration.Integration.Metadata.SecretAWSTag
 	}
@@ -439,6 +463,14 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		}
 	}
 
+	if plan.MappingBehavior.ValueString() != MAPPING_BEHAVIOR_ONE_TO_ONE && planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode == METADATA_SYNC_MODE_SECRET_METADATA {
+		resp.Diagnostics.AddError(
+			"Invalid plan",
+			"cannot use secret metadata sync mode when mapping_behavior is 'many-to-one'",
+		)
+		return
+	}
+
 	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
@@ -493,10 +525,15 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 	} else {
 		metadataMap["secretPrefix"] = ""
 	}
+
 	if planOptions.AwsTags != nil {
 		metadataMap["secretAWSTag"] = planOptions.AwsTags
 	} else {
 		metadataMap["secretAWSTag"] = []infisical.AwsTag{}
+	}
+
+	if planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode != "" {
+		metadataMap["metadataSyncMode"] = planOptions.MetadataSyncMode
 	}
 
 	updateIntegrationRequest := infisical.UpdateIntegrationRequest{
