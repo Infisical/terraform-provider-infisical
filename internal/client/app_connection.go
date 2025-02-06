@@ -14,7 +14,8 @@ const (
 type AppConnectionApp string
 
 const (
-	AppConnectionAppGCP AppConnectionApp = "gcp"
+	AppConnectionAppGCP   AppConnectionApp = "gcp"
+	AppConnectionAppAzure AppConnectionApp = "azure"
 )
 
 func (client Client) CreateAppConnection(request CreateAppConnectionRequest) (AppConnection, error) {

@@ -8,7 +8,9 @@ import (
 type SecretSyncApp string
 
 const (
-	SecretSyncAppGCPSecretManager SecretSyncApp = "gcp-secret-manager"
+	SecretSyncAppGCPSecretManager      SecretSyncApp = "gcp-secret-manager"
+	SecretSyncAppAzureAppConfiguration SecretSyncApp = "azure-app-configuration"
+	SecretSyncAppAzureKeyVault         SecretSyncApp = "azure-key-vault"
 )
 
 type SecretSyncBehavior string
