@@ -251,6 +251,14 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	if len(invitedUser) == 0 {
+		resp.Diagnostics.AddError(
+			"Error inviting user",
+			"Couldn't create project user to Infiscial, no invite was created. Is the user already in the project?",
+		)
+		return
+	}
+
 	_, err = r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
 		ProjectID:    plan.ProjectID.ValueString(),
 		MembershipID: invitedUser[0].ID,
