@@ -251,6 +251,14 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	if len(invitedUser) == 0 {
+		resp.Diagnostics.AddError(
+			"Error inviting user",
+			"Could not add user to project. No invite was sent, is the user already in the project?",
+		)
+		return
+	}
+
 	_, err = r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
 		ProjectID:    plan.ProjectID.ValueString(),
 		MembershipID: invitedUser[0].ID,
