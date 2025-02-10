@@ -254,7 +254,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 	if len(invitedUser) == 0 {
 		resp.Diagnostics.AddError(
 			"Error inviting user",
-			"Couldn't create project user to Infiscial, no invite was created. Is the user already in the project?",
+			"Could not add user to project. No invite was sent, is the user already in the project?",
 		)
 		return
 	}
