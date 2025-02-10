@@ -264,6 +264,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectSecretImportResource,
 		appConnectionResource.NewAppConnectionGcpResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
+		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
+		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
 	}
 }
 
