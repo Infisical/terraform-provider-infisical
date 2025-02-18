@@ -128,7 +128,7 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							"token_environment_variable_name": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   false,
-								Description: "The environment variable name for the OIDC JWT token. This attribute can also be set using the `INFISICAL_OIDC_AUTH_TOKEN_KEY_NAME` environment variable. Default is `TFC_WORKLOAD_IDENTITY_TOKEN`.",
+								Description: "The environment variable name for the OIDC JWT token. This attribute can also be set using the `INFISICAL_OIDC_AUTH_TOKEN_KEY_NAME` environment variable. Default is `INFISICAL_AUTH_JWT`.",
 							},
 						},
 					},
