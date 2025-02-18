@@ -58,6 +58,7 @@ Optional:
 Optional:
 
 - `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable
+- `token_environment_variable_name` (String) The environment variable name for the OIDC JWT token. This attribute can also be set using the `INFISICAL_OIDC_AUTH_TOKEN_KEY_NAME` environment variable. Default is `INFISICAL_AUTH_JWT`.
 
 
 <a id="nestedatt--auth--universal"></a>

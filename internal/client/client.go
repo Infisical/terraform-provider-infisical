@@ -34,7 +34,10 @@ type Config struct {
 	// Universal Machine Identity Auth
 	ClientId     string
 	ClientSecret string
-	IdentityId   string
+
+	//OIDC Machine Identity Auth
+	IdentityId       string
+	OidcTokenEnvName string
 
 	EnvSlug     string
 	SecretsPath string
@@ -65,7 +68,7 @@ func NewClient(cnf Config) (*Client, error) {
 		cnf.HttpClient.SetAuthToken(cnf.ServiceToken)
 		cnf.AuthStrategy = AuthStrategy.SERVICE_TOKEN
 	} else {
-		authStrategies := map[AuthStrategyType]func() (token string, e error){
+		authStrategies := map[AuthStrategyType]func() (string, error){
 			AuthStrategy.UNIVERSAL_MACHINE_IDENTITY: Client{cnf}.UniversalMachineIdentityAuth,
 			AuthStrategy.OIDC_MACHINE_IDENTITY:      Client{cnf}.OidcMachineIdentityAuth,
 		}
