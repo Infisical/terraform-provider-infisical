@@ -57,7 +57,8 @@ type authModel struct {
 }
 
 type oidcAuthModel struct {
-	IdentityId types.String `tfsdk:"identity_id"`
+	IdentityId   types.String `tfsdk:"identity_id"`
+	TokenEnvName types.String `tfsdk:"token_environment_variable_name"`
 }
 
 type universalAuthModel struct {
@@ -124,6 +125,11 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 								Sensitive:   true,
 								Description: "Machine identity ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
 							},
+							"token_environment_variable_name": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   false,
+								Description: "The environment variable name for the OIDC JWT token. This attribute can also be set using the `INFISICAL_OIDC_AUTH_TOKEN_KEY_NAME` environment variable. Default is `TFC_WORKLOAD_IDENTITY_TOKEN`.",
+							},
 						},
 					},
 				},
@@ -156,6 +162,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	clientId := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME)
 	clientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME)
 	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)
+	oidcTokenEnvName := os.Getenv(infisical.INFISICAL_OIDC_AUTH_TOKEN_NAME)
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -190,6 +197,10 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 			if !config.Auth.Oidc.IdentityId.IsNull() {
 				identityId = config.Auth.Oidc.IdentityId.ValueString()
 			}
+
+			if !config.Auth.Oidc.TokenEnvName.IsNull() {
+				oidcTokenEnvName = config.Auth.Oidc.TokenEnvName.ValueString()
+			}
 		}
 
 		if config.Auth.Universal != nil {
@@ -203,7 +214,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		}
 	}
 
-	client, err := infisical.NewClient(infisical.Config{HostURL: host, AuthStrategy: authStrategy, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret, IdentityId: identityId})
+	client, err := infisical.NewClient(infisical.Config{HostURL: host, AuthStrategy: authStrategy, ServiceToken: serviceToken, ClientId: clientId, ClientSecret: clientSecret, IdentityId: identityId, OidcTokenEnvName: oidcTokenEnvName})
 
 	if err != nil {
 		resp.Diagnostics.AddError(

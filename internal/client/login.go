@@ -48,14 +48,19 @@ func (client Client) GetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse,
 }
 
 func (client Client) OidcMachineIdentityAuth() (string, error) {
-	authJwt := os.Getenv(INFISICAL_AUTH_JWT_NAME)
+	tokenEnvironmentName := client.Config.OidcTokenEnvName
+	if tokenEnvironmentName == "" {
+		tokenEnvironmentName = "TFC_WORKLOAD_IDENTITY_TOKEN" // default
+	}
+
+	authJwt := os.Getenv(tokenEnvironmentName)
 
 	if client.Config.IdentityId == "" {
 		return "", fmt.Errorf("you must set the identity ID for the client before making calls")
 	}
 
 	if authJwt == "" {
-		return "", fmt.Errorf("%s is not present in the environment", INFISICAL_AUTH_JWT_NAME)
+		return "", fmt.Errorf("%s is not present in the environment", tokenEnvironmentName)
 	}
 
 	var loginResponse MachineIdentityAuthResponse
