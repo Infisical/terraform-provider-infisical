@@ -50,7 +50,7 @@ func (client Client) GetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse,
 func (client Client) OidcMachineIdentityAuth() (string, error) {
 	tokenEnvironmentName := client.Config.OidcTokenEnvName
 	if tokenEnvironmentName == "" {
-		tokenEnvironmentName = "TFC_WORKLOAD_IDENTITY_TOKEN" // default
+		tokenEnvironmentName = INFISICAL_AUTH_JWT_NAME
 	}
 
 	authJwt := os.Getenv(tokenEnvironmentName)
