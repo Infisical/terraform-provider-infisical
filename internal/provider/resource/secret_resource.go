@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -59,14 +61,16 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		Description: "Create secrets & save to Infisical",
 		Attributes: map[string]schema.Attribute{
 			"folder_path": schema.StringAttribute{
-				Description: "The path to the folder where the given secret resides",
-				Required:    true,
-				Computed:    false,
+				Description:   "The path to the folder where the given secret resides",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+				Computed:      false,
 			},
 			"env_slug": schema.StringAttribute{
-				Description: "The environment slug of the secret to modify/create",
-				Required:    true,
-				Computed:    false,
+				Description:   "The environment slug of the secret to modify/create",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+				Computed:      false,
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the secret",
@@ -80,9 +84,10 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Sensitive:   true,
 			},
 			"workspace_id": schema.StringAttribute{
-				Description: "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
-				Optional:    true,
-				Computed:    true,
+				Description:   "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
+				Optional:      true,
+				Computed:      true,
 			},
 
 			"last_updated": schema.StringAttribute{
