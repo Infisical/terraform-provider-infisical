@@ -119,6 +119,25 @@ func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Requ
 	return secretsResponse, nil
 }
 
+func (client Client) GetSingleSecretByIDV3(request GetSingleSecretByIDV3Request) (GetSingleSecretByIDV3Response, error) {
+	var secretsResponse GetSingleSecretByIDV3Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&secretsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v3/secrets/raw/id/%s", request.ID))
+
+	if err != nil {
+		return GetSingleSecretByIDV3Response{}, fmt.Errorf("CallGetSingleSecretByIDV3: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return GetSingleSecretByIDV3Response{}, fmt.Errorf("CallGetSingleSecretByIDV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+	}
+
+	return secretsResponse, nil
+}
+
 func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecretsV3Response, error) {
 	var secretsResponse GetRawSecretsV3Response
 

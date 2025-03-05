@@ -16,10 +16,12 @@ var AuthStrategy = struct {
 	SERVICE_TOKEN              AuthStrategyType
 	UNIVERSAL_MACHINE_IDENTITY AuthStrategyType
 	OIDC_MACHINE_IDENTITY      AuthStrategyType
+	TOKEN_MACHINE_IDENTITY     AuthStrategyType
 }{
 	SERVICE_TOKEN:              "SERVICE_TOKEN",
 	UNIVERSAL_MACHINE_IDENTITY: "UNIVERSAL_MACHINE_IDENTITY",
 	OIDC_MACHINE_IDENTITY:      "OIDC_MACHINE_IDENTITY",
+	TOKEN_MACHINE_IDENTITY:     "TOKEN_MACHINE_IDENTITY",
 }
 
 type Config struct {
@@ -34,6 +36,9 @@ type Config struct {
 	// Universal Machine Identity Auth
 	ClientId     string
 	ClientSecret string
+
+	// Token machine identity auth
+	Token string
 
 	//OIDC Machine Identity Auth
 	IdentityId       string
@@ -71,6 +76,7 @@ func NewClient(cnf Config) (*Client, error) {
 		authStrategies := map[AuthStrategyType]func() (string, error){
 			AuthStrategy.UNIVERSAL_MACHINE_IDENTITY: Client{cnf}.UniversalMachineIdentityAuth,
 			AuthStrategy.OIDC_MACHINE_IDENTITY:      Client{cnf}.OidcMachineIdentityAuth,
+			AuthStrategy.TOKEN_MACHINE_IDENTITY:     Client{cnf}.TokenMachineIdentityAuth,
 		}
 
 		token, err := authStrategies[selectedAuthStrategy]()

@@ -50,6 +50,7 @@ provider "infisical" {
 Optional:
 
 - `oidc` (Attributes) The configuration values for OIDC Auth (see [below for nested schema](#nestedatt--auth--oidc))
+- `token` (String, Sensitive) The authentication token for Machine Identity Token Auth
 - `universal` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal))
 
 <a id="nestedatt--auth--oidc"></a>

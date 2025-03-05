@@ -80,3 +80,11 @@ func (client Client) OidcMachineIdentityAuth() (string, error) {
 
 	return loginResponse.AccessToken, nil
 }
+
+func (client Client) TokenMachineIdentityAuth() (string, error) {
+	if client.Config.Token == "" {
+		return "", fmt.Errorf("you must set the token for the client before making calls")
+	}
+
+	return client.Config.Token, nil
+}

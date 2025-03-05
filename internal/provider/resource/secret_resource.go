@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -690,5 +691,45 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		)
 		return
 	}
+
+}
+
+func (r *secretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+
+	secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+		ID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Secret not found",
+				"The secret with the given ID was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching secret",
+				"Couldn't fetch secret from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	tagIds := []string{}
+	for _, tag := range secret.Secret.Tags {
+		tagIds = append(tagIds, tag.ID)
+	}
+	secretReminder := SecretReminder{
+		Note:       types.StringValue(secret.Secret.SecretReminderNote),
+		RepeatDays: types.Int64Value(secret.Secret.SecretReminderRepeatDays),
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), secret.Secret.Workspace)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("env_slug"), secret.Secret.Environment)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), secret.Secret.SecretPath)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), secret.Secret.SecretKey)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secret.Secret.SecretValue)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tagIds)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("secret_reminder"), secretReminder)...)
 
 }

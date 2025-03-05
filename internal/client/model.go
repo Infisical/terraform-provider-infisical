@@ -487,6 +487,10 @@ type GetSingleSecretByNameV3Request struct {
 	SecretPath  string `json:"secretPath"`
 }
 
+type GetSingleSecretByIDV3Request struct {
+	ID string
+}
+
 type GetSingleSecretByNameSecretResponse struct {
 	Secret EncryptedSecret `json:"secret"`
 }
@@ -523,6 +527,29 @@ type GetRawSecretsV3Response struct {
 
 type GetSingleRawSecretByNameSecretResponse struct {
 	Secret RawV3Secret `json:"secret"`
+}
+
+type GetSingleSecretByIDV3Response = struct {
+	Secret struct {
+		ID            string `json:"id"`
+		Version       int    `json:"version"`
+		Workspace     string `json:"workspace"`
+		Type          string `json:"type"`
+		Environment   string `json:"environment"`
+		SecretKey     string `json:"secretKey"`
+		SecretValue   string `json:"secretValue"`
+		SecretComment string `json:"secretComment"`
+		SecretPath    string `json:"secretPath"`
+
+		SecretReminderNote       string `json:"secretReminderNote"`
+		SecretReminderRepeatDays int64  `json:"secretReminderRepeatDays"`
+		Tags                     []struct {
+			ID    string `json:"id"`
+			Slug  string `json:"slug"`
+			Color string `json:"color"`
+			Name  string `json:"name"`
+		} `json:"tags"`
+	} `json:"secret"`
 }
 
 // create secrets.
