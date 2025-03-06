@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"terraform-provider-infisical/internal/crypto"
@@ -132,7 +133,10 @@ func (client Client) GetSingleSecretByIDV3(request GetSingleSecretByIDV3Request)
 	}
 
 	if response.IsError() {
-		return GetSingleSecretByIDV3Response{}, fmt.Errorf("CallGetSingleSecretByIDV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSingleSecretByIDV3Response{}, ErrNotFound
+		}
+		return GetSingleSecretByIDV3Response{}, fmt.Errorf("CallGetSingleSecretByIDV3: Unsuccessful response. [response=%s]", response)
 	}
 
 	return secretsResponse, nil

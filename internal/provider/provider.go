@@ -104,7 +104,7 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 					"token": schema.StringAttribute{
 						Optional:    true,
 						Sensitive:   true,
-						Description: "The authentication token for Machine Identity Token Auth",
+						Description: "The authentication token for Machine Identity Token Auth. This attribute can also be set using the `INFISICAL_TOKEN` environment variable",
 					},
 					"universal": schema.SingleNestedAttribute{
 						Optional:    true,
