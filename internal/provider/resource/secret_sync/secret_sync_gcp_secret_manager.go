@@ -22,12 +22,22 @@ type SecretSyncGcpSecretManagerDestinationConfigModel struct {
 	Scope     types.String `tfsdk:"scope"`
 }
 
+type SecretSyncGcpSecretManagerSyncOptionsModel struct {
+	InitialSyncBehavior types.String `tfsdk:"initial_sync_behavior"`
+}
+
 func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 	return &SecretSyncBaseResource{
 		App:              infisical.SecretSyncAppGCPSecretManager,
 		SyncName:         "GCP Secret Manager",
 		ResourceTypeName: "_secret_sync_gcp_secret_manager",
 		AppConnection:    "GCP",
+		SyncOptionsAttributes: map[string]schema.Attribute{
+			"initial_sync_behavior": schema.StringAttribute{
+				Required:    true,
+				Description: "Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination",
+			},
+		},
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Required:    true,
@@ -40,6 +50,45 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 				Computed:    true,
 			},
 		},
+
+		ReadSyncOptionsForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+			syncOptionsMap := make(map[string]interface{})
+
+			var syncOptions SecretSyncGcpSecretManagerSyncOptionsModel
+			diags := plan.SyncOptions.As(ctx, &syncOptions, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+
+			return syncOptionsMap, nil
+
+		},
+
+		ReadSyncOptionsForUpdateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+			syncOptionsMap := make(map[string]interface{})
+
+			var syncOptions SecretSyncGcpSecretManagerSyncOptionsModel
+			diags := plan.SyncOptions.As(ctx, &syncOptions, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			return syncOptionsMap, nil
+		},
+
+		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+			syncOptionsMap := map[string]attr.Value{
+				"initial_sync_behavior": types.StringValue(secretSync.SyncOptions["initialSyncBehavior"].(string)),
+			}
+
+			return types.ObjectValue(map[string]attr.Type{
+				"initial_sync_behavior": types.StringType,
+			}, syncOptionsMap)
+		},
+
 		ReadDestinationConfigForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			destinationConfig := make(map[string]interface{})
 

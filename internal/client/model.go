@@ -1999,10 +1999,10 @@ type SecretSync struct {
 	Version           int                    `json:"version"`
 	ProjectID         string                 `json:"projectId"`
 	ConnectionID      string                 `json:"connectionId"`
-	SyncOptions       SecretSyncOptions      `json:"syncOptions"`
 	Connection        SecretSyncConnection   `json:"connection"`
 	Environment       SecretSyncEnvironment  `json:"environment"`
 	SecretFolder      SecretSyncFolder       `json:"folder"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
 	DestinationConfig map[string]interface{} `json:"destinationConfig"`
 }
 
@@ -2015,7 +2015,7 @@ type CreateSecretSyncRequest struct {
 	SecretPath        string                 `json:"secretPath"`
 	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled"`
 	Description       string                 `json:"description"`
-	SyncOptions       SecretSyncOptions      `json:"syncOptions"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
 	DestinationConfig map[string]interface{} `json:"destinationConfig"`
 }
 
@@ -2042,7 +2042,7 @@ type UpdateSecretSyncRequest struct {
 	SecretPath        string                 `json:"secretPath,omitempty"`
 	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled,omitempty"`
 	Description       string                 `json:"description"`
-	SyncOptions       SecretSyncOptions      `json:"syncOptions,omitempty"`
+	SyncOptions       map[string]interface{} `json:"syncOptions,omitempty"`
 	DestinationConfig map[string]interface{} `json:"destinationConfig,omitempty"`
 }
 
