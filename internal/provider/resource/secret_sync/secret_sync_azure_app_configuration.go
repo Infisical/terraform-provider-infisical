@@ -65,8 +65,13 @@ func NewSecretSyncAzureAppConfigurationResource() resource.Resource {
 		},
 
 		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+			initialSyncBehavior, ok := secretSync.SyncOptions["initialSyncBehavior"].(string)
+			if !ok {
+				initialSyncBehavior = ""
+			}
+
 			syncOptionsMap := map[string]attr.Value{
-				"initial_sync_behavior": types.StringValue(secretSync.SyncOptions["initialSyncBehavior"].(string)),
+				"initial_sync_behavior": types.StringValue(initialSyncBehavior),
 			}
 
 			return types.ObjectValue(map[string]attr.Type{

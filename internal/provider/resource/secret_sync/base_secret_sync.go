@@ -149,7 +149,18 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	initialSyncBehavior := syncOptions["initialSyncBehavior"].(string)
+	initialSyncBehavior, ok := syncOptions["initialSyncBehavior"].(string)
+	if !ok {
+		initialSyncBehavior = ""
+	}
+
+	if initialSyncBehavior == "" {
+		resp.Diagnostics.AddError(
+			"Unable to create secret sync",
+			"Failed to parse initial_sync_behavior field",
+		)
+		return
+	}
 
 	switch infisical.SecretSyncBehavior(initialSyncBehavior) {
 	case infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination, infisical.SecretSyncBehaviorPrioritizeSource:
@@ -293,7 +304,18 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	initialSyncBehavior := secretSyncPlan["initialSyncBehavior"].(string)
+	initialSyncBehavior, ok := secretSyncPlan["initialSyncBehavior"].(string)
+	if !ok {
+		initialSyncBehavior = ""
+	}
+
+	if initialSyncBehavior == "" {
+		resp.Diagnostics.AddError(
+			"Unable to update secret sync",
+			"Failed to parse initial_sync_behavior field",
+		)
+		return
+	}
 
 	switch infisical.SecretSyncBehavior(initialSyncBehavior) {
 	case infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination, infisical.SecretSyncBehaviorPrioritizeSource:

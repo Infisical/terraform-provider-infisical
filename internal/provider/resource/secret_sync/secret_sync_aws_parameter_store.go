@@ -122,30 +122,63 @@ func NewSecretSyncAwsParameterStoreResource() resource.Resource {
 		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
 			syncOptionsMap := make(map[string]attr.Value)
 
-			syncOptionsMap["initial_sync_behavior"] = types.StringValue(secretSync.SyncOptions["initialSyncBehavior"].(string))
+			initialSyncBehavior, ok := secretSync.SyncOptions["initialSyncBehavior"].(string)
+			if !ok {
+				initialSyncBehavior = ""
+			}
+
+			syncOptionsMap["initial_sync_behavior"] = types.StringValue(initialSyncBehavior)
 
 			if secretSync.SyncOptions["keyId"] != nil {
-				syncOptionsMap["aws_kms_key_id"] = types.StringValue(secretSync.SyncOptions["keyId"].(string))
+
+				keyId := ""
+				if key, ok := secretSync.SyncOptions["keyId"].(string); ok {
+					keyId = key
+				}
+				syncOptionsMap["aws_kms_key_id"] = types.StringValue(keyId)
 			} else {
 				syncOptionsMap["aws_kms_key_id"] = types.StringNull() // Add a null value for missing attributes
 			}
 
 			if secretSync.SyncOptions["syncSecretMetadataAsTags"] != nil {
-				syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolValue(secretSync.SyncOptions["syncSecretMetadataAsTags"].(bool))
+
+				syncSecretMetadataAsTags := false
+				syncMetadataAsTags, ok := secretSync.SyncOptions["syncSecretMetadataAsTags"].(bool)
+				if ok {
+					syncSecretMetadataAsTags = syncMetadataAsTags
+				}
+
+				syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolValue(syncSecretMetadataAsTags)
 			} else {
 				syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolNull()
 			}
 
 			if secretSync.SyncOptions["tags"] != nil {
-				rawTags := secretSync.SyncOptions["tags"].([]interface{})
+				rawTags, ok := secretSync.SyncOptions["tags"].([]interface{})
+				if !ok {
+					rawTags = []interface{}{}
+				}
 
 				tagsObjects := make([]attr.Value, 0, len(rawTags))
 				for _, rawTag := range rawTags {
-					tag := rawTag.(map[string]interface{})
+					tag, ok := rawTag.(map[string]interface{})
+					if !ok {
+						tag = map[string]interface{}{}
+					}
+
+					key, ok := tag["key"].(string)
+					if !ok {
+						key = ""
+					}
+
+					value, ok := tag["value"].(string)
+					if !ok {
+						value = ""
+					}
 
 					attrs := map[string]attr.Value{
-						"key":   types.StringValue(tag["key"].(string)),
-						"value": types.StringValue(tag["value"].(string)),
+						"key":   types.StringValue(key),
+						"value": types.StringValue(value),
 					}
 
 					obj, diags := types.ObjectValue(
