@@ -2,33 +2,42 @@ terraform {
   required_providers {
     infisical = {
       # version = <latest version>
-      source = "hashicorp.com/edu/infisical"
+      source = "infisical/infisical"
     }
   }
 }
 
 provider "infisical" {
-  host = "http://localhost:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
+  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
     universal = {
-      client_id     = "f1db897a-bac9-4be8-9ce0-274a9d1f1c62"
-      client_secret = "2d7048a5f6bde2948ef43ab636bf1c6cce6d1d0bf7aee170a5403642ff7e1d1f"
+      client_id     = "<machine-identity-client-id>"
+      client_secret = "<machine-identity-client-secret>"
     }
   }
 }
 
-resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_testsss" {
-  name          = "gcp-sync-testsaaa"
+resource "infisical_app_connection_gcp" "app-connection-gcp" {
+  name   = "gcp-app-connect"
+  method = "service-account-impersonation"
+  credentials = {
+    service_account_email = "service-account-df92581a-0fe9@my-duplicate-project.iam.gserviceaccount.com"
+  }
+  description = "I am a test app connection"
+}
+
+resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_test" {
+  name          = "gcp-sync-tests"
   description   = "I am a test secret sync"
-  project_id    = "207ecdf1-bf06-4a5b-840d-4a52c9c32447"
-  environment   = "dev"
+  project_id    = "f4517f4c-8b61-4727-8aef-5ae2807126fb"
+  environment   = "prod"
   secret_path   = "/"
-  connection_id = "e5f707e2-b83d-4b12-9279-f6acfde429cd"
+  connection_id = infisical_app_connection_gcp.app-connection-gcp.id
 
   sync_options = {
-    initial_sync_behavior = "overwrite-destination"
+    initial_sync_behavior = "import-prioritize-destination"
   }
   destination_config = {
-    project_id = "daniel-test-437412"
+    project_id = "my-duplicate-project"
   }
 }
