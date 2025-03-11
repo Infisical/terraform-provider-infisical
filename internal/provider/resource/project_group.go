@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"net/url"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 	"time"
@@ -218,7 +219,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	if plan.GroupID.ValueString() != "" {
 		request.GroupIdOrName = plan.GroupID.ValueString()
 	} else {
-		request.GroupIdOrName = plan.GroupName.ValueString()
+		request.GroupIdOrName = url.QueryEscape(plan.GroupName.ValueString())
 	}
 
 	projectGroupResponse, err := r.client.CreateProjectGroup(request)
