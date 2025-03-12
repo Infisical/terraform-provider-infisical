@@ -1975,10 +1975,6 @@ type DeleteAppConnectionResponse struct {
 	AppConnection AppConnection `json:"appConnection"`
 }
 
-type SecretSyncOptions struct {
-	InitialSyncBehavior string `json:"initialSyncBehavior"`
-}
-
 type SecretSyncConnection struct {
 	ConnectionID string `json:"id"`
 }
