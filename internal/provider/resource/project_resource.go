@@ -73,6 +73,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"last_updated": schema.StringAttribute{
 				Computed: true,
+				// PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -130,7 +131,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	plan.LastUpdated = types.StringValue(newProject.Project.UpdatedAt.Format(time.RFC850))
 	plan.ID = types.StringValue(newProject.Project.ID)
 
 	diags = resp.State.Set(ctx, plan)
@@ -179,7 +180,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	state.Name = types.StringValue(project.Name)
-
+	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -244,7 +245,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.Description = types.StringValue(updatedProject.Description)
 	}
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	plan.LastUpdated = types.StringValue(updatedProject.UpdatedAt.Format(time.RFC850))
 	plan.Name = types.StringValue(plan.Name.ValueString())
 
 	diags = resp.State.Set(ctx, plan)
@@ -312,4 +313,5 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), project.Slug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), project.Name)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), project.Description)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("last_updated"), project.UpdatedAt.Format(time.RFC850))...)
 }

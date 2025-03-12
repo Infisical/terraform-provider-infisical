@@ -3,6 +3,7 @@ package datasource
 import (
 	"context"
 	"fmt"
+	"time"
 
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -176,8 +177,8 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		Slug:               types.StringValue(project.Slug),
 		AutoCapitalization: types.BoolValue(project.AutoCapitalization),
 		OrgID:              types.StringValue(project.OrgID),
-		CreatedAt:          types.StringValue(project.CreatedAt),
-		UpdatedAt:          types.StringValue(project.UpdatedAt),
+		CreatedAt:          types.StringValue(project.CreatedAt.Format(time.RFC850)),
+		UpdatedAt:          types.StringValue(project.UpdatedAt.Format(time.RFC850)),
 		Version:            types.Int64Value(project.Version),
 		UpgradeStatus:      types.StringValue(project.UpgradeStatus),
 		Environments:       data.Environments,

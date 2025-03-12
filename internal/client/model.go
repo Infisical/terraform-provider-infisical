@@ -258,8 +258,8 @@ type ProjectWithEnvironments struct {
 	Slug               string               `json:"slug"`
 	AutoCapitalization bool                 `json:"autoCapitalization"`
 	OrgID              string               `json:"orgId"`
-	CreatedAt          string               `json:"createdAt"`
-	UpdatedAt          string               `json:"updatedAt"`
+	CreatedAt          time.Time            `json:"createdAt"`
+	UpdatedAt          time.Time            `json:"updatedAt"`
 	Version            int64                `json:"version"`
 	UpgradeStatus      string               `json:"upgradeStatus"`
 	Environments       []ProjectEnvironment `json:"environments"`
