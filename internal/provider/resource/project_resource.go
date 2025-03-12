@@ -8,6 +8,7 @@ import (
 
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -130,9 +131,6 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
-	plan.Slug = types.StringValue(plan.Slug.ValueString())
-	plan.Name = types.StringValue(plan.Name.ValueString())
-	plan.Description = types.StringValue(plan.Description.ValueString())
 	plan.ID = types.StringValue(newProject.Project.ID)
 
 	diags = resp.State.Set(ctx, plan)
@@ -287,4 +285,31 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
+}
+
+func (r *projectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
+		ID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Project environment not found",
+				"The project environment with the given slug was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching project environment",
+				"Couldn't fetch project environment from Infiscial, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), project.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), project.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), project.Name)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), project.Description)...)
 }

@@ -101,6 +101,9 @@ func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithE
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 {
+			return ProjectWithEnvironments{}, ErrNotFound
+		}
 		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unsuccessful response. [response=%s]", response)
 	}
 
