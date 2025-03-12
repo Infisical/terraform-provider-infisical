@@ -1,6 +1,9 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 func (client Client) CreateProject(request CreateProjectRequest) (CreateProjectResponse, error) {
 
@@ -101,7 +104,7 @@ func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithE
 	}
 
 	if response.IsError() {
-		if response.StatusCode() == 404 {
+		if response.StatusCode() == http.StatusNotFound {
 			return ProjectWithEnvironments{}, ErrNotFound
 		}
 		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unsuccessful response. [response=%s]", response)
