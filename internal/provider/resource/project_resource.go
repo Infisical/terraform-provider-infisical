@@ -296,13 +296,13 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	if err != nil {
 		if err == infisical.ErrNotFound {
 			resp.Diagnostics.AddError(
-				"Project environment not found",
-				"The project environment with the given slug was not found",
+				"Project not found",
+				"The project with the given ID was not found",
 			)
 		} else {
 			resp.Diagnostics.AddError(
-				"Error fetching project environment",
-				"Couldn't fetch project environment from Infiscial, unexpected error: "+err.Error(),
+				"Error fetching project",
+				"Couldn't fetch project from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return
