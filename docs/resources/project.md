@@ -61,6 +61,7 @@ resource "infisical_project" "azure-project" {
 ### Optional
 
 - `description` (String) The description of the project
+- `template_name` (String) The name of the template to use for the project
 
 ### Read-Only
 
