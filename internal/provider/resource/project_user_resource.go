@@ -71,9 +71,8 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 		Description: "Create project users & save to Infisical. Only Machine Identity authentication is supported for this resource",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Description:   "The id of the project",
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Description: "The id of the project",
+				Required:    true,
 			},
 			"username": schema.StringAttribute{
 				Description: "The usename of the user. By default its the email",
@@ -443,6 +442,14 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 		resp.Diagnostics.AddError(
 			"Unable to update project user",
 			fmt.Sprintf("Cannot change username, previous username: %s, new username: %s", state.Username, plan.Username),
+		)
+		return
+	}
+
+	if state.ProjectID != plan.ProjectID {
+		resp.Diagnostics.AddError(
+			"Unable to update project user",
+			fmt.Sprintf("Cannot change project_id, previous project_id: %s, new project_id: %s", state.ProjectID, plan.ProjectID),
 		)
 		return
 	}
