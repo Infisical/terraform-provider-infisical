@@ -71,8 +71,9 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 		Description: "Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Description: "The id of the project",
-				Required:    true,
+				Description:   "The id of the project",
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"username": schema.StringAttribute{
 				Description: "The usename of the user. By default its the email",

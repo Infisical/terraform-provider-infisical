@@ -592,6 +592,7 @@ type CreateProjectRequest struct {
 	ProjectDescription string `json:"projectDescription,omitempty"`
 	Slug               string `json:"slug"`
 	OrganizationSlug   string `json:"organizationSlug"`
+	Template           string `json:"template,omitempty"`
 }
 
 type DeleteProjectRequest struct {
