@@ -68,9 +68,8 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional:    true,
 			},
 			"template_name": schema.StringAttribute{
-				Description:   "The name of the template to use for the project",
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Description: "The name of the template to use for the project",
+				Optional:    true,
 			},
 
 			"id": schema.StringAttribute{
@@ -219,6 +218,14 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.TemplateName != plan.TemplateName {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"Template name cannot be updated",
+		)
 		return
 	}
 
