@@ -34,11 +34,12 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug        types.String `tfsdk:"slug"`
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	LastUpdated types.String `tfsdk:"last_updated"`
+	Slug         types.String `tfsdk:"slug"`
+	ID           types.String `tfsdk:"id"`
+	Name         types.String `tfsdk:"name"`
+	Description  types.String `tfsdk:"description"`
+	LastUpdated  types.String `tfsdk:"last_updated"`
+	TemplateName types.String `tfsdk:"template_name"`
 }
 
 // Metadata returns the resource type name.
@@ -66,6 +67,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The description of the project",
 				Optional:    true,
 			},
+			"template_name": schema.StringAttribute{
+				Description: "The name of the template to use for the project",
+				Optional:    true,
+			},
+
 			"id": schema.StringAttribute{
 				Description:   "The ID of the project",
 				Computed:      true,
@@ -121,6 +127,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		ProjectName:        plan.Name.ValueString(),
 		ProjectDescription: plan.Description.ValueString(),
 		Slug:               plan.Slug.ValueString(),
+		Template:           plan.TemplateName.ValueString(),
 	})
 
 	if err != nil {
@@ -211,6 +218,14 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.TemplateName != plan.TemplateName {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"Template name cannot be updated",
+		)
 		return
 	}
 
