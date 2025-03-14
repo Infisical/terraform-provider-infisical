@@ -3,12 +3,12 @@
 page_title: "infisical_project_user Resource - terraform-provider-infisical"
 subcategory: ""
 description: |-
-  Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source
+  Create project users & save to Infisical. Only Machine Identity authentication is supported for this resource
 ---
 
 # infisical_project_user (Resource)
 
-Create project users & save to Infisical. Only Machine Identity authentication is supported for this data source
+Create project users & save to Infisical. Only Machine Identity authentication is supported for this resource
 
 ## Example Usage
 
