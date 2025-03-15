@@ -294,6 +294,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
+		secretSyncResource.NewSecretSyncAwsParameterStoreResource,
+		secretSyncResource.NewSecretSyncAwsSecretsManagerResource,
 	}
 }
 

@@ -26,23 +26,24 @@ type SecretSyncBaseResource struct {
 	ReadDestinationConfigForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadDestinationConfigForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
-}
 
-type SyncOptionsModel struct {
-	InitialSyncBehavior types.String `tfsdk:"initial_sync_behavior"`
+	SyncOptionsAttributes            map[string]schema.Attribute
+	ReadSyncOptionsForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadSyncOptionsForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadSyncOptionsFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
 }
 
 type SecretSyncBaseResourceModel struct {
-	ID                types.String      `tfsdk:"id"`
-	ConnectionID      types.String      `tfsdk:"connection_id"`
-	Name              types.String      `tfsdk:"name"`
-	ProjectID         types.String      `tfsdk:"project_id"`
-	Description       types.String      `tfsdk:"description"`
-	Environment       types.String      `tfsdk:"environment"`
-	SecretPath        types.String      `tfsdk:"secret_path"`
-	SyncOptions       *SyncOptionsModel `tfsdk:"sync_options"`
-	AutoSyncEnabled   types.Bool        `tfsdk:"auto_sync_enabled"`
-	DestinationConfig types.Object      `tfsdk:"destination_config"`
+	ID                types.String `tfsdk:"id"`
+	ConnectionID      types.String `tfsdk:"connection_id"`
+	Name              types.String `tfsdk:"name"`
+	ProjectID         types.String `tfsdk:"project_id"`
+	Description       types.String `tfsdk:"description"`
+	Environment       types.String `tfsdk:"environment"`
+	SecretPath        types.String `tfsdk:"secret_path"`
+	SyncOptions       types.Object `tfsdk:"sync_options"`
+	AutoSyncEnabled   types.Bool   `tfsdk:"auto_sync_enabled"`
+	DestinationConfig types.Object `tfsdk:"destination_config"`
 }
 
 // Metadata returns the resource type name.
@@ -93,12 +94,7 @@ func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"sync_options": schema.SingleNestedAttribute{
 				Required:    true,
 				Description: "Parameters to modify how secrets are synced.",
-				Attributes: map[string]schema.Attribute{
-					"initial_sync_behavior": schema.StringAttribute{
-						Required:    true,
-						Description: fmt.Sprintf("Specify how Infisical should resolve the initial sync to the %s destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination", r.SyncName),
-					},
-				},
+				Attributes:  r.SyncOptionsAttributes,
 			},
 			"destination_config": schema.SingleNestedAttribute{
 				Required:    true,
@@ -147,7 +143,26 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	switch infisical.SecretSyncBehavior(plan.SyncOptions.InitialSyncBehavior.ValueString()) {
+	syncOptions, diags := r.ReadSyncOptionsForCreateFromPlan(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	initialSyncBehavior, ok := syncOptions["initialSyncBehavior"].(string)
+	if !ok {
+		initialSyncBehavior = ""
+	}
+
+	if initialSyncBehavior == "" {
+		resp.Diagnostics.AddError(
+			"Unable to create secret sync",
+			"Failed to parse initial_sync_behavior field",
+		)
+		return
+	}
+
+	switch infisical.SecretSyncBehavior(initialSyncBehavior) {
 	case infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination, infisical.SecretSyncBehaviorPrioritizeSource:
 		break
 	default:
@@ -167,17 +182,15 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 	}
 
 	secretSync, err := r.client.CreateSecretSync(infisicalclient.CreateSecretSyncRequest{
-		App:             r.App,
-		Name:            plan.Name.ValueString(),
-		Description:     plan.Description.ValueString(),
-		ProjectID:       plan.ProjectID.ValueString(),
-		ConnectionID:    plan.ConnectionID.ValueString(),
-		Environment:     plan.Environment.ValueString(),
-		SecretPath:      plan.SecretPath.ValueString(),
-		AutoSyncEnabled: plan.AutoSyncEnabled.ValueBool(),
-		SyncOptions: infisicalclient.SecretSyncOptions{
-			InitialSyncBehavior: plan.SyncOptions.InitialSyncBehavior.ValueString(),
-		},
+		App:               r.App,
+		Name:              plan.Name.ValueString(),
+		Description:       plan.Description.ValueString(),
+		ProjectID:         plan.ProjectID.ValueString(),
+		ConnectionID:      plan.ConnectionID.ValueString(),
+		Environment:       plan.Environment.ValueString(),
+		SecretPath:        plan.SecretPath.ValueString(),
+		AutoSyncEnabled:   plan.AutoSyncEnabled.ValueBool(),
+		SyncOptions:       syncOptions,
 		DestinationConfig: destinationConfigMap,
 	})
 
@@ -245,8 +258,10 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		state.Description = types.StringValue(secretSync.Description)
 	}
 
-	if state.SyncOptions != nil {
-		state.SyncOptions.InitialSyncBehavior = types.StringValue(secretSync.SyncOptions.InitialSyncBehavior)
+	state.SyncOptions, diags = r.ReadSyncOptionsFromApi(ctx, secretSync)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	state.DestinationConfig, diags = r.ReadDestinationConfigFromApi(ctx, secretSync)
@@ -283,7 +298,26 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	switch infisical.SecretSyncBehavior(plan.SyncOptions.InitialSyncBehavior.ValueString()) {
+	secretSyncPlan, diags := r.ReadSyncOptionsForUpdateFromPlan(ctx, plan, state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	initialSyncBehavior, ok := secretSyncPlan["initialSyncBehavior"].(string)
+	if !ok {
+		initialSyncBehavior = ""
+	}
+
+	if initialSyncBehavior == "" {
+		resp.Diagnostics.AddError(
+			"Unable to update secret sync",
+			"Failed to parse initial_sync_behavior field",
+		)
+		return
+	}
+
+	switch infisical.SecretSyncBehavior(initialSyncBehavior) {
 	case infisical.SecretSyncBehaviorOverwriteDestination, infisical.SecretSyncBehaviorPrioritizeDestination, infisical.SecretSyncBehaviorPrioritizeSource:
 		break
 	default:
@@ -303,18 +337,16 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 	}
 
 	_, err := r.client.UpdateSecretSync(infisicalclient.UpdateSecretSyncRequest{
-		App:             r.App,
-		ID:              state.ID.ValueString(),
-		Name:            plan.Name.ValueString(),
-		Description:     plan.Description.ValueString(),
-		ProjectID:       plan.ProjectID.ValueString(),
-		ConnectionID:    plan.ConnectionID.ValueString(),
-		Environment:     plan.Environment.ValueString(),
-		SecretPath:      plan.SecretPath.ValueString(),
-		AutoSyncEnabled: plan.AutoSyncEnabled.ValueBool(),
-		SyncOptions: infisicalclient.SecretSyncOptions{
-			InitialSyncBehavior: plan.SyncOptions.InitialSyncBehavior.ValueString(),
-		},
+		App:               r.App,
+		ID:                state.ID.ValueString(),
+		Name:              plan.Name.ValueString(),
+		Description:       plan.Description.ValueString(),
+		ProjectID:         plan.ProjectID.ValueString(),
+		ConnectionID:      plan.ConnectionID.ValueString(),
+		Environment:       plan.Environment.ValueString(),
+		SecretPath:        plan.SecretPath.ValueString(),
+		AutoSyncEnabled:   plan.AutoSyncEnabled.ValueBool(),
+		SyncOptions:       secretSyncPlan,
 		DestinationConfig: destinationConfigMap,
 	})
 

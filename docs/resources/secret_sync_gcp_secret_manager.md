@@ -97,4 +97,4 @@ Optional:
 
 Required:
 
-- `initial_sync_behavior` (String) Specify how Infisical should resolve the initial sync to the GCP Secret Manager destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
+- `initial_sync_behavior` (String) Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination

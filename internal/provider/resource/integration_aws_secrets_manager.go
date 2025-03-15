@@ -64,9 +64,6 @@ type IntegrationAWSSecretsManagerResourceModel struct {
 	Options types.Object `tfsdk:"options"`
 }
 
-const MAPPING_BEHAVIOR_MANY_TO_ONE = "many-to-one"
-const MAPPING_BEHAVIOR_ONE_TO_ONE = "one-to-one"
-
 const METADATA_SYNC_MODE_SECRET_METADATA = "secret-metadata"
 
 // Metadata returns the resource type name.
@@ -173,7 +170,7 @@ func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resou
 			"mapping_behavior": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString(MAPPING_BEHAVIOR_MANY_TO_ONE),
+				Default:     stringdefault.StaticString(infisical.AWS_MAPPING_BEHAVIOR_MANY_TO_ONE),
 				Description: "The behavior of the mapping. Can be 'many-to-one' or 'one-to-one'. Many to One: All Infisical secrets will be mapped to a single AWS secret. One to One: Each Infisical secret will be mapped to its own AWS secret.",
 			},
 
@@ -228,7 +225,7 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		return
 	}
 
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
+	if plan.MappingBehavior.ValueString() == infisical.AWS_MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
 			"secrets_manager_path is required when mapping_behavior is 'many-to-one'",
@@ -236,7 +233,7 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		return
 	}
 
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_ONE_TO_ONE && (!plan.AWSPath.IsNull() && plan.AWSPath.ValueString() != "") {
+	if plan.MappingBehavior.ValueString() == infisical.AWS_MAPPING_BEHAVIOR_ONE_TO_ONE && (!plan.AWSPath.IsNull() && plan.AWSPath.ValueString() != "") {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
 			"secrets_manager_path should not be used when mapping_behavior is 'one-to-one'",
@@ -287,7 +284,7 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		}
 	}
 
-	if plan.MappingBehavior.ValueString() != MAPPING_BEHAVIOR_ONE_TO_ONE && planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode == METADATA_SYNC_MODE_SECRET_METADATA {
+	if plan.MappingBehavior.ValueString() != infisical.AWS_MAPPING_BEHAVIOR_ONE_TO_ONE && planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode == METADATA_SYNC_MODE_SECRET_METADATA {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
 			"cannot use secret metadata sync mode when mapping_behavior is 'many-to-one'",
@@ -324,7 +321,7 @@ func (r *IntegrationAWSSecretsManagerResource) Create(ctx context.Context, req r
 		SourceEnvironment: plan.Environment.ValueString(),
 	}
 
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE {
+	if plan.MappingBehavior.ValueString() == infisical.AWS_MAPPING_BEHAVIOR_MANY_TO_ONE {
 		request.App = plan.AWSPath.ValueString()
 	}
 
@@ -463,7 +460,7 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		}
 	}
 
-	if plan.MappingBehavior.ValueString() != MAPPING_BEHAVIOR_ONE_TO_ONE && planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode == METADATA_SYNC_MODE_SECRET_METADATA {
+	if plan.MappingBehavior.ValueString() != infisical.AWS_MAPPING_BEHAVIOR_ONE_TO_ONE && planOptions.MetadataSyncMode != nil && *planOptions.MetadataSyncMode == METADATA_SYNC_MODE_SECRET_METADATA {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
 			"cannot use secret metadata sync mode when mapping_behavior is 'many-to-one'",
@@ -471,7 +468,7 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		return
 	}
 
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
+	if plan.MappingBehavior.ValueString() == infisical.AWS_MAPPING_BEHAVIOR_MANY_TO_ONE && (plan.AWSPath.IsNull() || plan.AWSPath.ValueString() == "") {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
 			"secrets_manager_path is required when mapping_behavior is 'many-to-one'",
@@ -479,7 +476,7 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		return
 	}
 
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_ONE_TO_ONE && (!plan.AWSPath.IsNull() && plan.AWSPath.ValueString() != "") {
+	if plan.MappingBehavior.ValueString() == infisical.AWS_MAPPING_BEHAVIOR_ONE_TO_ONE && (!plan.AWSPath.IsNull() && plan.AWSPath.ValueString() != "") {
 		resp.Diagnostics.AddError(
 			"Invalid plan",
 			"secrets_manager_path should not be used when mapping_behavior is 'one-to-one'",
@@ -545,7 +542,7 @@ func (r *IntegrationAWSSecretsManagerResource) Update(ctx context.Context, req r
 		IsActive:    true,
 	}
 
-	if plan.MappingBehavior.ValueString() == MAPPING_BEHAVIOR_MANY_TO_ONE {
+	if plan.MappingBehavior.ValueString() == infisical.AWS_MAPPING_BEHAVIOR_MANY_TO_ONE {
 		updateIntegrationRequest.App = plan.AWSPath.ValueString()
 	}
 

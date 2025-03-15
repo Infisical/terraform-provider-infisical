@@ -9,6 +9,8 @@ type SecretSyncApp string
 
 const (
 	SecretSyncAppGCPSecretManager      SecretSyncApp = "gcp-secret-manager"
+	SecretSyncAppAWSParameterStore     SecretSyncApp = "aws-parameter-store"
+	SecretSyncAppAWSSecretsManager     SecretSyncApp = "aws-secrets-manager"
 	SecretSyncAppAzureAppConfiguration SecretSyncApp = "azure-app-configuration"
 	SecretSyncAppAzureKeyVault         SecretSyncApp = "azure-key-vault"
 )
