@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -58,7 +59,9 @@ func NewSecretSyncAwsParameterStoreResource() resource.Resource {
 			},
 			"sync_secret_metadata_as_tags": schema.BoolAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Whether to sync the secret metadata as tags",
+				Default:     booldefault.StaticBool(false),
 			},
 			"tags": schema.SetNestedAttribute{
 				Optional:    true,
@@ -88,13 +91,10 @@ func NewSecretSyncAwsParameterStoreResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
 				syncOptionsMap["keyId"] = syncOptions.KeyID.ValueString()
-			}
-
-			if syncOptions.SyncSecretMetadataAsTags.ValueBool() {
-				syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 			}
 
 			if !syncOptions.Tags.IsNull() {
@@ -242,13 +242,10 @@ func NewSecretSyncAwsParameterStoreResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
 				syncOptionsMap["keyId"] = syncOptions.KeyID.ValueString()
-			}
-
-			if !syncOptions.SyncSecretMetadataAsTags.IsNull() {
-				syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 			}
 
 			if !syncOptions.Tags.IsNull() {

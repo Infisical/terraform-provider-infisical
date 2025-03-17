@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -66,7 +67,9 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			},
 			"sync_secret_metadata_as_tags": schema.BoolAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Whether to sync the secret metadata as tags. This is only supported for the 'one-to-one' mapping behavior.",
+				Default:     booldefault.StaticBool(false),
 			},
 			"tags": schema.SetNestedAttribute{
 				Optional:    true,
@@ -96,13 +99,10 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
 				syncOptionsMap["keyId"] = syncOptions.KeyID.ValueString()
-			}
-
-			if syncOptions.SyncSecretMetadataAsTags.ValueBool() {
-				syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 			}
 
 			if !syncOptions.Tags.IsNull() {
@@ -129,6 +129,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 
 		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
 			syncOptionsMap := make(map[string]attr.Value)
+			var diags diag.Diagnostics
 
 			initialSyncBehavior, ok := secretSync.SyncOptions["initialSyncBehavior"].(string)
 			if !ok {
@@ -153,7 +154,8 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 
 				syncSecretMetadataAsTags, ok := secretSync.SyncOptions["syncSecretMetadataAsTags"].(bool)
 				if !ok {
-					syncSecretMetadataAsTags = false
+					diags.AddError("Invalid syncSecretMetadataAsTags type", "Expected 'syncSecretMetadataAsTags' to be a boolean but got something else")
+					return types.ObjectNull(map[string]attr.Type{}), diags
 				}
 
 				syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolValue(syncSecretMetadataAsTags)
@@ -249,13 +251,10 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
 				syncOptionsMap["keyId"] = syncOptions.KeyID.ValueString()
-			}
-
-			if !syncOptions.SyncSecretMetadataAsTags.IsNull() {
-				syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 			}
 
 			if !syncOptions.Tags.IsNull() {
