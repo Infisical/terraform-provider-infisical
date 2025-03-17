@@ -14,6 +14,9 @@ const (
 	INFISICAL_AUTH_JWT_NAME                     = "INFISICAL_AUTH_JWT"
 )
 
+const AWS_MAPPING_BEHAVIOR_MANY_TO_ONE = "many-to-one"
+const AWS_MAPPING_BEHAVIOR_ONE_TO_ONE = "one-to-one"
+
 var (
 	ErrNotFound = errors.New("resource not found")
 )
