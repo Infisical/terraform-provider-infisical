@@ -167,6 +167,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Get the latest data from the API
 	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: state.Slug.ValueString(),
