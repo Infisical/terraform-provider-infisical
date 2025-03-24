@@ -196,6 +196,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		state.Description = types.StringValue(project.Description)
 	}
 
+	state.ID = types.StringValue(project.ID)
 	state.Name = types.StringValue(project.Name)
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	diags = resp.State.Set(ctx, state)
