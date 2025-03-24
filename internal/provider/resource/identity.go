@@ -160,6 +160,11 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Get the latest data from the API
 	orgIdentity, err := r.client.GetIdentity(infisical.GetIdentityRequest{
 		IdentityID: state.ID.ValueString(),

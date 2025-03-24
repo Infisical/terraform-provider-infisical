@@ -200,6 +200,11 @@ func (r *projectEnvironmentResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	projectEnvironment, err := r.client.GetProjectEnvironmentByID(infisical.GetProjectEnvironmentByIDRequest{
 		ID: state.ID.ValueString(),
 	})
