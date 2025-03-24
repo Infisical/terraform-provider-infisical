@@ -64,6 +64,10 @@ func (client Client) GetProject(request GetProjectRequest) (ProjectWithEnvironme
 		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unable to complete api request [err=%s]", err)
 	}
 
+	if response.StatusCode() == http.StatusNotFound {
+		return ProjectWithEnvironments{}, ErrNotFound
+	}
+
 	if response.IsError() {
 		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unsuccessful response. [response=%s]", response)
 	}

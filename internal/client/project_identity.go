@@ -1,6 +1,9 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 func (client Client) CreateProjectIdentity(request CreateProjectIdentityRequest) (CreateProjectIdentityResponse, error) {
 	var responeData CreateProjectIdentityResponse
@@ -73,6 +76,10 @@ func (client Client) GetProjectIdentityByID(request GetProjectIdentityByIDReques
 
 	if err != nil {
 		return GetProjectIdentityByIDResponse{}, fmt.Errorf("GetProjectIdentityByIDResponse: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return GetProjectIdentityByIDResponse{}, ErrNotFound
 	}
 
 	if response.IsError() {

@@ -173,11 +173,16 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	})
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
-		)
-		return
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		} else {
+			resp.Diagnostics.AddError(
+				"Error reading project",
+				"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	if project.Description == "" {

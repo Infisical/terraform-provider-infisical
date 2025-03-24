@@ -332,13 +332,20 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 		ProjectID:  state.ProjectID.ValueString(),
 		IdentityID: state.IdentityID.ValueString(),
 	})
+
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching identity",
-			"Couldn't find identity in project, unexpected error: "+err.Error(),
-		)
-		return
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching identity",
+				"Couldn't find identity in project, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
+
 	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
 	for _, el := range projectIdentityDetails.Membership.Roles {
 		val := ProjectIdentityRole{
