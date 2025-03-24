@@ -168,7 +168,6 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	if state.ID.ValueString() == "" {
-		resp.State.RemoveResource(ctx)
 		return
 	}
 
