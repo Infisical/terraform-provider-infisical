@@ -263,6 +263,11 @@ func (r *IdentityUniversalAuthResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
+	if state.IdentityID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Get the latest data from the API
 	identityUniversalAuth, err := r.client.GetIdentityUniversalAuth(infisical.GetIdentityUniversalAuthRequest{
 		IdentityID: state.IdentityID.ValueString(),
