@@ -350,6 +350,11 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
+	if state.ProjectID.ValueString() == "" || state.Username.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	projectUserDetails, err := r.client.GetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
 		ProjectID: state.ProjectID.ValueString(),
 		Username:  state.Username.ValueString(),

@@ -257,6 +257,11 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	if state.ProjectID.ValueString() == "" || state.GroupID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
 		ProjectId: state.ProjectID.ValueString(),
 		GroupId:   state.GroupID.ValueString(),

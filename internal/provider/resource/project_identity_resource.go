@@ -328,6 +328,11 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
+	if state.ProjectID.String() == "" || state.IdentityID.String() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	projectIdentityDetails, err := r.client.GetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
 		ProjectID:  state.ProjectID.ValueString(),
 		IdentityID: state.IdentityID.ValueString(),
