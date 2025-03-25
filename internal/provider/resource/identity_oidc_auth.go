@@ -101,7 +101,7 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 			},
 
 			"claim_metadata_mapping": schema.MapAttribute{
-				Description: "The attributes that should be present in the permission metadata from the JWT.",
+				Description: "Map OIDC token claims to metadata fields. Example: {\"role\": \"token.groups\"}, this would become identity.metadata.oidc.claims.role",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,

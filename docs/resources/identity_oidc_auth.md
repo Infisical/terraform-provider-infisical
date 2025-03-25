@@ -70,7 +70,7 @@ resource "infisical_identity_oidc_auth" "oidc-auth" {
 - `bound_audiences` (List of String) The comma-separated list of intended recipients.
 - `bound_claims` (Map of String) The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.
 - `bound_subject` (String) The expected principal that is the subject of the JWT.
-- `claim_metadata_mapping` (Map of String) The attributes that should be present in the permission metadata from the JWT.
+- `claim_metadata_mapping` (Map of String) Map OIDC token claims to metadata fields. Example: {"role": "token.groups"}, this would become identity.metadata.oidc.claims.role
 - `oidc_ca_certificate` (String) The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints
 
 ### Read-Only
