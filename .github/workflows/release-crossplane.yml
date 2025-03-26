@@ -43,7 +43,7 @@ jobs:
         with:
           distribution: goreleaser-pro
           version: v1.26.2-pro
-          args: release --clean --config .goreleaser-crossplane.yml
+          args: release --clean --config .goreleaser-crossplane.yml --skip-validate
         env:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
