@@ -1,12 +1,12 @@
 # Terraform Provider release workflow for Crossplane.
-name: Release
+name: Release Crossplane
 
 # This GitHub action creates a release when a tag that matches the pattern
 # "crossplane-v*" (e.g. crossplane-v0.1.0) is created.
 on:
   push:
     tags:
-      - "crossplane-v*"
+      - "crossplane/v*"
 
 # Releases need permissions to read and write the repository contents.
 # GitHub considers creating releases and uploading assets as writing contents.
