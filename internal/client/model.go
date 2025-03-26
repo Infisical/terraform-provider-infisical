@@ -205,6 +205,7 @@ type IdentityOidcAuth struct {
 	BoundIssuer             string                  `json:"boundIssuer"`
 	BoundAudiences          string                  `json:"boundAudiences"`
 	BoundClaims             map[string]string       `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string       `json:"claimMetadataMapping"`
 	BoundSubject            string                  `json:"boundSubject"`
 	CACERT                  string                  `json:"caCert"`
 }
@@ -1542,6 +1543,7 @@ type CreateIdentityOidcAuthRequest struct {
 	BoundIssuer             string                         `json:"boundIssuer"`
 	BoundAudiences          string                         `json:"boundAudiences"`
 	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
 	BoundSubject            string                         `json:"boundSubject"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
@@ -1556,6 +1558,7 @@ type UpdateIdentityOidcAuthRequest struct {
 	BoundIssuer             string                         `json:"boundIssuer"`
 	BoundAudiences          string                         `json:"boundAudiences"`
 	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
 	BoundSubject            string                         `json:"boundSubject"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`

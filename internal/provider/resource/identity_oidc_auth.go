@@ -42,6 +42,7 @@ type IdentityOidcAuthResourceModel struct {
 	BoundIssuer             types.String `tfsdk:"bound_issuer"`
 	BoundAudiences          types.List   `tfsdk:"bound_audiences"`
 	BoundClaims             types.Map    `tfsdk:"bound_claims"`
+	ClaimMetadataMapping    types.Map    `tfsdk:"claim_metadata_mapping"`
 	BoundSubject            types.String `tfsdk:"bound_subject"`
 	AccessTokenTrustedIps   types.List   `tfsdk:"access_token_trusted_ips"`
 	AccessTokenTTL          types.Int64  `tfsdk:"access_token_ttl"`
@@ -96,6 +97,16 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				PlanModifiers: []planmodifier.Map{
 					mapplanmodifier.UseStateForUnknown(),
 					pkg.CommaSpaceMapModifier{},
+				},
+			},
+
+			"claim_metadata_mapping": schema.MapAttribute{
+				Description: "Map OIDC token claims to metadata fields. Example: {\"role\": \"token.groups\"}, this would become identity.metadata.oidc.claims.role",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"bound_subject": schema.StringAttribute{
@@ -178,6 +189,7 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 	plan.CaCertificate = types.StringValue(newIdentityOidcAuth.CACERT)
 
 	boundClaimsElements := make(map[string]attr.Value)
+	claimMetadataMappingElements := make(map[string]attr.Value)
 	for key, value := range newIdentityOidcAuth.BoundClaims {
 		// Check plan format
 		useSpaces := false
@@ -203,13 +215,24 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 		}
 	}
 
+	for key, value := range newIdentityOidcAuth.ClaimMetadataMapping {
+		claimMetadataMappingElements[key] = types.StringValue(value)
+	}
+
 	boundClaimsMapValue, diags := types.MapValue(types.StringType, boundClaimsElements)
 	diagnose.Append(diags...)
 	if diagnose.HasError() {
 		return
 	}
 
+	claimMetadataMappingMapValue, diags := types.MapValue(types.StringType, claimMetadataMappingElements)
+	diagnose.Append(diags...)
+	if diagnose.HasError() {
+		return
+	}
+
 	plan.BoundClaims = boundClaimsMapValue
+	plan.ClaimMetadataMapping = claimMetadataMappingMapValue
 
 	plan.BoundAudiences, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(newIdentityOidcAuth.BoundAudiences, ","))
 	diagnose.Append(diags...)
@@ -278,6 +301,13 @@ func (r *IdentityOidcAuthResource) Create(ctx context.Context, req resource.Crea
 		}
 	}
 
+	claimMetadataMappingMap := make(map[string]string)
+	for key, value := range plan.ClaimMetadataMapping.Elements() {
+		if strVal, ok := value.(types.String); ok {
+			claimMetadataMappingMap[key] = strVal.ValueString()
+		}
+	}
+
 	newIdentityOidcAuth, err := r.client.CreateIdentityOidcAuth(infisical.CreateIdentityOidcAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
@@ -289,6 +319,7 @@ func (r *IdentityOidcAuthResource) Create(ctx context.Context, req resource.Crea
 		BoundIssuer:             plan.BoundIssuer.ValueString(),
 		BoundSubject:            plan.BoundSubject.ValueString(),
 		BoundClaims:             boundClaimsMap,
+		ClaimMetadataMapping:    claimMetadataMappingMap,
 		CACERT:                  plan.CaCertificate.ValueString(),
 	})
 
@@ -395,6 +426,13 @@ func (r *IdentityOidcAuthResource) Update(ctx context.Context, req resource.Upda
 		}
 	}
 
+	claimMetadataMappingMap := make(map[string]string)
+	for key, value := range plan.ClaimMetadataMapping.Elements() {
+		if strVal, ok := value.(types.String); ok {
+			claimMetadataMappingMap[key] = strVal.ValueString()
+		}
+	}
+
 	updatedIdentityOidcAuth, err := r.client.UpdateIdentityOidcAuth(infisical.UpdateIdentityOidcAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
@@ -406,6 +444,7 @@ func (r *IdentityOidcAuthResource) Update(ctx context.Context, req resource.Upda
 		BoundIssuer:             plan.BoundIssuer.ValueString(),
 		BoundSubject:            plan.BoundSubject.ValueString(),
 		BoundClaims:             boundClaimsMap,
+		ClaimMetadataMapping:    claimMetadataMappingMap,
 		CACERT:                  plan.CaCertificate.ValueString(),
 	})
 
