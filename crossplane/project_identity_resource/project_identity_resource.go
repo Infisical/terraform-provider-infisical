@@ -73,8 +73,8 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"roles": schema.StringAttribute{
-				Optional:    true,
 				Description: "JSON array of role assignments for this identity. Each role object must include a `role_slug` field. Example: `[{\"role_slug\":\"admin\"},{\"role_slug\":\"member\"}]`.",
+				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					pkg.JsonEquivalentModifier{},
 				},
@@ -124,10 +124,6 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	// parse roles in plan from JSON string to ProjectIdentityRole struct
-
-	var roles []infisical.CreateProjectIdentityRequestRoles
-
 	var parsedRoles []ProjectIdentityRole
 	err := json.Unmarshal([]byte(plan.Roles.ValueString()), &parsedRoles)
 	if err != nil {
@@ -138,6 +134,7 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
+	var roles []infisical.CreateProjectIdentityRequestRoles
 	for _, el := range parsedRoles {
 		if el.RoleSlug == "" {
 			resp.Diagnostics.AddError(
@@ -271,6 +268,7 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 	state.Roles = types.StringValue(string(rolesJSON))
+	state.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -386,6 +384,7 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
+	plan.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
 	plan.Roles = types.StringValue(string(rolesJSON))
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
