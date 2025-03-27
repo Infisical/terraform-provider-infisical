@@ -22,15 +22,12 @@ resource "infisical_project" "example" {
   slug = "example"
 }
 
-resource "infisical_project_user" "test-user" {
+resource "infisical_project_group" "test-group" {
   project_id = infisical_project.example.id
-  username   = "sheen+200@infisical.com"
+  group_id = "<group-id>"
   roles = jsonencode([
     {
-      role_slug = "admin"
+      role_slug = "admin",
     },
-    {
-      role_slug = "no-access"
-    }
   ])
 }

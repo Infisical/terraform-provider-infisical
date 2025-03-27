@@ -75,7 +75,7 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Required:    true,
 				Description: "JSON array of role assignments for this user. Each role object must include a `role_slug` field. Example: `[{\"role_slug\":\"admin\"},{\"role_slug\":\"member\"}]`.",
 				PlanModifiers: []planmodifier.String{
-					pkg.JsonEquivalentModifier{},
+					pkg.UnorderedJsonEquivalentModifier{},
 				},
 				Validators: []validator.String{
 					infisicaltf.JsonStringValidator,
