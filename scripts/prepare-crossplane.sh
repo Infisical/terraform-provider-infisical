@@ -18,6 +18,18 @@ if [ -d "$SOURCE_DIR/project_identity_resource" ]; then
   cp -f "$SOURCE_DIR/project_identity_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_identity/"
 fi
 
+if [ -d "$SOURCE_DIR/project_user_resource" ]; then
+  echo "Replacing project_user_resource"
+  cp -f "$SOURCE_DIR/project_user_resource/project_user_resource.go" "$DESTINATION_DIR/"
+  cp -f "$SOURCE_DIR/project_user_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_user/"
+fi
+
+if [ -d "$SOURCE_DIR/project_group_resource" ]; then
+  echo "Replacing project_group_resource"
+  cp -f "$SOURCE_DIR/project_group_resource/project_group.go" "$DESTINATION_DIR/"
+  cp -f "$SOURCE_DIR/project_group_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_group/"
+fi
+
 # Regenerate documentation
 echo "Regenerating documentation..."
 go generate ./...
