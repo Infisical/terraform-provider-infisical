@@ -49,7 +49,7 @@ func (j UnorderedJsonEquivalentModifier) PlanModifyString(ctx context.Context, r
 }
 
 // areEquivalentJSON checks if two JSON strings are equivalent,
-// ignoring key ordering in objects and element ordering in arrays
+// ignoring key ordering in objects and element ordering in arrays.
 func areEquivalentJSON(json1, json2 string) (bool, error) {
 	var obj1, obj2 interface{}
 
@@ -64,7 +64,7 @@ func areEquivalentJSON(json1, json2 string) (bool, error) {
 	return deepEqual(obj1, obj2), nil
 }
 
-// deepEqual recursively compares two values, with special handling for arrays
+// deepEqual recursively compares two values, with special handling for arrays.
 func deepEqual(v1, v2 interface{}) bool {
 	// Handle nil values
 	if v1 == nil || v2 == nil {
