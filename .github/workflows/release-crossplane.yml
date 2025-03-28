@@ -1,15 +1,11 @@
 # Terraform Provider release workflow for Crossplane.
 name: Release Crossplane
 
-# This GitHub action creates a release when a tag that matches the pattern
-# "crossplane-v*" (e.g. crossplane-v0.1.0) is created.
 on:
   push:
     tags:
       - "crossplane-tf-provider/v*"
 
-# Releases need permissions to read and write the repository contents.
-# GitHub considers creating releases and uploading assets as writing contents.
 permissions:
   contents: write
 
@@ -19,25 +15,33 @@ jobs:
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
         with:
-          # Allow goreleaser to access older tag information.
           fetch-depth: 0
+
       - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753 # v4.0.1
         with:
           go-version-file: "go.mod"
           cache: true
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.10.4"
+
       - name: Replace resource files for Crossplane
         run: |
           chmod +x ./scripts/prepare-crossplane.sh
           ./scripts/prepare-crossplane.sh
+
+      - name: Zip regenerated docs
+        run: |
+          zip -r crossplane-tf-provider-docs.zip docs/
+
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@72b6676b71ab476b77e676928516f6982eef7a41 # v5.3.0
         id: import_gpg
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
@@ -45,7 +49,13 @@ jobs:
           version: v1.26.2-pro
           args: release --clean --config .goreleaser-crossplane.yml --skip-validate
         env:
-          # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           GORELEASER_KEY: ${{ secrets.GO_RELEASER_PRO_KEY }}
+
+      - name: Upload docs to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: crossplane-tf-provider-docs.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
