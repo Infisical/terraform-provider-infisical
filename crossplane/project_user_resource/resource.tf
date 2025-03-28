@@ -25,12 +25,5 @@ resource "infisical_project" "example" {
 resource "infisical_project_user" "test-user" {
   project_id = infisical_project.example.id
   username   = "sheen+200@infisical.com"
-  roles = jsonencode([
-    {
-      role_slug = "admin"
-    },
-    {
-      role_slug = "no-access"
-    }
-  ])
+  roles = "[{\"role_slug\": \"admin\"}]"
 }
