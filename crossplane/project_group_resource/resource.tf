@@ -25,9 +25,5 @@ resource "infisical_project" "example" {
 resource "infisical_project_group" "test-group" {
   project_id = infisical_project.example.id
   group_id = "<group-id>"
-  roles = jsonencode([
-    {
-      role_slug = "admin",
-    },
-  ])
+  roles = "[{\"role_slug\": \"admin\"}]"
 }
