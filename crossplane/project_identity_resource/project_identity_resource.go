@@ -169,29 +169,6 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
-	for _, el := range projectIdentityDetails.Membership.Roles {
-		val := ProjectIdentityRole{
-			RoleSlug: el.Role,
-		}
-
-		if el.CustomRoleId != "" {
-			val.RoleSlug = el.CustomRoleSlug
-		}
-
-		planRoles = append(planRoles, val)
-	}
-
-	rolesJSON, err := json.Marshal(planRoles)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error serializing roles to JSON",
-			fmt.Sprintf("Failed to serialize roles to JSON: %s", err.Error()),
-		)
-		return
-	}
-
-	plan.Roles = types.StringValue(string(rolesJSON))
 	plan.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -357,30 +334,7 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
-	for _, el := range projectIdentityDetails.Membership.Roles {
-		val := ProjectIdentityRole{
-			RoleSlug: el.Role,
-		}
-
-		if el.CustomRoleId != "" {
-			val.RoleSlug = el.CustomRoleSlug
-		}
-
-		planRoles = append(planRoles, val)
-	}
-
-	rolesJSON, err := json.Marshal(planRoles)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error serializing roles to JSON",
-			fmt.Sprintf("Failed to serialize roles to JSON: %s", err.Error()),
-		)
-		return
-	}
-
 	plan.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
-	plan.Roles = types.StringValue(string(rolesJSON))
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
