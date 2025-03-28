@@ -54,7 +54,7 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GO_RELEASER_PRO_KEY }}
 
       - name: Upload docs to GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: crossplane-tf-provider-docs.zip
         env:
