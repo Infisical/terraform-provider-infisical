@@ -6,13 +6,11 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
-	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -77,9 +75,6 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					pkg.UnorderedJsonEquivalentModifier{},
-				},
-				Validators: []validator.String{
-					infisicaltf.JsonStringValidator,
 				},
 			},
 		},
