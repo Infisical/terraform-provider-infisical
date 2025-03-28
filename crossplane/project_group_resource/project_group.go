@@ -8,13 +8,11 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
-	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -80,9 +78,6 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					pkg.UnorderedJsonEquivalentModifier{},
-				},
-				Validators: []validator.String{
-					infisicaltf.JsonStringValidator,
 				},
 			},
 		},
@@ -155,6 +150,13 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 
 	var roles []infisical.CreateProjectGroupRequestRoles
 	for _, el := range parsedRoles {
+		if el.RoleSlug == "" {
+			resp.Diagnostics.AddError(
+				"Error parsing roles JSON",
+				"Each role object must include a `role_slug` field. Example: `[{\"role_slug\":\"admin\"},{\"role_slug\":\"member\"}]`.",
+			)
+			return
+		}
 		roles = append(roles, infisical.CreateProjectGroupRequestRoles{
 			Role: el.RoleSlug,
 		})
@@ -314,6 +316,13 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 
 	var roles []infisical.UpdateProjectGroupRequestRoles
 	for _, el := range parsedRoles {
+		if el.RoleSlug == "" {
+			resp.Diagnostics.AddError(
+				"Error parsing roles JSON",
+				"Each role object must include a `role_slug` field. Example: `[{\"role_slug\":\"admin\"},{\"role_slug\":\"member\"}]`.",
+			)
+			return
+		}
 		roles = append(roles, infisical.UpdateProjectGroupRequestRoles{
 			Role: el.RoleSlug,
 		})
