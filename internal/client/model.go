@@ -1741,14 +1741,15 @@ type SecretApprovalPolicyApprover struct {
 }
 
 type SecretApprovalPolicy struct {
-	ID                string                          `json:"id"`
-	ProjectID         string                          `json:"projectId"`
-	Name              string                          `json:"name"`
-	Environment       SecretApprovalPolicyEnvironment `json:"environment"`
-	SecretPath        string                          `json:"secretPath"`
-	Approvers         []SecretApprovalPolicyApprover  `json:"approvers"`
-	RequiredApprovals int64                           `json:"approvals"`
-	EnforcementLevel  string                          `json:"enforcementLevel"`
+	ID                   string                          `json:"id"`
+	ProjectID            string                          `json:"projectId"`
+	Name                 string                          `json:"name"`
+	Environment          SecretApprovalPolicyEnvironment `json:"environment"`
+	SecretPath           string                          `json:"secretPath"`
+	Approvers            []SecretApprovalPolicyApprover  `json:"approvers"`
+	RequiredApprovals    int64                           `json:"approvals"`
+	EnforcementLevel     string                          `json:"enforcementLevel"`
+	AllowedSelfApprovals bool                            `json:"allowedSelfApprovals"`
 }
 
 type CreateSecretApprovalPolicyApprover struct {
@@ -1758,13 +1759,14 @@ type CreateSecretApprovalPolicyApprover struct {
 }
 
 type CreateSecretApprovalPolicyRequest struct {
-	ProjectID         string                               `json:"workspaceId"`
-	Name              string                               `json:"name,omitempty"`
-	Environment       string                               `json:"environment"`
-	SecretPath        string                               `json:"secretPath"`
-	Approvers         []CreateSecretApprovalPolicyApprover `json:"approvers"`
-	RequiredApprovals int64                                `json:"approvals"`
-	EnforcementLevel  string                               `json:"enforcementLevel"`
+	ProjectID            string                               `json:"workspaceId"`
+	Name                 string                               `json:"name,omitempty"`
+	Environment          string                               `json:"environment"`
+	SecretPath           string                               `json:"secretPath"`
+	Approvers            []CreateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals    int64                                `json:"approvals"`
+	EnforcementLevel     string                               `json:"enforcementLevel"`
+	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
 }
 
 type CreateSecretApprovalPolicyResponse struct {
@@ -1786,12 +1788,13 @@ type UpdateSecretApprovalPolicyApprover struct {
 }
 
 type UpdateSecretApprovalPolicyRequest struct {
-	ID                string
-	Name              string                               `json:"name"`
-	SecretPath        string                               `json:"secretPath"`
-	Approvers         []UpdateSecretApprovalPolicyApprover `json:"approvers"`
-	RequiredApprovals int64                                `json:"approvals"`
-	EnforcementLevel  string                               `json:"enforcementLevel"`
+	ID                   string
+	Name                 string                               `json:"name"`
+	SecretPath           string                               `json:"secretPath"`
+	Approvers            []UpdateSecretApprovalPolicyApprover `json:"approvers"`
+	RequiredApprovals    int64                                `json:"approvals"`
+	EnforcementLevel     string                               `json:"enforcementLevel"`
+	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
 }
 
 type UpdateSecretApprovalPolicyResponse struct {
