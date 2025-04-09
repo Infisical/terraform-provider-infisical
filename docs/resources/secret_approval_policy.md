@@ -69,6 +69,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 
 ### Optional
 
+- `allow_self_approval` (Boolean) Whether to allow the  approvers to approve their own changes
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `name` (String) The name of the secret approval policy
 
