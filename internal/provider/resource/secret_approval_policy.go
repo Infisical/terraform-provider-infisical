@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -39,6 +40,7 @@ type secretApprovalPolicyResourceModel struct {
 	Approvers         []SecretApprover `tfsdk:"approvers"`
 	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
 	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
+	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
 }
 
 // Metadata returns the resource type name.
@@ -73,6 +75,12 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 			"secret_path": schema.StringAttribute{
 				Description: "The secret path to apply the secret approval policy to",
 				Required:    true,
+			},
+			"allow_self_approval": schema.BoolAttribute{
+				Description: "Whether to allow the  approvers to approve their own changes",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"approvers": schema.SetNestedAttribute{
 				Required:    true,
@@ -190,13 +198,14 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 
 	secretApprovalPolicy, err := r.client.CreateSecretApprovalPolicy(infisical.CreateSecretApprovalPolicyRequest{
-		Name:              plan.Name.ValueString(),
-		ProjectID:         plan.ProjectID.ValueString(),
-		Environment:       plan.EnvironmentSlug.ValueString(),
-		SecretPath:        plan.SecretPath.ValueString(),
-		Approvers:         approvers,
-		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
-		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
+		Name:                 plan.Name.ValueString(),
+		ProjectID:            plan.ProjectID.ValueString(),
+		Environment:          plan.EnvironmentSlug.ValueString(),
+		SecretPath:           plan.SecretPath.ValueString(),
+		Approvers:            approvers,
+		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
+		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
+		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
 	})
 
 	if err != nil {
@@ -256,6 +265,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.SecretPath = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.SecretPath)
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.EnforcementLevel)
+	state.AllowSelfApproval = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.AllowedSelfApprovals)
 
 	approvers := make([]SecretApprover, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
 	for i, el := range secretApprovalPolicy.SecretApprovalPolicy.Approvers {
@@ -365,12 +375,13 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 	}
 
 	_, err := r.client.UpdateSecretApprovalPolicy(infisical.UpdateSecretApprovalPolicyRequest{
-		ID:                plan.ID.ValueString(),
-		Name:              plan.Name.ValueString(),
-		SecretPath:        plan.SecretPath.ValueString(),
-		Approvers:         approvers,
-		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
-		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
+		ID:                   plan.ID.ValueString(),
+		Name:                 plan.Name.ValueString(),
+		SecretPath:           plan.SecretPath.ValueString(),
+		Approvers:            approvers,
+		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
+		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
+		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
 	})
 
 	if err != nil {
