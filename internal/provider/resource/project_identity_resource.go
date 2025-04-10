@@ -586,3 +586,74 @@ func (r *ProjectIdentityResource) Delete(ctx context.Context, req resource.Delet
 	}
 
 }
+
+func (r *ProjectIdentityResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	projectIdentityDetails, err := r.client.GetProjectIdentityByMembershipID(infisical.GetProjectIdentityByMembershipIDRequest{
+		MembershipID: req.ID,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Error fetching identity", "Couldn't find identity by membership ID, unexpected error: "+err.Error())
+		return
+	}
+
+	identityDetails := ProjectIdentityDetails{
+		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
+	}
+
+	authMethods := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
+	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
+		authMethods[i] = types.StringValue(method)
+	}
+	identityDetails.AuthMethods = types.ListValueMust(types.StringType, authMethods)
+
+	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	for _, el := range projectIdentityDetails.Membership.Roles {
+		val := ProjectIdentityRole{
+			ID:                      types.StringValue(el.ID),
+			RoleSlug:                types.StringValue(el.Role),
+			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
+			TemporaryRange:          types.StringValue(el.TemporaryRange),
+			TemporaryMode:           types.StringValue(el.TemporaryMode),
+			CustomRoleID:            types.StringValue(el.CustomRoleId),
+			IsTemporary:             types.BoolValue(el.IsTemporary),
+			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+		}
+		if !el.IsTemporary {
+			val.TemporaryMode = types.StringNull()
+			val.TemporaryRange = types.StringNull()
+			val.TemporaryAccesStartTime = types.StringNull()
+			val.TemporaryAccessEndTime = types.StringNull()
+		}
+		planRoles = append(planRoles, val)
+	}
+
+	// Create the identity object value
+	identityObj, diags := types.ObjectValue(map[string]attr.Type{
+		"id":           types.StringType,
+		"name":         types.StringType,
+		"auth_methods": types.ListType{ElemType: types.StringType},
+	}, map[string]attr.Value{
+		"id":           identityDetails.ID,
+		"name":         identityDetails.Name,
+		"auth_methods": identityDetails.AuthMethods,
+	})
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	plan := ProjectIdentityResourceModel{
+		ProjectID:    types.StringValue(projectIdentityDetails.Membership.Project.ID),
+		IdentityID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		MembershipId: types.StringValue(projectIdentityDetails.Membership.ID),
+		Roles:        planRoles,
+		Identity:     identityObj,
+	}
+
+	// Set the state with the imported data
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
