@@ -82,6 +82,10 @@ type ProjectIdentity struct {
 		Id          string   `json:"id"`
 		AuthMethods []string `json:"authMethods"`
 	} `json:"identity"`
+	Project struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"project"`
 }
 
 type ProjectMemberRole struct {
@@ -713,6 +717,10 @@ type CreateProjectIdentityResponseMembers struct {
 type GetProjectIdentityByIDRequest struct {
 	ProjectID  string `json:"projectId"`
 	IdentityID string `json:"identityId"`
+}
+
+type GetProjectIdentityByMembershipIDRequest struct {
+	MembershipID string
 }
 
 type GetProjectIdentityByIDResponse struct {

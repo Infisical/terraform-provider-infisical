@@ -88,3 +88,26 @@ func (client Client) GetProjectIdentityByID(request GetProjectIdentityByIDReques
 
 	return responseData, nil
 }
+
+func (client Client) GetProjectIdentityByMembershipID(request GetProjectIdentityByMembershipIDRequest) (GetProjectIdentityByIDResponse, error) {
+	var responseData GetProjectIdentityByIDResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&responseData).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Get(fmt.Sprintf("api/v2/workspace/identity-memberships/%s", request.MembershipID))
+
+	if err != nil {
+		return GetProjectIdentityByIDResponse{}, fmt.Errorf("GetProjectIdentityByMembershipID: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectIdentityByIDResponse{}, ErrNotFound
+		}
+		return GetProjectIdentityByIDResponse{}, fmt.Errorf("GetProjectIdentityByMembershipID: Unsuccessful response. [response=%s]", response)
+	}
+
+	return responseData, nil
+}
