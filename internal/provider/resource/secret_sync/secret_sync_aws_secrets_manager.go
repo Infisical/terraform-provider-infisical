@@ -29,6 +29,7 @@ type AwsSecretsManagerTagsModel struct {
 
 type SecretSyncAwsSecretsManagerSyncOptionsModel struct {
 	InitialSyncBehavior      types.String `tfsdk:"initial_sync_behavior"`
+	DisableSecretDeletion    types.Bool   `tfsdk:"disable_secret_deletion"`
 	KeyID                    types.String `tfsdk:"aws_kms_key_id"`
 	SyncSecretMetadataAsTags types.Bool   `tfsdk:"sync_secret_metadata_as_tags"`
 	Tags                     types.Set    `tfsdk:"tags"`
@@ -60,6 +61,12 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			"initial_sync_behavior": schema.StringAttribute{
 				Required:    true,
 				Description: "Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination",
+			},
+			"disable_secret_deletion": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "When set to true, Infisical will not remove secrets from AWS Secrets Manager. Enable this option if you intend to manage some secrets manually outside of Infisical.",
+				Default:     booldefault.StaticBool(false),
 			},
 			"aws_kms_key_id": schema.StringAttribute{
 				Optional:    true,
@@ -99,6 +106,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
@@ -136,7 +144,13 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 				initialSyncBehavior = ""
 			}
 
+			disableSecretDeletion, ok := secretSync.SyncOptions["disableSecretDeletion"].(bool)
+			if !ok {
+				disableSecretDeletion = false
+			}
+
 			syncOptionsMap["initial_sync_behavior"] = types.StringValue(initialSyncBehavior)
+			syncOptionsMap["disable_secret_deletion"] = types.BoolValue(disableSecretDeletion)
 
 			if secretSync.SyncOptions["keyId"] != nil {
 
@@ -228,6 +242,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 
 			return types.ObjectValue(map[string]attr.Type{
 				"initial_sync_behavior":        types.StringType,
+				"disable_secret_deletion":      types.BoolType,
 				"aws_kms_key_id":               types.StringType,
 				"sync_secret_metadata_as_tags": types.BoolType,
 				"tags": types.SetType{
@@ -251,6 +266,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {

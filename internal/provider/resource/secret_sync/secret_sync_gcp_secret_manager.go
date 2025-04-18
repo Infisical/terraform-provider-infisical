@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -23,7 +24,8 @@ type SecretSyncGcpSecretManagerDestinationConfigModel struct {
 }
 
 type SecretSyncGcpSecretManagerSyncOptionsModel struct {
-	InitialSyncBehavior types.String `tfsdk:"initial_sync_behavior"`
+	InitialSyncBehavior   types.String `tfsdk:"initial_sync_behavior"`
+	DisableSecretDeletion types.Bool   `tfsdk:"disable_secret_deletion"`
 }
 
 func NewSecretSyncGcpSecretManagerResource() resource.Resource {
@@ -36,6 +38,12 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 			"initial_sync_behavior": schema.StringAttribute{
 				Required:    true,
 				Description: "Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination",
+			},
+			"disable_secret_deletion": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "When set to true, Infisical will not remove secrets from GCP Secret Manager. Enable this option if you intend to manage some secrets manually outside of Infisical.",
+				Default:     booldefault.StaticBool(false),
 			},
 		},
 		DestinationConfigAttributes: map[string]schema.Attribute{
@@ -61,7 +69,7 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
-
+			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			return syncOptionsMap, nil
 
 		},
@@ -76,6 +84,7 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			return syncOptionsMap, nil
 		},
 
@@ -86,12 +95,19 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 				initialSyncBehavior = ""
 			}
 
+			disableSecretDeletion, ok := secretSync.SyncOptions["disableSecretDeletion"].(bool)
+			if !ok {
+				disableSecretDeletion = false
+			}
+
 			syncOptionsMap := map[string]attr.Value{
-				"initial_sync_behavior": types.StringValue(initialSyncBehavior),
+				"initial_sync_behavior":   types.StringValue(initialSyncBehavior),
+				"disable_secret_deletion": types.BoolValue(disableSecretDeletion),
 			}
 
 			return types.ObjectValue(map[string]attr.Type{
-				"initial_sync_behavior": types.StringType,
+				"initial_sync_behavior":   types.StringType,
+				"disable_secret_deletion": types.BoolType,
 			}, syncOptionsMap)
 		},
 

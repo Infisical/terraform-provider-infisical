@@ -89,3 +89,7 @@ Optional:
 Required:
 
 - `initial_sync_behavior` (String) Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
+
+Optional:
+
+- `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Azure App Configuration. Enable this option if you intend to manage some secrets manually outside of Infisical.
