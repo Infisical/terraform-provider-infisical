@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -19,7 +20,8 @@ type SecretSyncAzureKeyVaultDestinationConfigModel struct {
 }
 
 type SecretSyncAzureKeyVaultSyncOptionsModel struct {
-	InitialSyncBehavior types.String `tfsdk:"initial_sync_behavior"`
+	InitialSyncBehavior   types.String `tfsdk:"initial_sync_behavior"`
+	DisableSecretDeletion types.Bool   `tfsdk:"disable_secret_deletion"`
 }
 
 func NewSecretSyncAzureKeyVaultResource() resource.Resource {
@@ -39,6 +41,12 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 				Required:    true,
 				Description: "Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination",
 			},
+			"disable_secret_deletion": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "When set to true, Infisical will not remove secrets from Azure Key Vault. Enable this option if you intend to manage some secrets manually outside of Infisical.",
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 
 		ReadSyncOptionsForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -51,7 +59,7 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
-
+			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			return syncOptionsMap, nil
 
 		},
@@ -66,6 +74,7 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 			}
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
+			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			return syncOptionsMap, nil
 		},
 
@@ -76,12 +85,19 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 				initialSyncBehavior = ""
 			}
 
+			disableSecretDeletion, ok := secretSync.SyncOptions["disableSecretDeletion"].(bool)
+			if !ok {
+				disableSecretDeletion = false
+			}
+
 			syncOptionsMap := map[string]attr.Value{
-				"initial_sync_behavior": types.StringValue(initialSyncBehavior),
+				"initial_sync_behavior":   types.StringValue(initialSyncBehavior),
+				"disable_secret_deletion": types.BoolValue(disableSecretDeletion),
 			}
 
 			return types.ObjectValue(map[string]attr.Type{
-				"initial_sync_behavior": types.StringType,
+				"initial_sync_behavior":   types.StringType,
+				"disable_secret_deletion": types.BoolType,
 			}, syncOptionsMap)
 		},
 
