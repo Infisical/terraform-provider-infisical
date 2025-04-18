@@ -104,6 +104,7 @@ Required:
 Optional:
 
 - `aws_kms_key_id` (String) The AWS KMS key ID to use for encryption
+- `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from AWS Parameter Store. Enable this option if you intend to manage some secrets manually outside of Infisical.
 - `sync_secret_metadata_as_tags` (Boolean) Whether to sync the secret metadata as tags
 - `tags` (Attributes Set) The tags to sync to the secret (see [below for nested schema](#nestedatt--sync_options--tags))
 
