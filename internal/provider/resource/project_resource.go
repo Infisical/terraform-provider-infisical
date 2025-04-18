@@ -34,12 +34,13 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug         types.String `tfsdk:"slug"`
-	ID           types.String `tfsdk:"id"`
-	Name         types.String `tfsdk:"name"`
-	Description  types.String `tfsdk:"description"`
-	LastUpdated  types.String `tfsdk:"last_updated"`
-	TemplateName types.String `tfsdk:"template_name"`
+	Slug                  types.String `tfsdk:"slug"`
+	ID                    types.String `tfsdk:"id"`
+	KmsSecretManagerKeyId types.String `tfsdk:"kms_secret_manager_key_id"`
+	Name                  types.String `tfsdk:"name"`
+	Description           types.String `tfsdk:"description"`
+	LastUpdated           types.String `tfsdk:"last_updated"`
+	TemplateName          types.String `tfsdk:"template_name"`
 }
 
 // Metadata returns the resource type name.
@@ -71,7 +72,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The name of the template to use for the project",
 				Optional:    true,
 			},
-
+			"kms_secret_manager_key_id": schema.StringAttribute{
+				Description: "The ID of the KMS secret manager key to use for the project",
+				Optional:    true,
+				Computed:    true,
+			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the project",
 				Computed:      true,
@@ -124,10 +129,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
-		ProjectName:        plan.Name.ValueString(),
-		ProjectDescription: plan.Description.ValueString(),
-		Slug:               plan.Slug.ValueString(),
-		Template:           plan.TemplateName.ValueString(),
+		ProjectName:           plan.Name.ValueString(),
+		ProjectDescription:    plan.Description.ValueString(),
+		Slug:                  plan.Slug.ValueString(),
+		Template:              plan.TemplateName.ValueString(),
+		KmsSecretManagerKeyId: plan.KmsSecretManagerKeyId.ValueString(),
 	})
 
 	if err != nil {
@@ -199,6 +205,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.ID = types.StringValue(project.ID)
 	state.Name = types.StringValue(project.Name)
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
+	state.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -244,6 +251,14 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError(
 			"Unable to update project",
 			"Slug cannot be updated",
+		)
+		return
+	}
+
+	if state.KmsSecretManagerKeyId != plan.KmsSecretManagerKeyId {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"KMS secret manager key ID cannot be updated",
 		)
 		return
 	}
