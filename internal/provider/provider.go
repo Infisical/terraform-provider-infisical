@@ -52,9 +52,10 @@ type infisicalProviderModel struct {
 }
 
 type authModel struct {
-	Oidc      *oidcAuthModel      `tfsdk:"oidc"`
-	Token     types.String        `tfsdk:"token"`
-	Universal *universalAuthModel `tfsdk:"universal"`
+	Oidc       *oidcAuthModel       `tfsdk:"oidc"`
+	Token      types.String         `tfsdk:"token"`
+	Universal  *universalAuthModel  `tfsdk:"universal"`
+	Kubernetes *kubernetesAuthModel `tfsdk:"kubernetes"`
 }
 
 type oidcAuthModel struct {
@@ -65,6 +66,12 @@ type oidcAuthModel struct {
 type universalAuthModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
+}
+
+type kubernetesAuthModel struct {
+	IdentityId types.String `tfsdk:"identity_id"`
+	TokenPath  types.String `tfsdk:"service_account_token_path"`
+	Token      types.String `tfsdk:"service_account_token"`
 }
 
 // Metadata returns the provider type name.
@@ -113,12 +120,12 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							"client_id": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   true,
-								Description: "Machine identity client ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` environment variable",
+								Description: "Machine identity client ID. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` environment variable",
 							},
 							"client_secret": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   true,
-								Description: "Machine identity client secret. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` environment variable",
+								Description: "Machine identity client secret. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` environment variable",
 							},
 						},
 					},
@@ -129,12 +136,33 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							"identity_id": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   true,
-								Description: "Machine identity ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
+								Description: "Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
 							},
 							"token_environment_variable_name": schema.StringAttribute{
 								Optional:    true,
 								Sensitive:   false,
 								Description: "The environment variable name for the OIDC JWT token. This attribute can also be set using the `INFISICAL_OIDC_AUTH_TOKEN_KEY_NAME` environment variable. Default is `INFISICAL_AUTH_JWT`.",
+							},
+						},
+					},
+					"kubernetes": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "The configuration values for Kubernetes Auth",
+						Attributes: map[string]schema.Attribute{
+							"identity_id": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
+							},
+							"service_account_token_path": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   false,
+								Description: "The path to the service account token. This attribute can also be set using the `INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH` environment variable. Default is `/var/run/secrets/kubernetes.io/serviceaccount/token`.",
+							},
+							"service_account_token": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "The service account token. This attribute can also be set using the `INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN` environment variable",
 							},
 						},
 					},
@@ -170,6 +198,8 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)
 	oidcTokenEnvName := os.Getenv(infisical.INFISICAL_OIDC_AUTH_TOKEN_NAME)
 	token := os.Getenv(infisical.INFISICAL_TOKEN_NAME)
+	serviceAccountToken := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_NAME)
+	serviceAccountTokenPath := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH_NAME)
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -216,6 +246,19 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 			if !config.Auth.Universal.ClientSecret.IsNull() {
 				clientSecret = config.Auth.Universal.ClientSecret.ValueString()
 			}
+		} else if config.Auth.Kubernetes != nil {
+			authStrategy = infisical.AuthStrategy.KUBERNETES_MACHINE_IDENTITY
+			if !config.Auth.Kubernetes.IdentityId.IsNull() {
+				identityId = config.Auth.Kubernetes.IdentityId.ValueString()
+			}
+
+			if !config.Auth.Kubernetes.TokenPath.IsNull() {
+				serviceAccountTokenPath = config.Auth.Kubernetes.TokenPath.ValueString()
+			}
+
+			if !config.Auth.Kubernetes.Token.IsNull() {
+				serviceAccountToken = config.Auth.Kubernetes.Token.ValueString()
+			}
 		} else if config.Auth.Token.ValueString() != "" {
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = config.Auth.Token.ValueString()
@@ -223,14 +266,16 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	}
 
 	client, err := infisical.NewClient(infisical.Config{
-		HostURL:          host,
-		AuthStrategy:     authStrategy,
-		ServiceToken:     serviceToken,
-		ClientId:         clientId,
-		ClientSecret:     clientSecret,
-		IdentityId:       identityId,
-		OidcTokenEnvName: oidcTokenEnvName,
-		Token:            token,
+		HostURL:                 host,
+		AuthStrategy:            authStrategy,
+		ServiceToken:            serviceToken,
+		ClientId:                clientId,
+		ClientSecret:            clientSecret,
+		IdentityId:              identityId,
+		OidcTokenEnvName:        oidcTokenEnvName,
+		Token:                   token,
+		ServiceAccountToken:     serviceAccountToken,
+		ServiceAccountTokenPath: serviceAccountTokenPath,
 	})
 
 	if err != nil {

@@ -49,16 +49,27 @@ provider "infisical" {
 
 Optional:
 
+- `kubernetes` (Attributes) The configuration values for Kubernetes Auth (see [below for nested schema](#nestedatt--auth--kubernetes))
 - `oidc` (Attributes) The configuration values for OIDC Auth (see [below for nested schema](#nestedatt--auth--oidc))
 - `token` (String, Sensitive) The authentication token for Machine Identity Token Auth. This attribute can also be set using the `INFISICAL_TOKEN` environment variable
 - `universal` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal))
+
+<a id="nestedatt--auth--kubernetes"></a>
+### Nested Schema for `auth.kubernetes`
+
+Optional:
+
+- `identity_id` (String, Sensitive) Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable
+- `service_account_token` (String, Sensitive) The service account token. This attribute can also be set using the `INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN` environment variable
+- `service_account_token_path` (String) The path to the service account token. This attribute can also be set using the `INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH` environment variable. Default is `/var/run/secrets/kubernetes.io/serviceaccount/token`.
+
 
 <a id="nestedatt--auth--oidc"></a>
 ### Nested Schema for `auth.oidc`
 
 Optional:
 
-- `identity_id` (String, Sensitive) Machine identity ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable
+- `identity_id` (String, Sensitive) Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable
 - `token_environment_variable_name` (String) The environment variable name for the OIDC JWT token. This attribute can also be set using the `INFISICAL_OIDC_AUTH_TOKEN_KEY_NAME` environment variable. Default is `INFISICAL_AUTH_JWT`.
 
 
@@ -67,5 +78,5 @@ Optional:
 
 Optional:
 
-- `client_id` (String, Sensitive) Machine identity client ID. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` environment variable
-- `client_secret` (String, Sensitive) Machine identity client secret. Used to fetch/modify secrets for a given project. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` environment variable
+- `client_id` (String, Sensitive) Machine identity client ID. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` environment variable
+- `client_secret` (String, Sensitive) Machine identity client secret. This attribute can also be set using the `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` environment variable

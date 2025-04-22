@@ -81,6 +81,46 @@ func (client Client) OidcMachineIdentityAuth() (string, error) {
 	return loginResponse.AccessToken, nil
 }
 
+func (client Client) KubernetesMachineIdentityAuth() (string, error) {
+
+	token := client.Config.ServiceAccountToken
+	tokenPath := client.Config.ServiceAccountTokenPath
+
+	if tokenPath == "" {
+		tokenPath = INFISICAL_KUBERNETES_SERVICE_ACCOUNT_DEFAULT_TOKEN_PATH
+	}
+
+	if token == "" {
+		tokenBytes, err := os.ReadFile(tokenPath)
+		if err != nil {
+			return "", fmt.Errorf("KubernetesMachineIdentityAuth: Unable to read service account token from file [err=%s]", err)
+		}
+
+		token = string(tokenBytes)
+	}
+
+	if client.Config.IdentityId == "" {
+		return "", fmt.Errorf("you must set the identity ID for the client before making calls")
+	}
+
+	var loginResponse MachineIdentityAuthResponse
+
+	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(map[string]string{
+		"identityId": client.Config.IdentityId,
+		"jwt":        token,
+	}).Post("api/v1/auth/kubernetes-auth/login")
+
+	if err != nil {
+		return "", fmt.Errorf("KubernetesMachineIdentityAuth: Unable to complete api request [err=%s]", err)
+	}
+
+	if res.IsError() {
+		return "", fmt.Errorf("KubernetesMachineIdentityAuth: Unsuccessful response: [response=%s]", res)
+	}
+
+	return loginResponse.AccessToken, nil
+}
+
 func (client Client) TokenMachineIdentityAuth() (string, error) {
 	if client.Config.Token == "" {
 		return "", fmt.Errorf("you must set the token for the client before making calls")
