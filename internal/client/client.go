@@ -13,15 +13,17 @@ type Client struct {
 type AuthStrategyType string
 
 var AuthStrategy = struct {
-	SERVICE_TOKEN              AuthStrategyType
-	UNIVERSAL_MACHINE_IDENTITY AuthStrategyType
-	OIDC_MACHINE_IDENTITY      AuthStrategyType
-	TOKEN_MACHINE_IDENTITY     AuthStrategyType
+	SERVICE_TOKEN               AuthStrategyType
+	UNIVERSAL_MACHINE_IDENTITY  AuthStrategyType
+	OIDC_MACHINE_IDENTITY       AuthStrategyType
+	TOKEN_MACHINE_IDENTITY      AuthStrategyType
+	KUBERNETES_MACHINE_IDENTITY AuthStrategyType
 }{
-	SERVICE_TOKEN:              "SERVICE_TOKEN",
-	UNIVERSAL_MACHINE_IDENTITY: "UNIVERSAL_MACHINE_IDENTITY",
-	OIDC_MACHINE_IDENTITY:      "OIDC_MACHINE_IDENTITY",
-	TOKEN_MACHINE_IDENTITY:     "TOKEN_MACHINE_IDENTITY",
+	SERVICE_TOKEN:               "SERVICE_TOKEN",
+	UNIVERSAL_MACHINE_IDENTITY:  "UNIVERSAL_MACHINE_IDENTITY",
+	OIDC_MACHINE_IDENTITY:       "OIDC_MACHINE_IDENTITY",
+	TOKEN_MACHINE_IDENTITY:      "TOKEN_MACHINE_IDENTITY",
+	KUBERNETES_MACHINE_IDENTITY: "KUBERNETES_MACHINE_IDENTITY",
 }
 
 type Config struct {
@@ -43,6 +45,10 @@ type Config struct {
 	//OIDC Machine Identity Auth
 	IdentityId       string
 	OidcTokenEnvName string
+
+	// Kubernetes Machine Identity Auth
+	ServiceAccountToken     string
+	ServiceAccountTokenPath string
 
 	EnvSlug     string
 	SecretsPath string
@@ -74,9 +80,10 @@ func NewClient(cnf Config) (*Client, error) {
 		cnf.AuthStrategy = AuthStrategy.SERVICE_TOKEN
 	} else {
 		authStrategies := map[AuthStrategyType]func() (string, error){
-			AuthStrategy.UNIVERSAL_MACHINE_IDENTITY: Client{cnf}.UniversalMachineIdentityAuth,
-			AuthStrategy.OIDC_MACHINE_IDENTITY:      Client{cnf}.OidcMachineIdentityAuth,
-			AuthStrategy.TOKEN_MACHINE_IDENTITY:     Client{cnf}.TokenMachineIdentityAuth,
+			AuthStrategy.UNIVERSAL_MACHINE_IDENTITY:  Client{cnf}.UniversalMachineIdentityAuth,
+			AuthStrategy.OIDC_MACHINE_IDENTITY:       Client{cnf}.OidcMachineIdentityAuth,
+			AuthStrategy.TOKEN_MACHINE_IDENTITY:      Client{cnf}.TokenMachineIdentityAuth,
+			AuthStrategy.KUBERNETES_MACHINE_IDENTITY: Client{cnf}.KubernetesMachineIdentityAuth,
 		}
 
 		token, err := authStrategies[selectedAuthStrategy]()
