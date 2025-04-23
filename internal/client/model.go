@@ -257,17 +257,18 @@ type ProjectRole struct {
 }
 
 type ProjectWithEnvironments struct {
-	ID                 string               `json:"id"`
-	Name               string               `json:"name"`
-	Description        string               `json:"description"`
-	Slug               string               `json:"slug"`
-	AutoCapitalization bool                 `json:"autoCapitalization"`
-	OrgID              string               `json:"orgId"`
-	CreatedAt          time.Time            `json:"createdAt"`
-	UpdatedAt          time.Time            `json:"updatedAt"`
-	Version            int64                `json:"version"`
-	UpgradeStatus      string               `json:"upgradeStatus"`
-	Environments       []ProjectEnvironment `json:"environments"`
+	ID                    string               `json:"id"`
+	Name                  string               `json:"name"`
+	Description           string               `json:"description"`
+	Slug                  string               `json:"slug"`
+	AutoCapitalization    bool                 `json:"autoCapitalization"`
+	OrgID                 string               `json:"orgId"`
+	CreatedAt             time.Time            `json:"createdAt"`
+	UpdatedAt             time.Time            `json:"updatedAt"`
+	KmsSecretManagerKeyId string               `json:"kmsSecretManagerKeyId"`
+	Version               int64                `json:"version"`
+	UpgradeStatus         string               `json:"upgradeStatus"`
+	Environments          []ProjectEnvironment `json:"environments"`
 }
 
 type GetProjectByIdResponse struct {
@@ -593,11 +594,12 @@ type UpdateRawSecretByNameV3Request struct {
 }
 
 type CreateProjectRequest struct {
-	ProjectName        string `json:"projectName"`
-	ProjectDescription string `json:"projectDescription,omitempty"`
-	Slug               string `json:"slug"`
-	OrganizationSlug   string `json:"organizationSlug"`
-	Template           string `json:"template,omitempty"`
+	ProjectName           string `json:"projectName"`
+	ProjectDescription    string `json:"projectDescription,omitempty"`
+	Slug                  string `json:"slug"`
+	OrganizationSlug      string `json:"organizationSlug"`
+	Template              string `json:"template,omitempty"`
+	KmsSecretManagerKeyId string `json:"kmsKeyId,omitempty"`
 }
 
 type DeleteProjectRequest struct {
