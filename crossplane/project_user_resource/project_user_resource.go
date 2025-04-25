@@ -153,17 +153,29 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	var membershipId string
 	if len(invitedUser) == 0 {
-		resp.Diagnostics.AddError(
-			"Error inviting user",
-			"Could not add user to project. No invite was sent, is the user already in the project?",
-		)
-		return
+		projectMember, err := r.client.GetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
+			ProjectID: plan.ProjectID.ValueString(),
+			Username:  plan.Username.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error inviting user",
+				"User is already in the project but cannot be queried, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		membershipId = projectMember.Membership.ID
+	} else {
+		membershipId = invitedUser[0].ID
 	}
 
 	_, err = r.client.UpdateProjectUser(infisical.UpdateProjectUserRequest{
 		ProjectID:    plan.ProjectID.ValueString(),
-		MembershipID: invitedUser[0].ID,
+		MembershipID: membershipId,
 		Roles:        roles,
 	})
 	if err != nil {
