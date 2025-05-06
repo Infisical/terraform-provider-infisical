@@ -34,13 +34,14 @@ type projectResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type projectResourceModel struct {
-	Slug                  types.String `tfsdk:"slug"`
-	ID                    types.String `tfsdk:"id"`
-	KmsSecretManagerKeyId types.String `tfsdk:"kms_secret_manager_key_id"`
-	Name                  types.String `tfsdk:"name"`
-	Description           types.String `tfsdk:"description"`
-	LastUpdated           types.String `tfsdk:"last_updated"`
-	TemplateName          types.String `tfsdk:"template_name"`
+	Slug                    types.String `tfsdk:"slug"`
+	ID                      types.String `tfsdk:"id"`
+	KmsSecretManagerKeyId   types.String `tfsdk:"kms_secret_manager_key_id"`
+	Name                    types.String `tfsdk:"name"`
+	Description             types.String `tfsdk:"description"`
+	LastUpdated             types.String `tfsdk:"last_updated"`
+	TemplateName            types.String `tfsdk:"template_name"`
+	ShouldCreateDefaultEnvs types.Bool   `tfsdk:"should_create_default_envs"`
 }
 
 // Metadata returns the resource type name.
@@ -76,6 +77,10 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The ID of the KMS secret manager key to use for the project",
 				Optional:    true,
 				Computed:    true,
+			},
+			"should_create_default_envs": schema.BoolAttribute{
+				Description: "Whether to create default environments for the project (dev, staging, prod), defaults to true",
+				Optional:    true,
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the project",
@@ -128,12 +133,18 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	shouldCreateDefaultEnvs := true
+	if !plan.ShouldCreateDefaultEnvs.IsNull() {
+		shouldCreateDefaultEnvs = plan.ShouldCreateDefaultEnvs.ValueBool()
+	}
+
 	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
-		ProjectName:           plan.Name.ValueString(),
-		ProjectDescription:    plan.Description.ValueString(),
-		Slug:                  plan.Slug.ValueString(),
-		Template:              plan.TemplateName.ValueString(),
-		KmsSecretManagerKeyId: plan.KmsSecretManagerKeyId.ValueString(),
+		ProjectName:             plan.Name.ValueString(),
+		ProjectDescription:      plan.Description.ValueString(),
+		Slug:                    plan.Slug.ValueString(),
+		Template:                plan.TemplateName.ValueString(),
+		KmsSecretManagerKeyId:   plan.KmsSecretManagerKeyId.ValueString(),
+		ShouldCreateDefaultEnvs: shouldCreateDefaultEnvs,
 	})
 
 	if err != nil {
@@ -144,9 +155,20 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	project, err := r.client.GetProject(infisical.GetProjectRequest{
+		Slug: plan.Slug.ValueString(),
+	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading project",
+			"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
+		)
+	}
+
 	plan.LastUpdated = types.StringValue(newProject.Project.UpdatedAt.Format(time.RFC850))
 	plan.ID = types.StringValue(newProject.Project.ID)
-
+	plan.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -243,6 +265,14 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError(
 			"Unable to update project",
 			"Template name cannot be updated",
+		)
+		return
+	}
+
+	if state.ShouldCreateDefaultEnvs != plan.ShouldCreateDefaultEnvs {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"should_create_default_envs cannot be updated",
 		)
 		return
 	}

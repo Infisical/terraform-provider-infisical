@@ -594,12 +594,13 @@ type UpdateRawSecretByNameV3Request struct {
 }
 
 type CreateProjectRequest struct {
-	ProjectName           string `json:"projectName"`
-	ProjectDescription    string `json:"projectDescription,omitempty"`
-	Slug                  string `json:"slug"`
-	OrganizationSlug      string `json:"organizationSlug"`
-	Template              string `json:"template,omitempty"`
-	KmsSecretManagerKeyId string `json:"kmsKeyId,omitempty"`
+	ProjectName             string `json:"projectName"`
+	ProjectDescription      string `json:"projectDescription,omitempty"`
+	Slug                    string `json:"slug"`
+	OrganizationSlug        string `json:"organizationSlug"`
+	Template                string `json:"template,omitempty"`
+	KmsSecretManagerKeyId   string `json:"kmsKeyId,omitempty"`
+	ShouldCreateDefaultEnvs bool   `json:"shouldCreateDefaultEnvs"`
 }
 
 type DeleteProjectRequest struct {
