@@ -62,6 +62,7 @@ resource "infisical_project" "azure-project" {
 
 - `description` (String) The description of the project
 - `kms_secret_manager_key_id` (String) The ID of the KMS secret manager key to use for the project
+- `should_create_default_envs` (Boolean) Whether to create default environments for the project (dev, staging, prod), defaults to true
 - `template_name` (String) The name of the template to use for the project
 
 ### Read-Only
