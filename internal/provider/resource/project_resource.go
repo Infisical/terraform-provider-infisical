@@ -272,7 +272,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	if state.ShouldCreateDefaultEnvs != plan.ShouldCreateDefaultEnvs {
 		resp.Diagnostics.AddError(
 			"Unable to update project",
-			"should_create_default_envs cannot be updated",
+			"should_create_default_envs cannot be updated after the resource is created",
 		)
 		return
 	}
