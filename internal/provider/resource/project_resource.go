@@ -89,6 +89,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"has_delete_protection": schema.BoolAttribute{
 				Description: "Whether the project has delete protection, defaults to false",
 				Optional:    true,
+				Computed:    true,
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the project",
@@ -178,6 +179,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.LastUpdated = types.StringValue(newProject.Project.UpdatedAt.Format(time.RFC850))
 	plan.ID = types.StringValue(newProject.Project.ID)
 	plan.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
+	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
