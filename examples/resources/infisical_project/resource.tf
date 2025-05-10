@@ -18,17 +18,15 @@ provider "infisical" {
 }
 
 resource "infisical_project" "gcp-project" {
-  name                  = "GCP Project"
-  slug                  = "gcp-project"
-  description           = "This is a GCP project"
-  has_delete_protection = true
+  name        = "GCP Project"
+  slug        = "gcp-project"
+  description = "This is a GCP project"
 }
 
 resource "infisical_project" "aws-project" {
-  name                  = "AWS Project"
-  slug                  = "aws-project"
-  description           = "This is an AWS project"
-  has_delete_protection = false
+  name        = "AWS Project"
+  slug        = "aws-project"
+  description = "This is an AWS project"
 }
 
 resource "infisical_project" "azure-project" {
