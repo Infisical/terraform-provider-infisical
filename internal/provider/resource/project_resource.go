@@ -78,6 +78,9 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The ID of the KMS secret manager key to use for the project",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"should_create_default_envs": schema.BoolAttribute{
 				Description: "Whether to create default environments for the project (dev, staging, prod), defaults to true",
