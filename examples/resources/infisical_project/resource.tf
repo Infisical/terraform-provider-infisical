@@ -33,5 +33,3 @@ resource "infisical_project" "azure-project" {
   name = "Azure Project"
   slug = "azure-project"
 }
-
-
