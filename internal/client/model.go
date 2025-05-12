@@ -273,6 +273,7 @@ type ProjectWithEnvironments struct {
 	CreatedAt             time.Time            `json:"createdAt"`
 	UpdatedAt             time.Time            `json:"updatedAt"`
 	KmsSecretManagerKeyId string               `json:"kmsSecretManagerKeyId"`
+	HasDeleteProtection   bool                 `json:"hasDeleteProtection"`
 	Version               int64                `json:"version"`
 	UpgradeStatus         string               `json:"upgradeStatus"`
 	Environments          []ProjectEnvironment `json:"environments"`
@@ -608,6 +609,7 @@ type CreateProjectRequest struct {
 	Template                string `json:"template,omitempty"`
 	KmsSecretManagerKeyId   string `json:"kmsKeyId,omitempty"`
 	ShouldCreateDefaultEnvs bool   `json:"shouldCreateDefaultEnvs"`
+	HasDeleteProtection     bool   `json:"hasDeleteProtection"`
 }
 
 type DeleteProjectRequest struct {
@@ -623,9 +625,10 @@ type GetProjectByIdRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Slug               string `json:"slug"`
-	ProjectName        string `json:"name"`
-	ProjectDescription string `json:"description"`
+	Slug                string `json:"slug"`
+	ProjectName         string `json:"name"`
+	ProjectDescription  string `json:"description"`
+	HasDeleteProtection bool   `json:"hasDeleteProtection"`
 }
 
 type InviteUsersToProjectRequest struct {

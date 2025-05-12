@@ -42,6 +42,7 @@ type projectResourceModel struct {
 	LastUpdated             types.String `tfsdk:"last_updated"`
 	TemplateName            types.String `tfsdk:"template_name"`
 	ShouldCreateDefaultEnvs types.Bool   `tfsdk:"should_create_default_envs"`
+	HasDeleteProtection     types.Bool   `tfsdk:"has_delete_protection"`
 }
 
 // Metadata returns the resource type name.
@@ -77,10 +78,18 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The ID of the KMS secret manager key to use for the project",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"should_create_default_envs": schema.BoolAttribute{
 				Description: "Whether to create default environments for the project (dev, staging, prod), defaults to true",
 				Optional:    true,
+			},
+			"has_delete_protection": schema.BoolAttribute{
+				Description: "Whether the project has delete protection, defaults to false",
+				Optional:    true,
+				Computed:    true,
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the project",
@@ -145,6 +154,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		Template:                plan.TemplateName.ValueString(),
 		KmsSecretManagerKeyId:   plan.KmsSecretManagerKeyId.ValueString(),
 		ShouldCreateDefaultEnvs: shouldCreateDefaultEnvs,
+		HasDeleteProtection:     plan.HasDeleteProtection.ValueBool(),
 	})
 
 	if err != nil {
@@ -169,6 +179,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.LastUpdated = types.StringValue(newProject.Project.UpdatedAt.Format(time.RFC850))
 	plan.ID = types.StringValue(newProject.Project.ID)
 	plan.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
+	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -228,6 +239,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.Name = types.StringValue(project.Name)
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	state.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
+	state.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -294,8 +306,9 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	updateRequest := infisical.UpdateProjectRequest{
-		ProjectName: plan.Name.ValueString(),
-		Slug:        plan.Slug.ValueString(),
+		ProjectName:         plan.Name.ValueString(),
+		Slug:                plan.Slug.ValueString(),
+		HasDeleteProtection: plan.HasDeleteProtection.ValueBool(),
 	}
 
 	if !plan.Description.IsNull() {
@@ -385,4 +398,5 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), project.Name)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), project.Description)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("last_updated"), project.UpdatedAt.Format(time.RFC850))...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("has_delete_protection"), project.HasDeleteProtection)...)
 }
