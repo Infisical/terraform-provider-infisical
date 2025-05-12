@@ -37,6 +37,16 @@ resource "infisical_identity" "universal-auth" {
   name   = "universal-auth"
   role   = "member"
   org_id = "<org_id>"
+  metadata = [
+    {
+      key : "key1",
+      value : "value1"
+    },
+    {
+      key : "key2",
+      value : "value2"
+    }
+  ]
 }
 
 resource "infisical_identity_universal_auth" "ua-auth" {
@@ -117,7 +127,23 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 - `org_id` (String) The ID of the organization for the identity
 - `role` (String) The role for the identity. Available default role options are 'admin', 'member', and 'no-access'. If you've created custom roles, you can use their slugs as well.
 
+### Optional
+
+- `metadata` (Attributes Set) The metadata associated with this identity (see [below for nested schema](#nestedatt--metadata))
+
 ### Read-Only
 
 - `auth_modes` (List of String) The authentication types of the identity
 - `id` (String) The ID of the identity
+
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Required:
+
+- `key` (String) The key of the metadata object
+- `value` (String) The value of the metadata object
+
+Read-Only:
+
+- `id` (String) The ID of the metadata object

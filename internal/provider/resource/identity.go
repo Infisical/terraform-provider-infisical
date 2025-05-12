@@ -24,6 +24,12 @@ type IdentityResource struct {
 	client *infisical.Client
 }
 
+type MetaEntry struct {
+	ID    types.String `tfsdk:"id"`
+	Key   types.String `tfsdk:"key"`
+	Value types.String `tfsdk:"value"`
+}
+
 // IdentityResourceSourceModel describes the data source data model.
 type IdentityResourceModel struct {
 	ID        types.String `tfsdk:"id"`
@@ -31,11 +37,16 @@ type IdentityResourceModel struct {
 	AuthModes types.List   `tfsdk:"auth_modes"`
 	Role      types.String `tfsdk:"role"`
 	OrgID     types.String `tfsdk:"org_id"`
+	Metadata  []MetaEntry  `tfsdk:"metadata"`
 }
 
 // Metadata returns the resource type name.
 func (r *IdentityResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_identity"
+}
+
+func (m MetaEntry) Equal(other MetaEntry) bool {
+	return m.Key.Equal(other.Key) && m.Value.Equal(other.Value)
 }
 
 // Schema defines the schema for the resource.
@@ -61,11 +72,30 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-
 			"auth_modes": schema.ListAttribute{
 				ElementType: types.StringType,
 				Description: "The authentication types of the identity",
 				Computed:    true,
+			},
+			"metadata": schema.SetNestedAttribute{
+				Description: "The metadata associated with this identity",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Description: "The ID of the metadata object",
+							Computed:    true,
+						},
+						"key": schema.StringAttribute{
+							Description: "The key of the metadata object",
+							Required:    true,
+						},
+						"value": schema.StringAttribute{
+							Description: "The value of the metadata object",
+							Required:    true,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -109,10 +139,19 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	var metadata []infisical.CreateMetaEntry
+	for _, el := range plan.Metadata {
+		metadata = append(metadata, infisical.CreateMetaEntry{
+			Key:   el.Key.ValueString(),
+			Value: el.Value.ValueString(),
+		})
+	}
+
 	newIdentity, err := r.client.CreateIdentity(infisical.CreateIdentityRequest{
-		OrgID: plan.OrgID.ValueString(),
-		Name:  plan.Name.ValueString(),
-		Role:  plan.Role.ValueString(),
+		OrgID:    plan.OrgID.ValueString(),
+		Name:     plan.Name.ValueString(),
+		Role:     plan.Role.ValueString(),
+		Metadata: metadata,
 	})
 
 	if err != nil {
@@ -133,6 +172,16 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 	} else {
 		plan.AuthModes = types.ListNull(types.StringType)
 	}
+
+	var converted []MetaEntry
+	for _, m := range newIdentity.Identity.Metadata {
+		converted = append(converted, MetaEntry{
+			ID:    types.StringValue(m.ID),
+			Key:   types.StringValue(m.Key),
+			Value: types.StringValue(m.Value),
+		})
+	}
+	plan.Metadata = converted
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -200,6 +249,17 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Role = types.StringValue(orgIdentity.Role)
 	}
 
+	var converted []MetaEntry
+	for _, m := range orgIdentity.Metadata {
+		converted = append(converted, MetaEntry{
+			ID:    types.StringValue(m.ID),
+			Key:   types.StringValue(m.Key),
+			Value: types.StringValue(m.Value),
+		})
+	}
+
+	state.Metadata = converted
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -232,10 +292,19 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	var metadata []infisical.CreateMetaEntry
+	for _, el := range plan.Metadata {
+		metadata = append(metadata, infisical.CreateMetaEntry{
+			Key:   el.Key.ValueString(),
+			Value: el.Value.ValueString(),
+		})
+	}
+
 	orgIdentity, err := r.client.UpdateIdentity(infisical.UpdateIdentityRequest{
 		IdentityID: state.ID.ValueString(),
 		Name:       plan.Name.ValueString(),
 		Role:       plan.Role.ValueString(),
+		Metadata:   metadata,
 	})
 
 	if err != nil {
@@ -255,6 +324,16 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 	} else {
 		plan.AuthModes = types.ListNull(types.StringType)
 	}
+
+	var converted []MetaEntry
+	for _, m := range orgIdentity.Identity.Metadata {
+		converted = append(converted, MetaEntry{
+			ID:    types.StringValue(m.ID),
+			Key:   types.StringValue(m.Key),
+			Value: types.StringValue(m.Value),
+		})
+	}
+	plan.Metadata = converted
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
