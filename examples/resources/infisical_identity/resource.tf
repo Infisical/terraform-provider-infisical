@@ -24,12 +24,12 @@ resource "infisical_identity" "universal-auth" {
   org_id = "<org_id>"
   metadata = [
     {
-      key : "key1",
-      value : "value1"
+      key   = "key1",
+      value = "value1"
     },
     {
-      key : "key2",
-      value : "value2"
+      key   = "key2",
+      value = "value2"
     }
   ]
 }

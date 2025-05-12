@@ -39,12 +39,12 @@ resource "infisical_identity" "universal-auth" {
   org_id = "<org_id>"
   metadata = [
     {
-      key : "key1",
-      value : "value1"
+      key   = "key1",
+      value = "value1"
     },
     {
-      key : "key2",
-      value : "value2"
+      key   = "key2",
+      value = "value2"
     }
   ]
 }
@@ -129,7 +129,7 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 
 ### Optional
 
-- `metadata` (Attributes Set) The metadata associated with this identity (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes List) The metadata associated with this identity (see [below for nested schema](#nestedatt--metadata))
 
 ### Read-Only
 
