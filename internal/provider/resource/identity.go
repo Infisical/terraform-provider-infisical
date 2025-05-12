@@ -73,7 +73,7 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description: "The authentication types of the identity",
 				Computed:    true,
 			},
-			"metadata": schema.SetNestedAttribute{
+			"metadata": schema.ListNestedAttribute{
 				Description: "The metadata associated with this identity",
 				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
@@ -135,12 +135,14 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	var metadata []infisical.CreateMetaEntry
-	for _, el := range plan.Metadata {
-		metadata = append(metadata, infisical.CreateMetaEntry{
-			Key:   el.Key.ValueString(),
-			Value: el.Value.ValueString(),
-		})
+	metadata := []infisical.CreateMetaEntry{}
+	if plan.Metadata != nil {
+		for _, el := range plan.Metadata {
+			metadata = append(metadata, infisical.CreateMetaEntry{
+				Key:   el.Key.ValueString(),
+				Value: el.Value.ValueString(),
+			})
+		}
 	}
 
 	newIdentity, err := r.client.CreateIdentity(infisical.CreateIdentityRequest{
@@ -288,12 +290,14 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	var metadata []infisical.CreateMetaEntry
-	for _, el := range plan.Metadata {
-		metadata = append(metadata, infisical.CreateMetaEntry{
-			Key:   el.Key.ValueString(),
-			Value: el.Value.ValueString(),
-		})
+	metadata := []infisical.CreateMetaEntry{}
+	if plan.Metadata != nil {
+		for _, el := range plan.Metadata {
+			metadata = append(metadata, infisical.CreateMetaEntry{
+				Key:   el.Key.ValueString(),
+				Value: el.Value.ValueString(),
+			})
+		}
 	}
 
 	orgIdentity, err := r.client.UpdateIdentity(infisical.UpdateIdentityRequest{
