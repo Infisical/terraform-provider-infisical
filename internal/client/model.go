@@ -1249,7 +1249,7 @@ type UpdateProjectEnvironmentResponse struct {
 	Environment ProjectEnvironmentWithPosition `json:"environment"`
 }
 
-// Different from Identity because metadata is only included on post/patch requests
+// Different from Identity because metadata is only included on post/patch requests.
 type CreateUpdateIdentity struct {
 	Name        string      `json:"name"`
 	ID          string      `json:"id"`
