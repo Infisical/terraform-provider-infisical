@@ -45,10 +45,6 @@ func (r *IdentityResource) Metadata(_ context.Context, req resource.MetadataRequ
 	resp.TypeName = req.ProviderTypeName + "_identity"
 }
 
-func (m MetaEntry) Equal(other MetaEntry) bool {
-	return m.Key.Equal(other.Key) && m.Value.Equal(other.Value)
-}
-
 // Schema defines the schema for the resource.
 func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
