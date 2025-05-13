@@ -112,6 +112,7 @@ type OrgIdentity struct {
 		Slug        string `json:"slug"`
 		Description string `json:"description"`
 	} `json:"customRole,omitempty"`
+	Metadata []MetaEntry `json:"metadata"`
 }
 
 type Identity struct {
@@ -120,6 +121,12 @@ type Identity struct {
 	AuthMethods []string  `json:"authMethods"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type MetaEntry struct {
+	ID    string `json:"id"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type IdentityUniversalAuth struct {
@@ -1242,24 +1249,41 @@ type UpdateProjectEnvironmentResponse struct {
 	Environment ProjectEnvironmentWithPosition `json:"environment"`
 }
 
+// Different from Identity because metadata is only included on post/patch requests.
+type CreateUpdateIdentity struct {
+	Name        string      `json:"name"`
+	ID          string      `json:"id"`
+	AuthMethods []string    `json:"authMethods"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+	Metadata    []MetaEntry `json:"metadata"`
+}
+
+type CreateMetaEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type CreateIdentityRequest struct {
-	Name  string `json:"name"`
-	OrgID string `json:"organizationId"`
-	Role  string `json:"role"`
+	Name     string            `json:"name"`
+	OrgID    string            `json:"organizationId"`
+	Role     string            `json:"role"`
+	Metadata []CreateMetaEntry `json:"metadata,omitempty"`
 }
 
 type CreateIdentityResponse struct {
-	Identity Identity `json:"identity"`
+	Identity CreateUpdateIdentity `json:"identity"`
 }
 
 type UpdateIdentityRequest struct {
-	IdentityID string `json:"identityId"`
-	Name       string `json:"name,omitempty"`
-	Role       string `json:"role,omitempty"`
+	IdentityID string            `json:"identityId"`
+	Name       string            `json:"name,omitempty"`
+	Role       string            `json:"role,omitempty"`
+	Metadata   []CreateMetaEntry `json:"metadata"`
 }
 
 type UpdateIdentityResponse struct {
-	Identity Identity `json:"identity"`
+	Identity CreateUpdateIdentity `json:"identity"`
 }
 
 type DeleteIdentityRequest struct {
@@ -1898,6 +1922,7 @@ type DeleteAccessApprovalPolicyRequest struct {
 type DeleteAccessApprovalPolicyResponse struct {
 	AccessApprovalPolicy AccessApprovalPolicy `json:"approval"`
 }
+
 type CreateSecretImportRequest struct {
 	ProjectID     string `json:"workspaceId"`
 	Environment   string `json:"environment"`

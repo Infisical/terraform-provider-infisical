@@ -24,6 +24,11 @@ type IdentityResource struct {
 	client *infisical.Client
 }
 
+type MetaEntry struct {
+	Key   types.String `tfsdk:"key"`
+	Value types.String `tfsdk:"value"`
+}
+
 // IdentityResourceSourceModel describes the data source data model.
 type IdentityResourceModel struct {
 	ID        types.String `tfsdk:"id"`
@@ -31,6 +36,7 @@ type IdentityResourceModel struct {
 	AuthModes types.List   `tfsdk:"auth_modes"`
 	Role      types.String `tfsdk:"role"`
 	OrgID     types.String `tfsdk:"org_id"`
+	Metadata  []MetaEntry  `tfsdk:"metadata"`
 }
 
 // Metadata returns the resource type name.
@@ -61,11 +67,26 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-
 			"auth_modes": schema.ListAttribute{
 				ElementType: types.StringType,
 				Description: "The authentication types of the identity",
 				Computed:    true,
+			},
+			"metadata": schema.SetNestedAttribute{
+				Description: "The metadata associated with this identity",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"key": schema.StringAttribute{
+							Description: "The key of the metadata object",
+							Required:    true,
+						},
+						"value": schema.StringAttribute{
+							Description: "The value of the metadata object",
+							Required:    true,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -109,10 +130,21 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	metadata := []infisical.CreateMetaEntry{}
+	if plan.Metadata != nil {
+		for _, el := range plan.Metadata {
+			metadata = append(metadata, infisical.CreateMetaEntry{
+				Key:   el.Key.ValueString(),
+				Value: el.Value.ValueString(),
+			})
+		}
+	}
+
 	newIdentity, err := r.client.CreateIdentity(infisical.CreateIdentityRequest{
-		OrgID: plan.OrgID.ValueString(),
-		Name:  plan.Name.ValueString(),
-		Role:  plan.Role.ValueString(),
+		OrgID:    plan.OrgID.ValueString(),
+		Name:     plan.Name.ValueString(),
+		Role:     plan.Role.ValueString(),
+		Metadata: metadata,
 	})
 
 	if err != nil {
@@ -200,6 +232,21 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Role = types.StringValue(orgIdentity.Role)
 	}
 
+	if state.Metadata != nil {
+		if len(orgIdentity.Metadata) > 0 {
+			var converted []MetaEntry
+			for _, m := range orgIdentity.Metadata {
+				converted = append(converted, MetaEntry{
+					Key:   types.StringValue(m.Key),
+					Value: types.StringValue(m.Value),
+				})
+			}
+			state.Metadata = converted
+		} else {
+			state.Metadata = []MetaEntry{}
+		}
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -232,10 +279,21 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	metadata := []infisical.CreateMetaEntry{}
+	if plan.Metadata != nil {
+		for _, el := range plan.Metadata {
+			metadata = append(metadata, infisical.CreateMetaEntry{
+				Key:   el.Key.ValueString(),
+				Value: el.Value.ValueString(),
+			})
+		}
+	}
+
 	orgIdentity, err := r.client.UpdateIdentity(infisical.UpdateIdentityRequest{
 		IdentityID: state.ID.ValueString(),
 		Name:       plan.Name.ValueString(),
 		Role:       plan.Role.ValueString(),
+		Metadata:   metadata,
 	})
 
 	if err != nil {
@@ -261,7 +319,6 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

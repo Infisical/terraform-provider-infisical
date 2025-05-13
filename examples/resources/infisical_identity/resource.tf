@@ -22,6 +22,16 @@ resource "infisical_identity" "universal-auth" {
   name   = "universal-auth"
   role   = "member"
   org_id = "<org_id>"
+  metadata = [
+    {
+      key   = "key1",
+      value = "value1"
+    },
+    {
+      key   = "key2",
+      value = "value2"
+    }
+  ]
 }
 
 resource "infisical_identity_universal_auth" "ua-auth" {
