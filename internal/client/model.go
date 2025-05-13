@@ -1268,7 +1268,7 @@ type CreateIdentityRequest struct {
 	Name     string            `json:"name"`
 	OrgID    string            `json:"organizationId"`
 	Role     string            `json:"role"`
-	Metadata []CreateMetaEntry `json:"metadata"`
+	Metadata []CreateMetaEntry `json:"metadata,omitempty"`
 }
 
 type CreateIdentityResponse struct {

@@ -25,7 +25,6 @@ type IdentityResource struct {
 }
 
 type MetaEntry struct {
-	ID    types.String `tfsdk:"id"`
 	Key   types.String `tfsdk:"key"`
 	Value types.String `tfsdk:"value"`
 }
@@ -73,15 +72,11 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description: "The authentication types of the identity",
 				Computed:    true,
 			},
-			"metadata": schema.ListNestedAttribute{
+			"metadata": schema.SetNestedAttribute{
 				Description: "The metadata associated with this identity",
 				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Description: "The ID of the metadata object",
-							Computed:    true,
-						},
 						"key": schema.StringAttribute{
 							Description: "The key of the metadata object",
 							Required:    true,
@@ -171,16 +166,6 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 		plan.AuthModes = types.ListNull(types.StringType)
 	}
 
-	var converted []MetaEntry
-	for _, m := range newIdentity.Identity.Metadata {
-		converted = append(converted, MetaEntry{
-			ID:    types.StringValue(m.ID),
-			Key:   types.StringValue(m.Key),
-			Value: types.StringValue(m.Value),
-		})
-	}
-	plan.Metadata = converted
-
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -247,16 +232,20 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Role = types.StringValue(orgIdentity.Role)
 	}
 
-	var converted []MetaEntry
-	for _, m := range orgIdentity.Metadata {
-		converted = append(converted, MetaEntry{
-			ID:    types.StringValue(m.ID),
-			Key:   types.StringValue(m.Key),
-			Value: types.StringValue(m.Value),
-		})
+	if state.Metadata != nil {
+		if len(orgIdentity.Metadata) > 0 {
+			var converted []MetaEntry
+			for _, m := range orgIdentity.Metadata {
+				converted = append(converted, MetaEntry{
+					Key:   types.StringValue(m.Key),
+					Value: types.StringValue(m.Value),
+				})
+			}
+			state.Metadata = converted
+		} else {
+			state.Metadata = []MetaEntry{}
+		}
 	}
-
-	state.Metadata = converted
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -325,22 +314,11 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		plan.AuthModes = types.ListNull(types.StringType)
 	}
 
-	var converted []MetaEntry
-	for _, m := range orgIdentity.Identity.Metadata {
-		converted = append(converted, MetaEntry{
-			ID:    types.StringValue(m.ID),
-			Key:   types.StringValue(m.Key),
-			Value: types.StringValue(m.Value),
-		})
-	}
-	plan.Metadata = converted
-
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

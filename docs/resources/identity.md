@@ -129,7 +129,7 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 
 ### Optional
 
-- `metadata` (Attributes List) The metadata associated with this identity (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes Set) The metadata associated with this identity (see [below for nested schema](#nestedatt--metadata))
 
 ### Read-Only
 
@@ -143,7 +143,3 @@ Required:
 
 - `key` (String) The key of the metadata object
 - `value` (String) The value of the metadata object
-
-Read-Only:
-
-- `id` (String) The ID of the metadata object
