@@ -95,6 +95,26 @@ func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectR
 	return projectResponse, nil
 }
 
+func (client Client) UpdateProjectAuditLogRetention(request UpdateProjectAuditLogRetentionRequest) (UpdateProjectAuditLogRetentionResponse, error) {
+	var projectResponse UpdateProjectAuditLogRetentionResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&projectResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Put(fmt.Sprintf("api/v1/workspace/%s/audit-logs-retention", request.ProjectSlug))
+
+	if err != nil {
+		return UpdateProjectAuditLogRetentionResponse{}, fmt.Errorf("CallUpdateProjectAuditLogRetention: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return UpdateProjectAuditLogRetentionResponse{}, fmt.Errorf("CallUpdateProjectAuditLogRetention: Unsuccessful response. [response=%s]", response)
+	}
+
+	return projectResponse, nil
+}
+
 func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithEnvironments, error) {
 	var projectResponse GetProjectByIdResponse
 	response, err := client.Config.HttpClient.

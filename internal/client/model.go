@@ -277,6 +277,7 @@ type ProjectWithEnvironments struct {
 	Version               int64                `json:"version"`
 	UpgradeStatus         string               `json:"upgradeStatus"`
 	Environments          []ProjectEnvironment `json:"environments"`
+	AuditLogRetentionDays int64                `json:"auditLogsRetentionDays"`
 }
 
 type GetProjectByIdResponse struct {
@@ -629,6 +630,15 @@ type UpdateProjectRequest struct {
 	ProjectName         string `json:"name"`
 	ProjectDescription  string `json:"description"`
 	HasDeleteProtection bool   `json:"hasDeleteProtection"`
+}
+
+type UpdateProjectAuditLogRetentionRequest struct {
+	ProjectSlug string
+	Days        int64 `json:"auditLogsRetentionDays"`
+}
+
+type UpdateProjectAuditLogRetentionResponse struct {
+	Project Project `json:"workspace"`
 }
 
 type InviteUsersToProjectRequest struct {
