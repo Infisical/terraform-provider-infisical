@@ -60,6 +60,7 @@ resource "infisical_project" "azure-project" {
 
 ### Optional
 
+- `audit_log_retention_days` (Number) The audit log retention in days
 - `description` (String) The description of the project
 - `has_delete_protection` (Boolean) Whether the project has delete protection, defaults to false
 - `kms_secret_manager_key_id` (String) The ID of the KMS secret manager key to use for the project

@@ -43,6 +43,7 @@ type projectResourceModel struct {
 	TemplateName            types.String `tfsdk:"template_name"`
 	ShouldCreateDefaultEnvs types.Bool   `tfsdk:"should_create_default_envs"`
 	HasDeleteProtection     types.Bool   `tfsdk:"has_delete_protection"`
+	AuditLogRetentionDays   types.Int64  `tfsdk:"audit_log_retention_days"`
 }
 
 // Metadata returns the resource type name.
@@ -88,6 +89,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"has_delete_protection": schema.BoolAttribute{
 				Description: "Whether the project has delete protection, defaults to false",
+				Optional:    true,
+				Computed:    true,
+			},
+			"audit_log_retention_days": schema.Int64Attribute{
+				Description: "The audit log retention in days",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -165,6 +171,20 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	if !plan.AuditLogRetentionDays.IsUnknown() {
+		_, err := r.client.UpdateProjectAuditLogRetention(infisical.UpdateProjectAuditLogRetentionRequest{
+			ProjectSlug: plan.Slug.ValueString(),
+			Days:        plan.AuditLogRetentionDays.ValueInt64(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project audit log retention",
+				"Couldn't update project audit log retention from Infiscial, unexpected error: "+err.Error(),
+			)
+		}
+	}
+
 	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: plan.Slug.ValueString(),
 	})
@@ -180,6 +200,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.ID = types.StringValue(newProject.Project.ID)
 	plan.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
+	plan.AuditLogRetentionDays = types.Int64Value(project.AuditLogRetentionDays)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -240,6 +261,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	state.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	state.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
+	state.AuditLogRetentionDays = types.Int64Value(project.AuditLogRetentionDays)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -325,13 +347,40 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	if state.AuditLogRetentionDays != plan.AuditLogRetentionDays {
+		_, err := r.client.UpdateProjectAuditLogRetention(infisical.UpdateProjectAuditLogRetentionRequest{
+			ProjectSlug: plan.Slug.ValueString(),
+			Days:        plan.AuditLogRetentionDays.ValueInt64(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project audit log retention",
+				"Couldn't update project audit log retention from Infiscial, unexpected error: "+err.Error(),
+			)
+		}
+	}
+
+	project, err := r.client.GetProject(infisical.GetProjectRequest{
+		Slug: plan.Slug.ValueString(),
+	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading project",
+			"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	if !plan.Description.IsNull() {
 		plan.Description = types.StringValue(updatedProject.Description)
 	}
 
 	plan.LastUpdated = types.StringValue(updatedProject.UpdatedAt.Format(time.RFC850))
 	plan.Name = types.StringValue(plan.Name.ValueString())
-
+	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
+	plan.AuditLogRetentionDays = types.Int64Value(project.AuditLogRetentionDays)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -399,4 +448,5 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), project.Description)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("last_updated"), project.UpdatedAt.Format(time.RFC850))...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("has_delete_protection"), project.HasDeleteProtection)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("audit_log_retention_days"), project.AuditLogRetentionDays)...)
 }
