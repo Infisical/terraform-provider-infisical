@@ -352,3 +352,75 @@ func (r *IdentityResource) Delete(ctx context.Context, req resource.DeleteReques
 	}
 
 }
+
+func (r *IdentityResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity role",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	orgIdentity, err := r.client.GetIdentity(infisical.GetIdentityRequest{
+		IdentityID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisicalclient.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Error importing identity",
+				fmt.Sprintf("No identity found with ID: %s", req.ID),
+			)
+			return
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity",
+				"Couldn't read identity from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
+	var state IdentityResourceModel
+	state.ID = types.StringValue(req.ID)
+	state.Name = types.StringValue(orgIdentity.Identity.Name)
+
+	if len(orgIdentity.Identity.AuthMethods) > 0 {
+		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
+		for i, method := range orgIdentity.Identity.AuthMethods {
+			elements[i] = types.StringValue(method)
+		}
+		state.AuthModes = types.ListValueMust(types.StringType, elements)
+	} else {
+		state.AuthModes = types.ListNull(types.StringType)
+	}
+
+	if orgIdentity.CustomRole != nil {
+		state.Role = types.StringValue(orgIdentity.CustomRole.Slug)
+	} else {
+		state.Role = types.StringValue(orgIdentity.Role)
+	}
+
+	state.OrgID = types.StringValue(orgIdentity.OrgID)
+
+	if len(orgIdentity.Metadata) > 0 {
+		var converted []MetaEntry
+		for _, m := range orgIdentity.Metadata {
+			converted = append(converted, MetaEntry{
+				Key:   types.StringValue(m.Key),
+				Value: types.StringValue(m.Value),
+			})
+		}
+		state.Metadata = converted
+	} else {
+		state.Metadata = []MetaEntry{}
+	}
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+}

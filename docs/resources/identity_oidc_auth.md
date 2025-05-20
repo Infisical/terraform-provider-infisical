@@ -32,11 +32,6 @@ provider "infisical" {
   }
 }
 
-resource "infisical_project" "example" {
-  name = "example"
-  slug = "example"
-}
-
 resource "infisical_identity" "machine-identity-1" {
   name   = "machine-identity-1"
   role   = "admin"
