@@ -143,3 +143,12 @@ Required:
 
 - `key` (String) The key of the metadata object
 - `value` (String) The value of the metadata object
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the resource by its identity ID
+terraform import infisical_identity.example <identity_id>
+```

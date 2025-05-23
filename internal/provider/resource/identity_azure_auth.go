@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
@@ -210,7 +211,7 @@ func (r *IdentityAzureAuthResource) Create(ctx context.Context, req resource.Cre
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity azure auth",
-			"Couldn't save azure auth to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save azure auth to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -255,7 +256,7 @@ func (r *IdentityAzureAuthResource) Read(ctx context.Context, req resource.ReadR
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity azure auth",
-				"Couldn't read identity azure auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity azure auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -310,7 +311,7 @@ func (r *IdentityAzureAuthResource) Update(ctx context.Context, req resource.Upd
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity azure auth",
-			"Couldn't update identity azure auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity azure auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -349,8 +350,116 @@ func (r *IdentityAzureAuthResource) Delete(ctx context.Context, req resource.Del
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity azure auth",
-			"Couldn't delete identity azure auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity azure auth from Infisical, unexpected error: "+err.Error(),
 		)
+		return
+	}
+
+}
+
+func (r *IdentityAzureAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity azure auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	identity, err := r.client.GetIdentity(infisical.GetIdentityRequest{
+		IdentityID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisicalclient.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity not found",
+				"The identity with the given ID was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity azure auth",
+				"Couldn't read identity azure auth from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	if len(identity.Identity.AuthMethods) == 0 {
+		resp.Diagnostics.AddError(
+			"Identity azure auth not found",
+			"The identity with the given ID has no configured auth methods",
+		)
+		return
+	}
+
+	hasAzureAuth := slices.Contains(identity.Identity.AuthMethods, "azure-auth")
+
+	if !hasAzureAuth {
+		resp.Diagnostics.AddError(
+			"Identity azure auth not found",
+			"The identity with the given ID does not have azure auth configured",
+		)
+		return
+	}
+
+	identityAzureAuth, err := r.client.GetIdentityAzureAuth(infisical.GetIdentityAzureAuthRequest{
+		IdentityID: req.ID,
+	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing identity azure auth",
+			"Couldn't read identity azure auth from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	var diags diag.Diagnostics
+	var state IdentityAzureAuthResourceModel
+
+	state.ID = types.StringValue(identityAzureAuth.ID)
+	state.IdentityID = types.StringValue(identityAzureAuth.IdentityID)
+	state.Resource = types.StringValue(identityAzureAuth.Resource)
+	state.TenantID = types.StringValue(identityAzureAuth.TenantID)
+	state.AccessTokenTTL = types.Int64Value(identityAzureAuth.AccessTokenTTL)
+	state.AccessTokenMaxTTL = types.Int64Value(identityAzureAuth.AccessTokenMaxTTL)
+	state.AccessTokenNumUsesLimit = types.Int64Value(identityAzureAuth.AccessTokenNumUsesLimit)
+
+	accessTokenTrustedIps := make([]IdentityAzureAuthResourceTrustedIps, len(identityAzureAuth.AccessTokenTrustedIPS))
+	for i, el := range identityAzureAuth.AccessTokenTrustedIPS {
+		if el.Prefix != nil {
+			accessTokenTrustedIps[i] = IdentityAzureAuthResourceTrustedIps{IpAddress: types.StringValue(
+				el.IpAddress + "/" + strconv.Itoa(*el.Prefix),
+			)}
+		} else {
+			accessTokenTrustedIps[i] = IdentityAzureAuthResourceTrustedIps{IpAddress: types.StringValue(
+				el.IpAddress,
+			)}
+		}
+	}
+
+	state.AccessTokenTrustedIps, diags = types.ListValueFrom(ctx, types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"ip_address": types.StringType,
+		},
+	}, accessTokenTrustedIps)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	state.AllowedServicePrincipalIDs, diags = types.ListValueFrom(ctx, types.StringType, infisicalstrings.StringSplitAndTrim(identityAzureAuth.AllowedServicePrincipalIDS, ","))
+
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
