@@ -75,3 +75,12 @@ resource "infisical_identity_azure_auth" "azure-auth" {
 Optional:
 
 - `ip_address` (String)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the resource by its identity ID
+terraform import infisical_identity_azure_auth.example <identity_id>
+```

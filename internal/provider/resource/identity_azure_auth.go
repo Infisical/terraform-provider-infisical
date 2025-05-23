@@ -389,7 +389,7 @@ func (r *IdentityAzureAuthResource) ImportState(ctx context.Context, req resourc
 	if len(identity.Identity.AuthMethods) == 0 {
 		resp.Diagnostics.AddError(
 			"Identity azure auth not found",
-			"The identity with the given ID was not found",
+			"The identity with the given ID has no configured auth methods",
 		)
 		return
 	}
