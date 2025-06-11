@@ -125,7 +125,6 @@ type Identity struct {
 }
 
 type MetaEntry struct {
-	ID    string `json:"id"`
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
@@ -2137,4 +2136,83 @@ type DeleteSecretSyncRequest struct {
 
 type DeleteSecretSyncResponse struct {
 	SecretSync SecretSync `json:"secretSync"`
+}
+
+type DynamicSecret struct {
+	Id               string                 `json:"id"`
+	Name             string                 `json:"name"`
+	Version          int                    `json:"version"`
+	Type             string                 `json:"type"`
+	DefaultTTL       string                 `json:"defaultTTL"`
+	MaxTTL           string                 `json:"maxTTL"`
+	FolderId         string                 `json:"folderId"`
+	CreatedAt        string                 `json:"createdAt"`
+	UpdatedAt        string                 `json:"updatedAt"`
+	UsernameTemplate string                 `json:"usernameTemplate"`
+	Metadata         []MetaEntry            `json:"metadata"`
+	Inputs           map[string]interface{} `json:"inputs"`
+}
+
+type DynamicSecretProviderObject struct {
+	Provider DynamicSecretProvider  `json:"type"`
+	Inputs   map[string]interface{} `json:"inputs"`
+}
+
+type CreateDynamicSecretRequest struct {
+	Provider         DynamicSecretProviderObject `json:"provider"`
+	Name             string                      `json:"name"`
+	ProjectSlug      string                      `json:"projectSlug"`
+	EnvironmentSlug  string                      `json:"environmentSlug"`
+	Path             string                      `json:"path"`
+	DefaultTTL       string                      `json:"defaultTTL"`
+	MaxTTL           string                      `json:"maxTTL,omitempty"`
+	UsernameTemplate string                      `json:"usernameTemplate,omitempty"`
+	Metadata         []MetaEntry                 `json:"metadata"`
+}
+
+type CreateDynamicSecretResponse struct {
+	DynamicSecret DynamicSecret `json:"dynamicSecret"`
+}
+
+type GetDynamicSecretByNameRequest struct {
+	ProjectSlug     string
+	EnvironmentSlug string
+	Path            string
+	Name            string
+}
+
+type GetDynamicSecretByNameResponse struct {
+	DynamicSecret DynamicSecret `json:"dynamicSecret"`
+}
+
+type UpdateDynamicSecretData struct {
+	Inputs           map[string]interface{} `json:"inputs"`
+	DefaultTTL       string                 `json:"defaultTTL"`
+	MaxTTL           string                 `json:"maxTTL,omitempty"`
+	NewName          string                 `json:"newName,omitempty"`
+	Metadata         []MetaEntry            `json:"metadata"`
+	UsernameTemplate string                 `json:"usernameTemplate,omitempty"`
+}
+
+type UpdateDynamicSecretRequest struct {
+	Name            string                  `json:"name"`
+	ProjectSlug     string                  `json:"projectSlug"`
+	EnvironmentSlug string                  `json:"environmentSlug"`
+	Path            string                  `json:"path"`
+	Data            UpdateDynamicSecretData `json:"data"`
+}
+
+type UpdateDynamicSecretResponse struct {
+	DynamicSecret DynamicSecret `json:"dynamicSecret"`
+}
+
+type DeleteDynamicSecretRequest struct {
+	Name            string `json:"name"`
+	ProjectSlug     string `json:"projectSlug"`
+	EnvironmentSlug string `json:"environmentSlug"`
+	Path            string `json:"path"`
+}
+
+type DeleteDynamicSecretResponse struct {
+	DynamicSecret DynamicSecret `json:"dynamicSecret"`
 }
