@@ -203,7 +203,15 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				return types.ObjectNull(map[string]attr.Type{}), diags
 			}
 
-			portVal := int64(dynamicSecret.Inputs["port"].(float64))
+			portFloat, ok := dynamicSecret.Inputs["port"].(float64)
+			if !ok {
+				diags.AddError(
+					"Invalid port type",
+					"Expected 'port' to be a float64 but got something else",
+				)
+				return types.ObjectNull(map[string]attr.Type{}), diags
+			}
+			portVal := int64(portFloat)
 
 			databaseVal, ok := dynamicSecret.Inputs["database"].(string)
 			if !ok {
