@@ -1881,7 +1881,7 @@ type AccessApprovalPolicy struct {
 type CreateAccessApprovalPolicyApprover struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
-	Name string `json:"name"`
+	Name string `json:"username"`
 }
 
 type CreateAccessApprovalPolicyRequest struct {
@@ -1909,7 +1909,7 @@ type GetAccessApprovalPolicyByIDResponse struct {
 type UpdateAccessApprovalPolicyApprover struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
-	Name string `json:"name"`
+	Name string `json:"username"`
 }
 
 type UpdateAccessApprovalPolicyRequest struct {
