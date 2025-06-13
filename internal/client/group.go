@@ -5,6 +5,65 @@ import (
 	"net/http"
 )
 
+func (client Client) CreateGroup(request CreateGroupRequest) (Group, error) {
+	var groupResponse Group
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&groupResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post("api/v1/groups")
+
+	if err != nil {
+		return Group{}, fmt.Errorf("CreateGroup: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return Group{}, fmt.Errorf("CreateGroup: Unsuccessful response. [response=%s]", response)
+	}
+
+	return groupResponse, nil
+}
+
+func (client Client) UpdateGroup(request UpdateGroupRequest) (Group, error) {
+	var groupResponse Group
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&groupResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("api/v1/groups/%s", request.ID))
+
+	if err != nil {
+		return Group{}, fmt.Errorf("UpdateGroup: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return Group{}, fmt.Errorf("UpdateGroup: Unsuccessful response. [response=%s]", response)
+	}
+
+	return groupResponse, nil
+}
+
+func (client Client) DeleteGroup(request DeleteGroupRequest) (Group, error) {
+	var groupResponse Group
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&groupResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		Delete(fmt.Sprintf("api/v1/groups/%s", request.ID))
+
+	if err != nil {
+		return Group{}, fmt.Errorf("DeleteGroup: Unable to complete api request [err=%s]", err)
+	}
+
+	if response.IsError() {
+		return Group{}, fmt.Errorf("DeleteGroup: Unsuccessful response. [response=%s]", response)
+	}
+
+	return groupResponse, nil
+}
+
 func (client Client) GetGroupById(request GetGroupByIdRequest) (Group, error) {
 	var groupResponse Group
 	response, err := client.Config.HttpClient.
