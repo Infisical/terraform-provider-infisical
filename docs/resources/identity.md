@@ -129,6 +129,7 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
 
 ### Optional
 
+- `has_delete_protection` (Boolean) Whether the identity has delete protection, defaults to false
 - `metadata` (Attributes Set) The metadata associated with this identity (see [below for nested schema](#nestedatt--metadata))
 
 ### Read-Only
