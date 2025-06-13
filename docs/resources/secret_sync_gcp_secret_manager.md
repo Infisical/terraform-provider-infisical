@@ -102,3 +102,4 @@ Required:
 Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from GCP Secret Manager. Enable this option if you intend to manage some secrets manually outside of Infisical.
+- `key_schema` (String) The format to use for structuring secret keys in the GCP Secret Manager destination.
