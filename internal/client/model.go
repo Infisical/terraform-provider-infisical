@@ -1089,12 +1089,13 @@ type GetGroupByIdRequest struct {
 }
 
 type Group struct {
-	ID     string `json:"id"`
-	OrgID  string `json:"orgId"`
-	Name   string `json:"name"`
-	Slug   string `json:"slug"`
-	Role   string `json:"role"`
-	RoleId string `json:"roleId"`
+	ID             string `json:"id"`
+	OrgID          string `json:"orgId"`
+	Name           string `json:"name"`
+	Slug           string `json:"slug"`
+	Role           string `json:"role"`
+	RoleId         string `json:"roleId"`
+	CustomRoleSlug string `json:"customRoleSlug"`
 }
 
 type GetGroupsResponse []Group
@@ -2215,4 +2216,21 @@ type DeleteDynamicSecretRequest struct {
 
 type DeleteDynamicSecretResponse struct {
 	DynamicSecret DynamicSecret `json:"dynamicSecret"`
+}
+
+type CreateGroupRequest struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Role string `json:"role"`
+}
+
+type UpdateGroupRequest struct {
+	ID   string
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Role string `json:"role"`
+}
+
+type DeleteGroupRequest struct {
+	ID string
 }
