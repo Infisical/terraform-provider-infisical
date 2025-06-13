@@ -22,6 +22,7 @@ type SecretSyncAzureKeyVaultDestinationConfigModel struct {
 type SecretSyncAzureKeyVaultSyncOptionsModel struct {
 	InitialSyncBehavior   types.String `tfsdk:"initial_sync_behavior"`
 	DisableSecretDeletion types.Bool   `tfsdk:"disable_secret_deletion"`
+	KeySchema             types.String `tfsdk:"key_schema"`
 }
 
 func NewSecretSyncAzureKeyVaultResource() resource.Resource {
@@ -47,6 +48,10 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 				Description: "When set to true, Infisical will not remove secrets from Azure Key Vault. Enable this option if you intend to manage some secrets manually outside of Infisical.",
 				Default:     booldefault.StaticBool(false),
 			},
+			"key_schema": schema.StringAttribute{
+				Optional:    true,
+				Description: "The format to use for structuring secret keys in the Azure Key Vault destination.",
+			},
 		},
 
 		ReadSyncOptionsForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -60,6 +65,7 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
 			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
+			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
 			return syncOptionsMap, nil
 
 		},
@@ -75,6 +81,7 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
 			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
+			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
 			return syncOptionsMap, nil
 		},
 
@@ -95,9 +102,17 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 				"disable_secret_deletion": types.BoolValue(disableSecretDeletion),
 			}
 
+			keySchema, ok := secretSync.SyncOptions["keySchema"].(string)
+			if keySchema == "" || !ok {
+				syncOptionsMap["key_schema"] = types.StringNull()
+			} else {
+				syncOptionsMap["key_schema"] = types.StringValue(keySchema)
+			}
+
 			return types.ObjectValue(map[string]attr.Type{
 				"initial_sync_behavior":   types.StringType,
 				"disable_secret_deletion": types.BoolType,
+				"key_schema":              types.StringType,
 			}, syncOptionsMap)
 		},
 
