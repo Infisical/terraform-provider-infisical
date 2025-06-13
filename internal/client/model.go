@@ -78,9 +78,10 @@ type ProjectIdentity struct {
 	IdentityID string `json:"identityId"`
 	Roles      []ProjectMemberRole
 	Identity   struct {
-		Name        string   `json:"name"`
-		Id          string   `json:"id"`
-		AuthMethods []string `json:"authMethods"`
+		Name                string   `json:"name"`
+		HasDeleteProtection bool     `json:"hasDeleteProtection"`
+		Id                  string   `json:"id"`
+		AuthMethods         []string `json:"authMethods"`
 	} `json:"identity"`
 	Project struct {
 		ID   string `json:"id"`
@@ -117,11 +118,12 @@ type OrgIdentity struct {
 }
 
 type Identity struct {
-	Name        string    `json:"name"`
-	ID          string    `json:"id"`
-	AuthMethods []string  `json:"authMethods"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	Name                string    `json:"name"`
+	HasDeleteProtection bool      `json:"hasDeleteProtection"`
+	ID                  string    `json:"id"`
+	AuthMethods         []string  `json:"authMethods"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
 }
 
 type MetaEntry struct {
@@ -1261,12 +1263,13 @@ type UpdateProjectEnvironmentResponse struct {
 
 // Different from Identity because metadata is only included on post/patch requests.
 type CreateUpdateIdentity struct {
-	Name        string      `json:"name"`
-	ID          string      `json:"id"`
-	AuthMethods []string    `json:"authMethods"`
-	CreatedAt   time.Time   `json:"createdAt"`
-	UpdatedAt   time.Time   `json:"updatedAt"`
-	Metadata    []MetaEntry `json:"metadata"`
+	Name                string      `json:"name"`
+	HasDeleteProtection bool        `json:"hasDeleteProtection"`
+	ID                  string      `json:"id"`
+	AuthMethods         []string    `json:"authMethods"`
+	CreatedAt           time.Time   `json:"createdAt"`
+	UpdatedAt           time.Time   `json:"updatedAt"`
+	Metadata            []MetaEntry `json:"metadata"`
 }
 
 type CreateMetaEntry struct {
@@ -1275,10 +1278,11 @@ type CreateMetaEntry struct {
 }
 
 type CreateIdentityRequest struct {
-	Name     string            `json:"name"`
-	OrgID    string            `json:"organizationId"`
-	Role     string            `json:"role"`
-	Metadata []CreateMetaEntry `json:"metadata,omitempty"`
+	Name                string            `json:"name"`
+	HasDeleteProtection bool              `json:"hasDeleteProtection"`
+	OrgID               string            `json:"organizationId"`
+	Role                string            `json:"role"`
+	Metadata            []CreateMetaEntry `json:"metadata,omitempty"`
 }
 
 type CreateIdentityResponse struct {
@@ -1286,10 +1290,11 @@ type CreateIdentityResponse struct {
 }
 
 type UpdateIdentityRequest struct {
-	IdentityID string            `json:"identityId"`
-	Name       string            `json:"name,omitempty"`
-	Role       string            `json:"role,omitempty"`
-	Metadata   []CreateMetaEntry `json:"metadata"`
+	IdentityID          string            `json:"identityId"`
+	Name                string            `json:"name,omitempty"`
+	HasDeleteProtection bool              `json:"hasDeleteProtection"`
+	Role                string            `json:"role,omitempty"`
+	Metadata            []CreateMetaEntry `json:"metadata"`
 }
 
 type UpdateIdentityResponse struct {
