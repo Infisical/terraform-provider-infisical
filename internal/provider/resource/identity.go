@@ -163,6 +163,8 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.ID = types.StringValue(newIdentity.Identity.ID)
+	plan.HasDeleteProtection = types.BoolValue(newIdentity.Identity.HasDeleteProtection)
+
 	if len(newIdentity.Identity.AuthMethods) > 0 {
 		elements := make([]attr.Value, len(newIdentity.Identity.AuthMethods))
 		for i, method := range newIdentity.Identity.AuthMethods {
@@ -312,6 +314,8 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		)
 		return
 	}
+
+	plan.HasDeleteProtection = types.BoolValue(orgIdentity.Identity.HasDeleteProtection)
 
 	if len(orgIdentity.Identity.AuthMethods) > 0 {
 		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
