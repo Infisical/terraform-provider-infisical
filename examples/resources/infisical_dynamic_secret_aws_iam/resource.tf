@@ -32,48 +32,31 @@ resource "infisical_dynamic_secret_aws_iam" "aws-iam" {
     access_key_config = {
       access_key        = "YOUR_AWS_ACCESS_KEY_ID"
       secret_access_key = "YOUR_AWS_SECRET_ACCESS_KEY"
-      region            = "us-east-1"
-
-      aws_path                       = "/"
-      permission_boundary_policy_arn = "arn:aws:iam::123456789012:policy/YourBoundaryPolicy"
-      policy_document                = <<-EOT
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Action": "s3:ListBucket",
-            "Resource": "*"
-          }
-        ]
-      }
-      EOT
-      user_groups                    = "group-a,group-b"
-      policy_arns                    = "arn:aws:iam::aws:policy/ReadOnlyAccess,arn:aws:iam::123456789012:policy/SpecificPolicy"
     }
 
     # This block is used if 'method' is set to "assume_role"
     # assume_role_config = {
     #   role_arn = "arn:aws:iam::123456789012:role/YourAssumeRole"
-    #   region   = "us-west-2"
-
-    #   # aws_path = "/"
-    #   # permission_boundary_policy_arn = "arn:aws:iam::123456789012:policy/YourBoundaryPolicyForAssumedRole"
-    #   # policy_document = <<-EOT
-    #   # {
-    #   #   "Version": "2012-10-17",
-    #   #   "Statement": [
-    #   #     {
-    #   #       "Effect": "Allow",
-    #   #       "Action": "ec2:DescribeInstances",
-    #   #       "Resource": "*"
-    #   #     }
-    #   #   ]
-    #   # }
-    #   # EOT
-    #   # user_groups = "assumed-role-group"
-    #   # policy_arns = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
     # }
+
+    region = "us-east-1"
+
+    aws_path                       = "/"
+    permission_boundary_policy_arn = "arn:aws:iam::123456789012:policy/YourBoundaryPolicy"
+    policy_document                = <<-EOT
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": "s3:ListBucket",
+          "Resource": "*"
+        }
+      ]
+    }
+    EOT
+    user_groups                    = "group-a,group-b"
+    policy_arns                    = "arn:aws:iam::aws:policy/ReadOnlyAccess,arn:aws:iam::123456789012:policy/SpecificPolicy"
   }
 
   username_template = "{{randomUsername}}"

@@ -47,48 +47,31 @@ resource "infisical_dynamic_secret_aws_iam" "aws-iam" {
     access_key_config = {
       access_key        = "YOUR_AWS_ACCESS_KEY_ID"
       secret_access_key = "YOUR_AWS_SECRET_ACCESS_KEY"
-      region            = "us-east-1"
-
-      aws_path                       = "/"
-      permission_boundary_policy_arn = "arn:aws:iam::123456789012:policy/YourBoundaryPolicy"
-      policy_document                = <<-EOT
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Action": "s3:ListBucket",
-            "Resource": "*"
-          }
-        ]
-      }
-      EOT
-      user_groups                    = "group-a,group-b"
-      policy_arns                    = "arn:aws:iam::aws:policy/ReadOnlyAccess,arn:aws:iam::123456789012:policy/SpecificPolicy"
     }
 
     # This block is used if 'method' is set to "assume_role"
     # assume_role_config = {
     #   role_arn = "arn:aws:iam::123456789012:role/YourAssumeRole"
-    #   region   = "us-west-2"
-
-    #   # aws_path = "/"
-    #   # permission_boundary_policy_arn = "arn:aws:iam::123456789012:policy/YourBoundaryPolicyForAssumedRole"
-    #   # policy_document = <<-EOT
-    #   # {
-    #   #   "Version": "2012-10-17",
-    #   #   "Statement": [
-    #   #     {
-    #   #       "Effect": "Allow",
-    #   #       "Action": "ec2:DescribeInstances",
-    #   #       "Resource": "*"
-    #   #     }
-    #   #   ]
-    #   # }
-    #   # EOT
-    #   # user_groups = "assumed-role-group"
-    #   # policy_arns = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
     # }
+
+    region = "us-east-1"
+
+    aws_path                       = "/"
+    permission_boundary_policy_arn = "arn:aws:iam::123456789012:policy/YourBoundaryPolicy"
+    policy_document                = <<-EOT
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": "s3:ListBucket",
+          "Resource": "*"
+        }
+      ]
+    }
+    EOT
+    user_groups                    = "group-a,group-b"
+    policy_arns                    = "arn:aws:iam::aws:policy/ReadOnlyAccess,arn:aws:iam::123456789012:policy/SpecificPolicy"
   }
 
   username_template = "{{randomUsername}}"
@@ -123,11 +106,17 @@ resource "infisical_dynamic_secret_aws_iam" "aws-iam" {
 Required:
 
 - `method` (String) The authentication method to use. Must be 'access_key' or 'assume_role'.
+- `region` (String) The AWS data center region.
 
 Optional:
 
 - `access_key_config` (Attributes) Configuration for the 'access_key' authentication method. (see [below for nested schema](#nestedatt--configuration--access_key_config))
 - `assume_role_config` (Attributes) Configuration for the 'assume_role' authentication method. (see [below for nested schema](#nestedatt--configuration--assume_role_config))
+- `aws_path` (String) IAM AWS Path to scope created IAM User resource access.
+- `permission_boundary_policy_arn` (String) The IAM Policy ARN of the AWS Permissions Boundary to attach to IAM users created in the role.
+- `policy_arns` (String) The AWS IAM managed policies that should be attached to the created users. Multiple values can be provided by separating them with commas
+- `policy_document` (String) The AWS IAM inline policy that should be attached to the created users. Multiple values can be provided by separating them with commas
+- `user_groups` (String) The AWS IAM groups that should be assigned to the created users. Multiple values can be provided by separating them with commas
 
 <a id="nestedatt--configuration--access_key_config"></a>
 ### Nested Schema for `configuration.access_key_config`
@@ -135,16 +124,7 @@ Optional:
 Required:
 
 - `access_key` (String) The managing AWS IAM User Access Key
-- `region` (String) The AWS data center region.
 - `secret_access_key` (String, Sensitive) The managing AWS IAM User Secret Key
-
-Optional:
-
-- `aws_path` (String) IAM AWS Path to scope created IAM User resource access.
-- `permission_boundary_policy_arn` (String) The IAM Policy ARN of the AWS Permissions Boundary to attach to IAM users created in the role.
-- `policy_arns` (String) The AWS IAM managed policies that should be attached to the created users. Multiple values can be provided by separating them with commas
-- `policy_document` (String) The AWS IAM inline policy that should be attached to the created users. Multiple values can be provided by separating them with commas
-- `user_groups` (String) The AWS IAM groups that should be assigned to the created users. Multiple values can be provided by separating them with commas
 
 
 <a id="nestedatt--configuration--assume_role_config"></a>
@@ -152,16 +132,7 @@ Optional:
 
 Required:
 
-- `region` (String) The AWS data center region.
 - `role_arn` (String) The ARN of the AWS Role to assume.
-
-Optional:
-
-- `aws_path` (String) IAM AWS Path to scope created IAM User resource access.
-- `permission_boundary_policy_arn` (String) The IAM Policy ARN of the AWS Permissions Boundary to attach to IAM users created in the role.
-- `policy_arns` (String) The AWS IAM managed policies that should be attached to the created users. Multiple values can be provided by separating them with commas
-- `policy_document` (String) The AWS IAM inline policy that should be attached to the created users. Multiple values can be provided by separating them with commas
-- `user_groups` (String) The AWS IAM groups that should be assigned to the created users. Multiple values can be provided by separating them with commas
 
 
 
