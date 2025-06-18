@@ -251,13 +251,37 @@ func NewDynamicSecretAwsIamResource() resource.Resource {
 			}
 			configuration["method"] = types.StringValue(tfMethod)
 
-			configuration["access_key_config"] = types.ObjectNull(configurationSchema["access_key_config"].(types.ObjectType).AttrTypes)
-			configuration["assume_role_config"] = types.ObjectNull(configurationSchema["assume_role_config"].(types.ObjectType).AttrTypes)
+			accessKeyConfigSchemaEntry, okAks := configurationSchema["access_key_config"].(types.ObjectType)
+			if !okAks {
+				diags.AddError(
+					"Internal Schema Error",
+					"Could not assert 'access_key_config' to types.ObjectType. This indicates an issue with the provider's internal schema definition.",
+				)
+				return types.ObjectNull(configurationSchema), diags
+			}
+			configuration["access_key_config"] = types.ObjectNull(accessKeyConfigSchemaEntry.AttrTypes)
+			assumeRoleConfigSchemaEntry, okArs := configurationSchema["assume_role_config"].(types.ObjectType)
+			if !okArs {
+				diags.AddError(
+					"Internal Schema Error",
+					"Could not assert 'assume_role_config' to types.ObjectType. This indicates an issue with the provider's internal schema definition.",
+				)
+				return types.ObjectNull(configurationSchema), diags
+			}
+			configuration["assume_role_config"] = types.ObjectNull(assumeRoleConfigSchemaEntry.AttrTypes)
 
 			switch tfMethod {
 			case "access_key":
 				accessKeyConfigMap := make(map[string]attr.Value)
-				accessKeyConfigSchema := configurationSchema["access_key_config"].(types.ObjectType).AttrTypes
+				accessKeyConfigAttrType, ok := configurationSchema["access_key_config"].(types.ObjectType)
+				if !ok {
+					diags.AddError(
+						"Internal Schema Error",
+						"Could not assert 'access_key_config' to types.ObjectType within access_key case. This indicates an issue with the provider's internal schema definition.",
+					)
+					return types.ObjectNull(configurationSchema), diags
+				}
+				accessKeyConfigSchema := accessKeyConfigAttrType.AttrTypes
 
 				accessKeyVal, ok := dynamicSecret.Inputs["accessKey"].(string)
 				if !ok {
@@ -324,7 +348,15 @@ func NewDynamicSecretAwsIamResource() resource.Resource {
 
 			case "assume_role":
 				assumeRoleConfigMap := make(map[string]attr.Value)
-				assumeRoleConfigSchema := configurationSchema["assume_role_config"].(types.ObjectType).AttrTypes
+				assumeRoleConfigAttrType, ok := configurationSchema["assume_role_config"].(types.ObjectType)
+				if !ok {
+					diags.AddError(
+						"Internal Schema Error",
+						"Could not assert 'assume_role_config' to types.ObjectType within assume_role case. This indicates an issue with the provider's internal schema definition.",
+					)
+					return types.ObjectNull(configurationSchema), diags
+				}
+				assumeRoleConfigSchema := assumeRoleConfigAttrType.AttrTypes
 
 				roleArnVal, ok := dynamicSecret.Inputs["roleArn"].(string)
 				if !ok {
