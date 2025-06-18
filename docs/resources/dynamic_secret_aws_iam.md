@@ -122,7 +122,7 @@ resource "infisical_dynamic_secret_aws_iam" "aws-iam" {
 
 Required:
 
-- `method` (String) The authentication method to use. Must be 'access_key' or 'assume_role'. Defaults to 'access_key' if not specified in the API.
+- `method` (String) The authentication method to use. Must be 'access_key' or 'assume_role'.
 
 Optional:
 
