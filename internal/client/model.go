@@ -1804,7 +1804,7 @@ type SecretApprovalPolicy struct {
 type CreateSecretApprovalPolicyApprover struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
-	Name string `json:"name"`
+	Name string `json:"username"`
 }
 
 type CreateSecretApprovalPolicyRequest struct {
@@ -1833,7 +1833,7 @@ type GetSecretApprovalPolicyByIDResponse struct {
 type UpdateSecretApprovalPolicyApprover struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
-	Name string `json:"name"`
+	Name string `json:"username"`
 }
 
 type UpdateSecretApprovalPolicyRequest struct {
