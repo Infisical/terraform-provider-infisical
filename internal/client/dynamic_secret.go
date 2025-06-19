@@ -9,6 +9,7 @@ type DynamicSecretProvider string
 
 const (
 	DynamicSecretProviderSQLDatabase DynamicSecretProvider = "sql-database"
+	DynamicSecretProviderAWSIAM      DynamicSecretProvider = "aws-iam"
 )
 
 func (client Client) CreateDynamicSecret(request CreateDynamicSecretRequest) (DynamicSecret, error) {
