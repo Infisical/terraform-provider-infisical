@@ -121,17 +121,26 @@ func NewDynamicSecretAwsIamResource() resource.Resource {
 			}
 			configurationMap["method"] = apiMethod
 
-			if method == "access_key" && configuration.AccessKeyConfig != nil {
+			switch method {
+			case "access_key":
+				if configuration.AccessKeyConfig == nil {
+					diags.AddError(
+						"Invalid Configuration",
+						"When method is 'access_key', the 'access_key_config' block must be provided.",
+					)
+					return nil, diags
+				}
 				configurationMap["accessKey"] = configuration.AccessKeyConfig.AccessKey.ValueString()
 				configurationMap["secretAccessKey"] = configuration.AccessKeyConfig.SecretAccessKey.ValueString()
-			} else if method == "assume_role" && configuration.AssumeRoleConfig != nil {
+			case "assume_role":
+				if configuration.AssumeRoleConfig == nil {
+					diags.AddError(
+						"Invalid Configuration",
+						"When method is 'assume_role', the 'assume_role_config' block must be provided.",
+					)
+					return nil, diags
+				}
 				configurationMap["roleArn"] = configuration.AssumeRoleConfig.RoleArn.ValueString()
-			} else {
-				diags.AddError(
-					"Invalid Configuration",
-					"Configuration must specify either 'access_key_config' or 'assume_role_config' based on the 'method'.",
-				)
-				return nil, diags
 			}
 
 			configurationMap["region"] = configuration.Region.ValueString()
@@ -149,14 +158,6 @@ func NewDynamicSecretAwsIamResource() resource.Resource {
 			}
 			if !configuration.PolicyArns.IsNull() {
 				configurationMap["policyArns"] = configuration.PolicyArns.ValueString()
-			}
-
-			if (method == "access_key" && configuration.AccessKeyConfig == nil) || (method == "assume_role" && configuration.AssumeRoleConfig == nil) {
-				diags.AddError(
-					"Invalid Configuration",
-					"Configuration must specify either 'access_key_config' or 'assume_role_config' based on the 'method'.",
-				)
-				return nil, diags
 			}
 
 			return configurationMap, diags
