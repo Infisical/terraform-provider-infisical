@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -31,12 +32,13 @@ type MetaEntry struct {
 
 // IdentityResourceSourceModel describes the data source data model.
 type IdentityResourceModel struct {
-	ID        types.String `tfsdk:"id"`
-	Name      types.String `tfsdk:"name"`
-	AuthModes types.List   `tfsdk:"auth_modes"`
-	Role      types.String `tfsdk:"role"`
-	OrgID     types.String `tfsdk:"org_id"`
-	Metadata  []MetaEntry  `tfsdk:"metadata"`
+	ID                  types.String `tfsdk:"id"`
+	Name                types.String `tfsdk:"name"`
+	HasDeleteProtection types.Bool   `tfsdk:"has_delete_protection"`
+	AuthModes           types.List   `tfsdk:"auth_modes"`
+	Role                types.String `tfsdk:"role"`
+	OrgID               types.String `tfsdk:"org_id"`
+	Metadata            []MetaEntry  `tfsdk:"metadata"`
 }
 
 // Metadata returns the resource type name.
@@ -52,6 +54,14 @@ func (r *IdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"name": schema.StringAttribute{
 				Description: "The name for the identity",
 				Required:    true,
+			},
+			"has_delete_protection": schema.BoolAttribute{
+				Description: "Whether the identity has delete protection, defaults to false",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"org_id": schema.StringAttribute{
 				Description:   "The ID of the organization for the identity",
@@ -141,10 +151,11 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	newIdentity, err := r.client.CreateIdentity(infisical.CreateIdentityRequest{
-		OrgID:    plan.OrgID.ValueString(),
-		Name:     plan.Name.ValueString(),
-		Role:     plan.Role.ValueString(),
-		Metadata: metadata,
+		OrgID:               plan.OrgID.ValueString(),
+		Name:                plan.Name.ValueString(),
+		HasDeleteProtection: plan.HasDeleteProtection.ValueBool(),
+		Role:                plan.Role.ValueString(),
+		Metadata:            metadata,
 	})
 
 	if err != nil {
@@ -156,6 +167,8 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.ID = types.StringValue(newIdentity.Identity.ID)
+	plan.HasDeleteProtection = types.BoolValue(newIdentity.Identity.HasDeleteProtection)
+
 	if len(newIdentity.Identity.AuthMethods) > 0 {
 		elements := make([]attr.Value, len(newIdentity.Identity.AuthMethods))
 		for i, method := range newIdentity.Identity.AuthMethods {
@@ -216,6 +229,7 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	state.Name = types.StringValue(orgIdentity.Identity.Name)
+	state.HasDeleteProtection = types.BoolValue(orgIdentity.Identity.HasDeleteProtection)
 	if len(orgIdentity.Identity.AuthMethods) > 0 {
 		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
 		for i, method := range orgIdentity.Identity.AuthMethods {
@@ -290,10 +304,11 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	orgIdentity, err := r.client.UpdateIdentity(infisical.UpdateIdentityRequest{
-		IdentityID: state.ID.ValueString(),
-		Name:       plan.Name.ValueString(),
-		Role:       plan.Role.ValueString(),
-		Metadata:   metadata,
+		IdentityID:          state.ID.ValueString(),
+		Name:                plan.Name.ValueString(),
+		HasDeleteProtection: plan.HasDeleteProtection.ValueBool(),
+		Role:                plan.Role.ValueString(),
+		Metadata:            metadata,
 	})
 
 	if err != nil {
@@ -303,6 +318,8 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 		)
 		return
 	}
+
+	plan.HasDeleteProtection = types.BoolValue(orgIdentity.Identity.HasDeleteProtection)
 
 	if len(orgIdentity.Identity.AuthMethods) > 0 {
 		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
@@ -385,6 +402,7 @@ func (r *IdentityResource) ImportState(ctx context.Context, req resource.ImportS
 	var state IdentityResourceModel
 	state.ID = types.StringValue(req.ID)
 	state.Name = types.StringValue(orgIdentity.Identity.Name)
+	state.HasDeleteProtection = types.BoolValue(orgIdentity.Identity.HasDeleteProtection)
 
 	if len(orgIdentity.Identity.AuthMethods) > 0 {
 		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
