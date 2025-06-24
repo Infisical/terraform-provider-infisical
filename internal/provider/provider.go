@@ -346,6 +346,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncAwsSecretsManagerResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
+		dynamicSecretResource.NewDynamicSecretKubernetesResource,
 	}
 }
 
