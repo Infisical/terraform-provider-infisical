@@ -86,10 +86,10 @@ Required:
 Optional:
 
 - `repository_environment` (String) The environment to sync the secrets to, required if scope is `repository-environment`
-- `repository_name` (String) The repository to sync the secrets to, required if scope is repository
-- `repository_owner` (String) The owner of the Github repository, required if scope is repository
-- `selected_repository_ids` (List of Number) The repository ids to sync the secrets to, required if scope is organization and visibility is `selected`
-- `visibility` (String) The visibility of the Github repository, required if scope is organization
+- `repository_name` (String) The repository to sync the secrets to, required if scope is `repository` or `repository-environment`
+- `repository_owner` (String) The owner of the Github repository, required if scope is `repository`, `repository-environment`, or `organization`
+- `selected_repository_ids` (List of Number) The repository ids to sync the secrets to, required if scope is `organization` and the visibility field is set to `selected`
+- `visibility` (String) The visibility of the Github repository, required if scope is `organization`
 
 
 <a id="nestedatt--sync_options"></a>

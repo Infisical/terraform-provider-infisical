@@ -142,20 +142,20 @@ func NewSecretSyncGithubResource() resource.Resource {
 			},
 			"repository_owner": schema.StringAttribute{
 				Optional:    true,
-				Description: "The owner of the Github repository, required if scope is repository",
+				Description: "The owner of the Github repository, required if scope is `repository`, `repository-environment`, or `organization`",
 			},
 			"repository_name": schema.StringAttribute{
 				Optional:    true,
-				Description: "The repository to sync the secrets to, required if scope is repository",
+				Description: "The repository to sync the secrets to, required if scope is `repository` or `repository-environment`",
 			},
 			"visibility": schema.StringAttribute{
 				Optional:    true,
-				Description: "The visibility of the Github repository, required if scope is organization",
+				Description: "The visibility of the Github repository, required if scope is `organization`",
 			},
 			"selected_repository_ids": schema.ListAttribute{
 				Optional:    true,
 				ElementType: types.Int64Type,
-				Description: "The repository ids to sync the secrets to, required if scope is organization and visibility is `selected`",
+				Description: "The repository ids to sync the secrets to, required if scope is `organization` and the visibility field is set to `selected`",
 			},
 			"repository_environment": schema.StringAttribute{
 				Optional:    true,
