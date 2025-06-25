@@ -1790,7 +1790,7 @@ type SecretApprovalPolicyEnvironment struct {
 
 type SecretApprovalPolicyApprover struct {
 	ID   string `json:"id"`
-	Name string `json:"name"`
+	Name string `json:"username"`
 	Type string `json:"type"`
 }
 
