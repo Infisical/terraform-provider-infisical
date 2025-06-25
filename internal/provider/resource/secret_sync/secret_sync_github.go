@@ -142,15 +142,15 @@ func NewSecretSyncGithubResource() resource.Resource {
 			},
 			"repository_owner": schema.StringAttribute{
 				Optional:    true,
-				Description: "The owner of the Github repository, required if scope is `repository`, `repository-environment`, or `organization`",
+				Description: "The owner of the Github repository, required if scope is `repository`, `repository-environment`, or `organization`. This is the organization name, or the username for personal repositories. As an example if you have a repository called Infisical/go-sdk, you would only need to provide `Infisical` here.",
 			},
 			"repository_name": schema.StringAttribute{
 				Optional:    true,
-				Description: "The repository to sync the secrets to, required if scope is `repository` or `repository-environment`",
+				Description: "The repository to sync the secrets to, required if scope is `repository` or `repository-environment`. This is only the name of the repository, without the repository owner included. As an example if you have a repository called Infisical/go-sdk, you would only need to provide `go-sdk` here.",
 			},
 			"visibility": schema.StringAttribute{
 				Optional:    true,
-				Description: "The visibility of the Github repository, required if scope is `organization`",
+				Description: "The visibility of the Github repository, required if scope is `organization`. Accepted values are: `all`|`private`|`selected`",
 			},
 			"selected_repository_ids": schema.ListAttribute{
 				Optional:    true,
@@ -266,80 +266,20 @@ func NewSecretSyncGithubResource() resource.Resource {
 			destinationConfig["scope"] = githubCfg.Scope.ValueString()
 
 			if GithubSyncScope(githubCfg.Scope.ValueString()) == GithubSyncScopeRepository {
-
-				if githubCfg.RepositoryOwner.IsNull() {
-					diags.AddError(
-						"Invalid repository owner",
-						"Expected 'repository_owner' to be set when scope is repository",
-					)
-					return nil, diags
-				}
-
-				if githubCfg.RepositoryName.IsNull() {
-					diags.AddError(
-						"Invalid repository name",
-						"Expected 'repository_name' to be set when scope is repository",
-					)
-					return nil, diags
-				}
-
 				destinationConfig["owner"] = githubCfg.RepositoryOwner.ValueString()
 				destinationConfig["repo"] = githubCfg.RepositoryName.ValueString()
 			}
 
 			if GithubSyncScope(githubCfg.Scope.ValueString()) == GithubSyncScopeRepositoryEnvironment {
-				if githubCfg.RepositoryEnvironment.IsNull() {
-					diags.AddError(
-						"Invalid repository environment",
-						"Expected 'repository_environment' to be set when scope is repository and visibility is `repository-environment`",
-					)
-					return nil, diags
-				}
-
-				if githubCfg.RepositoryOwner.IsNull() {
-					diags.AddError(
-						"Invalid repository owner",
-						"Expected 'repository_owner' to be set when scope is repository-environment",
-					)
-					return nil, diags
-				}
-
-				if githubCfg.RepositoryName.IsNull() {
-					diags.AddError(
-						"Invalid repository name",
-						"Expected 'repository_name' to be set when scope is repository-environment",
-					)
-					return nil, diags
-				}
-
 				destinationConfig["env"] = githubCfg.RepositoryEnvironment.ValueString()
 				destinationConfig["owner"] = githubCfg.RepositoryOwner.ValueString()
 				destinationConfig["repo"] = githubCfg.RepositoryName.ValueString()
 			}
 
 			if GithubSyncScope(githubCfg.Scope.ValueString()) == GithubSyncScopeOrganization {
-				if githubCfg.RepositoryOwner.IsNull() {
-					diags.AddError(
-						"Invalid organization",
-						"Expected 'repository_owner' to be set when scope is organization",
-					)
-					return nil, diags
-				}
-
-				if githubCfg.Visibility.IsNull() {
-					diags.AddError(
-						"Invalid visibility",
-						"Expected 'visibility' to be set when scope is organization",
-					)
-					return nil, diags
-				}
-
 				if GithubSyncVisibility(githubCfg.Visibility.ValueString()) == GithubSyncVisibilitySelected {
-					if githubCfg.SelectedRepositoryIds.IsNull() || len(githubCfg.SelectedRepositoryIds.Elements()) == 0 {
-						diags.AddError(
-							"Invalid selected repository ids",
-							"Expected 'selected_repository_ids' to be set when scope is organization and visibility is `selected`",
-						)
+					if len(githubCfg.SelectedRepositoryIds.Elements()) == 0 {
+						diags.AddError("Invalid selected repository ids", "Expected 'selected_repository_ids' to be set with at least one repository when scope is organization and visibility is `selected`")
 						return nil, diags
 					}
 
@@ -396,31 +336,6 @@ func NewSecretSyncGithubResource() resource.Resource {
 			}
 
 			if GithubSyncScope(githubCfg.Scope.ValueString()) == GithubSyncScopeRepositoryEnvironment {
-
-				if githubCfg.RepositoryEnvironment.IsNull() {
-					diags.AddError(
-						"Invalid repository environment",
-						"Expected 'repository_environment' to be set when scope is repository-environment",
-					)
-					return nil, diags
-				}
-
-				if githubCfg.RepositoryOwner.IsNull() {
-					diags.AddError(
-						"Invalid repository owner",
-						"Expected 'repository_owner' to be set when scope is repository-environment",
-					)
-					return nil, diags
-				}
-
-				if githubCfg.RepositoryName.IsNull() {
-					diags.AddError(
-						"Invalid repository name",
-						"Expected 'repository_name' to be set when scope is repository-environment",
-					)
-					return nil, diags
-				}
-
 				destinationConfig["env"] = githubCfg.RepositoryEnvironment.ValueString()
 				destinationConfig["owner"] = githubCfg.RepositoryOwner.ValueString()
 				destinationConfig["repo"] = githubCfg.RepositoryName.ValueString()
@@ -429,11 +344,8 @@ func NewSecretSyncGithubResource() resource.Resource {
 			if GithubSyncScope(githubCfg.Scope.ValueString()) == GithubSyncScopeOrganization {
 
 				if GithubSyncVisibility(githubCfg.Visibility.ValueString()) == GithubSyncVisibilitySelected {
-					if githubCfg.SelectedRepositoryIds.IsNull() || len(githubCfg.SelectedRepositoryIds.Elements()) == 0 {
-						diags.AddError(
-							"Invalid selected repository ids",
-							"Expected 'selected_repository_ids' to be set when scope is organization and visibility is `selected`",
-						)
+					if len(githubCfg.SelectedRepositoryIds.Elements()) == 0 {
+						diags.AddError("Invalid selected repository ids", "Expected 'selected_repository_ids' to be set with at least one repository when scope is organization and visibility is `selected`")
 						return nil, diags
 					}
 

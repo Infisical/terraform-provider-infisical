@@ -86,10 +86,10 @@ Required:
 Optional:
 
 - `repository_environment` (String) The environment to sync the secrets to, required if scope is `repository-environment`
-- `repository_name` (String) The repository to sync the secrets to, required if scope is `repository` or `repository-environment`
-- `repository_owner` (String) The owner of the Github repository, required if scope is `repository`, `repository-environment`, or `organization`
+- `repository_name` (String) The repository to sync the secrets to, required if scope is `repository` or `repository-environment`. This is only the name of the repository, without the repository owner included. As an example if you have a repository called Infisical/go-sdk, you would only need to provide `go-sdk` here.
+- `repository_owner` (String) The owner of the Github repository, required if scope is `repository`, `repository-environment`, or `organization`. This is the organization name, or the username for personal repositories. As an example if you have a repository called Infisical/go-sdk, you would only need to provide `Infisical` here.
 - `selected_repository_ids` (List of Number) The repository ids to sync the secrets to, required if scope is `organization` and the visibility field is set to `selected`
-- `visibility` (String) The visibility of the Github repository, required if scope is `organization`
+- `visibility` (String) The visibility of the Github repository, required if scope is `organization`. Accepted values are: `all`|`private`|`selected`
 
 
 <a id="nestedatt--sync_options"></a>
