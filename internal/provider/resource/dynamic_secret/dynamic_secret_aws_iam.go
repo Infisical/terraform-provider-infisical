@@ -163,7 +163,7 @@ func NewDynamicSecretAwsIamResource() resource.Resource {
 			return configurationMap, diags
 		},
 
-		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret) (types.Object, diag.Diagnostics) {
+		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			configuration := make(map[string]attr.Value)
 			configurationSchema := map[string]attr.Type{

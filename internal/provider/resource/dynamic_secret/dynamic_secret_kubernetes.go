@@ -225,8 +225,12 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 			return configurationMap, diags
 		},
 
-		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret) (types.Object, diag.Diagnostics) {
+		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
+
+			var currentState DynamicSecretKubernetesConfigurationModel
+			stateDiags := configState.As(ctx, &currentState, basetypes.ObjectAsOptions{})
+			diags.Append(stateDiags...)
 
 			gatewayId := types.StringNull()
 			if gatewayIdVal, ok := dynamicSecret.Inputs["gatewayId"].(string); ok {
@@ -372,23 +376,29 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 				return types.ObjectNull(map[string]attr.Type{}), diags
 			}
 
-			var audiences []string
-			for i, v := range audiencesRaw {
-				s, ok := v.(string)
-				if !ok {
-					diags.AddError(
-						"Invalid audience element type",
-						"Expected audience at index "+string(rune(i))+" to be a string but got something else.",
-					)
-					return types.ObjectNull(map[string]attr.Type{}), diags
+			plannedListIsUndefinedOrEmpty := currentState.Audiences.IsNull() || len(currentState.Audiences.Elements()) == 0
+
+			if len(audiencesRaw) == 0 && plannedListIsUndefinedOrEmpty {
+				configuration["audiences"] = currentState.Audiences
+			} else {
+				var audiences []string
+				for i, v := range audiencesRaw {
+					s, ok := v.(string)
+					if !ok {
+						diags.AddError(
+							"Invalid audience element type",
+							"Expected audience at index "+string(rune(i))+" to be a string but got something else.",
+						)
+						return types.ObjectNull(map[string]attr.Type{}), diags
+					}
+					audiences = append(audiences, s)
 				}
-				audiences = append(audiences, s)
+
+				audiencesList, listDiags := types.ListValueFrom(ctx, types.StringType, audiences)
+				diags.Append(listDiags...)
+
+				configuration["audiences"] = audiencesList
 			}
-
-			audiencesList, listDiags := types.ListValueFrom(ctx, types.StringType, audiences)
-			diags.Append(listDiags...)
-
-			configuration["audiences"] = audiencesList
 
 			obj, objDiags := types.ObjectValue(map[string]attr.Type{
 				"gateway_id": types.StringType,
