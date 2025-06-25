@@ -3,6 +3,14 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreateProjectGroup        = "CallCreateProjectGroup"
+	operationGetProjectGroupMembership = "CallGetProjectGroupMembership"
+	operationUpdateProjectGroup        = "CallUpdateProjectGroup"
+	operationDeleteProjectGroup        = "CallDeleteProjectGroup"
 )
 
 func (client Client) CreateProjectGroup(request CreateProjectGroupRequest) (CreateProjectGroupResponse, error) {
@@ -15,11 +23,11 @@ func (client Client) CreateProjectGroup(request CreateProjectGroupRequest) (Crea
 		Post(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupIdOrName))
 
 	if err != nil {
-		return CreateProjectGroupResponse{}, fmt.Errorf("CallCreateProjectGroup: Unable to complete api request [err=%s]", err)
+		return CreateProjectGroupResponse{}, errors.NewGenericRequestError(operationCreateProjectGroup, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectGroupResponse{}, fmt.Errorf("CallCreateProjectGroup: Unsuccessful response. [response=%s]", response)
+		return CreateProjectGroupResponse{}, errors.NewAPIErrorWithResponse(operationCreateProjectGroup, response, nil)
 	}
 
 	return responseData, nil
@@ -39,11 +47,11 @@ func (client Client) GetProjectGroupMembership(request GetProjectGroupMembership
 	}
 
 	if err != nil {
-		return GetProjectGroupMembershipResponse{}, fmt.Errorf("GetProjectGroupMembershipResponse: Unable to complete api request [err=%s]", err)
+		return GetProjectGroupMembershipResponse{}, errors.NewGenericRequestError(operationGetProjectGroupMembership, err)
 	}
 
 	if response.IsError() {
-		return GetProjectGroupMembershipResponse{}, fmt.Errorf("GetProjectGroupMembershipResponse: Unsuccessful response. [response=%s]", response)
+		return GetProjectGroupMembershipResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectGroupMembership, response, nil)
 	}
 
 	return responseData, nil
@@ -59,11 +67,11 @@ func (client Client) UpdateProjectGroup(request UpdateProjectGroupRequest) (Upda
 		Patch(fmt.Sprintf("api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if err != nil {
-		return UpdateProjectGroupResponse{}, fmt.Errorf("CallUpdateProjectGroup: Unable to complete api request [err=%s]", err)
+		return UpdateProjectGroupResponse{}, errors.NewGenericRequestError(operationUpdateProjectGroup, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectGroupResponse{}, fmt.Errorf("CallUpdateProjectGroup: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectGroupResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectGroup, response, nil)
 	}
 
 	return responseData, nil
@@ -79,11 +87,11 @@ func (client Client) DeleteProjectGroup(request DeleteProjectGroupRequest) (Dele
 		Delete(fmt.Sprintf("/api/v2/workspace/%s/groups/%s", request.ProjectId, request.GroupId))
 
 	if err != nil {
-		return DeleteProjectGroupResponse{}, fmt.Errorf("CallDeleteProjectGroup: Unable to complete api request [err=%s]", err)
+		return DeleteProjectGroupResponse{}, errors.NewGenericRequestError(operationDeleteProjectGroup, err)
 	}
 
 	if response.IsError() {
-		return DeleteProjectGroupResponse{}, fmt.Errorf("CallDeleteProjectGroup: Unsuccessful response. [response=%s]", response)
+		return DeleteProjectGroupResponse{}, errors.NewAPIErrorWithResponse(operationDeleteProjectGroup, response, nil)
 	}
 
 	return responseData, nil

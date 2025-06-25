@@ -4,6 +4,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetSecretFolderByID   = "CallGetSecretFolderByID"
+	operationGetSecretFolderList   = "CallGetSecretFolderList"
+	operationCreateSecretFolder    = "CallCreateSecretFolder"
+	operationUpdateSecretFolder    = "CallUpdateSecretFolder"
+	operationDeleteSecretFolder    = "CallDeleteSecretFolder"
+	operationGetSecretFolderByPath = "CallGetSecretFolderByPath"
 )
 
 func (client Client) GetSecretFolderByID(request GetSecretFolderByIDRequest) (GetSecretFolderByIDResponse, error) {
@@ -17,11 +27,11 @@ func (client Client) GetSecretFolderByID(request GetSecretFolderByIDRequest) (Ge
 	response, err := httpRequest.Get("api/v1/folders/" + request.ID)
 
 	if err != nil {
-		return GetSecretFolderByIDResponse{}, fmt.Errorf("GetSecretFolderByID: Unable to complete api request [err=%s]", err)
+		return GetSecretFolderByIDResponse{}, errors.NewGenericRequestError(operationGetSecretFolderByID, err)
 	}
 
 	if response.IsError() {
-		return GetSecretFolderByIDResponse{}, fmt.Errorf("GetSecretFolderByID: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretFolderByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretFolderByID, response, nil)
 	}
 
 	return body, nil
@@ -41,11 +51,11 @@ func (client Client) GetSecretFolderList(request ListSecretFolderRequest) (ListS
 	response, err := httpRequest.Get("api/v1/folders")
 
 	if err != nil {
-		return ListSecretFolderResponse{}, fmt.Errorf("ListSecretFolder: Unable to complete api request [err=%s]", err)
+		return ListSecretFolderResponse{}, errors.NewGenericRequestError(operationGetSecretFolderList, err)
 	}
 
 	if response.IsError() {
-		return ListSecretFolderResponse{}, fmt.Errorf("ListSecretFolder: Unsuccessful response. [response=%v]", string(response.Body()))
+		return ListSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretFolderList, response, nil)
 	}
 
 	return body, nil
@@ -61,11 +71,11 @@ func (client Client) CreateSecretFolder(request CreateSecretFolderRequest) (Crea
 		Post("api/v1/folders")
 
 	if err != nil {
-		return CreateSecretFolderResponse{}, fmt.Errorf("CallCreateSecretFolder: Unable to complete api request [err=%s]", err)
+		return CreateSecretFolderResponse{}, errors.NewGenericRequestError(operationCreateSecretFolder, err)
 	}
 
 	if response.IsError() {
-		return CreateSecretFolderResponse{}, fmt.Errorf("CallCreateSecretFolder: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationCreateSecretFolder, response, nil)
 	}
 
 	return body, nil
@@ -81,11 +91,11 @@ func (client Client) UpdateSecretFolder(request UpdateSecretFolderRequest) (Upda
 		Patch("api/v1/folders/" + request.ID)
 
 	if err != nil {
-		return UpdateSecretFolderResponse{}, fmt.Errorf("CallUpdateSecretFolder: Unable to complete api request [err=%s]", err)
+		return UpdateSecretFolderResponse{}, errors.NewGenericRequestError(operationUpdateSecretFolder, err)
 	}
 
 	if response.IsError() {
-		return UpdateSecretFolderResponse{}, fmt.Errorf("CallUpdateSecretFolder: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationUpdateSecretFolder, response, nil)
 	}
 
 	return body, nil
@@ -101,11 +111,11 @@ func (client Client) DeleteSecretFolder(request DeleteSecretFolderRequest) (Dele
 		Delete("api/v1/folders/" + request.ID)
 
 	if err != nil {
-		return DeleteSecretFolderResponse{}, fmt.Errorf("CallDeleteSecretFolder: Unable to complete api request [err=%s]", err)
+		return DeleteSecretFolderResponse{}, errors.NewGenericRequestError(operationDeleteSecretFolder, err)
 	}
 
 	if response.IsError() {
-		return DeleteSecretFolderResponse{}, fmt.Errorf("CallDeleteSecretFolder: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DeleteSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationDeleteSecretFolder, response, nil)
 	}
 
 	return body, nil
@@ -121,14 +131,14 @@ func (client Client) GetFolderByPath(request GetSecretFolderByPathRequest) (GetS
 	response, err := httpRequest.Get(fmt.Sprintf("api/v1/folders/%s/%s/%s", request.ProjectID, request.Environment, url.PathEscape(request.SecretPath)))
 
 	if err != nil {
-		return GetSecretFolderByPathResponse{}, fmt.Errorf("GetFolderByPath: Unable to complete api request [err=%s]", err)
+		return GetSecretFolderByPathResponse{}, errors.NewGenericRequestError(operationGetSecretFolderByPath, err)
 	}
 
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
 			return GetSecretFolderByPathResponse{}, ErrNotFound
 		}
-		return GetSecretFolderByPathResponse{}, fmt.Errorf("GetFolderByPath: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretFolderByPathResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretFolderByPath, response, nil)
 	}
 
 	return body, nil

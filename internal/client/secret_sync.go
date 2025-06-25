@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
 )
 
 type SecretSyncApp string
@@ -23,6 +24,13 @@ const (
 	SecretSyncBehaviorPrioritizeDestination SecretSyncBehavior = "import-prioritize-destination"
 )
 
+const (
+	operationCreateSecretSync  = "CallCreateSecretSync"
+	operationUpdateSecretSync  = "CallUpdateSecretSync"
+	operationGetSecretSyncById = "CallGetSecretSyncById"
+	operationDeleteSecretSync  = "CallDeleteSecretSync"
+)
+
 func (client Client) CreateSecretSync(request CreateSecretSyncRequest) (SecretSync, error) {
 	var body CreateSecretSyncResponse
 	response, err := client.Config.HttpClient.
@@ -33,11 +41,11 @@ func (client Client) CreateSecretSync(request CreateSecretSyncRequest) (SecretSy
 		Post("api/v1/secret-syncs/" + string(request.App))
 
 	if err != nil {
-		return SecretSync{}, fmt.Errorf("CreateSecretSync: Unable to complete api request [err=%s]", err)
+		return SecretSync{}, errors.NewGenericRequestError(operationCreateSecretSync, err)
 	}
 
 	if response.IsError() {
-		return SecretSync{}, fmt.Errorf("CreateSecretSync: Unsuccessful response. [response=%s]", string(response.Body()))
+		return SecretSync{}, errors.NewAPIErrorWithResponse(operationCreateSecretSync, response, nil)
 	}
 
 	return body.SecretSync, nil
@@ -53,11 +61,11 @@ func (client Client) UpdateSecretSync(request UpdateSecretSyncRequest) (SecretSy
 		Patch(fmt.Sprintf("api/v1/secret-syncs/%s/%s", string(request.App), request.ID))
 
 	if err != nil {
-		return SecretSync{}, fmt.Errorf("UpdateSecretSync: Unable to complete api request [err=%s]", err)
+		return SecretSync{}, errors.NewGenericRequestError(operationUpdateSecretSync, err)
 	}
 
 	if response.IsError() {
-		return SecretSync{}, fmt.Errorf("UpdateSecretSync: Unsuccessful response. [response=%s]", string(response.Body()))
+		return SecretSync{}, errors.NewAPIErrorWithResponse(operationUpdateSecretSync, response, nil)
 	}
 
 	return body.SecretSync, nil
@@ -72,7 +80,7 @@ func (client Client) GetSecretSyncById(request GetSecretSyncByIdRequest) (Secret
 		Get(fmt.Sprintf("api/v1/secret-syncs/%s/%s", string(request.App), request.ID))
 
 	if err != nil {
-		return SecretSync{}, fmt.Errorf("GetSecretSyncById: Unable to complete api request [err=%s]", err)
+		return SecretSync{}, errors.NewGenericRequestError(operationGetSecretSyncById, err)
 	}
 
 	if response.StatusCode() == http.StatusNotFound {
@@ -80,7 +88,7 @@ func (client Client) GetSecretSyncById(request GetSecretSyncByIdRequest) (Secret
 	}
 
 	if response.IsError() {
-		return SecretSync{}, fmt.Errorf("GetSecretSyncById: Unsuccessful response. [response=%s]", string(response.Body()))
+		return SecretSync{}, errors.NewAPIErrorWithResponse(operationGetSecretSyncById, response, nil)
 	}
 
 	return body.SecretSync, nil
@@ -95,11 +103,11 @@ func (client Client) DeleteSecretSync(request DeleteSecretSyncRequest) (SecretSy
 		Delete(fmt.Sprintf("api/v1/secret-syncs/%s/%s", string(request.App), request.ID))
 
 	if err != nil {
-		return SecretSync{}, fmt.Errorf("DeleteSecretSync: Unable to complete api request [err=%s]", err)
+		return SecretSync{}, errors.NewGenericRequestError(operationDeleteSecretSync, err)
 	}
 
 	if response.IsError() {
-		return SecretSync{}, fmt.Errorf("DeleteSecretSync: Unsuccessful response. [response=%s]", string(response.Body()))
+		return SecretSync{}, errors.NewAPIErrorWithResponse(operationDeleteSecretSync, response, nil)
 	}
 
 	return body.SecretSync, nil

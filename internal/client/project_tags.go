@@ -1,8 +1,17 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetProjectTags      = "CallGetProjectTags"
+	operationCreateProjectTag    = "CallCreateProjectTag"
+	operationUpdateProjectTag    = "CallUpdateProjectTag"
+	operationGetProjectTagByID   = "CallGetProjectTagByID"
+	operationGetProjectTagBySlug = "CallGetProjectTagBySlug"
+	operationDeleteProjectTag    = "CallDeleteProjectTag"
 )
 
 func (client Client) GetProjectTags(request GetProjectTagsRequest) (GetProjectTagsResponse, error) {
@@ -16,11 +25,11 @@ func (client Client) GetProjectTags(request GetProjectTagsRequest) (GetProjectTa
 	response, err := httpRequest.Get("api/v1/workspace/" + request.ProjectID + "/tags")
 
 	if err != nil {
-		return GetProjectTagsResponse{}, fmt.Errorf("CallGetProjectTags: Unable to complete api request [err=%s]", err)
+		return GetProjectTagsResponse{}, errors.NewGenericRequestError(operationGetProjectTags, err)
 	}
 
 	if response.IsError() {
-		return GetProjectTagsResponse{}, fmt.Errorf("CallGetProjectTags: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetProjectTagsResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectTags, response, nil)
 	}
 
 	return body, nil
@@ -36,11 +45,11 @@ func (client Client) CreateProjectTag(request CreateProjectTagRequest) (CreatePr
 		Post("api/v1/workspace/" + request.ProjectID + "/tags")
 
 	if err != nil {
-		return CreateProjectTagResponse{}, fmt.Errorf("CallCreateProjectTag: Unable to complete api request [err=%s]", err)
+		return CreateProjectTagResponse{}, errors.NewGenericRequestError(operationCreateProjectTag, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectTagResponse{}, fmt.Errorf("CallCreateProjectTag: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateProjectTagResponse{}, errors.NewAPIErrorWithResponse(operationCreateProjectTag, response, nil)
 	}
 
 	return body, nil
@@ -56,11 +65,11 @@ func (client Client) UpdateProjectTag(request UpdateProjectTagRequest) (UpdatePr
 		Patch("api/v1/workspace/" + request.ProjectID + "/tags/" + request.TagID)
 
 	if err != nil {
-		return UpdateProjectTagResponse{}, fmt.Errorf("CallUpdateProjectTag: Unable to complete api request [err=%s]", err)
+		return UpdateProjectTagResponse{}, errors.NewGenericRequestError(operationUpdateProjectTag, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectTagResponse{}, fmt.Errorf("CallUpdateProjectTag: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateProjectTagResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectTag, response, nil)
 	}
 
 	return body, nil
@@ -80,11 +89,11 @@ func (client Client) GetProjectTagByID(request GetProjectTagByIDRequest) (GetPro
 	}
 
 	if err != nil {
-		return GetProjectTagByIDResponse{}, fmt.Errorf("CallGetProjectTag: Unable to complete api request [err=%s]", err)
+		return GetProjectTagByIDResponse{}, errors.NewGenericRequestError(operationGetProjectTagByID, err)
 	}
 
 	if response.IsError() {
-		return GetProjectTagByIDResponse{}, fmt.Errorf("CallGetProjectTag: Unsuccessful response. [response=%s]", string(response.Body()))
+		return GetProjectTagByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectTagByID, response, nil)
 	}
 
 	return body, nil
@@ -104,11 +113,11 @@ func (client Client) GetProjectTagBySlug(request GetProjectTagBySlugRequest) (Ge
 	}
 
 	if err != nil {
-		return GetProjectTagBySlugResponse{}, fmt.Errorf("CallGetProjectTagBySlug: Unable to complete api request [err=%s]", err)
+		return GetProjectTagBySlugResponse{}, errors.NewGenericRequestError(operationGetProjectTagBySlug, err)
 	}
 
 	if response.IsError() {
-		return GetProjectTagBySlugResponse{}, fmt.Errorf("CallGetProjectTagBySlug: Unsuccessful response. [response=%s]", string(response.Body()))
+		return GetProjectTagBySlugResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectTagBySlug, response, nil)
 	}
 
 	return body, nil
@@ -124,11 +133,11 @@ func (client Client) DeleteProjectTag(request DeleteProjectTagRequest) (DeletePr
 		Delete("api/v1/workspace/" + request.ProjectID + "/tags/" + request.TagID)
 
 	if err != nil {
-		return DeleteProjectTagResponse{}, fmt.Errorf("CallDeleteProjectTag: Unable to complete api request [err=%s]", err)
+		return DeleteProjectTagResponse{}, errors.NewGenericRequestError(operationDeleteProjectTag, err)
 	}
 
 	if response.IsError() {
-		return DeleteProjectTagResponse{}, fmt.Errorf("CallDeleteProjectTag: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DeleteProjectTagResponse{}, errors.NewAPIErrorWithResponse(operationDeleteProjectTag, response, nil)
 	}
 
 	return body, nil
