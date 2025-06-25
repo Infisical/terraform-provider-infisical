@@ -52,7 +52,6 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 		ConfigurationAttributes: map[string]schema.Attribute{
 			"gateway_id": schema.StringAttribute{
 				Optional:    true,
-				Computed:    true,
 				Description: "Select a gateway for private cluster access. If not specified, the Internet Gateway will be used.",
 			},
 
@@ -70,7 +69,7 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 					},
 					"cluster_token": schema.StringAttribute{
 						Required:    true,
-						Description: "Token with permissions to create service accounts and manage RBAC.",
+						Description: "Service account token with permissions to create service accounts and manage RBAC.",
 						Sensitive:   true,
 					},
 					"enable_ssl": schema.BoolAttribute{
@@ -374,7 +373,7 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 						"Invalid audience element type",
 						"Expected audience at index "+string(rune(i))+" to be a string but got something else.",
 					)
-					continue
+					return types.ObjectNull(map[string]attr.Type{}), diags
 				}
 				audiences = append(audiences, s)
 			}

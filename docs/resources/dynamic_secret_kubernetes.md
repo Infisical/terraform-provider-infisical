@@ -116,7 +116,7 @@ Optional:
 
 Required:
 
-- `cluster_token` (String, Sensitive) Token with permissions to create service accounts and manage RBAC.
+- `cluster_token` (String, Sensitive) Service account token with permissions to create service accounts and manage RBAC.
 - `cluster_url` (String) Kubernetes API server URL (e.g., https://kubernetes.default.svc).
 
 Optional:
