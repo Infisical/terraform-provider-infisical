@@ -162,6 +162,13 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 					return nil, diags
 				}
 			case "gateway":
+				if configuration.GatewayId.IsNull() || configuration.GatewayId.IsUnknown() || configuration.GatewayId.ValueString() == "" {
+					diags.AddError(
+						"Invalid Configuration",
+						"When auth_method is 'gateway', 'gateway_id' must be provided.",
+					)
+					return nil, diags
+				}
 			default:
 				diags.AddError(
 					"Invalid Configuration",
