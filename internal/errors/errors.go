@@ -20,7 +20,7 @@ func NewGenericRequestError(operation string, err error) *GenericRequestError {
 	return &GenericRequestError{err: err, operation: operation}
 }
 
-// APIError represents an error response from the API
+// APIError represents an error response from the API.
 type APIError struct {
 	AdditionalContext string `json:"additionalContext,omitempty"`
 	Operation         string `json:"operation"`
