@@ -452,7 +452,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			WorkspaceId:            state.WorkspaceId.ValueString(),
 			Environment:            state.EnvSlug.ValueString(),
 			SecretPath:             state.FolderPath.ValueString(),
-			ExpandSecretReferences: true,
+			ExpandSecretReferences: false,
 		})
 
 		if err != nil {
