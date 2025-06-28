@@ -107,6 +107,7 @@ func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Requ
 		SetQueryParam("environment", request.Environment).
 		SetQueryParam("type", request.Type).
 		SetQueryParam("secretPath", request.SecretPath).
+		SetQueryParam("expandSecretReferences", strconv.FormatBool(request.ExpandSecretReferences)).
 		Get(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
 	if err != nil {
@@ -242,6 +243,7 @@ func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3R
 		SetQueryParam("environment", request.Environment).
 		SetQueryParam("type", request.Type).
 		SetQueryParam("secretPath", request.SecretPath).
+		SetQueryParam("expandSecretReferences", strconv.FormatBool(request.ExpandSecretReferences)).
 		Get(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
 
 	if err != nil {
