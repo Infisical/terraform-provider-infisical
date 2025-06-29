@@ -1,8 +1,17 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetSecretImport     = "CallGetSecretImport"
+	operationGetSecretImportByID = "CallGetSecretImportByID"
+	operationGetSecretImportList = "CallGetSecretImportList"
+	operationCreateSecretImport  = "CallCreateSecretImport"
+	operationUpdateSecretImport  = "CallUpdateSecretImport"
+	operationDeleteSecretImport  = "CallDeleteSecretImport"
 )
 
 // Workaround to getSecretImportById API call.
@@ -30,11 +39,11 @@ func (client Client) GetSecretImport(request GetSecretImportRequest) (GetSecretI
 	response, err := httpRequest.Get("api/v1/secret-imports")
 
 	if err != nil {
-		return GetSecretImportResponse{}, fmt.Errorf("GetSecretImport: Unable to complete api request [err=%s]", err)
+		return GetSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImport, err)
 	}
 
 	if response.IsError() {
-		return GetSecretImportResponse{}, fmt.Errorf("GetSecretImport: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImport, response, nil)
 	}
 
 	return findSecretImportByID(body.SecretImports, request.ID)
@@ -52,14 +61,14 @@ func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (Ge
 	response, err := httpRequest.Get("api/v1/secret-imports/" + request.ID)
 
 	if err != nil {
-		return GetSecretImportByIDResponse{}, fmt.Errorf("GetSecretImportByID: Unable to complete api request [err=%s]", err)
+		return GetSecretImportByIDResponse{}, errors.NewGenericRequestError(operationGetSecretImportByID, err)
 	}
 
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
 			return GetSecretImportByIDResponse{}, ErrNotFound
 		}
-		return GetSecretImportByIDResponse{}, fmt.Errorf("GetSecretImportByID: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretImportByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImportByID, response, nil)
 	}
 
 	return body, nil
@@ -79,11 +88,11 @@ func (client Client) GetSecretImportList(request ListSecretImportRequest) (ListS
 	response, err := httpRequest.Get("api/v1/secret-imports")
 
 	if err != nil {
-		return ListSecretImportResponse{}, fmt.Errorf("ListSecretImport: Unable to complete api request [err=%s]", err)
+		return ListSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImportList, err)
 	}
 
 	if response.IsError() {
-		return ListSecretImportResponse{}, fmt.Errorf("ListSecretImport: Unsuccessful response. [response=%v]", string(response.Body()))
+		return ListSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImportList, response, nil)
 	}
 
 	return body, nil
@@ -99,11 +108,11 @@ func (client Client) CreateSecretImport(request CreateSecretImportRequest) (Crea
 		Post("api/v1/secret-imports")
 
 	if err != nil {
-		return CreateSecretImportResponse{}, fmt.Errorf("CallCreateSecretImport: Unable to complete api request [err=%s]", err)
+		return CreateSecretImportResponse{}, errors.NewGenericRequestError(operationCreateSecretImport, err)
 	}
 
 	if response.IsError() {
-		return CreateSecretImportResponse{}, fmt.Errorf("CallCreateSecretImport: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationCreateSecretImport, response, nil)
 	}
 
 	return body, nil
@@ -119,7 +128,7 @@ func (client Client) UpdateSecretImport(request UpdateSecretImportRequest) (Upda
 		Patch("api/v1/secret-imports/" + request.ID)
 
 	if err != nil {
-		return UpdateSecretImportResponse{}, fmt.Errorf("CallUpdateSecretImport: Unable to complete api request [err=%s]", err)
+		return UpdateSecretImportResponse{}, errors.NewGenericRequestError(operationUpdateSecretImport, err)
 	}
 
 	if response.IsError() {
@@ -127,7 +136,7 @@ func (client Client) UpdateSecretImport(request UpdateSecretImportRequest) (Upda
 			return UpdateSecretImportResponse{}, NewNotFoundError("SecretImport", request.SecretPath)
 		}
 
-		return UpdateSecretImportResponse{}, fmt.Errorf("CallUpdateSecretImport: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationUpdateSecretImport, response, nil)
 	}
 
 	return body, nil
@@ -143,7 +152,7 @@ func (client Client) DeleteSecretImport(request DeleteSecretImportRequest) (Dele
 		Delete("api/v1/secret-imports/" + request.ID)
 
 	if err != nil {
-		return DeleteSecretImportResponse{}, fmt.Errorf("CallDeleteSecretImport: Unable to complete api request [err=%s]", err)
+		return DeleteSecretImportResponse{}, errors.NewGenericRequestError(operationDeleteSecretImport, err)
 	}
 
 	if response.IsError() {
@@ -151,7 +160,7 @@ func (client Client) DeleteSecretImport(request DeleteSecretImportRequest) (Dele
 			return DeleteSecretImportResponse{}, NewNotFoundError("SecretImport", request.SecretPath)
 		}
 
-		return DeleteSecretImportResponse{}, fmt.Errorf("CallDeleteSecretImport: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DeleteSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationDeleteSecretImport, response, nil)
 	}
 
 	return body, nil

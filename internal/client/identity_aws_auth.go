@@ -1,8 +1,15 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentityAwsAuth    = "CallGetIdentityAwsAuth"
+	operationCreateIdentityAwsAuth = "CallCreateIdentityAwsAuth"
+	operationUpdateIdentityAwsAuth = "CallUpdateIdentityAwsAuth"
+	operationRevokeIdentityAwsAuth = "CallRevokeIdentityAwsAuth"
 )
 
 func (client Client) GetIdentityAwsAuth(request GetIdentityAwsAuthRequest) (IdentityAwsAuth, error) {
@@ -20,11 +27,11 @@ func (client Client) GetIdentityAwsAuth(request GetIdentityAwsAuthRequest) (Iden
 	}
 
 	if err != nil {
-		return IdentityAwsAuth{}, fmt.Errorf("GetIdentityAwsAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAwsAuth{}, errors.NewGenericRequestError(operationGetIdentityAwsAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAwsAuth{}, fmt.Errorf("GetIdentityAwsAuth: Unsuccessful response. [response=%v]", string(response.Body()))
+		return IdentityAwsAuth{}, errors.NewAPIErrorWithResponse(operationGetIdentityAwsAuth, response, nil)
 	}
 
 	return body.IdentityAwsAuth, nil
@@ -40,11 +47,11 @@ func (client Client) CreateIdentityAwsAuth(request CreateIdentityAwsAuthRequest)
 		Post("api/v1/auth/aws-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityAwsAuth{}, fmt.Errorf("CreateIdentityAwsAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAwsAuth{}, errors.NewGenericRequestError(operationCreateIdentityAwsAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAwsAuth{}, fmt.Errorf("CreateIdentityAwsAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityAwsAuth{}, errors.NewAPIErrorWithResponse(operationCreateIdentityAwsAuth, response, nil)
 	}
 
 	return body.IdentityAwsAuth, nil
@@ -60,11 +67,11 @@ func (client Client) UpdateIdentityAwsAuth(request UpdateIdentityAwsAuthRequest)
 		Patch("api/v1/auth/aws-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityAwsAuth{}, fmt.Errorf("UpdateIdentityAwsAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAwsAuth{}, errors.NewGenericRequestError(operationUpdateIdentityAwsAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAwsAuth{}, fmt.Errorf("UpdateIdentityAwsAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityAwsAuth{}, errors.NewAPIErrorWithResponse(operationUpdateIdentityAwsAuth, response, nil)
 	}
 
 	return body.IdentityAwsAuth, nil
@@ -80,11 +87,11 @@ func (client Client) RevokeIdentityAwsAuth(request RevokeIdentityAwsAuthRequest)
 		Delete("api/v1/auth/aws-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityAwsAuth{}, fmt.Errorf("RevokeIdentityAwsAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAwsAuth{}, errors.NewGenericRequestError(operationRevokeIdentityAwsAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAwsAuth{}, fmt.Errorf("RevokeIdentityAwsAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityAwsAuth{}, errors.NewAPIErrorWithResponse(operationRevokeIdentityAwsAuth, response, nil)
 	}
 
 	return body.IdentityAwsAuth, nil

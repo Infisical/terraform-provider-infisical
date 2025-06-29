@@ -1,6 +1,19 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreateProjectRole      = "CallCreateProjectRole"
+	operationDeleteProjectRole      = "CallDeleteProjectRole"
+	operationUpdateProjectRole      = "CallUpdateProjectRole"
+	operationGetProjectRoleBySlug   = "CallGetProjectRoleBySlug"
+	operationCreateProjectRoleV2    = "CallCreateProjectRoleV2"
+	operationUpdateProjectRoleV2    = "CallUpdateProjectRoleV2"
+	operationGetProjectRoleBySlugV2 = "CallGetProjectRoleBySlugV2"
+)
 
 func (client Client) CreateProjectRole(request CreateProjectRoleRequest) (CreateProjectRoleResponse, error) {
 	var responeData CreateProjectRoleResponse
@@ -12,11 +25,11 @@ func (client Client) CreateProjectRole(request CreateProjectRoleRequest) (Create
 		Post(fmt.Sprintf("api/v1/workspace/%s/roles", request.ProjectSlug))
 
 	if err != nil {
-		return CreateProjectRoleResponse{}, fmt.Errorf("CreateProjectRole: Unable to complete api request [err=%s]", err)
+		return CreateProjectRoleResponse{}, errors.NewGenericRequestError(operationCreateProjectRole, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectRoleResponse{}, fmt.Errorf("CreateProjectRole: Unsuccessful response. [response=%s]", response)
+		return CreateProjectRoleResponse{}, errors.NewAPIErrorWithResponse(operationCreateProjectRole, response, nil)
 	}
 
 	return responeData, nil
@@ -32,11 +45,11 @@ func (client Client) CreateProjectRoleV2(request CreateProjectRoleV2Request) (Cr
 		Post(fmt.Sprintf("api/v2/workspace/%s/roles", request.ProjectId))
 
 	if err != nil {
-		return CreateProjectRoleV2Response{}, fmt.Errorf("CreateProjectRoleV2: Unable to complete api request [err=%s]", err)
+		return CreateProjectRoleV2Response{}, errors.NewGenericRequestError(operationCreateProjectRoleV2, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectRoleV2Response{}, fmt.Errorf("CreateProjectRoleV2: Unsuccessful response. [response=%s]", response)
+		return CreateProjectRoleV2Response{}, errors.NewAPIErrorWithResponse(operationCreateProjectRoleV2, response, nil)
 	}
 
 	return responseData, nil
@@ -52,11 +65,11 @@ func (client Client) DeleteProjectRole(request DeleteProjectRoleRequest) (Delete
 		Delete(fmt.Sprintf("/api/v1/workspace/%s/roles/%s", request.ProjectSlug, request.RoleId))
 
 	if err != nil {
-		return DeleteProjectRoleResponse{}, fmt.Errorf("DeleteProjectRole: Unable to complete api request [err=%s]", err)
+		return DeleteProjectRoleResponse{}, errors.NewGenericRequestError(operationDeleteProjectRole, err)
 	}
 
 	if response.IsError() {
-		return DeleteProjectRoleResponse{}, fmt.Errorf("DeleteProjectRole: Unsuccessful response. [response=%s]", response)
+		return DeleteProjectRoleResponse{}, errors.NewAPIErrorWithResponse(operationDeleteProjectRole, response, nil)
 	}
 
 	return responseData, nil
@@ -72,11 +85,11 @@ func (client Client) UpdateProjectRole(request UpdateProjectRoleRequest) (Update
 		Patch(fmt.Sprintf("api/v1/workspace/%s/roles/%s", request.ProjectSlug, request.RoleId))
 
 	if err != nil {
-		return UpdateProjectRoleResponse{}, fmt.Errorf("UpdateProjectRole: Unable to complete api request [err=%s]", err)
+		return UpdateProjectRoleResponse{}, errors.NewGenericRequestError(operationUpdateProjectRole, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectRoleResponse{}, fmt.Errorf("UpdateProjectRole: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectRoleResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectRole, response, nil)
 	}
 
 	return responseData, nil
@@ -92,11 +105,11 @@ func (client Client) UpdateProjectRoleV2(request UpdateProjectRoleV2Request) (Up
 		Patch(fmt.Sprintf("api/v2/workspace/%s/roles/%s", request.ProjectId, request.RoleId))
 
 	if err != nil {
-		return UpdateProjectRoleV2Response{}, fmt.Errorf("UpdateProjectRoleV2: Unable to complete api request [err=%s]", err)
+		return UpdateProjectRoleV2Response{}, errors.NewGenericRequestError(operationUpdateProjectRoleV2, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectRoleV2Response{}, fmt.Errorf("UpdateProjectRoleV2: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectRoleV2Response{}, errors.NewAPIErrorWithResponse(operationUpdateProjectRoleV2, response, nil)
 	}
 
 	return responseData, nil
@@ -112,11 +125,11 @@ func (client Client) GetProjectRoleBySlug(request GetProjectRoleBySlugRequest) (
 		Get(fmt.Sprintf("api/v1/workspace/%s/roles/slug/%s", request.ProjectSlug, request.RoleSlug))
 
 	if err != nil {
-		return GetProjectRoleBySlugResponse{}, fmt.Errorf("GetProjectRoleBySlug: Unable to complete api request [err=%s]", err)
+		return GetProjectRoleBySlugResponse{}, errors.NewGenericRequestError(operationGetProjectRoleBySlug, err)
 	}
 
 	if response.IsError() {
-		return GetProjectRoleBySlugResponse{}, fmt.Errorf("GetProjectRoleBySlug: Unsuccessful response. [response=%s]", response)
+		return GetProjectRoleBySlugResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleBySlug, response, nil)
 	}
 
 	return responseData, nil
@@ -132,11 +145,11 @@ func (client Client) GetProjectRoleBySlugV2(request GetProjectRoleBySlugV2Reques
 		Get(fmt.Sprintf("api/v2/workspace/%s/roles/slug/%s", request.ProjectId, request.RoleSlug))
 
 	if err != nil {
-		return GetProjectRoleBySlugV2Response{}, fmt.Errorf("GetProjectRoleBySlugV2: Unable to complete api request [err=%s]", err)
+		return GetProjectRoleBySlugV2Response{}, errors.NewGenericRequestError(operationGetProjectRoleBySlugV2, err)
 	}
 
 	if response.IsError() {
-		return GetProjectRoleBySlugV2Response{}, fmt.Errorf("GetProjectRoleBySlugV2: Unsuccessful response. [response=%s]", response)
+		return GetProjectRoleBySlugV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleBySlugV2, response, nil)
 	}
 
 	return responseData, nil

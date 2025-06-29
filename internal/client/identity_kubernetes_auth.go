@@ -1,8 +1,15 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentityKubernetesAuth    = "CallGetIdentityKubernetesAuth"
+	operationCreateIdentityKubernetesAuth = "CallCreateIdentityKubernetesAuth"
+	operationUpdateIdentityKubernetesAuth = "CallUpdateIdentityKubernetesAuth"
+	operationRevokeIdentityKubernetesAuth = "CallRevokeIdentityKubernetesAuth"
 )
 
 func (client Client) GetIdentityKubernetesAuth(request GetIdentityKubernetesAuthRequest) (IdentityKubernetesAuth, error) {
@@ -20,11 +27,11 @@ func (client Client) GetIdentityKubernetesAuth(request GetIdentityKubernetesAuth
 	}
 
 	if err != nil {
-		return IdentityKubernetesAuth{}, fmt.Errorf("GetIdentityKubernetesAuth: Unable to complete api request [err=%s]", err)
+		return IdentityKubernetesAuth{}, errors.NewGenericRequestError(operationGetIdentityKubernetesAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityKubernetesAuth{}, fmt.Errorf("GetIdentityKubernetesAuth: Unsuccessful response. [response=%v]", string(response.Body()))
+		return IdentityKubernetesAuth{}, errors.NewAPIErrorWithResponse(operationGetIdentityKubernetesAuth, response, nil)
 	}
 
 	return body.IdentityKubernetesAuth, nil
@@ -40,11 +47,11 @@ func (client Client) CreateIdentityKubernetesAuth(request CreateIdentityKubernet
 		Post("api/v1/auth/kubernetes-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityKubernetesAuth{}, fmt.Errorf("CreateIdentityKubernetesAuth: Unable to complete api request [err=%s]", err)
+		return IdentityKubernetesAuth{}, errors.NewGenericRequestError(operationCreateIdentityKubernetesAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityKubernetesAuth{}, fmt.Errorf("CreateIdentityKubernetesAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityKubernetesAuth{}, errors.NewAPIErrorWithResponse(operationCreateIdentityKubernetesAuth, response, nil)
 	}
 
 	return body.IdentityKubernetesAuth, nil
@@ -60,11 +67,11 @@ func (client Client) UpdateIdentityKubernetesAuth(request UpdateIdentityKubernet
 		Patch("api/v1/auth/kubernetes-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityKubernetesAuth{}, fmt.Errorf("UpdateIdentityKubernetesAuth: Unable to complete api request [err=%s]", err)
+		return IdentityKubernetesAuth{}, errors.NewGenericRequestError(operationUpdateIdentityKubernetesAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityKubernetesAuth{}, fmt.Errorf("UpdateIdentityKubernetesAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityKubernetesAuth{}, errors.NewAPIErrorWithResponse(operationUpdateIdentityKubernetesAuth, response, nil)
 	}
 
 	return body.IdentityKubernetesAuth, nil
@@ -80,11 +87,11 @@ func (client Client) RevokeIdentityKubernetesAuth(request RevokeIdentityKubernet
 		Delete("api/v1/auth/kubernetes-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityKubernetesAuth{}, fmt.Errorf("RevokeIdentityKubernetesAuth: Unable to complete api request [err=%s]", err)
+		return IdentityKubernetesAuth{}, errors.NewGenericRequestError(operationRevokeIdentityKubernetesAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityKubernetesAuth{}, fmt.Errorf("RevokeIdentityKubernetesAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityKubernetesAuth{}, errors.NewAPIErrorWithResponse(operationRevokeIdentityKubernetesAuth, response, nil)
 	}
 
 	return body.IdentityKubernetesAuth, nil

@@ -1,6 +1,20 @@
 package infisicalclient
 
-import "fmt"
+import (
+	"fmt"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreatePermanentProjectIdentitySpecificPrivilege = "CallCreatePermanentProjectIdentitySpecificPrivilege"
+	operationCreateTemporaryProjectIdentitySpecificPrivilege = "CallCreateTemporaryProjectIdentitySpecificPrivilege"
+	operationCreateProjectIdentitySpecificPrivilegeV2        = "CallCreateProjectIdentitySpecificPrivilegeV2"
+	operationDeleteProjectIdentitySpecificPrivilege          = "CallDeleteProjectIdentitySpecificPrivilege"
+	operationUpdateProjectIdentitySpecificPrivilege          = "CallUpdateProjectIdentitySpecificPrivilege"
+	operationUpdateProjectIdentitySpecificPrivilegeV2        = "CallUpdateProjectIdentitySpecificPrivilegeV2"
+	operationGetProjectIdentitySpecificPrivilegeBySlug       = "CallGetProjectIdentitySpecificPrivilegeBySlug"
+	operationGetProjectIdentitySpecificPrivilegeV2           = "CallGetProjectIdentitySpecificPrivilegeV2"
+)
 
 func (client Client) CreatePermanentProjectIdentitySpecificPrivilege(request CreatePermanentProjectIdentitySpecificPrivilegeRequest) (CreateProjectIdentitySpecificPrivilegeResponse, error) {
 	var responeData CreateProjectIdentitySpecificPrivilegeResponse
@@ -12,11 +26,11 @@ func (client Client) CreatePermanentProjectIdentitySpecificPrivilege(request Cre
 		Post("/api/v1/additional-privilege/identity/permanent")
 
 	if err != nil {
-		return CreateProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("CreatePermanentProjectIdentitySpecificPrivilege: Unable to complete api request [err=%s]", err)
+		return CreateProjectIdentitySpecificPrivilegeResponse{}, errors.NewGenericRequestError(operationCreatePermanentProjectIdentitySpecificPrivilege, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("CreatePermanentProjectIdentitySpecificPrivilege: Unsuccessful response. [response=%s]", response)
+		return CreateProjectIdentitySpecificPrivilegeResponse{}, errors.NewAPIErrorWithResponse(operationCreatePermanentProjectIdentitySpecificPrivilege, response, nil)
 	}
 
 	return responeData, nil
@@ -32,11 +46,11 @@ func (client Client) CreateTemporaryProjectIdentitySpecificPrivilege(request Cre
 		Post("/api/v1/additional-privilege/identity/temporary")
 
 	if err != nil {
-		return CreateProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("CreateTemporaryProjectIdentitySpecificPrivilege: Unable to complete api request [err=%s]", err)
+		return CreateProjectIdentitySpecificPrivilegeResponse{}, errors.NewGenericRequestError(operationCreateTemporaryProjectIdentitySpecificPrivilege, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("CreateTemporaryProjectIdentitySpecificPrivilege: Unsuccessful response. [response=%s]", response)
+		return CreateProjectIdentitySpecificPrivilegeResponse{}, errors.NewAPIErrorWithResponse(operationCreateTemporaryProjectIdentitySpecificPrivilege, response, nil)
 	}
 
 	return responeData, nil
@@ -52,11 +66,11 @@ func (client Client) CreateProjectIdentitySpecificPrivilegeV2(request CreateProj
 		Post("/api/v2/identity-project-additional-privilege")
 
 	if err != nil {
-		return CreateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("CreateProjectIdentitySpecificPrivilegeV2: Unable to complete api request [err=%s]", err)
+		return CreateProjectIdentitySpecificPrivilegeV2Response{}, errors.NewGenericRequestError(operationCreateProjectIdentitySpecificPrivilegeV2, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("CreateProjectIdentitySpecificPrivilegeV2: Unsuccessful response. [response=%s]", response)
+		return CreateProjectIdentitySpecificPrivilegeV2Response{}, errors.NewAPIErrorWithResponse(operationCreateProjectIdentitySpecificPrivilegeV2, response, nil)
 	}
 
 	return responeData, nil
@@ -72,11 +86,11 @@ func (client Client) DeleteProjectIdentitySpecificPrivilege(request DeleteProjec
 		Delete("/api/v1/additional-privilege/identity")
 
 	if err != nil {
-		return DeleteProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("DeleteProjectIdentitySpecificPrivilege: Unable to complete api request [err=%s]", err)
+		return DeleteProjectIdentitySpecificPrivilegeResponse{}, errors.NewGenericRequestError(operationDeleteProjectIdentitySpecificPrivilege, err)
 	}
 
 	if response.IsError() {
-		return DeleteProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("DeleteProjectIdentitySpecificPrivilege: Unsuccessful response. [response=%s]", response)
+		return DeleteProjectIdentitySpecificPrivilegeResponse{}, errors.NewAPIErrorWithResponse(operationDeleteProjectIdentitySpecificPrivilege, response, nil)
 	}
 
 	return responseData, nil
@@ -92,11 +106,11 @@ func (client Client) UpdateProjectIdentitySpecificPrivilege(request UpdateProjec
 		Patch("/api/v1/additional-privilege/identity")
 
 	if err != nil {
-		return UpdateProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("UpdateProjectIdentitySpecificPrivilege: Unable to complete api request [err=%s]", err)
+		return UpdateProjectIdentitySpecificPrivilegeResponse{}, errors.NewGenericRequestError(operationUpdateProjectIdentitySpecificPrivilege, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("UpdateProjectIdentitySpecificPrivilege: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectIdentitySpecificPrivilegeResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectIdentitySpecificPrivilege, response, nil)
 	}
 
 	return responseData, nil
@@ -112,11 +126,11 @@ func (client Client) UpdateProjectIdentitySpecificPrivilegeV2(request UpdateProj
 		Patch(fmt.Sprintf("/api/v2/identity-project-additional-privilege/%s", request.ID))
 
 	if err != nil {
-		return UpdateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("UpdateProjectIdentitySpecificPrivilegeV2: Unable to complete api request [err=%s]", err)
+		return UpdateProjectIdentitySpecificPrivilegeV2Response{}, errors.NewGenericRequestError(operationUpdateProjectIdentitySpecificPrivilegeV2, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("UpdateProjectIdentitySpecificPrivilegeV2: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectIdentitySpecificPrivilegeV2Response{}, errors.NewAPIErrorWithResponse(operationUpdateProjectIdentitySpecificPrivilegeV2, response, nil)
 	}
 
 	return responseData, nil
@@ -132,11 +146,11 @@ func (client Client) GetProjectIdentitySpecificPrivilegeBySlug(request GetProjec
 		Get(fmt.Sprintf("/api/v1/additional-privilege/identity/%s?projectSlug=%s&identityId=%s", request.PrivilegeSlug, request.ProjectSlug, request.IdentityID))
 
 	if err != nil {
-		return GetProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeBySlug: Unable to complete api request [err=%s]", err)
+		return GetProjectIdentitySpecificPrivilegeResponse{}, errors.NewGenericRequestError(operationGetProjectIdentitySpecificPrivilegeBySlug, err)
 	}
 
 	if response.IsError() {
-		return GetProjectIdentitySpecificPrivilegeResponse{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeBySlug: Unsuccessful response. [response=%s]", response)
+		return GetProjectIdentitySpecificPrivilegeResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectIdentitySpecificPrivilegeBySlug, response, nil)
 	}
 
 	return responseData, nil
@@ -152,11 +166,11 @@ func (client Client) GetProjectIdentitySpecificPrivilegeV2(request GetProjectIde
 		Get(fmt.Sprintf("/api/v2/identity-project-additional-privilege/%s", request.ID))
 
 	if err != nil {
-		return GetProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeV2: Unable to complete api request [err=%s]", err)
+		return GetProjectIdentitySpecificPrivilegeV2Response{}, errors.NewGenericRequestError(operationGetProjectIdentitySpecificPrivilegeV2, err)
 	}
 
 	if response.IsError() {
-		return GetProjectIdentitySpecificPrivilegeV2Response{}, fmt.Errorf("GetProjectIdentitySpecificPrivilegeV2: Unsuccessful response. [response=%s]", response)
+		return GetProjectIdentitySpecificPrivilegeV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectIdentitySpecificPrivilegeV2, response, nil)
 	}
 
 	return responseData, nil

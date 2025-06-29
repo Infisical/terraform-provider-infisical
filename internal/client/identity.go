@@ -1,8 +1,15 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentity    = "CallGetIdentity"
+	operationCreateIdentity = "CallCreateIdentity"
+	operationUpdateIdentity = "CallUpdateIdentity"
+	operationDeleteIdentity = "CallDeleteIdentity"
 )
 
 func (client Client) GetIdentity(request GetIdentityRequest) (OrgIdentity, error) {
@@ -20,11 +27,11 @@ func (client Client) GetIdentity(request GetIdentityRequest) (OrgIdentity, error
 	}
 
 	if err != nil {
-		return OrgIdentity{}, fmt.Errorf("CallGetIdentity: Unable to complete api request [err=%s]", err)
+		return OrgIdentity{}, errors.NewGenericRequestError(operationGetIdentity, err)
 	}
 
 	if response.IsError() {
-		return OrgIdentity{}, fmt.Errorf("CallGetIdentity: Unsuccessful response. [response=%v]", string(response.Body()))
+		return OrgIdentity{}, errors.NewAPIErrorWithResponse(operationGetIdentity, response, nil)
 	}
 
 	return body.Identity, nil
@@ -40,11 +47,11 @@ func (client Client) CreateIdentity(request CreateIdentityRequest) (CreateIdenti
 		Post("api/v1/identities")
 
 	if err != nil {
-		return CreateIdentityResponse{}, fmt.Errorf("CallCreateIdentity: Unable to complete api request [err=%s]", err)
+		return CreateIdentityResponse{}, errors.NewGenericRequestError(operationCreateIdentity, err)
 	}
 
 	if response.IsError() {
-		return CreateIdentityResponse{}, fmt.Errorf("CallCreateIdentity: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateIdentityResponse{}, errors.NewAPIErrorWithResponse(operationCreateIdentity, response, nil)
 	}
 
 	return body, nil
@@ -60,11 +67,11 @@ func (client Client) UpdateIdentity(request UpdateIdentityRequest) (UpdateIdenti
 		Patch("api/v1/identities/" + request.IdentityID)
 
 	if err != nil {
-		return UpdateIdentityResponse{}, fmt.Errorf("CallUpdateIdentity: Unable to complete api request [err=%s]", err)
+		return UpdateIdentityResponse{}, errors.NewGenericRequestError(operationUpdateIdentity, err)
 	}
 
 	if response.IsError() {
-		return UpdateIdentityResponse{}, fmt.Errorf("CallUpdateIdentity: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateIdentityResponse{}, errors.NewAPIErrorWithResponse(operationUpdateIdentity, response, nil)
 	}
 
 	return body, nil
@@ -80,11 +87,11 @@ func (client Client) DeleteIdentity(request DeleteIdentityRequest) (DeleteIdenti
 		Delete("api/v1/identities/" + request.IdentityID)
 
 	if err != nil {
-		return DeleteIdentityResponse{}, fmt.Errorf("CallDeleteIdentity: Unable to complete api request [err=%s]", err)
+		return DeleteIdentityResponse{}, errors.NewGenericRequestError(operationDeleteIdentity, err)
 	}
 
 	if response.IsError() {
-		return DeleteIdentityResponse{}, fmt.Errorf("CallDeleteIdentity: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DeleteIdentityResponse{}, errors.NewAPIErrorWithResponse(operationDeleteIdentity, response, nil)
 	}
 
 	return body, nil

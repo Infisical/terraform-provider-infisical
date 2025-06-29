@@ -1,8 +1,15 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentityUniversalAuth    = "CallGetIdentityUniversalAuth"
+	operationCreateIdentityUniversalAuth = "CallCreateIdentityUniversalAuth"
+	operationUpdateIdentityUniversalAuth = "CallUpdateIdentityUniversalAuth"
+	operationRevokeIdentityUniversalAuth = "CallRevokeIdentityUniversalAuth"
 )
 
 func (client Client) GetIdentityUniversalAuth(request GetIdentityUniversalAuthRequest) (IdentityUniversalAuth, error) {
@@ -20,11 +27,11 @@ func (client Client) GetIdentityUniversalAuth(request GetIdentityUniversalAuthRe
 	}
 
 	if err != nil {
-		return IdentityUniversalAuth{}, fmt.Errorf("GetIdentityUniversalAuth: Unable to complete api request [err=%s]", err)
+		return IdentityUniversalAuth{}, errors.NewGenericRequestError(operationGetIdentityUniversalAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityUniversalAuth{}, fmt.Errorf("GetIdentityUniversalAuth: Unsuccessful response. [response=%v]", string(response.Body()))
+		return IdentityUniversalAuth{}, errors.NewAPIErrorWithResponse(operationGetIdentityUniversalAuth, response, nil)
 	}
 
 	return body.UniversalAuth, nil
@@ -40,11 +47,11 @@ func (client Client) CreateIdentityUniversalAuth(request CreateIdentityUniversal
 		Post("api/v1/auth/universal-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityUniversalAuth{}, fmt.Errorf("CreateIdentityUniversalAuth: Unable to complete api request [err=%s]", err)
+		return IdentityUniversalAuth{}, errors.NewGenericRequestError(operationCreateIdentityUniversalAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityUniversalAuth{}, fmt.Errorf("CreateIdentityUniversalAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityUniversalAuth{}, errors.NewAPIErrorWithResponse(operationCreateIdentityUniversalAuth, response, nil)
 	}
 
 	return body.UniversalAuth, nil
@@ -60,11 +67,11 @@ func (client Client) UpdateIdentityUniversalAuth(request UpdateIdentityUniversal
 		Patch("api/v1/auth/universal-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityUniversalAuth{}, fmt.Errorf("UpdateIdentityUniversalAuth: Unable to complete api request [err=%s]", err)
+		return IdentityUniversalAuth{}, errors.NewGenericRequestError(operationUpdateIdentityUniversalAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityUniversalAuth{}, fmt.Errorf("UpdateIdentityUniversalAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityUniversalAuth{}, errors.NewAPIErrorWithResponse(operationUpdateIdentityUniversalAuth, response, nil)
 	}
 
 	return body.UniversalAuth, nil
@@ -80,11 +87,11 @@ func (client Client) RevokeIdentityUniversalAuth(request RevokeIdentityUniversal
 		Delete("api/v1/auth/universal-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityUniversalAuth{}, fmt.Errorf("RevokeIdentityUniversalAuth: Unable to complete api request [err=%s]", err)
+		return IdentityUniversalAuth{}, errors.NewGenericRequestError(operationRevokeIdentityUniversalAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityUniversalAuth{}, fmt.Errorf("RevokeIdentityUniversalAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityUniversalAuth{}, errors.NewAPIErrorWithResponse(operationRevokeIdentityUniversalAuth, response, nil)
 	}
 
 	return body.UniversalAuth, nil

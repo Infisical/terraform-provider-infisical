@@ -2,6 +2,7 @@ package infisicalclient
 
 import (
 	"fmt"
+	"terraform-provider-infisical/internal/errors"
 )
 
 // Enum containing the possible values for the `type` field in the CreateIntegrationAuthRequest.
@@ -15,6 +16,12 @@ const (
 	IntegrationAuthTypeCircleCi          IntegrationAuthType = "circleci"
 )
 
+const (
+	operationCreateIntegrationAuth = "CallCreateIntegrationAuth"
+	operationUpdateIntegrationAuth = "CallUpdateIntegrationAuth"
+	operationDeleteIntegrationAuth = "CallDeleteIntegrationAuth"
+)
+
 func (client Client) CreateIntegrationAuth(request CreateIntegrationAuthRequest) (CreateIntegrationAuthResponse, error) {
 	var body CreateIntegrationAuthResponse
 	response, err := client.Config.HttpClient.
@@ -25,11 +32,11 @@ func (client Client) CreateIntegrationAuth(request CreateIntegrationAuthRequest)
 		Post("api/v1/integration-auth/access-token")
 
 	if err != nil {
-		return CreateIntegrationAuthResponse{}, fmt.Errorf("CreateIntegrationAuth: Unable to complete api request [err=%s]", err)
+		return CreateIntegrationAuthResponse{}, errors.NewGenericRequestError(operationCreateIntegrationAuth, err)
 	}
 
 	if response.IsError() {
-		return CreateIntegrationAuthResponse{}, fmt.Errorf("CreateIntegrationAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateIntegrationAuthResponse{}, errors.NewAPIErrorWithResponse(operationCreateIntegrationAuth, response, nil)
 	}
 
 	return body, nil
@@ -45,11 +52,11 @@ func (client Client) UpdateIntegrationAuth(request UpdateIntegrationAuthRequest)
 		Patch("api/v1/integration-auth/" + request.IntegrationAuthId)
 
 	if err != nil {
-		return UpdateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unable to complete api request [err=%s]", err)
+		return UpdateIntegrationAuthResponse{}, errors.NewGenericRequestError(operationUpdateIntegrationAuth, err)
 	}
 
 	if response.IsError() {
-		return UpdateIntegrationAuthResponse{}, fmt.Errorf("UpdateIntegrationAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateIntegrationAuthResponse{}, errors.NewAPIErrorWithResponse(operationUpdateIntegrationAuth, response, nil)
 	}
 
 	return body, nil
@@ -65,11 +72,11 @@ func (client Client) DeleteIntegrationAuth(request DeleteIntegrationAuthRequest)
 		Delete(fmt.Sprintf("api/v1/integration-auth/%s", request.ID))
 
 	if err != nil {
-		return DeleteIntegrationAuthResponse{}, fmt.Errorf("DeleteIntegrationAuth: Unable to complete api request [err=%s]", err)
+		return DeleteIntegrationAuthResponse{}, errors.NewGenericRequestError(operationDeleteIntegrationAuth, err)
 	}
 
 	if response.IsError() {
-		return DeleteIntegrationAuthResponse{}, fmt.Errorf("DeleteIntegrationAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DeleteIntegrationAuthResponse{}, errors.NewAPIErrorWithResponse(operationDeleteIntegrationAuth, response, nil)
 	}
 
 	return body, nil
