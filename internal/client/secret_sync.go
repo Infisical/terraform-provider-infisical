@@ -14,6 +14,7 @@ const (
 	SecretSyncAppAzureAppConfiguration SecretSyncApp = "azure-app-configuration"
 	SecretSyncAppAzureKeyVault         SecretSyncApp = "azure-key-vault"
 	SecretSyncAppGithub                SecretSyncApp = "github"
+	SecretSyncApp1Password             SecretSyncApp = "1password"
 )
 
 type SecretSyncBehavior string
