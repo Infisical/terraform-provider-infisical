@@ -57,6 +57,7 @@ type authModel struct {
 	Token      types.String         `tfsdk:"token"`
 	Universal  *universalAuthModel  `tfsdk:"universal"`
 	Kubernetes *kubernetesAuthModel `tfsdk:"kubernetes"`
+	AWS        *awsIamAuthModel     `tfsdk:"aws_iam"`
 }
 
 type oidcAuthModel struct {
@@ -67,6 +68,10 @@ type oidcAuthModel struct {
 type universalAuthModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
+}
+
+type awsIamAuthModel struct {
+	IdentityId types.String `tfsdk:"identity_id"`
 }
 
 type kubernetesAuthModel struct {
@@ -167,6 +172,17 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							},
 						},
 					},
+					"aws_iam": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "The configuration values for AWS IAM Auth",
+						Attributes: map[string]schema.Attribute{
+							"identity_id": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -259,6 +275,11 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 
 			if !config.Auth.Kubernetes.Token.IsNull() {
 				serviceAccountToken = config.Auth.Kubernetes.Token.ValueString()
+			}
+		} else if config.Auth.AWS != nil {
+			authStrategy = infisical.AuthStrategy.AWS_IAM_MACHINE_IDENTITY
+			if !config.Auth.AWS.IdentityId.IsNull() {
+				identityId = config.Auth.AWS.IdentityId.ValueString()
 			}
 		} else if config.Auth.Token.ValueString() != "" {
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY

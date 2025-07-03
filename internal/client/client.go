@@ -18,12 +18,14 @@ var AuthStrategy = struct {
 	OIDC_MACHINE_IDENTITY       AuthStrategyType
 	TOKEN_MACHINE_IDENTITY      AuthStrategyType
 	KUBERNETES_MACHINE_IDENTITY AuthStrategyType
+	AWS_IAM_MACHINE_IDENTITY    AuthStrategyType
 }{
 	SERVICE_TOKEN:               "SERVICE_TOKEN",
 	UNIVERSAL_MACHINE_IDENTITY:  "UNIVERSAL_MACHINE_IDENTITY",
 	OIDC_MACHINE_IDENTITY:       "OIDC_MACHINE_IDENTITY",
 	TOKEN_MACHINE_IDENTITY:      "TOKEN_MACHINE_IDENTITY",
 	KUBERNETES_MACHINE_IDENTITY: "KUBERNETES_MACHINE_IDENTITY",
+	AWS_IAM_MACHINE_IDENTITY:    "AWS_IAM_MACHINE_IDENTITY",
 }
 
 type Config struct {
@@ -84,6 +86,7 @@ func NewClient(cnf Config) (*Client, error) {
 			AuthStrategy.OIDC_MACHINE_IDENTITY:       Client{cnf}.OidcMachineIdentityAuth,
 			AuthStrategy.TOKEN_MACHINE_IDENTITY:      Client{cnf}.TokenMachineIdentityAuth,
 			AuthStrategy.KUBERNETES_MACHINE_IDENTITY: Client{cnf}.KubernetesMachineIdentityAuth,
+			AuthStrategy.AWS_IAM_MACHINE_IDENTITY:    Client{cnf}.AwsIamMachineIdentityAuth,
 		}
 
 		token, err := authStrategies[selectedAuthStrategy]()
