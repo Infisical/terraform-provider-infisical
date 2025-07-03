@@ -3,6 +3,15 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreateGroup  = "CallCreateGroup"
+	operationUpdateGroup  = "CallUpdateGroup"
+	operationDeleteGroup  = "CallDeleteGroup"
+	operationGetGroupById = "CallGetGroupById"
+	operationGetGroups    = "CallGetGroups"
 )
 
 func (client Client) CreateGroup(request CreateGroupRequest) (Group, error) {
@@ -15,11 +24,11 @@ func (client Client) CreateGroup(request CreateGroupRequest) (Group, error) {
 		Post("api/v1/groups")
 
 	if err != nil {
-		return Group{}, fmt.Errorf("CreateGroup: Unable to complete api request [err=%s]", err)
+		return Group{}, errors.NewGenericRequestError(operationCreateGroup, err)
 	}
 
 	if response.IsError() {
-		return Group{}, fmt.Errorf("CreateGroup: Unsuccessful response. [response=%s]", response)
+		return Group{}, errors.NewAPIErrorWithResponse(operationCreateGroup, response, nil)
 	}
 
 	return groupResponse, nil
@@ -35,11 +44,11 @@ func (client Client) UpdateGroup(request UpdateGroupRequest) (Group, error) {
 		Patch(fmt.Sprintf("api/v1/groups/%s", request.ID))
 
 	if err != nil {
-		return Group{}, fmt.Errorf("UpdateGroup: Unable to complete api request [err=%s]", err)
+		return Group{}, errors.NewGenericRequestError(operationUpdateGroup, err)
 	}
 
 	if response.IsError() {
-		return Group{}, fmt.Errorf("UpdateGroup: Unsuccessful response. [response=%s]", response)
+		return Group{}, errors.NewAPIErrorWithResponse(operationUpdateGroup, response, nil)
 	}
 
 	return groupResponse, nil
@@ -54,11 +63,11 @@ func (client Client) DeleteGroup(request DeleteGroupRequest) (Group, error) {
 		Delete(fmt.Sprintf("api/v1/groups/%s", request.ID))
 
 	if err != nil {
-		return Group{}, fmt.Errorf("DeleteGroup: Unable to complete api request [err=%s]", err)
+		return Group{}, errors.NewGenericRequestError(operationDeleteGroup, err)
 	}
 
 	if response.IsError() {
-		return Group{}, fmt.Errorf("DeleteGroup: Unsuccessful response. [response=%s]", response)
+		return Group{}, errors.NewAPIErrorWithResponse(operationDeleteGroup, response, nil)
 	}
 
 	return groupResponse, nil
@@ -77,11 +86,11 @@ func (client Client) GetGroupById(request GetGroupByIdRequest) (Group, error) {
 	}
 
 	if err != nil {
-		return Group{}, fmt.Errorf("CallGetGroupById: Unable to complete api request [err=%s]", err)
+		return Group{}, errors.NewGenericRequestError(operationGetGroupById, err)
 	}
 
 	if response.IsError() {
-		return Group{}, fmt.Errorf("CallGetGroupById: Unsuccessful response. [response=%s]", response)
+		return Group{}, errors.NewAPIErrorWithResponse(operationGetGroupById, response, nil)
 	}
 
 	return groupResponse, nil
@@ -98,11 +107,11 @@ func (client Client) GetGroups() (GetGroupsResponse, error) {
 	response, err := httpRequest.Get("api/v1/groups")
 
 	if err != nil {
-		return GetGroupsResponse{}, fmt.Errorf("GetGroups: Unable to complete api request [err=%s]", err)
+		return GetGroupsResponse{}, errors.NewGenericRequestError(operationGetGroups, err)
 	}
 
 	if response.IsError() {
-		return GetGroupsResponse{}, fmt.Errorf("GetGroups: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetGroupsResponse{}, errors.NewAPIErrorWithResponse(operationGetGroups, response, nil)
 	}
 
 	return body, nil

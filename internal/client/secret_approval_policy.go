@@ -3,6 +3,14 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreateSecretApprovalPolicy  = "CallCreateSecretApprovalPolicy"
+	operationGetSecretApprovalPolicyByID = "CallGetSecretApprovalPolicyByID"
+	operationUpdateSecretApprovalPolicy  = "CallUpdateSecretApprovalPolicy"
+	operationDeleteSecretApprovalPolicy  = "CallDeleteSecretApprovalPolicy"
 )
 
 func (client Client) CreateSecretApprovalPolicy(request CreateSecretApprovalPolicyRequest) (CreateSecretApprovalPolicyResponse, error) {
@@ -15,11 +23,11 @@ func (client Client) CreateSecretApprovalPolicy(request CreateSecretApprovalPoli
 		Post("api/v1/secret-approvals")
 
 	if err != nil {
-		return CreateSecretApprovalPolicyResponse{}, fmt.Errorf("CallCreateSecretApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return CreateSecretApprovalPolicyResponse{}, errors.NewGenericRequestError(operationCreateSecretApprovalPolicy, err)
 	}
 
 	if response.IsError() {
-		return CreateSecretApprovalPolicyResponse{}, fmt.Errorf("CallCreateSecretApprovalPolicy: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateSecretApprovalPolicyResponse{}, errors.NewAPIErrorWithResponse(operationCreateSecretApprovalPolicy, response, nil)
 	}
 
 	return body, nil
@@ -40,11 +48,11 @@ func (client Client) GetSecretApprovalPolicyByID(request GetSecretApprovalPolicy
 	}
 
 	if err != nil {
-		return GetSecretApprovalPolicyByIDResponse{}, fmt.Errorf("CallGetSecretApprovalPolicyByID: Unable to complete api request [err=%s]", err)
+		return GetSecretApprovalPolicyByIDResponse{}, errors.NewGenericRequestError(operationGetSecretApprovalPolicyByID, err)
 	}
 
 	if response.IsError() {
-		return GetSecretApprovalPolicyByIDResponse{}, fmt.Errorf("CallGetSecretApprovalPolicyByID: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetSecretApprovalPolicyByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretApprovalPolicyByID, response, nil)
 	}
 
 	return body, nil
@@ -60,11 +68,11 @@ func (client Client) UpdateSecretApprovalPolicy(request UpdateSecretApprovalPoli
 		Patch(fmt.Sprintf("api/v1/secret-approvals/%s", request.ID))
 
 	if err != nil {
-		return UpdateSecretApprovalPolicyResponse{}, fmt.Errorf("CallUpdateSecretApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return UpdateSecretApprovalPolicyResponse{}, errors.NewGenericRequestError(operationUpdateSecretApprovalPolicy, err)
 	}
 
 	if response.IsError() {
-		return UpdateSecretApprovalPolicyResponse{}, fmt.Errorf("CallUpdateSecretApprovalPolicy: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateSecretApprovalPolicyResponse{}, errors.NewAPIErrorWithResponse(operationUpdateSecretApprovalPolicy, response, nil)
 	}
 
 	return body, nil
@@ -80,11 +88,11 @@ func (client Client) DeleteSecretApprovalPolicy(request DeleteSecretApprovalPoli
 		Delete(fmt.Sprintf("/api/v1/secret-approvals/%s", request.ID))
 
 	if err != nil {
-		return DeleteSecretApprovalPolicyResponse{}, fmt.Errorf("CallDeleteSecretApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return DeleteSecretApprovalPolicyResponse{}, errors.NewGenericRequestError(operationDeleteSecretApprovalPolicy, err)
 	}
 
 	if response.IsError() {
-		return DeleteSecretApprovalPolicyResponse{}, fmt.Errorf("CallDeleteSecretApprovalPolicy: Unsuccessful response. [response=%s]", response)
+		return DeleteSecretApprovalPolicyResponse{}, errors.NewAPIErrorWithResponse(operationDeleteSecretApprovalPolicy, response, nil)
 	}
 
 	return responseData, nil
