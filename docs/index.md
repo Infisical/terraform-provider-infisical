@@ -49,10 +49,19 @@ provider "infisical" {
 
 Optional:
 
+- `aws_iam` (Attributes) The configuration values for AWS IAM Auth (see [below for nested schema](#nestedatt--auth--aws_iam))
 - `kubernetes` (Attributes) The configuration values for Kubernetes Auth (see [below for nested schema](#nestedatt--auth--kubernetes))
 - `oidc` (Attributes) The configuration values for OIDC Auth (see [below for nested schema](#nestedatt--auth--oidc))
 - `token` (String, Sensitive) The authentication token for Machine Identity Token Auth. This attribute can also be set using the `INFISICAL_TOKEN` environment variable
 - `universal` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal))
+
+<a id="nestedatt--auth--aws_iam"></a>
+### Nested Schema for `auth.aws_iam`
+
+Optional:
+
+- `identity_id` (String, Sensitive) Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable
+
 
 <a id="nestedatt--auth--kubernetes"></a>
 ### Nested Schema for `auth.kubernetes`

@@ -1,9 +1,12 @@
 package infisicalclient
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"terraform-provider-infisical/internal/errors"
+
+	infisicalSdk "github.com/infisical/go-sdk"
 )
 
 const (
@@ -136,4 +139,26 @@ func (client Client) TokenMachineIdentityAuth() (string, error) {
 	}
 
 	return client.Config.Token, nil
+}
+
+func (client Client) AwsIamMachineIdentityAuth() (string, error) {
+	if client.Config.IdentityId == "" {
+		return "", fmt.Errorf("you must set the identity ID for the client before making calls")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	infisicalClient := infisicalSdk.NewInfisicalClient(ctx, infisicalSdk.Config{
+		SiteUrl:          client.Config.HostURL,
+		AutoTokenRefresh: false,
+	})
+
+	credential, err := infisicalClient.Auth().AwsIamAuthLogin(client.Config.IdentityId)
+
+	if err != nil {
+		return "", fmt.Errorf("AwsIamMachineIdentityAuth: Unable to get machine identity token [err=%s]", err)
+	}
+
+	return credential.AccessToken, nil
 }

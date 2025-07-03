@@ -27,7 +27,7 @@ type DynamicSecretBaseResource struct {
 	client                    *infisical.Client
 	ConfigurationAttributes   map[string]schema.Attribute
 	ReadConfigurationFromPlan func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadConfigurationFromApi  func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret) (types.Object, diag.Diagnostics)
+	ReadConfigurationFromApi  func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics)
 }
 
 type DynamicSecretBaseResourceModel struct {
@@ -252,7 +252,7 @@ func (r *DynamicSecretBaseResource) Read(ctx context.Context, req resource.ReadR
 		state.UsernameTemplate = types.StringValue(dynamicSecret.UsernameTemplate)
 	}
 
-	state.Configuration, diags = r.ReadConfigurationFromApi(ctx, dynamicSecret)
+	state.Configuration, diags = r.ReadConfigurationFromApi(ctx, dynamicSecret, state.Configuration)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
