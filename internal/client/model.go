@@ -2239,3 +2239,105 @@ type UpdateGroupRequest struct {
 type DeleteGroupRequest struct {
 	ID string
 }
+
+type SecretRotationProviderObject struct {
+	Provider SecretRotationProvider `json:"type"`
+	Inputs   map[string]interface{} `json:"inputs"`
+}
+
+type SecretRotationConnection struct {
+	ConnectionID string `json:"id"`
+}
+
+type SecretRotationEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type SecretRotationFolder struct {
+	Path string `json:"path"`
+}
+
+type SecretRotationRotateAtUtc struct {
+	Hours   int64 `json:"hours"`
+	Minutes int64 `json:"minutes"`
+}
+
+type SecretRotation struct {
+	ID                  string                    `json:"id"`
+	Name                string                    `json:"name"`
+	Description         string                    `json:"description"`
+	AutoRotationEnabled bool                      `json:"isAutoRotationEnabled"`
+	ProjectID           string                    `json:"projectId"`
+	ConnectionID        string                    `json:"connectionId"`
+	Connection          SecretRotationConnection  `json:"connection"`
+	Environment         SecretRotationEnvironment `json:"environment"`
+	SecretFolder        SecretRotationFolder      `json:"folder"`
+
+	RotationInterval int32                     `json:"rotationInterval"`
+	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+
+	Parameters     map[string]interface{} `json:"parameters"`
+	SecretsMapping map[string]interface{} `json:"secretsMapping"`
+}
+
+type CreateSecretRotationRequest struct {
+	Provider SecretRotationProvider
+
+	Name                string `json:"name"`
+	Description         string `json:"description"`
+	AutoRotationEnabled bool   `json:"isAutoRotationEnabled"`
+	ProjectID           string `json:"projectId"`
+	ConnectionID        string `json:"connectionId"`
+	Environment         string `json:"environment"`
+	SecretPath          string `json:"secretPath"`
+
+	RotationInterval int32                     `json:"rotationInterval"`
+	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+
+	Parameters     map[string]interface{} `json:"parameters"`
+	SecretsMapping map[string]interface{} `json:"secretsMapping"`
+}
+
+type CreateSecretRotationResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type GetSecretRotationByIdRequest struct {
+	Provider SecretRotationProvider
+	ID       string
+}
+
+type GetSecretRotationByIdResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type UpdateSecretRotationRequest struct {
+	Provider SecretRotationProvider
+	ID       string
+
+	Name                string `json:"name,omitempty"`
+	Description         string `json:"description,omitempty"`
+	AutoRotationEnabled bool   `json:"isAutoRotationEnabled,omitempty"`
+	ConnectionID        string `json:"connectionId,omitempty"`
+	Environment         string `json:"environment,omitempty"`
+	SecretPath          string `json:"secretPath,omitempty"`
+
+	RotationInterval int32                     `json:"rotationInterval,omitempty"`
+	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+
+	Parameters     map[string]interface{} `json:"parameters,omitempty"`
+	SecretsMapping map[string]interface{} `json:"secretsMapping,omitempty"`
+}
+
+type UpdateSecretRotationResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type DeleteSecretRotationRequest struct {
+	Provider SecretRotationProvider
+	ID       string
+}
+
+type DeleteSecretRotationResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
