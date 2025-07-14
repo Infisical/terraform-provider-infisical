@@ -82,9 +82,9 @@ func (r *SecretRotationBaseResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"auto_rotation_enabled": schema.BoolAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Whether secrets should be automatically rotated.",
 				Default:     booldefault.StaticBool(true),
-				Computed:    true,
 			},
 			"project_id": schema.StringAttribute{
 				Required:      true,
@@ -106,9 +106,9 @@ func (r *SecretRotationBaseResource) Schema(_ context.Context, _ resource.Schema
 
 			"rotation_interval": schema.Int32Attribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "How many days to wait between each rotation.",
 				Default:     int32default.StaticInt32(30),
-				Computed:    true,
 			},
 			"rotate_at_utc": schema.SingleNestedAttribute{
 				Optional:    true,
@@ -278,6 +278,8 @@ func (r *SecretRotationBaseResource) Read(ctx context.Context, req resource.Read
 	}
 
 	state.Name = types.StringValue(secretRotation.Name)
+
+	fmt.Printf("Secret rotation description from API: %s\n", secretRotation.Description)
 
 	if !(state.Description.IsNull() && secretRotation.Description == "") {
 		state.Description = types.StringValue(secretRotation.Description)

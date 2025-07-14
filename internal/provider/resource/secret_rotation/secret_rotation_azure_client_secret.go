@@ -13,54 +13,54 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-type SecretRotationMySqlCredentialsParametersModel struct {
-	Username1 types.String `tfsdk:"username1"`
-	Username2 types.String `tfsdk:"username2"`
+type SecretRotationAzureClientSecretParametersModel struct {
+	ObjectId types.String `tfsdk:"object_id"`
+	ClientId types.String `tfsdk:"client_id"`
 }
 
-type SecretRotationMySqlCredentialsSecretsMappingModel struct {
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+type SecretRotationAzureClientSecretSecretsMappingModel struct {
+	ClientId     types.String `tfsdk:"client_id"`
+	ClientSecret types.String `tfsdk:"client_secret"`
 }
 
-func NewSecretRotationMySqlCredentialsResource() resource.Resource {
+func NewSecretRotationAzureClientSecretResource() resource.Resource {
 	return &SecretRotationBaseResource{
-		Provider:           infisical.SecretRotationProviderMySqlCredentials,
-		SecretRotationName: "MySQL Credentials",
-		ResourceTypeName:   "_secret_rotation_mysql_credentials",
-		AppConnection:      infisical.AppConnectionAppMySql,
+		Provider:           infisical.SecretRotationProviderAzureClientSecret,
+		SecretRotationName: "Azure Client Secret",
+		ResourceTypeName:   "_secret_rotation_azure_client_secret",
+		AppConnection:      infisical.AppConnectionAppAzureClientSecrets,
 		ParametersAttributes: map[string]schema.Attribute{
-			"username1": schema.StringAttribute{
+			"object_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The username of the first login to rotate passwords for. This user must already exists in your database.",
+				Description: "The ID of the Azure Application to rotate the client secret for.",
 			},
-			"username2": schema.StringAttribute{
+			"client_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The username of the second login to rotate passwords for. This user must already exists in your database.",
+				Description: "The client ID of the Azure Application to rotate the client secret for.",
 			},
 		},
 		SecretsMappingAttributes: map[string]schema.Attribute{
-			"username": schema.StringAttribute{
+			"client_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The name of the secret that the active username will be mapped to.",
+				Description: "The name of the secret that the client ID will be mapped to.",
 			},
-			"password": schema.StringAttribute{
+			"client_secret": schema.StringAttribute{
 				Required:    true,
-				Description: "The name of the secret that the generated password will be mapped to.",
+				Description: "The name of the secret that the rotated client secret will be mapped to.",
 			},
 		},
 
 		ReadParametersFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			parametersMap := make(map[string]interface{})
-			var parameters SecretRotationMySqlCredentialsParametersModel
+			var parameters SecretRotationAzureClientSecretParametersModel
 
 			diags := plan.Parameters.As(ctx, &parameters, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
 
-			parametersMap["username1"] = parameters.Username1.ValueString()
-			parametersMap["username2"] = parameters.Username2.ValueString()
+			parametersMap["objectId"] = parameters.ObjectId.ValueString()
+			parametersMap["clientId"] = parameters.ClientId.ValueString()
 
 			return parametersMap, diags
 		},
@@ -69,23 +69,23 @@ func NewSecretRotationMySqlCredentialsResource() resource.Resource {
 			var diags diag.Diagnostics
 			parameters := make(map[string]attr.Value)
 			parametersSchema := map[string]attr.Type{
-				"username1": types.StringType,
-				"username2": types.StringType,
+				"object_id": types.StringType,
+				"client_id": types.StringType,
 			}
 
-			usernameOneVal, ok := secretRotation.Parameters["username1"].(string)
+			objectIdVal, ok := secretRotation.Parameters["objectId"].(string)
 			if !ok {
-				diags.AddError("API Reading Error", "Expected 'username1' (string) but got wrong type or missing")
+				diags.AddError("API Reading Error", "Expected 'objectId' (string) but got wrong type or missing")
 				return types.ObjectNull(parametersSchema), diags
 			}
-			parameters["username1"] = types.StringValue(usernameOneVal)
+			parameters["object_id"] = types.StringValue(objectIdVal)
 
-			usernameTwoVal, ok := secretRotation.Parameters["username2"].(string)
+			clientIdVal, ok := secretRotation.Parameters["clientId"].(string)
 			if !ok {
-				diags.AddError("API Reading Error", "Expected 'username2' (string) but got wrong type or missing")
+				diags.AddError("API Reading Error", "Expected 'clientId' (string) but got wrong type or missing")
 				return types.ObjectNull(parametersSchema), diags
 			}
-			parameters["username2"] = types.StringValue(usernameTwoVal)
+			parameters["client_id"] = types.StringValue(clientIdVal)
 
 			obj, objDiags := types.ObjectValue(parametersSchema, parameters)
 			diags.Append(objDiags...)
@@ -98,15 +98,15 @@ func NewSecretRotationMySqlCredentialsResource() resource.Resource {
 
 		ReadSecretsMappingFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			secretsMappingMap := make(map[string]interface{})
-			var secretsMapping SecretRotationMySqlCredentialsSecretsMappingModel
+			var secretsMapping SecretRotationAzureClientSecretSecretsMappingModel
 
 			diags := plan.SecretsMapping.As(ctx, &secretsMapping, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
 
-			secretsMappingMap["username"] = secretsMapping.Username.ValueString()
-			secretsMappingMap["password"] = secretsMapping.Password.ValueString()
+			secretsMappingMap["clientId"] = secretsMapping.ClientId.ValueString()
+			secretsMappingMap["clientSecret"] = secretsMapping.ClientSecret.ValueString()
 
 			return secretsMappingMap, diags
 		},
@@ -115,23 +115,23 @@ func NewSecretRotationMySqlCredentialsResource() resource.Resource {
 			var diags diag.Diagnostics
 			secretsMapping := make(map[string]attr.Value)
 			secretsMappingSchema := map[string]attr.Type{
-				"username": types.StringType,
-				"password": types.StringType,
+				"client_id":     types.StringType,
+				"client_secret": types.StringType,
 			}
 
-			usernameVal, ok := secretRotation.SecretsMapping["username"].(string)
+			clientIdVal, ok := secretRotation.SecretsMapping["clientId"].(string)
 			if !ok {
-				diags.AddError("API Reading Error", "Expected 'username' (string) but got wrong type or missing")
+				diags.AddError("API Reading Error", "Expected 'clientId' (string) but got wrong type or missing")
 				return types.ObjectNull(secretsMappingSchema), diags
 			}
-			secretsMapping["username"] = types.StringValue(usernameVal)
+			secretsMapping["client_id"] = types.StringValue(clientIdVal)
 
-			passwordVal, ok := secretRotation.SecretsMapping["password"].(string)
+			clientSecretVal, ok := secretRotation.SecretsMapping["clientSecret"].(string)
 			if !ok {
-				diags.AddError("API Reading Error", "Expected 'password' (string) but got wrong type or missing")
+				diags.AddError("API Reading Error", "Expected 'clientSecret' (string) but got wrong type or missing")
 				return types.ObjectNull(secretsMappingSchema), diags
 			}
-			secretsMapping["password"] = types.StringValue(passwordVal)
+			secretsMapping["client_secret"] = types.StringValue(clientSecretVal)
 
 			obj, objDiags := types.ObjectValue(secretsMappingSchema, secretsMapping)
 			diags.Append(objDiags...)

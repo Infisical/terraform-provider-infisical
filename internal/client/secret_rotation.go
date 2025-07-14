@@ -8,7 +8,8 @@ import (
 type SecretRotationProvider string
 
 const (
-	SecretRotationProviderMySql SecretRotationProvider = "mysql-credentials"
+	SecretRotationProviderMySqlCredentials  SecretRotationProvider = "mysql-credentials"
+	SecretRotationProviderAzureClientSecret SecretRotationProvider = "azure-client-secret"
 )
 
 const (

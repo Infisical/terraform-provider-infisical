@@ -2316,7 +2316,7 @@ type UpdateSecretRotationRequest struct {
 	ID       string
 
 	Name                string `json:"name,omitempty"`
-	Description         string `json:"description,omitempty"`
+	Description         string `json:"description"`
 	AutoRotationEnabled bool   `json:"isAutoRotationEnabled,omitempty"`
 	ConnectionID        string `json:"connectionId,omitempty"`
 	Environment         string `json:"environment,omitempty"`
