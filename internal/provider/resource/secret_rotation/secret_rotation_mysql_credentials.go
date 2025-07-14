@@ -5,10 +5,12 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type SecretRotationMySqlCredentialsParametersModel struct {
@@ -49,23 +51,95 @@ func NewSecretRotationMySqlCredentialsResource() resource.Resource {
 		},
 
 		ReadParametersFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			// TODO(andrey): Finish
-			return nil, nil
+			parametersMap := make(map[string]interface{})
+			var parameters SecretRotationMySqlCredentialsParametersModel
+
+			diags := plan.Parameters.As(ctx, &parameters, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			parametersMap["username1"] = parameters.Username1.ValueString()
+			parametersMap["username2"] = parameters.Username2.ValueString()
+
+			return parametersMap, diags
 		},
 
 		ReadParametersFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
-			// TODO(andrey): Finish
-			return types.Object{}, nil
+			var diags diag.Diagnostics
+			parameters := make(map[string]attr.Value)
+			parametersSchema := map[string]attr.Type{
+				"username1": types.StringType,
+				"username2": types.StringType,
+			}
+
+			usernameOneVal, ok := secretRotation.Parameters["username1"].(string)
+			if !ok {
+				diags.AddError("API Reading Error", "Expected 'username1' (string) but got wrong type or missing")
+				return types.ObjectNull(parametersSchema), diags
+			}
+			parameters["username1"] = types.StringValue(usernameOneVal)
+
+			usernameTwoVal, ok := secretRotation.Parameters["username2"].(string)
+			if !ok {
+				diags.AddError("API Reading Error", "Expected 'username2' (string) but got wrong type or missing")
+				return types.ObjectNull(parametersSchema), diags
+			}
+			parameters["username2"] = types.StringValue(usernameTwoVal)
+
+			obj, objDiags := types.ObjectValue(parametersSchema, parameters)
+			diags.Append(objDiags...)
+			if diags.HasError() {
+				return types.ObjectNull(parametersSchema), diags
+			}
+
+			return obj, diags
 		},
 
 		ReadSecretsMappingFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			// TODO(andrey): Finish
-			return nil, nil
+			secretsMappingMap := make(map[string]interface{})
+			var secretsMapping SecretRotationMySqlCredentialsSecretsMappingModel
+
+			diags := plan.SecretsMapping.As(ctx, &secretsMapping, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			secretsMappingMap["username"] = secretsMapping.Username.ValueString()
+			secretsMappingMap["password"] = secretsMapping.Password.ValueString()
+
+			return secretsMappingMap, diags
 		},
 
 		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
-			// TODO(andrey): Finish
-			return types.Object{}, nil
+			var diags diag.Diagnostics
+			secretsMapping := make(map[string]attr.Value)
+			secretsMappingSchema := map[string]attr.Type{
+				"username": types.StringType,
+				"password": types.StringType,
+			}
+
+			usernameVal, ok := secretRotation.SecretsMapping["username"].(string)
+			if !ok {
+				diags.AddError("API Reading Error", "Expected 'username' (string) but got wrong type or missing")
+				return types.ObjectNull(secretsMappingSchema), diags
+			}
+			secretsMapping["username"] = types.StringValue(usernameVal)
+
+			passwordVal, ok := secretRotation.SecretsMapping["password"].(string)
+			if !ok {
+				diags.AddError("API Reading Error", "Expected 'password' (string) but got wrong type or missing")
+				return types.ObjectNull(secretsMappingSchema), diags
+			}
+			secretsMapping["password"] = types.StringValue(passwordVal)
+
+			obj, objDiags := types.ObjectValue(secretsMappingSchema, secretsMapping)
+			diags.Append(objDiags...)
+			if diags.HasError() {
+				return types.ObjectNull(secretsMappingSchema), diags
+			}
+
+			return obj, diags
 		},
 	}
 }

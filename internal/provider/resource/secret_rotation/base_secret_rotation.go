@@ -6,12 +6,14 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalclient "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -126,6 +128,16 @@ func (r *SecretRotationBaseResource) Schema(_ context.Context, _ resource.Schema
 						Default:     int64default.StaticInt64(0),
 					},
 				},
+				Default: objectdefault.StaticValue(types.ObjectValueMust(
+					map[string]attr.Type{
+						"hours":   types.Int64Type,
+						"minutes": types.Int64Type,
+					},
+					map[string]attr.Value{
+						"hours":   types.Int64Value(0),
+						"minutes": types.Int64Value(0),
+					},
+				)),
 			},
 
 			"parameters": schema.SingleNestedAttribute{
@@ -278,8 +290,13 @@ func (r *SecretRotationBaseResource) Read(ctx context.Context, req resource.Read
 	state.SecretPath = types.StringValue(secretRotation.SecretFolder.Path)
 
 	state.RotationInterval = types.Int32Value(secretRotation.RotationInterval)
-	state.RotateAtUtc.Hours = types.Int64Value(secretRotation.RotateAtUtc.Hours)
-	state.RotateAtUtc.Minutes = types.Int64Value(secretRotation.RotateAtUtc.Minutes)
+	if secretRotation.RotateAtUtc != nil {
+		state.RotateAtUtc.Hours = types.Int64Value(secretRotation.RotateAtUtc.Hours)
+		state.RotateAtUtc.Minutes = types.Int64Value(secretRotation.RotateAtUtc.Minutes)
+	} else {
+		state.RotateAtUtc.Hours = types.Int64Value(0)
+		state.RotateAtUtc.Minutes = types.Int64Value(0)
+	}
 
 	state.Parameters, diags = r.ReadParametersFromApi(ctx, secretRotation)
 	resp.Diagnostics.Append(diags...)

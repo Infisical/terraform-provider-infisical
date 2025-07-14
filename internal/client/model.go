@@ -2273,8 +2273,8 @@ type SecretRotation struct {
 	Environment         SecretRotationEnvironment `json:"environment"`
 	SecretFolder        SecretRotationFolder      `json:"folder"`
 
-	RotationInterval int32                     `json:"rotationInterval"`
-	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+	RotationInterval int32                      `json:"rotationInterval"`
+	RotateAtUtc      *SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
 
 	Parameters     map[string]interface{} `json:"parameters"`
 	SecretsMapping map[string]interface{} `json:"secretsMapping"`

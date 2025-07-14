@@ -42,9 +42,10 @@ func (client Client) GetSecretRotationById(request GetSecretRotationByIdRequest)
 	var body GetSecretRotationByIdResponse
 	response, err := client.Config.HttpClient.
 		R().
+		SetDebug(true).
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
-		Get("api/v2/secret-rotations/" + string(request.Provider))
+		Get("api/v2/secret-rotations/" + string(request.Provider) + "/" + string(request.ID))
 
 	if err != nil {
 		return SecretRotation{}, errors.NewGenericRequestError(operationGetSecretRotationById, err)
@@ -68,7 +69,7 @@ func (client Client) UpdateSecretRotation(request UpdateSecretRotationRequest) (
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch("api/v2/secret-rotations/" + string(request.Provider))
+		Patch("api/v2/secret-rotations/" + string(request.Provider) + "/" + string(request.ID))
 
 	if err != nil {
 		return SecretRotation{}, errors.NewGenericRequestError(operationUpdateSecretRotation, err)
@@ -88,7 +89,7 @@ func (client Client) DeleteSecretRotation(request DeleteSecretRotationRequest) (
 		SetResult(&body).
 		SetBody(request).
 		SetHeader("User-Agent", USER_AGENT).
-		Delete("api/v2/secret-rotations/" + string(request.Provider))
+		Delete("api/v2/secret-rotations/" + string(request.Provider) + "/" + string(request.ID))
 
 	if err != nil {
 		return SecretRotation{}, errors.NewGenericRequestError(operationDeleteSecretRotation, err)
