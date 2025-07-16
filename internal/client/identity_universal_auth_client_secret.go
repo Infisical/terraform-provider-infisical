@@ -1,8 +1,14 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentityUniversalAuthClientSecret    = "CallGetIdentityUniversalAuthClientSecret"
+	operationCreateIdentityUniversalAuthClientSecret = "CallCreateIdentityUniversalAuthClientSecret"
+	operationRevokeIdentityUniversalAuthClientSecret = "CallRevokeIdentityUniversalAuthClientSecret"
 )
 
 func (client Client) GetIdentityUniversalAuthClientSecret(request GetIdentityUniversalAuthClientSecretRequest) (IdentityUniversalAuthClientSecret, error) {
@@ -20,11 +26,11 @@ func (client Client) GetIdentityUniversalAuthClientSecret(request GetIdentityUni
 	}
 
 	if err != nil {
-		return IdentityUniversalAuthClientSecret{}, fmt.Errorf("GetIdentityUniversalAuthClientSecret: Unable to complete api request [err=%s]", err)
+		return IdentityUniversalAuthClientSecret{}, errors.NewGenericRequestError(operationGetIdentityUniversalAuthClientSecret, err)
 	}
 
 	if response.IsError() {
-		return IdentityUniversalAuthClientSecret{}, fmt.Errorf("GetIdentityUniversalAuthClientSecret: Unsuccessful response. [response=%v]", string(response.Body()))
+		return IdentityUniversalAuthClientSecret{}, errors.NewAPIErrorWithResponse(operationGetIdentityUniversalAuthClientSecret, response, nil)
 	}
 
 	return body.ClientSecretData, nil
@@ -40,11 +46,11 @@ func (client Client) CreateIdentityUniversalAuthClientSecret(request CreateIdent
 		Post("api/v1/auth/universal-auth/identities/" + request.IdentityID + "/client-secrets")
 
 	if err != nil {
-		return CreateIdentityUniversalAuthClientSecretResponse{}, fmt.Errorf("CreateIdentityUniversalAuthClientSecret: Unable to complete api request [err=%s]", err)
+		return CreateIdentityUniversalAuthClientSecretResponse{}, errors.NewGenericRequestError(operationCreateIdentityUniversalAuthClientSecret, err)
 	}
 
 	if response.IsError() {
-		return CreateIdentityUniversalAuthClientSecretResponse{}, fmt.Errorf("CreateIdentityUniversalAuthClientSecret: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateIdentityUniversalAuthClientSecretResponse{}, errors.NewAPIErrorWithResponse(operationCreateIdentityUniversalAuthClientSecret, response, nil)
 	}
 
 	return body, nil
@@ -60,11 +66,11 @@ func (client Client) RevokeIdentityUniversalAuthClientSecret(request RevokeIdent
 		Post("api/v1/auth/universal-auth/identities/" + request.IdentityID + "/client-secrets/" + request.ClientSecretID + "/revoke")
 
 	if err != nil {
-		return IdentityUniversalAuthClientSecret{}, fmt.Errorf("RevokeIdentityUniversalAuthClientSecret: Unable to complete api request [err=%s]", err)
+		return IdentityUniversalAuthClientSecret{}, errors.NewGenericRequestError(operationRevokeIdentityUniversalAuthClientSecret, err)
 	}
 
 	if response.IsError() {
-		return IdentityUniversalAuthClientSecret{}, fmt.Errorf("RevokeIdentityUniversalAuthClientSecret: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityUniversalAuthClientSecret{}, errors.NewAPIErrorWithResponse(operationRevokeIdentityUniversalAuthClientSecret, response, nil)
 	}
 
 	return body.ClientSecretData, nil

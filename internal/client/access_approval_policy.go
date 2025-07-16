@@ -3,9 +3,18 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCallCreateAccessApprovalPolicy = "CallCreateAccessApprovalPolicy"
+	operationGetAccessApprovalPolicyById    = "GetAccessApprovalPolicyById"
+	operationCallUpdateAccessApprovalPolicy = "CallUpdateAccessApprovalPolicy"
+	operationCallDeleteAccessApprovalPolicy = "CallDeleteAccessApprovalPolicy"
 )
 
 func (client Client) CreateAccessApprovalPolicy(request CreateAccessApprovalPolicyRequest) (CreateAccessApprovalPolicyResponse, error) {
+
 	var body CreateAccessApprovalPolicyResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -15,11 +24,11 @@ func (client Client) CreateAccessApprovalPolicy(request CreateAccessApprovalPoli
 		Post("api/v1/access-approvals/policies")
 
 	if err != nil {
-		return CreateAccessApprovalPolicyResponse{}, fmt.Errorf("CallCreateAccessApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return CreateAccessApprovalPolicyResponse{}, errors.NewGenericRequestError(operationCallCreateAccessApprovalPolicy, err)
 	}
 
 	if response.IsError() {
-		return CreateAccessApprovalPolicyResponse{}, fmt.Errorf("CallCreateAccessApprovalPolicy: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateAccessApprovalPolicyResponse{}, errors.NewAPIErrorWithResponse(operationCallCreateAccessApprovalPolicy, response, nil)
 	}
 
 	return body, nil
@@ -40,11 +49,11 @@ func (client Client) GetAccessApprovalPolicyByID(request GetAccessApprovalPolicy
 	}
 
 	if err != nil {
-		return GetAccessApprovalPolicyByIDResponse{}, fmt.Errorf("GetAccessApprovalPolicyById: Unable to complete api request [err=%s]", err)
+		return GetAccessApprovalPolicyByIDResponse{}, errors.NewGenericRequestError(operationGetAccessApprovalPolicyById, err)
 	}
 
 	if response.IsError() {
-		return GetAccessApprovalPolicyByIDResponse{}, fmt.Errorf("GetAccessApprovalPolicyById: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetAccessApprovalPolicyByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetAccessApprovalPolicyById, response, nil)
 	}
 
 	return body, nil
@@ -60,11 +69,11 @@ func (client Client) UpdateAccessApprovalPolicy(request UpdateAccessApprovalPoli
 		Patch(fmt.Sprintf("api/v1/access-approvals/policies/%s", request.ID))
 
 	if err != nil {
-		return UpdateAccessApprovalPolicyResponse{}, fmt.Errorf("CallUpdateAccessApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return UpdateAccessApprovalPolicyResponse{}, errors.NewGenericRequestError(operationCallUpdateAccessApprovalPolicy, err)
 	}
 
 	if response.IsError() {
-		return UpdateAccessApprovalPolicyResponse{}, fmt.Errorf("CallUpdateAccessApprovalPolicy: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateAccessApprovalPolicyResponse{}, errors.NewAPIErrorWithResponse(operationCallUpdateAccessApprovalPolicy, response, nil)
 	}
 
 	return body, nil
@@ -80,11 +89,11 @@ func (client Client) DeleteAccessApprovalPolicy(request DeleteAccessApprovalPoli
 		Delete(fmt.Sprintf("/api/v1/access-approvals/policies/%s", request.ID))
 
 	if err != nil {
-		return DeleteAccessApprovalPolicyResponse{}, fmt.Errorf("CallDeleteAccessApprovalPolicy: Unable to complete api request [err=%s]", err)
+		return DeleteAccessApprovalPolicyResponse{}, errors.NewGenericRequestError(operationCallDeleteAccessApprovalPolicy, err)
 	}
 
 	if response.IsError() {
-		return DeleteAccessApprovalPolicyResponse{}, fmt.Errorf("CallDeleteAccessApprovalPolicy: Unsuccessful response. [response=%s]", response)
+		return DeleteAccessApprovalPolicyResponse{}, errors.NewAPIErrorWithResponse(operationCallDeleteAccessApprovalPolicy, response, nil)
 	}
 
 	return responseData, nil

@@ -3,6 +3,14 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationInviteUsersToProject     = "CallInviteUsersToProject"
+	operationDeleteProjectUser        = "CallDeleteProjectUser"
+	operationUpdateProjectUser        = "CallUpdateProjectUser"
+	operationGetProjectUserByUsername = "CallGetProjectUserByUsername"
 )
 
 func (client Client) InviteUsersToProject(request InviteUsersToProjectRequest) ([]ProjectMemberships, error) {
@@ -15,11 +23,11 @@ func (client Client) InviteUsersToProject(request InviteUsersToProjectRequest) (
 		Post(fmt.Sprintf("api/v2/workspace/%s/memberships", request.ProjectID))
 
 	if err != nil {
-		return nil, fmt.Errorf("CallInviteUsersToProject: Unable to complete api request [err=%s]", err)
+		return nil, errors.NewGenericRequestError(operationInviteUsersToProject, err)
 	}
 
 	if response.IsError() {
-		return nil, fmt.Errorf("InviteUsersToProjectRequest: Unsuccessful response. [response=%s]", response)
+		return nil, errors.NewAPIErrorWithResponse(operationInviteUsersToProject, response, nil)
 	}
 
 	return inviteUsersToProjectResponse.Members, nil
@@ -35,11 +43,11 @@ func (client Client) DeleteProjectUser(request DeleteProjectUserRequest) (Delete
 		Delete(fmt.Sprintf("api/v2/workspace/%s/memberships", request.ProjectID))
 
 	if err != nil {
-		return DeleteProjectUserResponse{}, fmt.Errorf("CallDeleteProjectUser: Unable to complete api request [err=%s]", err)
+		return DeleteProjectUserResponse{}, errors.NewGenericRequestError(operationDeleteProjectUser, err)
 	}
 
 	if response.IsError() {
-		return DeleteProjectUserResponse{}, fmt.Errorf("CallDeleteProjectUser: Unsuccessful response. [response=%s]", response)
+		return DeleteProjectUserResponse{}, errors.NewAPIErrorWithResponse(operationDeleteProjectUser, response, nil)
 	}
 
 	return projectUserResponse, nil
@@ -55,11 +63,11 @@ func (client Client) UpdateProjectUser(request UpdateProjectUserRequest) (Update
 		Patch(fmt.Sprintf("api/v1/workspace/%s/memberships/%s", request.ProjectID, request.MembershipID))
 
 	if err != nil {
-		return UpdateProjectUserResponse{}, fmt.Errorf("UpdateProjectUserResponse: Unable to complete api request [err=%s]", err)
+		return UpdateProjectUserResponse{}, errors.NewGenericRequestError(operationUpdateProjectUser, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectUserResponse{}, fmt.Errorf("UpdateProjectUserResponse: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectUserResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectUser, response, nil)
 	}
 
 	return projectUserResponse, nil
@@ -75,7 +83,7 @@ func (client Client) GetProjectUserByUsername(request GetProjectUserByUserNameRe
 		Post(fmt.Sprintf("api/v1/workspace/%s/memberships/details", request.ProjectID))
 
 	if err != nil {
-		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallGetProjectUserByUsername: Unable to complete api request [err=%s]", err)
+		return GetProjectUserByUserNameResponse{}, errors.NewGenericRequestError(operationGetProjectUserByUsername, err)
 	}
 
 	if response.IsError() {
@@ -84,7 +92,7 @@ func (client Client) GetProjectUserByUsername(request GetProjectUserByUserNameRe
 			return GetProjectUserByUserNameResponse{}, ErrNotFound
 		}
 
-		return GetProjectUserByUserNameResponse{}, fmt.Errorf("CallGetProjectUserByUsername: Unsuccessful response. [response=%s]", response)
+		return GetProjectUserByUserNameResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectUserByUsername, response, nil)
 	}
 
 	return projectUserResponse, nil

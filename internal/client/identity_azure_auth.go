@@ -1,8 +1,15 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentityAzureAuth    = "CallGetIdentityAzureAuth"
+	operationCreateIdentityAzureAuth = "CallCreateIdentityAzureAuth"
+	operationUpdateIdentityAzureAuth = "CallUpdateIdentityAzureAuth"
+	operationRevokeIdentityAzureAuth = "CallRevokeIdentityAzureAuth"
 )
 
 func (client Client) GetIdentityAzureAuth(request GetIdentityAzureAuthRequest) (IdentityAzureAuth, error) {
@@ -20,11 +27,11 @@ func (client Client) GetIdentityAzureAuth(request GetIdentityAzureAuthRequest) (
 	}
 
 	if err != nil {
-		return IdentityAzureAuth{}, fmt.Errorf("GetIdentityAzureAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAzureAuth{}, errors.NewGenericRequestError(operationGetIdentityAzureAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAzureAuth{}, fmt.Errorf("GetIdentityAzureAuth: Unsuccessful response. [response=%v]", string(response.Body()))
+		return IdentityAzureAuth{}, errors.NewAPIErrorWithResponse(operationGetIdentityAzureAuth, response, nil)
 	}
 
 	return body.IdentityAzureAuth, nil
@@ -40,11 +47,11 @@ func (client Client) CreateIdentityAzureAuth(request CreateIdentityAzureAuthRequ
 		Post("api/v1/auth/azure-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityAzureAuth{}, fmt.Errorf("CreateIdentityAzureAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAzureAuth{}, errors.NewGenericRequestError(operationCreateIdentityAzureAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAzureAuth{}, fmt.Errorf("CreateIdentityAzureAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityAzureAuth{}, errors.NewAPIErrorWithResponse(operationCreateIdentityAzureAuth, response, nil)
 	}
 
 	return body.IdentityAzureAuth, nil
@@ -60,11 +67,11 @@ func (client Client) UpdateIdentityAzureAuth(request UpdateIdentityAzureAuthRequ
 		Patch("api/v1/auth/azure-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityAzureAuth{}, fmt.Errorf("UpdateIdentityAzureAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAzureAuth{}, errors.NewGenericRequestError(operationUpdateIdentityAzureAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAzureAuth{}, fmt.Errorf("UpdateIdentityAzureAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityAzureAuth{}, errors.NewAPIErrorWithResponse(operationUpdateIdentityAzureAuth, response, nil)
 	}
 
 	return body.IdentityAzureAuth, nil
@@ -80,11 +87,11 @@ func (client Client) RevokeIdentityAzureAuth(request RevokeIdentityAzureAuthRequ
 		Delete("api/v1/auth/azure-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityAzureAuth{}, fmt.Errorf("RevokeIdentityAzureAuth: Unable to complete api request [err=%s]", err)
+		return IdentityAzureAuth{}, errors.NewGenericRequestError(operationRevokeIdentityAzureAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityAzureAuth{}, fmt.Errorf("RevokeIdentityAzureAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityAzureAuth{}, errors.NewAPIErrorWithResponse(operationRevokeIdentityAzureAuth, response, nil)
 	}
 
 	return body.IdentityAzureAuth, nil

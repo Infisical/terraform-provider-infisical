@@ -1,8 +1,20 @@
 package infisicalclient
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"terraform-provider-infisical/internal/errors"
+
+	infisicalSdk "github.com/infisical/go-sdk"
+)
+
+const (
+	operationUniversalMachineIdentityAuth  = "CallUniversalMachineIdentityAuth"
+	operationGetServiceTokenDetailsV2      = "CallGetServiceTokenDetailsV2"
+	operationOidcMachineIdentityAuth       = "CallOidcMachineIdentityAuth"
+	operationKubernetesMachineIdentityAuth = "CallKubernetesMachineIdentityAuth"
+	operationTokenMachineIdentityAuth      = "CallTokenMachineIdentityAuth"
 )
 
 func (client Client) UniversalMachineIdentityAuth() (string, error) {
@@ -18,11 +30,11 @@ func (client Client) UniversalMachineIdentityAuth() (string, error) {
 	}).Post("api/v1/auth/universal-auth/login")
 
 	if err != nil {
-		return "", fmt.Errorf("UniversalMachineIdentityAuth: Unable to complete api request [err=%s]", err)
+		return "", errors.NewGenericRequestError(operationUniversalMachineIdentityAuth, err)
 	}
 
 	if res.IsError() {
-		return "", fmt.Errorf("UniversalMachineIdentityAuth: Unsuccessful response: [response=%s]", res)
+		return "", errors.NewAPIErrorWithResponse(operationUniversalMachineIdentityAuth, res, nil)
 	}
 
 	return loginResponse.AccessToken, nil
@@ -37,11 +49,11 @@ func (client Client) GetServiceTokenDetailsV2() (GetServiceTokenDetailsResponse,
 		Get("api/v2/service-token")
 
 	if err != nil {
-		return GetServiceTokenDetailsResponse{}, fmt.Errorf("CallGetServiceTokenDetails: Unable to complete api request [err=%s]", err)
+		return GetServiceTokenDetailsResponse{}, errors.NewGenericRequestError(operationGetServiceTokenDetailsV2, err)
 	}
 
 	if response.IsError() {
-		return GetServiceTokenDetailsResponse{}, fmt.Errorf("CallGetServiceTokenDetails: Unsuccessful response: [response=%s]", response)
+		return GetServiceTokenDetailsResponse{}, errors.NewAPIErrorWithResponse(operationGetServiceTokenDetailsV2, response, nil)
 	}
 
 	return tokenDetailsResponse, nil
@@ -71,11 +83,11 @@ func (client Client) OidcMachineIdentityAuth() (string, error) {
 	}).Post("api/v1/auth/oidc-auth/login")
 
 	if err != nil {
-		return "", fmt.Errorf("OidcMachineIdentityAuth: Unable to complete api request [err=%s]", err)
+		return "", errors.NewGenericRequestError(operationOidcMachineIdentityAuth, err)
 	}
 
 	if res.IsError() {
-		return "", fmt.Errorf("OidcMachineIdentityAuth: Unsuccessful response: [response=%s]", res)
+		return "", errors.NewAPIErrorWithResponse(operationOidcMachineIdentityAuth, res, nil)
 	}
 
 	return loginResponse.AccessToken, nil
@@ -93,7 +105,7 @@ func (client Client) KubernetesMachineIdentityAuth() (string, error) {
 	if token == "" {
 		tokenBytes, err := os.ReadFile(tokenPath)
 		if err != nil {
-			return "", fmt.Errorf("KubernetesMachineIdentityAuth: Unable to read service account token from file [err=%s]", err)
+			return "", errors.NewGenericRequestError(operationKubernetesMachineIdentityAuth, err)
 		}
 
 		token = string(tokenBytes)
@@ -111,11 +123,11 @@ func (client Client) KubernetesMachineIdentityAuth() (string, error) {
 	}).Post("api/v1/auth/kubernetes-auth/login")
 
 	if err != nil {
-		return "", fmt.Errorf("KubernetesMachineIdentityAuth: Unable to complete api request [err=%s]", err)
+		return "", errors.NewGenericRequestError(operationKubernetesMachineIdentityAuth, err)
 	}
 
 	if res.IsError() {
-		return "", fmt.Errorf("KubernetesMachineIdentityAuth: Unsuccessful response: [response=%s]", res)
+		return "", errors.NewAPIErrorWithResponse(operationKubernetesMachineIdentityAuth, res, nil)
 	}
 
 	return loginResponse.AccessToken, nil
@@ -127,4 +139,26 @@ func (client Client) TokenMachineIdentityAuth() (string, error) {
 	}
 
 	return client.Config.Token, nil
+}
+
+func (client Client) AwsIamMachineIdentityAuth() (string, error) {
+	if client.Config.IdentityId == "" {
+		return "", fmt.Errorf("you must set the identity ID for the client before making calls")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	infisicalClient := infisicalSdk.NewInfisicalClient(ctx, infisicalSdk.Config{
+		SiteUrl:          client.Config.HostURL,
+		AutoTokenRefresh: false,
+	})
+
+	credential, err := infisicalClient.Auth().AwsIamAuthLogin(client.Config.IdentityId)
+
+	if err != nil {
+		return "", fmt.Errorf("AwsIamMachineIdentityAuth: Unable to get machine identity token [err=%s]", err)
+	}
+
+	return credential.AccessToken, nil
 }

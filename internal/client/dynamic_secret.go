@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
 )
 
 type DynamicSecretProvider string
@@ -11,6 +12,13 @@ const (
 	DynamicSecretProviderSQLDatabase DynamicSecretProvider = "sql-database"
 	DynamicSecretProviderAWSIAM      DynamicSecretProvider = "aws-iam"
 	DynamicSecretProviderKubernetes  DynamicSecretProvider = "kubernetes"
+)
+
+const (
+	operationCreateDynamicSecret    = "CallCreateDynamicSecret"
+	operationGetDynamicSecretByName = "CallGetDynamicSecretByName"
+	operationUpdateDynamicSecret    = "CallUpdateDynamicSecret"
+	operationDeleteDynamicSecret    = "CallDeleteDynamicSecret"
 )
 
 func (client Client) CreateDynamicSecret(request CreateDynamicSecretRequest) (DynamicSecret, error) {
@@ -23,11 +31,11 @@ func (client Client) CreateDynamicSecret(request CreateDynamicSecretRequest) (Dy
 		Post("api/v1/dynamic-secrets")
 
 	if err != nil {
-		return DynamicSecret{}, fmt.Errorf("CreateDynamicSecret: Unable to complete api request [err=%s]", err)
+		return DynamicSecret{}, errors.NewGenericRequestError(operationCreateDynamicSecret, err)
 	}
 
 	if response.IsError() {
-		return DynamicSecret{}, fmt.Errorf("CreateDynamicSecret: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DynamicSecret{}, errors.NewAPIErrorWithResponse(operationCreateDynamicSecret, response, nil)
 	}
 
 	return body.DynamicSecret, nil
@@ -45,7 +53,7 @@ func (client Client) GetDynamicSecretByName(request GetDynamicSecretByNameReques
 		Get(fmt.Sprintf("api/v1/dynamic-secrets/%s", request.Name))
 
 	if err != nil {
-		return DynamicSecret{}, fmt.Errorf("GetDynamicSecretByName: Unable to complete api request [err=%s]", err)
+		return DynamicSecret{}, errors.NewGenericRequestError(operationGetDynamicSecretByName, err)
 	}
 
 	if response.StatusCode() == http.StatusNotFound {
@@ -53,7 +61,7 @@ func (client Client) GetDynamicSecretByName(request GetDynamicSecretByNameReques
 	}
 
 	if response.IsError() {
-		return DynamicSecret{}, fmt.Errorf("GetDynamicSecretByName: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DynamicSecret{}, errors.NewAPIErrorWithResponse(operationGetDynamicSecretByName, response, nil)
 	}
 
 	return body.DynamicSecret, nil
@@ -69,11 +77,11 @@ func (client Client) UpdateDynamicSecret(request UpdateDynamicSecretRequest) (Dy
 		Patch(fmt.Sprintf("api/v1/dynamic-secrets/%s", request.Name))
 
 	if err != nil {
-		return DynamicSecret{}, fmt.Errorf("UpdateDynamicSecret: Unable to complete api request [err=%s]", err)
+		return DynamicSecret{}, errors.NewGenericRequestError(operationUpdateDynamicSecret, err)
 	}
 
 	if response.IsError() {
-		return DynamicSecret{}, fmt.Errorf("UpdateDynamicSecret: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DynamicSecret{}, errors.NewAPIErrorWithResponse(operationUpdateDynamicSecret, response, nil)
 	}
 
 	return body.DynamicSecret, nil
@@ -89,11 +97,11 @@ func (client Client) DeleteDynamicSecret(request DeleteDynamicSecretRequest) (Dy
 		Delete(fmt.Sprintf("api/v1/dynamic-secrets/%s", request.Name))
 
 	if err != nil {
-		return DynamicSecret{}, fmt.Errorf("DeleteDynamicSecret: Unable to complete api request [err=%s]", err)
+		return DynamicSecret{}, errors.NewGenericRequestError(operationDeleteDynamicSecret, err)
 	}
 
 	if response.IsError() {
-		return DynamicSecret{}, fmt.Errorf("DeleteDynamicSecret: Unsuccessful response. [response=%s]", string(response.Body()))
+		return DynamicSecret{}, errors.NewAPIErrorWithResponse(operationDeleteDynamicSecret, response, nil)
 	}
 
 	return body.DynamicSecret, nil

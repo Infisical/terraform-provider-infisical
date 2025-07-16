@@ -3,6 +3,16 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreateProject                  = "CallCreateProject"
+	operationDeleteProject                  = "CallDeleteProject"
+	operationGetProject                     = "CallGetProject"
+	operationUpdateProject                  = "CallUpdateProject"
+	operationUpdateProjectAuditLogRetention = "CallUpdateProjectAuditLogRetention"
+	operationGetProjectById                 = "CallGetProjectById"
 )
 
 func (client Client) CreateProject(request CreateProjectRequest) (CreateProjectResponse, error) {
@@ -23,11 +33,11 @@ func (client Client) CreateProject(request CreateProjectRequest) (CreateProjectR
 		Post("api/v2/workspace")
 
 	if err != nil {
-		return CreateProjectResponse{}, fmt.Errorf("CallCreateProject: Unable to complete api request [err=%s]", err)
+		return CreateProjectResponse{}, errors.NewGenericRequestError(operationCreateProject, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectResponse{}, fmt.Errorf("CallCreateProject: Unsuccessful response. [response=%s]", response)
+		return CreateProjectResponse{}, errors.NewAPIErrorWithResponse(operationCreateProject, response, nil)
 	}
 
 	return projectResponse, nil
@@ -42,11 +52,11 @@ func (client Client) DeleteProject(request DeleteProjectRequest) error {
 		Delete(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
 
 	if err != nil {
-		return fmt.Errorf("CallDeleteProject: Unable to complete api request [err=%s]", err)
+		return errors.NewGenericRequestError(operationDeleteProject, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallDeleteProject: Unsuccessful response. [response=%s]", response)
+		return errors.NewAPIErrorWithResponse(operationDeleteProject, response, nil)
 	}
 
 	return nil
@@ -61,7 +71,7 @@ func (client Client) GetProject(request GetProjectRequest) (ProjectWithEnvironme
 		Get(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
 
 	if err != nil {
-		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unable to complete api request [err=%s]", err)
+		return ProjectWithEnvironments{}, errors.NewGenericRequestError(operationGetProject, err)
 	}
 
 	if response.StatusCode() == http.StatusNotFound {
@@ -69,7 +79,7 @@ func (client Client) GetProject(request GetProjectRequest) (ProjectWithEnvironme
 	}
 
 	if response.IsError() {
-		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProject: Unsuccessful response. [response=%s]", response)
+		return ProjectWithEnvironments{}, errors.NewAPIErrorWithResponse(operationGetProject, response, nil)
 	}
 
 	return projectResponse, nil
@@ -85,11 +95,11 @@ func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectR
 		Patch(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
 
 	if err != nil {
-		return UpdateProjectResponse{}, fmt.Errorf("CallUpdateProject: Unable to complete api request [err=%s]", err)
+		return UpdateProjectResponse{}, errors.NewGenericRequestError(operationUpdateProject, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectResponse{}, fmt.Errorf("CallUpdateProject: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProject, response, nil)
 	}
 
 	return projectResponse, nil
@@ -105,11 +115,11 @@ func (client Client) UpdateProjectAuditLogRetention(request UpdateProjectAuditLo
 		Put(fmt.Sprintf("api/v1/workspace/%s/audit-logs-retention", request.ProjectSlug))
 
 	if err != nil {
-		return UpdateProjectAuditLogRetentionResponse{}, fmt.Errorf("CallUpdateProjectAuditLogRetention: Unable to complete api request [err=%s]", err)
+		return UpdateProjectAuditLogRetentionResponse{}, errors.NewGenericRequestError(operationUpdateProjectAuditLogRetention, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectAuditLogRetentionResponse{}, fmt.Errorf("CallUpdateProjectAuditLogRetention: Unsuccessful response. [response=%s]", response)
+		return UpdateProjectAuditLogRetentionResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectAuditLogRetention, response, nil)
 	}
 
 	return projectResponse, nil
@@ -124,14 +134,14 @@ func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithE
 		Get(fmt.Sprintf("api/v1/workspace/%s", request.ID))
 
 	if err != nil {
-		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unable to complete api request [err=%s]", err)
+		return ProjectWithEnvironments{}, errors.NewGenericRequestError(operationGetProjectById, err)
 	}
 
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
 			return ProjectWithEnvironments{}, ErrNotFound
 		}
-		return ProjectWithEnvironments{}, fmt.Errorf("CallGetProjectById: Unsuccessful response. [response=%s]", response)
+		return ProjectWithEnvironments{}, errors.NewAPIErrorWithResponse(operationGetProjectById, response, nil)
 	}
 
 	return projectResponse.Workspace, nil
