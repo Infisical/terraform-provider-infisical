@@ -87,7 +87,7 @@ resource "infisical_secret_sync_1password" "one-password-secret-sync-demo" {
 
 Required:
 
-- `vault_id` (String) The The ID of the 1Password vault to sync secrets to
+- `vault_id` (String) The ID of the 1Password vault to sync secrets to
 
 Optional:
 
