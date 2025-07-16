@@ -64,7 +64,7 @@ resource "infisical_app_connection_1password" "one-password-demo" {
 <a id="nestedatt--credentials"></a>
 ### Nested Schema for `credentials`
 
-Optional:
+Required:
 
 - `api_token` (String, Sensitive) The API token to use for authentication. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/1password
 - `instance_url` (String, Sensitive) The URL of the 1Password Connect instance to connect to. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/1password

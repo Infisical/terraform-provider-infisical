@@ -28,12 +28,12 @@ func NewAppConnection1PasswordResource() resource.Resource {
 		AllowedMethods:    []string{AppConnection1PasswordAuthMethodApiToken},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"instance_url": schema.StringAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "The URL of the 1Password Connect instance to connect to. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/1password",
 				Sensitive:   true,
 			},
 			"api_token": schema.StringAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "The API token to use for authentication. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/1password",
 				Sensitive:   true,
 			},
