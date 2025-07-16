@@ -35,7 +35,7 @@ func NewSecretSync1PasswordResource() resource.Resource {
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vault_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The ID of the 1Password vault to sync secrets from",
+				Description: "The The ID of the 1Password vault to sync secrets to",
 			},
 			"value_label": schema.StringAttribute{
 				Optional:    true,

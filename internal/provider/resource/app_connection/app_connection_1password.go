@@ -55,21 +55,6 @@ func NewAppConnection1PasswordResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentials.InstanceUrl.IsNull() || credentials.InstanceUrl.ValueString() == "" {
-				diags.AddError(
-					"Unable to create 1Password app connection",
-					"instance_url field must be defined in api-token method",
-				)
-				return nil, diags
-			}
-			if credentials.ApiToken.IsNull() || credentials.ApiToken.ValueString() == "" {
-				diags.AddError(
-					"Unable to create 1Password app connection",
-					"api_token field must be defined in api-token method",
-				)
-				return nil, diags
-			}
-
 			credentialsConfig["instanceUrl"] = credentials.InstanceUrl.ValueString()
 			credentialsConfig["apiToken"] = credentials.ApiToken.ValueString()
 
@@ -94,21 +79,6 @@ func NewAppConnection1PasswordResource() resource.Resource {
 				diags.AddError(
 					"Unable to update 1Password app connection",
 					"Invalid method. Only api-token method is supported",
-				)
-				return nil, diags
-			}
-
-			if credentialsFromPlan.InstanceUrl.IsNull() || credentialsFromPlan.InstanceUrl.ValueString() == "" {
-				diags.AddError(
-					"Unable to update 1Password app connection",
-					"instance_url field must be defined in api-token method",
-				)
-				return nil, diags
-			}
-			if credentialsFromPlan.ApiToken.IsNull() || credentialsFromPlan.ApiToken.ValueString() == "" {
-				diags.AddError(
-					"Unable to update 1Password app connection",
-					"api_token field must be defined in api-token method",
 				)
 				return nil, diags
 			}
