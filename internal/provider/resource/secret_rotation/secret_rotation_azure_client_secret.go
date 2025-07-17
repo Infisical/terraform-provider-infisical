@@ -28,7 +28,7 @@ func NewSecretRotationAzureClientSecretResource() resource.Resource {
 		Provider:           infisical.SecretRotationProviderAzureClientSecret,
 		SecretRotationName: "Azure Client Secret",
 		ResourceTypeName:   "_secret_rotation_azure_client_secret",
-		AppConnection:      infisical.AppConnectionAppAzureClientSecrets,
+		AppConnection:      infisical.AppConnectionAppAzure,
 		ParametersAttributes: map[string]schema.Attribute{
 			"object_id": schema.StringAttribute{
 				Required:    true,
