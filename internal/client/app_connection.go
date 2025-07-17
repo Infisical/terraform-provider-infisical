@@ -21,6 +21,7 @@ const (
 	AppConnectionAppGithub             AppConnectionApp = "github"
 	AppConnectionAppMySql              AppConnectionApp = "mysql"
 	AppConnectionAppAzureClientSecrets AppConnectionApp = "azure-client-secrets"
+	AppConnectionApp1Password          AppConnectionApp = "1password"
 )
 
 const (
