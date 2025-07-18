@@ -17,6 +17,7 @@ const (
 	SecretSyncAppAzureDevOps           SecretSyncApp = "azure-devops"
 	SecretSyncAppGithub                SecretSyncApp = "github"
 	SecretSyncApp1Password             SecretSyncApp = "1password"
+	SecretSyncAppRender                SecretSyncApp = "render"
 )
 
 type SecretSyncBehavior string
