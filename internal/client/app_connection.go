@@ -20,6 +20,7 @@ const (
 	AppConnectionAppAzure     AppConnectionApp = "azure"
 	AppConnectionAppGithub    AppConnectionApp = "github"
 	AppConnectionApp1Password AppConnectionApp = "1password"
+	AppConnectionAppRender    AppConnectionApp = "render"
 )
 
 const (
