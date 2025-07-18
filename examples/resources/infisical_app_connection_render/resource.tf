@@ -22,6 +22,6 @@ resource "infisical_app_connection_render" "render-demo" {
   description = "This is a demo render connection."
   method      = "api-key"
   credentials = {
-    api_key    = "<api-key>"
+    api_key = "<api-key>"
   }
 }
