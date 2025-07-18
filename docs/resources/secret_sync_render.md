@@ -47,7 +47,7 @@ resource "infisical_secret_sync_render" "render-secret-sync-demo" {
   project_id    = "<project-id>"
   environment   = "<environment-slug>"
   secret_path   = "<secret-path>"
-  connection_id = infisical_app_connection_render.one-password-app-connection-demo.id
+  connection_id = infisical_app_connection_render.render-app-connection-demo.id
   destination_config = {
     service_id = "<service-id>"
     scope      = "<scope>" // Supported options: service
@@ -87,9 +87,9 @@ resource "infisical_secret_sync_render" "render-secret-sync-demo" {
 
 Required:
 
-- `scope` (String) The Render scope that secrets should be synced to.
+- `scope` (String) The Render scope that secrets should be synced to. Supported options: service
 - `service_id` (String) The ID of the Render service to sync secrets to.
-- `type` (String) The Render resource type to sync secrets to.
+- `type` (String) The Render resource type to sync secrets to. Supported options: env, file
 
 
 <a id="nestedatt--sync_options"></a>

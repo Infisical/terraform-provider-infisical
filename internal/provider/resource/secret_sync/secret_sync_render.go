@@ -55,7 +55,7 @@ func verifyRenderDestinationConfigState(destinationConfig map[string]attr.Value,
 	case "service":
 		requiredFields = []string{"scope", "service_id", "type"}
 	default:
-		diags.AddError("Invalid config", fmt.Sprintf("Invalid scope '%s'", scope))
+		diags.AddError("Invalid config", fmt.Sprintf("Invalid scope '%s' expected options 'service'", scope))
 		return false
 	}
 
@@ -79,7 +79,7 @@ func verifyRenderDestinationConfigState(destinationConfig map[string]attr.Value,
 	syncType := RenderSyncType(typeVal.ValueString())
 
 	if syncType != RenderSyncTypeEnv && syncType != RenderSyncTypeFile {
-		diags.AddError("Invalid destination config", fmt.Sprintf("Invalid type '%s'.", syncType))
+		diags.AddError("Invalid destination config", fmt.Sprintf("Invalid type '%s' expected options 'env', 'file'", syncType))
 	}
 
 	// Check required fields are not empty
@@ -140,7 +140,7 @@ func NewSecretSyncRenderResource() resource.Resource {
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{
 				Required:    true,
-				Description: "The Render scope that secrets should be synced to.",
+				Description: "The Render scope that secrets should be synced to. Supported options: service",
 			},
 			"service_id": schema.StringAttribute{
 				Required:    true,
@@ -148,7 +148,7 @@ func NewSecretSyncRenderResource() resource.Resource {
 			},
 			"type": schema.StringAttribute{
 				Required:    true,
-				Description: "The Render resource type to sync secrets to.",
+				Description: "The Render resource type to sync secrets to. Supported options: env, file",
 			},
 		},
 		SyncOptionsAttributes: map[string]schema.Attribute{

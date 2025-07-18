@@ -32,7 +32,7 @@ resource "infisical_secret_sync_render" "render-secret-sync-demo" {
   project_id    = "<project-id>"
   environment   = "<environment-slug>"
   secret_path   = "<secret-path>"
-  connection_id = infisical_app_connection_render.one-password-app-connection-demo.id
+  connection_id = infisical_app_connection_render.render-app-connection-demo.id
   destination_config = {
     service_id = "<service-id>"
     scope      = "<scope>" // Supported options: service
