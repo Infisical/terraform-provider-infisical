@@ -9,6 +9,7 @@ import (
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
 	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
+	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -362,6 +363,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionAwsResource,
 		appConnectionResource.NewAppConnection1PasswordResource,
 		appConnectionResource.NewAppConnectionRenderResource,
+		appConnectionResource.NewAppConnectionMySqlResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
@@ -374,6 +376,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,
+		secretRotationResource.NewSecretRotationMySqlCredentialsResource,
+		secretRotationResource.NewSecretRotationAzureClientSecretResource,
 	}
 }
 
