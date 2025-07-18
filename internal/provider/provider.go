@@ -370,6 +370,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncGithubResource,
 		secretSyncResource.NewSecretSync1PasswordResource,
 		secretSyncResource.NewSecretSyncAzureDevOpsResource,
+		secretSyncResource.NewSecretSyncRenderResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,
