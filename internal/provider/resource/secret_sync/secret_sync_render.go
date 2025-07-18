@@ -50,7 +50,7 @@ func verifyRenderDestinationConfigState(destinationConfig map[string]attr.Value,
 	scope := RenderSyncScope(scopeVal.ValueString())
 
 	var requiredFields []string
-	print(scope)
+
 	switch scope {
 	case "service":
 		requiredFields = []string{"scope", "service_id", "type"}
@@ -71,7 +71,7 @@ func verifyRenderDestinationConfigState(destinationConfig map[string]attr.Value,
 		return false
 	}
 
-	if scopeVal.IsNull() || scopeVal.IsUnknown() {
+	if typeVal.IsNull() || typeVal.IsUnknown() {
 		diags.AddError("Invalid destination config", "Expected 'type' to have a value")
 		return false
 	}
