@@ -79,20 +79,20 @@ func verifyRenderDestinationConfigState(destinationConfig map[string]attr.Value,
 	syncType := RenderSyncType(typeVal.ValueString())
 
 	if syncType != RenderSyncTypeEnv && syncType != RenderSyncTypeFile {
-		diags.AddError("Invalid destination config", fmt.Sprintf("Invalid type '%s' for type '%s'."))
+		diags.AddError("Invalid destination config", fmt.Sprintf("Invalid type '%s'.", syncType))
 	}
 
 	// Check required fields are not empty
 	for _, field := range requiredFields {
 		value, exists := destinationConfig[field]
 		if !exists {
-			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be present", field, scope))
+			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be present", field))
 			return false
 		}
 
 		// Check if the value is null, unknown, or empty based on its type
 		if terraform.IsAttrValueEmpty(value) {
-			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be set", field, scope))
+			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be set", field))
 			return false
 		}
 	}
