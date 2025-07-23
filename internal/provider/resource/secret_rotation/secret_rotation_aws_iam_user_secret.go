@@ -23,7 +23,7 @@ type SecretRotationAwsIAMSecretSecretsMappingModel struct {
 	SecretAccessKey types.String `tfsdk:"secret_access_key"`
 }
 
-func NewSecretRotationAwsIAMSecretResource() resource.Resource {
+func NewSecretRotationAwsIamSecretResource() resource.Resource {
 	return &SecretRotationBaseResource{
 		Provider:           infisical.SecretRotationProviderAwsIamUserSecret,
 		SecretRotationName: "AWS IAM User Secret",

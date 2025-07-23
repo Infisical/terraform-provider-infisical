@@ -33,7 +33,7 @@ provider "infisical" {
 }
 
 resource "infisical_secret_rotation_aws_iam_user_secret" "aws-iam-user-secret" {
-  name          = "azure-client-secret-secret-rotation-example"
+  name          = "aws-iam-user-secret-rotation-example"
   project_id    = "<project-id>"
   environment   = "<environment-slug>"
   secret_path   = "<secret-path>" # Root folder is /
@@ -45,8 +45,8 @@ resource "infisical_secret_rotation_aws_iam_user_secret" "aws-iam-user-secret" {
   }
 
   secrets_mapping = {
-    access_key_id     = "<aws-access-key-id>"
-    secret_access_key = "<aws-secret-access-key>"
+    access_key_id     = "AWS_ACCESS_KEY_ID"
+    secret_access_key = "AWS_SECRET_ACCESS_KEY"
   }
 }
 ```
