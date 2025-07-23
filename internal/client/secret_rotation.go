@@ -10,6 +10,7 @@ type SecretRotationProvider string
 const (
 	SecretRotationProviderMySqlCredentials  SecretRotationProvider = "mysql-credentials"
 	SecretRotationProviderAzureClientSecret SecretRotationProvider = "azure-client-secret"
+	SecretRotationProviderAwsIamUserSecret  SecretRotationProvider = "aws-iam-user-secret"
 )
 
 const (
