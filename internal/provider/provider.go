@@ -379,6 +379,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationMySqlCredentialsResource,
 		secretRotationResource.NewSecretRotationAzureClientSecretResource,
 		secretRotationResource.NewSecretRotationAwsIamUserSecretResource,
+		infisicalResource.NewProjectTemplateResource,
 	}
 }
 
