@@ -23,10 +23,10 @@ resource "infisical_project" "example" {
 }
 
 resource "infisical_secret_approval_policy" "prod-policy" {
-  project_id       = infisical_project.example.id
-  name             = "my-prod-policy"
-  environment_slug = "prod"
-  secret_path      = "/"
+  project_id        = infisical_project.example.id
+  name              = "my-prod-policy"
+  environment_slugs = ["prod"]
+  secret_path       = "/"
   approvers = [
     {
       type = "group"
