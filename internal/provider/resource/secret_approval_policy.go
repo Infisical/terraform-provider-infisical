@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -36,6 +37,7 @@ type secretApprovalPolicyResourceModel struct {
 	ProjectID         types.String     `tfsdk:"project_id"`
 	Name              types.String     `tfsdk:"name"`
 	EnvironmentSlug   types.String     `tfsdk:"environment_slug"`
+	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
 	SecretPath        types.String     `tfsdk:"secret_path"`
 	Approvers         []SecretApprover `tfsdk:"approvers"`
 	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
@@ -69,8 +71,13 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"environment_slug": schema.StringAttribute{
-				Description: "The environment to apply the secret approval policy to",
-				Required:    true,
+				Description: " (DEPRECATED, Use environment_slugs instead) The environment to apply the secret approval policy to",
+				Optional:    true,
+			},
+			"environment_slugs": schema.ListAttribute{
+				Description: "The environments to apply the secret approval policy to",
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 			"secret_path": schema.StringAttribute{
 				Description: "The secret path to apply the secret approval policy to",
@@ -197,10 +204,22 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		})
 	}
 
+	var environments []string
+	if !plan.EnvironmentSlugs.IsNull() {
+		environments = infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
+	} else {
+		environments = []string{plan.EnvironmentSlug.ValueString()}
+	}
+	var environment string
+	if len(environments) > 0 {
+		environment = environments[0]
+	}
+
 	secretApprovalPolicy, err := r.client.CreateSecretApprovalPolicy(infisical.CreateSecretApprovalPolicyRequest{
 		Name:                 plan.Name.ValueString(),
 		ProjectID:            plan.ProjectID.ValueString(),
-		Environment:          plan.EnvironmentSlug.ValueString(),
+		Environments:         environments,
+		Environment:          environment,
 		SecretPath:           plan.SecretPath.ValueString(),
 		Approvers:            approvers,
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
@@ -282,6 +301,27 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 	}
 
+	if len(secretApprovalPolicy.SecretApprovalPolicy.Environments) > 0 {
+		// Extract environment slugs from the environment objects
+		var environmentSlugs []string
+		for _, env := range secretApprovalPolicy.SecretApprovalPolicy.Environments {
+			environmentSlugs = append(environmentSlugs, env.Slug)
+		}
+
+		// Always set the new environment_slugs field
+		environmentSlugsList, diags := types.ListValueFrom(ctx, types.StringType, environmentSlugs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.EnvironmentSlugs = environmentSlugsList
+
+		// For backward compatibility, set environment_slug if there's exactly one environment
+		if len(environmentSlugs) == 1 && !state.EnvironmentSlug.IsNull() {
+			state.EnvironmentSlug = types.StringValue(environmentSlugs[0])
+		}
+	}
+
 	state.Approvers = approvers
 
 	diags = resp.State.Set(ctx, &state)
@@ -323,7 +363,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	if state.EnvironmentSlug != plan.EnvironmentSlug {
+	if state.EnvironmentSlug != plan.EnvironmentSlug && infisicaltf.IsAttrValueEmpty(plan.EnvironmentSlugs) {
 		resp.Diagnostics.AddError(
 			"Unable to update secret approval policy",
 			fmt.Sprintf("Cannot change environment, previous environment: %s, new environment: %s", state.EnvironmentSlug, plan.EnvironmentSlug),
@@ -374,6 +414,12 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		})
 	}
 
+	var environments []string
+	if !plan.EnvironmentSlugs.IsNull() {
+		environments = infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
+	} else {
+		environments = []string{plan.EnvironmentSlug.ValueString()}
+	}
 	_, err := r.client.UpdateSecretApprovalPolicy(infisical.UpdateSecretApprovalPolicyRequest{
 		ID:                   plan.ID.ValueString(),
 		Name:                 plan.Name.ValueString(),
@@ -382,6 +428,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
+		Environments:         environments,
 	})
 
 	if err != nil {
