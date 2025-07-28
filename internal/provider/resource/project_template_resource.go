@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -217,7 +216,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	roles := []infisical.Role{}
 
 	if !plan.Roles.IsNull() || !plan.Roles.IsUnknown() {
-		roles, diags = r.unmarshalRoles(ctx, plan.Roles)
+		roles, diags = r.unmarshalRoles(plan.Roles)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -246,7 +245,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	plan.Description = types.StringValue(res.Description)
 	plan.Type = types.StringValue(res.Type)
 
-	plan.Roles, diags = r.marshalRoles(ctx, res.Roles)
+	plan.Roles, diags = r.marshalRoles(res.Roles)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -309,7 +308,7 @@ func (r *ProjectTemplateResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	plan.Roles, diags = r.marshalRoles(ctx, template.Roles)
+	plan.Roles, diags = r.marshalRoles(template.Roles)
 
 	resp.Diagnostics.Append(diags...)
 
@@ -352,7 +351,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	var environments []infisical.Environment
 
 	if !plan.Roles.IsNull() && !plan.Roles.IsUnknown() {
-		roles, diags = r.unmarshalRoles(ctx, plan.Roles)
+		roles, diags = r.unmarshalRoles(plan.Roles)
 		resp.Diagnostics.Append(diags...)
 	}
 
@@ -390,7 +389,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	plan.Description = types.StringValue(apiResp.Description)
 	plan.Type = types.StringValue(apiResp.Type)
 
-	plan.Roles, diags = r.marshalRoles(ctx, apiResp.Roles)
+	plan.Roles, diags = r.marshalRoles(apiResp.Roles)
 	resp.Diagnostics.Append(diags...)
 
 	plan.Environments, diags = r.marshalEnvironments(apiResp.Environments)
@@ -422,9 +421,6 @@ func (r *ProjectTemplateResource) Delete(ctx context.Context, req resource.Delet
 
 	if err != nil {
 		if err == infisical.ErrNotFound {
-			tflog.Warn(ctx, "Resource not found during delete; assuming it's already gone", map[string]any{
-				"id": state.ID.ValueString(),
-			})
 			return
 		}
 
@@ -438,7 +434,7 @@ func (r *ProjectTemplateResource) Delete(ctx context.Context, req resource.Delet
 	state.ID = types.StringNull()
 }
 
-func (r ProjectTemplateResource) marshalRoles(ctx context.Context, roles []infisical.Role) (types.List, diag.Diagnostics) {
+func (r ProjectTemplateResource) marshalRoles(roles []infisical.Role) (types.List, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	var tfValues []attr.Value
 
@@ -526,7 +522,7 @@ func (r ProjectTemplateResource) marshalRoles(ctx context.Context, roles []infis
 	return tfList, diags
 }
 
-func (r ProjectTemplateResource) unmarshalRoles(ctx context.Context, tfRoles types.List) ([]infisical.Role, diag.Diagnostics) {
+func (r ProjectTemplateResource) unmarshalRoles(tfRoles types.List) ([]infisical.Role, diag.Diagnostics) {
 	roles := make([]infisical.Role, len(tfRoles.Elements()))
 	var diags diag.Diagnostics
 
@@ -549,9 +545,6 @@ func (r ProjectTemplateResource) unmarshalRoles(ctx context.Context, tfRoles typ
 		}
 
 		if isDefaultRole(role.Slug) {
-			tflog.Warn(ctx, "Skipping default role", map[string]any{
-				"role_slug": role.Slug,
-			})
 			continue
 		}
 
@@ -617,11 +610,6 @@ func (r ProjectTemplateResource) unmarshalRoles(ctx context.Context, tfRoles typ
 				}
 
 				if condition, ok := attrs["conditions"].(types.String); ok && !condition.IsNull() {
-					tflog.Info(ctx, "Unmarshalling conditions for permission", map[string]any{
-						"permission_subject": permission.Subject,
-						"conditions":         condition.ValueString(),
-					})
-
 					err := json.Unmarshal([]byte(condition.ValueString()), &permission.Conditions)
 
 					if err != nil {
