@@ -316,7 +316,7 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 
 	state.Approvers = approvers
 
-	if len(accessApprovalPolicy.AccessApprovalPolicy.Environments) > 0 {
+	if len(accessApprovalPolicy.AccessApprovalPolicy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
 		// Extract environment slugs from the environment objects
 		var environmentSlugs []string
 		for _, env := range accessApprovalPolicy.AccessApprovalPolicy.Environments {

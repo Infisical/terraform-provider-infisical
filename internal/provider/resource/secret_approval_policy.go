@@ -301,7 +301,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 	}
 
-	if len(secretApprovalPolicy.SecretApprovalPolicy.Environments) > 0 {
+	if len(secretApprovalPolicy.SecretApprovalPolicy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
 		// Extract environment slugs from the environment objects
 		var environmentSlugs []string
 		for _, env := range secretApprovalPolicy.SecretApprovalPolicy.Environments {
