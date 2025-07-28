@@ -22,8 +22,33 @@ resource "infisical_project_template" "example-project" {
   description = "This is an example project"
   type        = "secret-manager"
   environments = [{
-    "name" : "development",
-    "slug" : "dev",
-    "position" : 1
+    name     = "development",
+    slug     = "dev",
+    position = 1
+  }]
+
+  roles = [{
+    name = "Test",
+    slug = "test",
+    permissions = [
+      {
+        action   = ["edit"]
+        subject  = "secret-folders",
+        inverted = true,
+      },
+      {
+        action  = ["read", "edit"]
+        subject = "secrets",
+        conditions = jsonencode({
+          environment = {
+            "$in" = ["dev", "prod"]
+            "$eq" = "dev"
+          }
+          secretPath = {
+            "$eq" = "/"
+          }
+        })
+      },
+    ]
   }]
 }

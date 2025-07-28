@@ -2355,7 +2355,7 @@ type ProjectTemplate struct {
 }
 
 type Environment struct {
-	Name     string `json:"name" tfsdk:""`
+	Name     string `json:"name"`
 	Slug     string `json:"slug"`
 	Position int64  `json:"position"`
 }
@@ -2373,10 +2373,10 @@ type Role struct {
 }
 
 type Permission struct {
-	Subject   string               `json:"subject"`
-	Action    []string             `json:"action"`
-	Condition *PermissionCondition `json:"conditions,omitempty"`
-	Inverted  bool                 `json:"inverted"`
+	Subject    string         `json:"subject"`
+	Action     []string       `json:"action"`
+	Conditions map[string]any `json:"conditions,omitempty"`
+	Inverted   bool           `json:"inverted"`
 }
 
 type CreateProjectTemplateRequest struct {

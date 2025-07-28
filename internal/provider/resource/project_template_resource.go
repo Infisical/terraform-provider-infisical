@@ -86,7 +86,7 @@ func (r *ProjectTemplateResource) Schema(_ context.Context, _ resource.SchemaReq
 				Optional:    true,
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of the project template",
+				Description: "The type of the project template. Refer to the documentation here https://infisical.com/docs/api-reference/endpoints/project-templates/create#body-type for the available options",
 				Required:    true,
 			},
 			"roles": schema.ListNestedAttribute{
@@ -105,7 +105,8 @@ func (r *ProjectTemplateResource) Schema(_ context.Context, _ resource.SchemaReq
 						},
 						"permissions": schema.ListNestedAttribute{
 							Optional:    true,
-							Description: "The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
+							Computed:    true,
+							Description: "The permissions assigned to the role. Refer to the documentation here https://infisical.com/docs/api-reference/endpoints/project-templates/create#body-roles-permissions for its usage.",
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"action": schema.SetAttribute{
@@ -216,7 +217,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	roles := []infisical.Role{}
 
 	if !plan.Roles.IsNull() || !plan.Roles.IsUnknown() {
-		roles, diags = r.unmarshalRoles(plan.Roles)
+		roles, diags = r.unmarshalRoles(ctx, plan.Roles)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -245,7 +246,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	plan.Description = types.StringValue(res.Description)
 	plan.Type = types.StringValue(res.Type)
 
-	plan.Roles, diags = r.marshalRoles(res.Roles)
+	plan.Roles, diags = r.marshalRoles(ctx, res.Roles)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -301,13 +302,15 @@ func (r *ProjectTemplateResource) Read(ctx context.Context, req resource.ReadReq
 	plan.Type = types.StringValue(template.Type)
 
 	plan.Environments, diags = r.marshalEnvironments(template.Environments)
+
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	plan.Roles, diags = r.marshalRoles(template.Roles)
+	plan.Roles, diags = r.marshalRoles(ctx, template.Roles)
+
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
@@ -349,7 +352,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	var environments []infisical.Environment
 
 	if !plan.Roles.IsNull() && !plan.Roles.IsUnknown() {
-		roles, diags = r.unmarshalRoles(plan.Roles)
+		roles, diags = r.unmarshalRoles(ctx, plan.Roles)
 		resp.Diagnostics.Append(diags...)
 	}
 
@@ -387,7 +390,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	plan.Description = types.StringValue(apiResp.Description)
 	plan.Type = types.StringValue(apiResp.Type)
 
-	plan.Roles, diags = r.marshalRoles(apiResp.Roles)
+	plan.Roles, diags = r.marshalRoles(ctx, apiResp.Roles)
 	resp.Diagnostics.Append(diags...)
 
 	plan.Environments, diags = r.marshalEnvironments(apiResp.Environments)
@@ -435,7 +438,7 @@ func (r *ProjectTemplateResource) Delete(ctx context.Context, req resource.Delet
 	state.ID = types.StringNull()
 }
 
-func (r ProjectTemplateResource) marshalRoles(roles []infisical.Role) (types.List, diag.Diagnostics) {
+func (r ProjectTemplateResource) marshalRoles(ctx context.Context, roles []infisical.Role) (types.List, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	var tfValues []attr.Value
 
@@ -458,11 +461,11 @@ func (r ProjectTemplateResource) marshalRoles(roles []infisical.Role) (types.Lis
 	}
 
 	for _, role := range roles {
-		if isDefaultPermissionScope(role.Slug) {
+		if isDefaultRole(role.Slug) {
 			continue
 		}
 
-		var permissions []attr.Value
+		permissions := []attr.Value{}
 
 		for _, p := range role.Permissions {
 			var actionValues []attr.Value
@@ -480,8 +483,8 @@ func (r ProjectTemplateResource) marshalRoles(roles []infisical.Role) (types.Lis
 				"inverted":   types.BoolValue(p.Inverted),
 			}
 
-			if p.Condition != nil {
-				encodedConditions, err := json.Marshal(p.Condition)
+			if p.Conditions != nil {
+				encodedConditions, err := json.Marshal(p.Conditions)
 				if err != nil {
 					diags.AddError(
 						"Error marshalling conditions",
@@ -523,11 +526,11 @@ func (r ProjectTemplateResource) marshalRoles(roles []infisical.Role) (types.Lis
 	return tfList, diags
 }
 
-func (r ProjectTemplateResource) unmarshalRoles(tfRoles types.List) ([]infisical.Role, diag.Diagnostics) {
-	var roles []infisical.Role
+func (r ProjectTemplateResource) unmarshalRoles(ctx context.Context, tfRoles types.List) ([]infisical.Role, diag.Diagnostics) {
+	roles := make([]infisical.Role, len(tfRoles.Elements()))
 	var diags diag.Diagnostics
 
-	for _, roleVal := range tfRoles.Elements() {
+	for index, roleVal := range tfRoles.Elements() {
 		roleObj, ok := roleVal.(types.Object)
 		if !ok {
 			continue
@@ -535,75 +538,107 @@ func (r ProjectTemplateResource) unmarshalRoles(tfRoles types.List) ([]infisical
 
 		attrs := roleObj.Attributes()
 
-		name := attrs["name"].(types.String)
-		slug := attrs["slug"].(types.String)
+		role := infisical.Role{}
 
-		if isDefaultPermissionScope(slug.ValueString()) {
+		if name, ok := attrs["name"].(types.String); ok {
+			role.Name = name.ValueString()
+		}
+
+		if slug, ok := attrs["slug"].(types.String); ok {
+			role.Slug = slug.ValueString()
+		}
+
+		if isDefaultRole(role.Slug) {
+			tflog.Warn(ctx, "Skipping default role", map[string]any{
+				"role_slug": role.Slug,
+			})
 			continue
 		}
 
-		permissionsList := attrs["permissions"].(types.List)
+		if list, ok := attrs["permissions"].(types.List); ok {
+			permissions := []infisical.Permission{}
 
-		permissions := make([]infisical.Permission, 0, len(permissionsList.Elements()))
+			for _, permVal := range list.Elements() {
 
-		for _, permVal := range permissionsList.Elements() {
-			var permission infisical.Permission
+				permission := infisical.Permission{
+					Conditions: make(map[string]any),
+				}
 
-			permObj, ok := permVal.(types.Object)
+				permObj, ok := permVal.(types.Object)
 
-			if !ok {
-				diags.AddError(
-					"Invalid Permission Object",
-					"Expected a valid permission object, but got an invalid type.",
-				)
-				continue
-			}
+				if !ok {
+					diags.AddError(
+						"Invalid Permission Object",
+						"Expected a valid permission object, but got an invalid type.",
+					)
+					continue
+				}
 
-			attrs := permObj.Attributes()
+				attrs := permObj.Attributes()
 
-			if subject, ok := attrs["subject"].(types.String); ok {
-				permission.Subject = subject.ValueString()
-			}
-
-			if inverted, ok := attrs["inverted"].(types.Bool); ok {
-				permission.Inverted = inverted.ValueBool()
-			}
-
-			if actionList, ok := attrs["action"].(types.Set); ok {
-				var actions []string
-				for _, act := range actionList.Elements() {
-					actionStr, ok := act.(types.String)
-					if !ok {
+				if subject, ok := attrs["subject"].(types.String); ok {
+					if subject.IsNull() || subject.IsUnknown() {
 						diags.AddError(
-							"Invalid Action Type",
-							"Expected a string for action, but got an invalid type.",
+							"Invalid Permission Subject",
+							"Expected a valid permission subject string, but got an invalid type.",
 						)
 						continue
 					}
-					actions = append(actions, actionStr.ValueString())
+
+					permission.Subject = subject.ValueString()
 				}
 
-				permission.Action = actions
+				if inverted, ok := attrs["inverted"].(types.Bool); ok {
+					permission.Inverted = inverted.ValueBool()
+				}
+
+				if actionList, ok := attrs["action"].(types.Set); ok {
+					if actionList.IsNull() || actionList.IsUnknown() {
+						diags.AddError(
+							"Invalid Permission Action",
+							"Expected a valid permission action list, but got an invalid type.",
+						)
+					}
+
+					var actions []string
+					for _, act := range actionList.Elements() {
+						actionStr, ok := act.(types.String)
+						if !ok {
+							diags.AddError(
+								"Invalid Action Type",
+								"Expected a string for action, but got an invalid type.",
+							)
+							continue
+						}
+						actions = append(actions, actionStr.ValueString())
+					}
+
+					permission.Action = actions
+				}
+
+				if condition, ok := attrs["conditions"].(types.String); ok && !condition.IsNull() {
+					tflog.Info(ctx, "Unmarshalling conditions for permission", map[string]any{
+						"permission_subject": permission.Subject,
+						"conditions":         condition.ValueString(),
+					})
+
+					err := json.Unmarshal([]byte(condition.ValueString()), &permission.Conditions)
+
+					if err != nil {
+						diags.AddError(
+							"Error unmarshalling conditions",
+							fmt.Sprintf("Could not unmarshal conditions for permission: %s", err.Error()),
+						)
+					}
+				}
+
+				permissions = append(permissions, permission)
 			}
 
-			if condition, ok := attrs["condition"].(types.Object); ok {
-				var conditionsMap infisical.PermissionCondition
-				err := json.Unmarshal([]byte(condition.String()), &conditionsMap)
-				diags.AddError(
-					"Error unmarshalling conditions",
-					fmt.Sprintf("Could not unmarshal conditions for permission: %s", err.Error()),
-				)
-				permission.Condition = &conditionsMap
-			}
-
-			permissions = append(permissions, permission)
+			role.Permissions = permissions
 		}
 
-		roles = append(roles, infisical.Role{
-			Name:        name.ValueString(),
-			Slug:        slug.ValueString(),
-			Permissions: permissions,
-		})
+		roles[index] = role
 	}
 
 	return roles, diags
@@ -671,6 +706,6 @@ func (r ProjectTemplateResource) unmarshalEnvironments(tfList types.List) ([]inf
 	return envs, diags
 }
 
-func isDefaultPermissionScope(slug string) bool {
+func isDefaultRole(slug string) bool {
 	return slug == "admin" || slug == "member" || slug == "viewer" || slug == "no-access"
 }
