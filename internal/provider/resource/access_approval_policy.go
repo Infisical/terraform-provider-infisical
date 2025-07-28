@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,6 +35,7 @@ type accessApprovalPolicyResourceModel struct {
 	ID                types.String     `tfsdk:"id"`
 	ProjectID         types.String     `tfsdk:"project_id"`
 	Name              types.String     `tfsdk:"name"`
+	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
 	EnvironmentSlug   types.String     `tfsdk:"environment_slug"`
 	SecretPath        types.String     `tfsdk:"secret_path"`
 	Approvers         []AccessApprover `tfsdk:"approvers"`
@@ -66,9 +68,14 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"environment_slugs": schema.ListAttribute{
+				Description: "The environments to apply the access approval policy to",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 			"environment_slug": schema.StringAttribute{
-				Description: "The environment to apply the access approval policy to",
-				Required:    true,
+				Description: "(DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to",
+				Optional:    true,
 			},
 			"secret_path": schema.StringAttribute{
 				Description: "The secret path to apply the access approval policy to",
@@ -200,11 +207,34 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 			Type: el.Type.ValueString(),
 		})
 	}
+	if plan.EnvironmentSlugs.IsNull() && plan.EnvironmentSlug.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error creating access approval policy",
+			"Must provide either environment_slugs or environment_slug",
+		)
+		return
+	}
+
+	environments := make([]string, 0)
+
+	if !plan.EnvironmentSlugs.IsNull() {
+		envSlugs := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
+		if envSlugs != nil {
+			environments = append(environments, envSlugs...)
+		}
+	} else {
+		environments = append(environments, plan.EnvironmentSlug.ValueString())
+	}
+	var environment string
+	if len(environments) > 0 {
+		environment = environments[0]
+	}
 
 	accessApprovalPolicy, err := r.client.CreateAccessApprovalPolicy(infisical.CreateAccessApprovalPolicyRequest{
 		Name:              plan.Name.ValueString(),
 		ProjectSlug:       projectDetail.Slug,
-		Environment:       plan.EnvironmentSlug.ValueString(),
+		Environments:      environments,
+		Environment:       environment,
 		SecretPath:        plan.SecretPath.ValueString(),
 		Approvers:         approvers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
@@ -286,6 +316,27 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 
 	state.Approvers = approvers
 
+	if len(accessApprovalPolicy.AccessApprovalPolicy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
+		// Extract environment slugs from the environment objects
+		var environmentSlugs []string
+		for _, env := range accessApprovalPolicy.AccessApprovalPolicy.Environments {
+			environmentSlugs = append(environmentSlugs, env.Slug)
+		}
+
+		// Always set the new environment_slugs field
+		environmentSlugsList, diags := types.ListValueFrom(ctx, types.StringType, environmentSlugs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.EnvironmentSlugs = environmentSlugsList
+
+		// For backward compatibility, set environment_slug if there's exactly one environment
+		if len(environmentSlugs) == 1 && !state.EnvironmentSlug.IsNull() {
+			state.EnvironmentSlug = types.StringValue(environmentSlugs[0])
+		}
+	}
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -325,7 +376,7 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	if state.EnvironmentSlug != plan.EnvironmentSlug {
+	if state.EnvironmentSlug != plan.EnvironmentSlug && infisicaltf.IsAttrValueEmpty(plan.EnvironmentSlugs) {
 		resp.Diagnostics.AddError(
 			"Unable to update access approval policy",
 			fmt.Sprintf("Cannot change environment, previous environment: %s, new environment: %s", state.EnvironmentSlug, plan.EnvironmentSlug),
@@ -376,6 +427,13 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		})
 	}
 
+	var environments []string
+	if !state.EnvironmentSlugs.IsNull() {
+		environments = infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
+	} else {
+		environments = []string{plan.EnvironmentSlug.ValueString()}
+	}
+
 	_, err := r.client.UpdateAccessApprovalPolicy(infisical.UpdateAccessApprovalPolicyRequest{
 		ID:                plan.ID.ValueString(),
 		Name:              plan.Name.ValueString(),
@@ -383,6 +441,7 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		Approvers:         approvers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
+		Environments:      environments,
 	})
 
 	if err != nil {
