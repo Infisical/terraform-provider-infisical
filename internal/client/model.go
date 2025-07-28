@@ -2348,3 +2348,71 @@ type DeleteSecretRotationRequest struct {
 type DeleteSecretRotationResponse struct {
 	SecretRotation SecretRotation `json:"secretRotation"`
 }
+
+type ProjectTemplate struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Roles        []Role        `json:"roles"`
+	Environments []Environment `json:"environments"`
+	OrgID        string        `json:"orgId"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	UpdatedAt    time.Time     `json:"updatedAt"`
+	Type         string        `json:"type"`
+}
+
+type Environment struct {
+	Name     string `json:"name"`
+	Slug     string `json:"slug"`
+	Position int64  `json:"position"`
+}
+
+type Role struct {
+	Name        string       `json:"name"`
+	Slug        string       `json:"slug"`
+	Permissions []Permission `json:"permissions"`
+}
+
+type Permission struct {
+	Subject    string         `json:"subject"`
+	Action     []string       `json:"action"`
+	Conditions map[string]any `json:"conditions,omitempty"`
+	Inverted   bool           `json:"inverted"`
+}
+
+type CreateProjectTemplateRequest struct {
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Type         string        `json:"type"`
+	Roles        []Role        `json:"roles,omitempty"`
+	Environments []Environment `json:"environments,omitempty"`
+}
+
+type CreateProjectTemplateResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+type GetProjectTemplateByIdRequest struct {
+	ID string `json:"id"`
+}
+
+type GetProjectTemplateByIdResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+type UpdateProjectTemplateRequest struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Type         string        `json:"type"`
+	Roles        []Role        `json:"roles,omitempty"`
+	Environments []Environment `json:"environments,omitempty"`
+}
+
+type UpdateProjectTemplateResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+type DeleteProjectTemplateResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
