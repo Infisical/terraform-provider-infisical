@@ -17,9 +17,9 @@ provider "infisical" {
   }
 }
 
-resource "infisical_project_template" "example-project" {
-  name        = "example-project"
-  description = "This is an example project"
+resource "infisical_project_template" "example-project-template" {
+  name        = "example-project-template"
+  description = "This is an example project template"
   type        = "secret-manager"
   environments = [{
     name     = "development",

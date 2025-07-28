@@ -395,6 +395,10 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	plan.Environments, diags = r.marshalEnvironments(apiResp.Environments)
 	resp.Diagnostics.Append(diags...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 }
@@ -430,8 +434,6 @@ func (r *ProjectTemplateResource) Delete(ctx context.Context, req resource.Delet
 		)
 		return
 	}
-
-	state.ID = types.StringNull()
 }
 
 func (r ProjectTemplateResource) marshalRoles(roles []infisical.Role) (types.List, diag.Diagnostics) {

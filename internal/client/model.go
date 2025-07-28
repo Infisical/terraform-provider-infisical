@@ -2360,12 +2360,6 @@ type Environment struct {
 	Position int64  `json:"position"`
 }
 
-type PermissionCondition struct {
-	Environment string `json:"environment"`
-	SecretPath  string `json:"secretPath"`
-	SecretName  string `json:"secretName"`
-}
-
 type Role struct {
 	Name        string       `json:"name"`
 	Slug        string       `json:"slug"`
