@@ -287,6 +287,10 @@ func (r *ProjectTemplateResource) Read(ctx context.Context, req resource.ReadReq
 	template, err := r.client.GetProjectTemplateById(plan.ID.ValueString())
 
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading project template",
 			fmt.Sprintf("Could not read project template with ID %s: %s", plan.ID.ValueString(), err.Error()),
