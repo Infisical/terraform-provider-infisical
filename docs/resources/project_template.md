@@ -37,9 +37,34 @@ resource "infisical_project_template" "example-project" {
   description = "This is an example project"
   type        = "secret-manager"
   environments = [{
-    "name" : "development",
-    "slug" : "dev",
-    "position" : 1
+    name     = "development",
+    slug     = "dev",
+    position = 1
+  }]
+
+  roles = [{
+    name = "Test",
+    slug = "test",
+    permissions = [
+      {
+        action   = ["edit"]
+        subject  = "secret-folders",
+        inverted = true,
+      },
+      {
+        action  = ["read", "edit"]
+        subject = "secrets",
+        conditions = jsonencode({
+          environment = {
+            "$in" = ["dev", "prod"]
+            "$eq" = "dev"
+          }
+          secretPath = {
+            "$eq" = "/"
+          }
+        })
+      },
+    ]
   }]
 }
 ```
@@ -50,7 +75,7 @@ resource "infisical_project_template" "example-project" {
 ### Required
 
 - `name` (String) The name of the project template
-- `type` (String) The type of the project template
+- `type` (String) The type of the project template. Refer to the documentation here https://infisical.com/docs/api-reference/endpoints/project-templates/create#body-type for the available options
 
 ### Optional
 
@@ -82,7 +107,7 @@ Required:
 
 Optional:
 
-- `permissions` (Attributes List) The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--roles--permissions))
+- `permissions` (Attributes List) The permissions assigned to the role. Refer to the documentation here https://infisical.com/docs/api-reference/endpoints/project-templates/create#body-roles-permissions for its usage. (see [below for nested schema](#nestedatt--roles--permissions))
 
 <a id="nestedatt--roles--permissions"></a>
 ### Nested Schema for `roles.permissions`
