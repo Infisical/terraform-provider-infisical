@@ -15,13 +15,14 @@ const (
 type AppConnectionApp string
 
 const (
-	AppConnectionAppAWS       AppConnectionApp = "aws"
-	AppConnectionAppGCP       AppConnectionApp = "gcp"
-	AppConnectionAppAzure     AppConnectionApp = "azure"
-	AppConnectionAppGithub    AppConnectionApp = "github"
-	AppConnectionAppMySql     AppConnectionApp = "mysql"
-	AppConnectionApp1Password AppConnectionApp = "1password"
-	AppConnectionAppRender    AppConnectionApp = "render"
+	AppConnectionAppAWS                AppConnectionApp = "aws"
+	AppConnectionAppGCP                AppConnectionApp = "gcp"
+	AppConnectionAppAzure              AppConnectionApp = "azure"
+	AppConnectionAppGithub             AppConnectionApp = "github"
+	AppConnectionAppMySql              AppConnectionApp = "mysql"
+	AppConnectionApp1Password          AppConnectionApp = "1password"
+	AppConnectionAppRender             AppConnectionApp = "render"
+	AppConnectionAppAzureClientSecrets AppConnectionApp = "azure-client-secrets"
 )
 
 const (
