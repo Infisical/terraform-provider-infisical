@@ -65,8 +65,8 @@ resource "infisical_app_connection_azure_client_secrets" "app_connection_azure_c
 <a id="nestedatt--credentials"></a>
 ### Nested Schema for `credentials`
 
-Optional:
+Required:
 
 - `client_id` (String, Sensitive) The Azure application (client) ID. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets
 - `client_secret` (String, Sensitive) The Azure client secret. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets
-- `tenant_id` (String, Sensitive) The Azure Active Directory (AAD) tenant ID. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets
+- `tenant_id` (String) The Azure Active Directory (AAD) tenant ID. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets

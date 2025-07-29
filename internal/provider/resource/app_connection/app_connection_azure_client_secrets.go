@@ -29,17 +29,17 @@ func NewAppConnectionAzureResource() resource.Resource {
 		AllowedMethods:    []string{AzureAppConnectionClientSecretsMethod},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"tenant_id": schema.StringAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "The Azure Active Directory (AAD) tenant ID. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets",
-				Sensitive:   true,
+				Sensitive:   false,
 			},
 			"client_id": schema.StringAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "The Azure application (client) ID. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets",
 				Sensitive:   true,
 			},
 			"client_secret": schema.StringAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "The Azure client secret. Required for client-secret method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/azure-client-secrets",
 				Sensitive:   true,
 			},
