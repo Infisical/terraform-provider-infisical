@@ -43,7 +43,7 @@ func NewAppConnectionMsSqlResource() resource.Resource {
 				Optional:    true,
 				Computed:    true,
 				Description: "The port number of the database.",
-				Default:     int32default.StaticInt32(3306),
+				Default:     int32default.StaticInt32(1433),
 			},
 			"database": schema.StringAttribute{
 				Required:    true,
