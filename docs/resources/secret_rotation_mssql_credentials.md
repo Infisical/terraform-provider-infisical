@@ -44,7 +44,6 @@ resource "infisical_secret_rotation_mssql_credentials" "mssql-credentials" {
     username2 = "infisical_user_2"
   }
 
-
   secrets_mapping = {
     username = "MSSQL_USERNAME"
     password = "MSSQL_PASSWORD"
