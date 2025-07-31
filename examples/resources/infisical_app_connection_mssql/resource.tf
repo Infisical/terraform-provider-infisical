@@ -23,7 +23,7 @@ resource "infisical_app_connection_mssql" "mssql-demo" {
   method      = "username-and-password"
   credentials = {
     host        = "example.com"
-    port        = 1443
+    port        = 1433
     database    = "default"
     username    = "root"
     password    = "<password>"
