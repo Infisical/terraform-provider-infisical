@@ -31,6 +31,10 @@ func (client Client) GetSecretFolderByID(request GetSecretFolderByIDRequest) (Ge
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSecretFolderByIDResponse{}, ErrNotFound
+		}
+
 		return GetSecretFolderByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretFolderByID, response, nil)
 	}
 
