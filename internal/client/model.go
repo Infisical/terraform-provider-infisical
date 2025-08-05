@@ -497,11 +497,12 @@ type UpdateSecretByNameV3Request struct {
 
 // get secret by name api.
 type GetSingleSecretByNameV3Request struct {
-	SecretName  string `json:"secretName"`
-	WorkspaceId string `json:"workspaceId"`
-	Environment string `json:"environment"`
-	Type        string `json:"type"`
-	SecretPath  string `json:"secretPath"`
+	SecretName             string `json:"secretName"`
+	WorkspaceId            string `json:"workspaceId"`
+	Environment            string `json:"environment"`
+	Type                   string `json:"type"`
+	SecretPath             string `json:"secretPath"`
+	ExpandSecretReferences bool   `json:"expandSecretReferences"`
 }
 
 type GetSingleSecretByIDV3Request struct {
