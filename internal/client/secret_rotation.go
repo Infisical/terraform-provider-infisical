@@ -8,10 +8,11 @@ import (
 type SecretRotationProvider string
 
 const (
-	SecretRotationProviderMySqlCredentials  SecretRotationProvider = "mysql-credentials"
-	SecretRotationProviderMsSqlCredentials  SecretRotationProvider = "mssql-credentials"
-	SecretRotationProviderAzureClientSecret SecretRotationProvider = "azure-client-secret"
-	SecretRotationProviderAwsIamUserSecret  SecretRotationProvider = "aws-iam-user-secret"
+	SecretRotationProviderMySqlCredentials    SecretRotationProvider = "mysql-credentials"
+	SecretRotationProviderMsSqlCredentials    SecretRotationProvider = "mssql-credentials"
+	SecretRotationProviderPostgresCredentials SecretRotationProvider = "postgres-credentials"
+	SecretRotationProviderAzureClientSecret   SecretRotationProvider = "azure-client-secret"
+	SecretRotationProviderAwsIamUserSecret    SecretRotationProvider = "aws-iam-user-secret"
 )
 
 const (
