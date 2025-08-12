@@ -312,6 +312,7 @@ type SecretFolder struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	EnvID string `json:"envId"`
+	Path  string `json:"path"`
 }
 
 type SecretFolderByID struct {
