@@ -2416,3 +2416,15 @@ type UpdateProjectTemplateResponse struct {
 type DeleteProjectTemplateResponse struct {
 	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
 }
+
+// IdentityDetails
+
+type IdentityDetails struct {
+	OrganizationID   string `json:"id"`
+	OrganizationName string `json:"name"`
+	OrganizationSlug string `json:"slug"`
+}
+
+type GetIdentityDetailsResponse struct {
+	IdentityDetails IdentityDetails `json:"identityDetails"`
+}
