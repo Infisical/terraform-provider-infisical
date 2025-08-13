@@ -40,13 +40,13 @@ resource "infisical_secret_rotation_oracle_credentials" "oracle-credentials" {
   connection_id = "<app-connection-id>"
 
   parameters = {
-    username1 = "oracle_user_1"
-    username2 = "oracle_user_2"
+    username1 = "INFISICAL_USER_1"
+    username2 = "INFISICAL_USER_2"
   }
 
   secrets_mapping = {
-    username = "ORACLE_DB_USERNAME"
-    password = "ORACLE_DB_PASSWORD"
+    username = "ORACLEDB_USERNAME"
+    password = "ORACLEDB_PASSWORD"
   }
 }
 ```
