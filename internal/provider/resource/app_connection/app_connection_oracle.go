@@ -18,7 +18,7 @@ import (
 type AppConnectionOracleCredentialsModel struct {
 	Host                  types.String `tfsdk:"host"`
 	Port                  types.Int32  `tfsdk:"port"`
-	ServiceName           types.String `tfsdk:"service_name"`
+	Database              types.String `tfsdk:"database"`
 	Username              types.String `tfsdk:"username"`
 	Password              types.String `tfsdk:"password"`
 	SslEnabled            types.Bool   `tfsdk:"ssl_enabled"`
@@ -45,9 +45,9 @@ func NewAppConnectionOracleResource() resource.Resource {
 				Description: "The port number of the Oracle database.",
 				Default:     int32default.StaticInt32(1521),
 			},
-			"service_name": schema.StringAttribute{
+			"database": schema.StringAttribute{
 				Required:    true,
-				Description: "The service name of the Oracle database.",
+				Description: "The database/service name of the Oracle database.",
 			},
 			"username": schema.StringAttribute{
 				Required:    true,
@@ -94,7 +94,7 @@ func NewAppConnectionOracleResource() resource.Resource {
 
 			credentialsConfig["host"] = credentials.Host.ValueString()
 			credentialsConfig["port"] = credentials.Port.ValueInt32()
-			credentialsConfig["serviceName"] = credentials.ServiceName.ValueString()
+			credentialsConfig["database"] = credentials.Database.ValueString()
 			credentialsConfig["username"] = credentials.Username.ValueString()
 			credentialsConfig["password"] = credentials.Password.ValueString()
 			credentialsConfig["sslEnabled"] = credentials.SslEnabled.ValueBool()
@@ -132,8 +132,8 @@ func NewAppConnectionOracleResource() resource.Resource {
 			if credentialsFromState.Port.ValueInt32() != credentialsFromPlan.Port.ValueInt32() {
 				credentialsConfig["port"] = credentialsFromPlan.Port.ValueInt32()
 			}
-			if credentialsFromState.ServiceName.ValueString() != credentialsFromPlan.ServiceName.ValueString() {
-				credentialsConfig["serviceName"] = credentialsFromPlan.ServiceName.ValueString()
+			if credentialsFromState.Database.ValueString() != credentialsFromPlan.Database.ValueString() {
+				credentialsConfig["database"] = credentialsFromPlan.Database.ValueString()
 			}
 			if credentialsFromState.Username.ValueString() != credentialsFromPlan.Username.ValueString() {
 				credentialsConfig["username"] = credentialsFromPlan.Username.ValueString()
@@ -157,7 +157,7 @@ func NewAppConnectionOracleResource() resource.Resource {
 			credentialsConfig := map[string]attr.Value{
 				"host":                    types.StringNull(),
 				"port":                    types.Int32Null(),
-				"service_name":            types.StringNull(),
+				"database":                types.StringNull(),
 				"username":                types.StringNull(),
 				"password":                types.StringNull(),
 				"ssl_enabled":             types.BoolNull(),
@@ -169,7 +169,7 @@ func NewAppConnectionOracleResource() resource.Resource {
 			state.Credentials, diags = types.ObjectValue(map[string]attr.Type{
 				"host":                    types.StringType,
 				"port":                    types.Int32Type,
-				"service_name":            types.StringType,
+				"database":                types.StringType,
 				"username":                types.StringType,
 				"password":                types.StringType,
 				"ssl_enabled":             types.BoolType,

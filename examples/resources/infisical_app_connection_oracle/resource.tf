@@ -22,11 +22,11 @@ resource "infisical_app_connection_oracle" "oracle-demo" {
   description = "This is a demo Oracle connection."
   method      = "username-and-password"
   credentials = {
-    host         = "example.com"
-    port         = 1521
-    service_name = "ORCL"
-    username     = "system"
-    password     = "<password>"
-    ssl_enabled  = false
+    host        = "example.com"
+    port        = 1521
+    database    = "ORCL"
+    username    = "system"
+    password    = "<password>"
+    ssl_enabled = false
   }
 }

@@ -37,12 +37,12 @@ resource "infisical_app_connection_oracle" "oracle-demo" {
   description = "This is a demo Oracle connection."
   method      = "username-and-password"
   credentials = {
-    host         = "example.com"
-    port         = 1521
-    service_name = "ORCL"
-    username     = "system"
-    password     = "<password>"
-    ssl_enabled  = false
+    host        = "example.com"
+    port        = 1521
+    database    = "ORCL"
+    username    = "system"
+    password    = "<password>"
+    ssl_enabled = false
   }
 }
 ```
@@ -70,9 +70,9 @@ resource "infisical_app_connection_oracle" "oracle-demo" {
 
 Required:
 
+- `database` (String) The database/service name of the Oracle database.
 - `host` (String) The hostname of the Oracle database server.
 - `password` (String, Sensitive) The password to connect to the Oracle database with.
-- `service_name` (String) The service name of the Oracle database.
 - `username` (String) The username to connect to the Oracle database with.
 
 Optional:
