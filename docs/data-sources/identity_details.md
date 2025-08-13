@@ -36,7 +36,7 @@ data "infisical_identity_details" "terraform" {
 }
 
 output "identity-details" {
-  value = data.infisical_secret_tag.terraform
+  value = data.infisical_identity_details.terraform
 }
 ```
 

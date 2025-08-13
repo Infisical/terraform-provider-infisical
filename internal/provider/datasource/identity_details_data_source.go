@@ -115,9 +115,9 @@ func (d *IdentityDetailsDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	organizationData := OrganizationModel{
-		ID:   types.StringValue(identityDetails.IdentityDetails.OrganizationID),
-		Name: types.StringValue(identityDetails.IdentityDetails.OrganizationName),
-		Slug: types.StringValue(identityDetails.IdentityDetails.OrganizationSlug),
+		ID:   types.StringValue(identityDetails.IdentityDetails.Organization.ID),
+		Name: types.StringValue(identityDetails.IdentityDetails.Organization.Name),
+		Slug: types.StringValue(identityDetails.IdentityDetails.Organization.Slug),
 	}
 
 	organizationValue, diags := types.ObjectValueFrom(ctx, map[string]attr.Type{

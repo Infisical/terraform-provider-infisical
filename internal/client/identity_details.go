@@ -9,7 +9,7 @@ const (
 )
 
 func (client Client) GetIdentityDetails() (GetIdentityDetailsResponse, error) {
-	var body IdentityDetails
+	var body GetIdentityDetailsResponse
 
 	httpRequest := client.Config.HttpClient.
 		R().
@@ -26,8 +26,5 @@ func (client Client) GetIdentityDetails() (GetIdentityDetailsResponse, error) {
 		return GetIdentityDetailsResponse{}, errors.NewAPIErrorWithResponse(operationGetIdentityDetails, response, nil)
 	}
 
-	// Wrap the response in the expected structure
-	return GetIdentityDetailsResponse{
-		IdentityDetails: body,
-	}, nil
+	return body, nil
 }

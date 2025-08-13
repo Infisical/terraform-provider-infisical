@@ -2419,10 +2419,14 @@ type DeleteProjectTemplateResponse struct {
 
 // IdentityDetails
 
+type IdentityOrganization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 type IdentityDetails struct {
-	OrganizationID   string `json:"id"`
-	OrganizationName string `json:"name"`
-	OrganizationSlug string `json:"slug"`
+	Organization IdentityOrganization `json:"organization"`
 }
 
 type GetIdentityDetailsResponse struct {
