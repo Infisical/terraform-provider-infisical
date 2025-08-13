@@ -16,7 +16,7 @@ func (client Client) GetIdentityDetails() (GetIdentityDetailsResponse, error) {
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT)
 
-	response, err := httpRequest.Get("api/v1/organization")
+	response, err := httpRequest.Get("api/v1/identities/details")
 
 	if err != nil {
 		return GetIdentityDetailsResponse{}, errors.NewGenericRequestError(operationGetIdentityDetails, err)
