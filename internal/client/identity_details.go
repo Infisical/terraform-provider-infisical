@@ -9,7 +9,7 @@ const (
 )
 
 func (client Client) GetIdentityDetails() (GetIdentityDetailsResponse, error) {
-	var body IdentityDetails // Changed: Use IdentityDetails directly
+	var body IdentityDetails
 
 	httpRequest := client.Config.HttpClient.
 		R().
