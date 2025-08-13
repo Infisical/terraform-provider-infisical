@@ -26,3 +26,4 @@ Create secret folder & save to Infisical.
 
 - `environment_id` (String) The ID of the environment
 - `id` (String) The ID of the folder
+- `path` (String) The full path of the folder, including its name.
