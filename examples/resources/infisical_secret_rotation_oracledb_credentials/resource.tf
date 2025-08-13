@@ -17,8 +17,8 @@ provider "infisical" {
   }
 }
 
-resource "infisical_secret_rotation_oracle_credentials" "oracle-credentials" {
-  name          = "oracle-credentials-secret-rotation-example"
+resource "infisical_secret_rotation_oracledb_credentials" "oracledb-credentials" {
+  name          = "oracledb-credentials-secret-rotation-example"
   project_id    = "<project-id>"
   environment   = "<environment-slug>"
   secret_path   = "<secret-path>" # Root folder is /

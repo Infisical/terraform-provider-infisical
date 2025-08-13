@@ -12,21 +12,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-type SecretRotationOracleCredentialsParametersModel struct {
+type SecretRotationOracleDBCredentialsParametersModel struct {
 	Username1 types.String `tfsdk:"username1"`
 	Username2 types.String `tfsdk:"username2"`
 }
 
-type SecretRotationOracleCredentialsSecretsMappingModel struct {
+type SecretRotationOracleDBCredentialsSecretsMappingModel struct {
 	Username types.String `tfsdk:"username"`
 	Password types.String `tfsdk:"password"`
 }
 
-func NewSecretRotationOracleCredentialsResource() resource.Resource {
+func NewSecretRotationOracleDBCredentialsResource() resource.Resource {
 	return &SecretRotationBaseResource{
 		Provider:           infisicalclient.SecretRotationProviderOracleCredentials,
-		SecretRotationName: "Oracle Credentials",
-		ResourceTypeName:   "_secret_rotation_oracle_credentials",
+		SecretRotationName: "OracleDB Credentials",
+		ResourceTypeName:   "_secret_rotation_oracledb_credentials",
 		AppConnection:      infisicalclient.AppConnectionAppOracle,
 		ParametersAttributes: map[string]schema.Attribute{
 			"username1": schema.StringAttribute{
@@ -51,7 +51,7 @@ func NewSecretRotationOracleCredentialsResource() resource.Resource {
 
 		ReadParametersFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			parametersMap := make(map[string]interface{})
-			var parameters SecretRotationOracleCredentialsParametersModel
+			var parameters SecretRotationOracleDBCredentialsParametersModel
 
 			diags := plan.Parameters.As(ctx, &parameters, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
@@ -97,7 +97,7 @@ func NewSecretRotationOracleCredentialsResource() resource.Resource {
 
 		ReadSecretsMappingFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			secretsMappingMap := make(map[string]interface{})
-			var secretsMapping SecretRotationOracleCredentialsSecretsMappingModel
+			var secretsMapping SecretRotationOracleDBCredentialsSecretsMappingModel
 
 			diags := plan.SecretsMapping.As(ctx, &secretsMapping, basetypes.ObjectAsOptions{})
 			if diags.HasError() {

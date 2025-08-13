@@ -14,8 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-// AppConnectionOracleCredentialsModel describes the data source data model.
-type AppConnectionOracleCredentialsModel struct {
+// AppConnectionOracleDBCredentialsModel describes the data source data model.
+type AppConnectionOracleDBCredentialsModel struct {
 	Host                  types.String `tfsdk:"host"`
 	Port                  types.Int32  `tfsdk:"port"`
 	Database              types.String `tfsdk:"database"`
@@ -26,42 +26,42 @@ type AppConnectionOracleCredentialsModel struct {
 	SslCertificate        types.String `tfsdk:"ssl_certificate"`
 }
 
-const AppConnectionOracleAuthMethodUsernameAndPassword = "username-and-password"
+const AppConnectionOracleDBAuthMethodUsernameAndPassword = "username-and-password"
 
-func NewAppConnectionOracleResource() resource.Resource {
+func NewAppConnectionOracleDBResource() resource.Resource {
 	return &AppConnectionBaseResource{
 		App:               infisical.AppConnectionAppOracle,
-		AppConnectionName: "Oracle",
-		ResourceTypeName:  "_app_connection_oracle",
-		AllowedMethods:    []string{AppConnectionOracleAuthMethodUsernameAndPassword},
+		AppConnectionName: "OracleDB",
+		ResourceTypeName:  "_app_connection_oracledb",
+		AllowedMethods:    []string{AppConnectionOracleDBAuthMethodUsernameAndPassword},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Required:    true,
-				Description: "The hostname of the Oracle database server.",
+				Description: "The hostname of the OracleDB server.",
 			},
 			"port": schema.Int32Attribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "The port number of the Oracle database.",
+				Description: "The port number of the OracleDB.",
 				Default:     int32default.StaticInt32(1521),
 			},
 			"database": schema.StringAttribute{
 				Required:    true,
-				Description: "The database/service name of the Oracle database.",
+				Description: "The database/service name of the OracleDB.",
 			},
 			"username": schema.StringAttribute{
 				Required:    true,
-				Description: "The username to connect to the Oracle database with.",
+				Description: "The username to connect to the OracleDB with.",
 			},
 			"password": schema.StringAttribute{
 				Required:    true,
-				Description: "The password to connect to the Oracle database with.",
+				Description: "The password to connect to the OracleDB with.",
 				Sensitive:   true,
 			},
 			"ssl_enabled": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether or not to use SSL when connecting to the Oracle database.",
+				Description: "Whether or not to use SSL when connecting to the OracleDB.",
 				Default:     booldefault.StaticBool(false),
 			},
 			"ssl_reject_unauthorized": schema.BoolAttribute{
@@ -78,15 +78,15 @@ func NewAppConnectionOracleResource() resource.Resource {
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
 			credentialsConfig := make(map[string]any)
 
-			var credentials AppConnectionOracleCredentialsModel
+			var credentials AppConnectionOracleDBCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
 
-			if plan.Method.ValueString() != AppConnectionOracleAuthMethodUsernameAndPassword {
+			if plan.Method.ValueString() != AppConnectionOracleDBAuthMethodUsernameAndPassword {
 				diags.AddError(
-					"Unable to create Oracle app connection",
+					"Unable to create OracleDB app connection",
 					"Invalid method. Only username-and-password method is supported",
 				)
 				return nil, diags
@@ -106,21 +106,21 @@ func NewAppConnectionOracleResource() resource.Resource {
 		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
 			credentialsConfig := make(map[string]any)
 
-			var credentialsFromPlan AppConnectionOracleCredentialsModel
+			var credentialsFromPlan AppConnectionOracleDBCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
 
-			var credentialsFromState AppConnectionOracleCredentialsModel
+			var credentialsFromState AppConnectionOracleDBCredentialsModel
 			diags = state.Credentials.As(ctx, &credentialsFromState, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
 			}
 
-			if plan.Method.ValueString() != AppConnectionOracleAuthMethodUsernameAndPassword {
+			if plan.Method.ValueString() != AppConnectionOracleDBAuthMethodUsernameAndPassword {
 				diags.AddError(
-					"Unable to update Oracle app connection",
+					"Unable to update OracleDB app connection",
 					"Invalid method. Only username-and-password method is supported",
 				)
 				return nil, diags
