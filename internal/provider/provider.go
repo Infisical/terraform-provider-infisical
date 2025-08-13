@@ -382,6 +382,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationMySqlCredentialsResource,
 		secretRotationResource.NewSecretRotationMsSqlCredentialsResource,
 		secretRotationResource.NewSecretRotationPostgresCredentialsResource,
+		secretRotationResource.NewSecretRotationOracleCredentialsResource,
 		secretRotationResource.NewSecretRotationAzureClientSecretResource,
 		secretRotationResource.NewSecretRotationAwsIamUserSecretResource,
 		infisicalResource.NewProjectTemplateResource,
