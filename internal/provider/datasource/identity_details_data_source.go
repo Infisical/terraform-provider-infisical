@@ -24,7 +24,7 @@ type IdentityDetailsDataSource struct {
 	client *infisical.Client
 }
 
-// OrganizationModel represents the organization nested object
+// OrganizationModel represents the organization nested object.
 type OrganizationModel struct {
 	ID   types.String `tfsdk:"id"`
 	Name types.String `tfsdk:"name"`
@@ -98,7 +98,7 @@ func (d *IdentityDetailsDataSource) Read(ctx context.Context, req datasource.Rea
 
 	var data IdentityDetailsDataSourceModel
 
-	// Read Terraform configuration data into the model
+	// Read Terraform configuration data into the model.
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -132,6 +132,6 @@ func (d *IdentityDetailsDataSource) Read(ctx context.Context, req datasource.Rea
 
 	data.Organization = organizationValue
 
-	// Save data into Terraform state
+	// Save data into Terraform state.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
