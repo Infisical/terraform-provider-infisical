@@ -28,6 +28,7 @@ const (
 	AppConnectionAppAzureClientSecrets AppConnectionApp = "azure-client-secrets"
 	AppConnectionAppBitbucket          AppConnectionApp = "bitbucket"
 	AppConnectionAppDatabricks         AppConnectionApp = "databricks"
+	AppConnectionAppSupabase           AppConnectionApp = "supabase"
 	AppConnectionAppFlyio              AppConnectionApp = "flyio"
 )
 
