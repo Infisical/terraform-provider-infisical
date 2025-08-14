@@ -19,7 +19,7 @@ provider "infisical" {
 
 resource "infisical_app_connection_oracledb" "oracledb-demo" {
   name        = "oracledb-demo"
-  description = "This is a demo OracleDB connection."
+  description = "This is a demo Oracle Database connection."
   method      = "username-and-password"
   credentials = {
     host        = "example.com"

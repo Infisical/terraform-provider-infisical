@@ -2,7 +2,7 @@ package resource
 
 import (
 	"context"
-	infisicalclient "terraform-provider-infisical/internal/client"
+	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -12,22 +12,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-type SecretRotationOracleDBCredentialsParametersModel struct {
+type SecretRotationOracleDbCredentialsParametersModel struct {
 	Username1 types.String `tfsdk:"username1"`
 	Username2 types.String `tfsdk:"username2"`
 }
 
-type SecretRotationOracleDBCredentialsSecretsMappingModel struct {
+type SecretRotationOracleDbCredentialsSecretsMappingModel struct {
 	Username types.String `tfsdk:"username"`
 	Password types.String `tfsdk:"password"`
 }
 
-func NewSecretRotationOracleDBCredentialsResource() resource.Resource {
+func NewSecretRotationOracleDbCredentialsResource() resource.Resource {
 	return &SecretRotationBaseResource{
-		Provider:           infisicalclient.SecretRotationProviderOracleCredentials,
-		SecretRotationName: "OracleDB Credentials",
+		Provider:           infisical.SecretRotationProviderOracleCredentials,
+		SecretRotationName: "Oracle Database Credentials",
 		ResourceTypeName:   "_secret_rotation_oracledb_credentials",
-		AppConnection:      infisicalclient.AppConnectionAppOracle,
+		AppConnection:      infisical.AppConnectionAppOracle,
 		ParametersAttributes: map[string]schema.Attribute{
 			"username1": schema.StringAttribute{
 				Required:    true,
@@ -49,9 +49,9 @@ func NewSecretRotationOracleDBCredentialsResource() resource.Resource {
 			},
 		},
 
-		ReadParametersFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			parametersMap := make(map[string]interface{})
-			var parameters SecretRotationOracleDBCredentialsParametersModel
+		ReadParametersFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			parametersMap := make(map[string]any)
+			var parameters SecretRotationOracleDbCredentialsParametersModel
 
 			diags := plan.Parameters.As(ctx, &parameters, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
@@ -64,7 +64,7 @@ func NewSecretRotationOracleDBCredentialsResource() resource.Resource {
 			return parametersMap, diags
 		},
 
-		ReadParametersFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
+		ReadParametersFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			parameters := make(map[string]attr.Value)
 			parametersSchema := map[string]attr.Type{
@@ -95,9 +95,9 @@ func NewSecretRotationOracleDBCredentialsResource() resource.Resource {
 			return obj, diags
 		},
 
-		ReadSecretsMappingFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			secretsMappingMap := make(map[string]interface{})
-			var secretsMapping SecretRotationOracleDBCredentialsSecretsMappingModel
+		ReadSecretsMappingFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			secretsMappingMap := make(map[string]any)
+			var secretsMapping SecretRotationOracleDbCredentialsSecretsMappingModel
 
 			diags := plan.SecretsMapping.As(ctx, &secretsMapping, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
@@ -110,7 +110,7 @@ func NewSecretRotationOracleDBCredentialsResource() resource.Resource {
 			return secretsMappingMap, diags
 		},
 
-		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
+		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			secretsMapping := make(map[string]attr.Value)
 			secretsMappingSchema := map[string]attr.Type{
