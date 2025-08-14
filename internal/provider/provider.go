@@ -383,6 +383,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncBitbucketResource,
 		secretSyncResource.NewSecretSyncDatabricksResource,
 		secretSyncResource.NewSecretSyncCloudflareWorkersResource,
+		secretSyncResource.NewSecretSyncCloudflarePagesResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,

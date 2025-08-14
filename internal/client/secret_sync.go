@@ -21,6 +21,7 @@ const (
 	SecretSyncAppBitbucket             SecretSyncApp = "bitbucket"
 	SecretSyncAppDatabricks            SecretSyncApp = "databricks"
 	SecretSyncAppCloudflareWorkers     SecretSyncApp = "cloudflare-workers"
+	SecretSyncAppCloudflarePages       SecretSyncApp = "cloudflare-pages"
 )
 
 type SecretSyncBehavior string
