@@ -13,9 +13,9 @@ import (
 )
 
 type AppConnectionDatabricksCredentialsModel struct {
-	ClientId      types.String `tfsdk:"client_id"`
-	ClientSecret  types.String `tfsdk:"client_secret"`
-	WorkspaceUrl  types.String `tfsdk:"workspace_url"`
+	ClientId     types.String `tfsdk:"client_id"`
+	ClientSecret types.String `tfsdk:"client_secret"`
+	WorkspaceUrl types.String `tfsdk:"workspace_url"`
 }
 
 const AppConnectionDatabricksAuthMethodServicePrincipal = "service-principal"
