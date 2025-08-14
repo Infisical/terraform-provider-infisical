@@ -19,7 +19,7 @@ provider "infisical" {
 
 resource "infisical_app_connection_bitbucket" "example" {
   name        = "bitbucket-connection"
-  description = "Bitbucket connection for secret sync"
+  description = "I am a test app connection"
   method      = "api-token"
 
   credentials = {

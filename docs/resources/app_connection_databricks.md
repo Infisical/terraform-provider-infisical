@@ -34,7 +34,7 @@ provider "infisical" {
 
 resource "infisical_app_connection_databricks" "example" {
   name        = "databricks-connection"
-  description = "Databricks connection for secret sync"
+  description = "I am a test app connection"
   method      = "service-principal"
 
   credentials = {
