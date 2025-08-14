@@ -17,14 +17,13 @@ provider "infisical" {
   }
 }
 
-resource "infisical_app_connection_databricks" "example" {
-  name        = "databricks-connection"
+resource "infisical_app_connection_bitbucket" "example" {
+  name        = "bitbucket-connection"
   description = "I am a test app connection"
-  method      = "service-principal"
+  method      = "api-token"
 
   credentials = {
-    client_id     = "your-databricks-client-id"
-    client_secret = "your-databricks-client-secret"
-    workspace_url = "https://your-workspace.cloud.databricks.com"
+    email     = "your-bitbucket-email@example.com"
+    api_token = "your-bitbucket-api-token"
   }
 }

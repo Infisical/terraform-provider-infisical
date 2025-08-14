@@ -17,18 +17,20 @@ provider "infisical" {
   }
 }
 
-resource "infisical_secret_sync_databricks" "example" {
-  name          = "databricks-secret-sync"
-  description   = "Sync secrets to Databricks secret scope"
+resource "infisical_secret_sync_bitbucket" "example" {
+  name          = "bitbucket-secret-sync"
+  description   = "Sync secrets to Bitbucket repository"
   project_id    = "<your-infisical-project-id>"
-  connection_id = "<app-connection-id>" # The ID of your Databricks App Connection
+  connection_id = "<app-connection-id>" # The ID of your Bitbucket App Connection
   environment   = "<env-slug>"
   secret_path   = "<infisical-secret-path>"
 
   auto_sync_enabled = true
 
   destination_config = {
-    scope = "<databricks-secret-scope>"
+    repository_slug = "<bitbucket-repository-slug>"
+    workspace_slug  = "<bitbucket-workspace-slug>"
+    environment_id  = "<bitbucket-environment-slug>"
   }
 
   sync_options = {
