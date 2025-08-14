@@ -32,7 +32,7 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 				Sensitive:   true,
 			},
 			"instance_url": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The Supabase instance URL (e.g., https://your-domain.com).",
 			},
 		},
@@ -54,7 +54,9 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 			}
 
 			credentialsConfig["accessKey"] = credentials.AccessKey.ValueString()
-			credentialsConfig["instanceUrl"] = credentials.InstanceUrl.ValueString()
+			if !credentials.InstanceUrl.IsNull() && !credentials.InstanceUrl.IsUnknown() {
+				credentialsConfig["instanceUrl"] = credentials.InstanceUrl.ValueString()
+			}
 
 			return credentialsConfig, diags
 		},
@@ -85,7 +87,9 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 				credentialsConfig["accessKey"] = credentialsFromPlan.AccessKey.ValueString()
 			}
 			if credentialsFromState.InstanceUrl.ValueString() != credentialsFromPlan.InstanceUrl.ValueString() {
-				credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
+				if !credentialsFromPlan.InstanceUrl.IsNull() && !credentialsFromPlan.InstanceUrl.IsUnknown() {
+					credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
+				}
 			}
 
 			return credentialsConfig, diags

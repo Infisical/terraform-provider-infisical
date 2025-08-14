@@ -24,6 +24,6 @@ resource "infisical_app_connection_supabase" "example" {
 
   credentials = {
     access_key   = "<your-supabase-access-key>"
-    instance_url = "<your-supabase-instance-url>"
+    instance_url = "<your-supabase-instance-url>" # Optional
   }
 }

@@ -39,7 +39,7 @@ resource "infisical_app_connection_supabase" "example" {
 
   credentials = {
     access_key   = "<your-supabase-access-key>"
-    instance_url = "<your-supabase-instance-url>"
+    instance_url = "<your-supabase-instance-url>" # Optional
   }
 }
 ```
@@ -68,4 +68,7 @@ resource "infisical_app_connection_supabase" "example" {
 Required:
 
 - `access_key` (String, Sensitive) The Supabase access key for authentication.
+
+Optional:
+
 - `instance_url` (String) The Supabase instance URL (e.g., https://your-domain.com).
