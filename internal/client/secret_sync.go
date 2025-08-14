@@ -18,6 +18,8 @@ const (
 	SecretSyncAppGithub                SecretSyncApp = "github"
 	SecretSyncApp1Password             SecretSyncApp = "1password"
 	SecretSyncAppRender                SecretSyncApp = "render"
+	SecretSyncAppBitbucket             SecretSyncApp = "bitbucket"
+	SecretSyncAppDatabricks            SecretSyncApp = "databricks"
 )
 
 type SecretSyncBehavior string
