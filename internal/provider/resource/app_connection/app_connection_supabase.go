@@ -83,9 +83,7 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.AccessKey.ValueString() != credentialsFromPlan.AccessKey.ValueString() {
-				credentialsConfig["accessKey"] = credentialsFromPlan.AccessKey.ValueString()
-			}
+			credentialsConfig["accessKey"] = credentialsFromPlan.AccessKey.ValueString()
 			if credentialsFromState.InstanceUrl.ValueString() != credentialsFromPlan.InstanceUrl.ValueString() {
 				if !credentialsFromPlan.InstanceUrl.IsNull() && !credentialsFromPlan.InstanceUrl.IsUnknown() {
 					credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
