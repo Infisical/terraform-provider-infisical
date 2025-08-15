@@ -28,7 +28,7 @@ resource "infisical_secret_sync_cloudflare_workers" "cloudflare-workers-secret-s
   sync_options = {
     initial_sync_behavior   = "overwrite-destination" # Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
     disable_secret_deletion = false
-    key_schema              = "<key-schema>" # Optional: The format to use for structuring secret keys
+    key_schema              = "<key-schema>" # The format to use for structuring secret keys
   }
 
   destination_config = {
