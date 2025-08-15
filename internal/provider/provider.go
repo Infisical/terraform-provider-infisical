@@ -326,6 +326,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewSecretTagDataSource,
 		infisicalDatasource.NewSecretFolderDataSource,
 		infisicalDatasource.NewGroupsDataSource,
+		infisicalDatasource.NewIdentityDetailsDataSource,
 	}
 }
 
@@ -371,6 +372,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionBitbucketResource,
 		appConnectionResource.NewAppConnectionDatabricksResource,
 		appConnectionResource.NewAppConnectionCloudflareResource,
+		appConnectionResource.NewAppConnectionSupabaseResource,
+		appConnectionResource.NewAppConnectionFlyioResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
@@ -383,6 +386,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncBitbucketResource,
 		secretSyncResource.NewSecretSyncDatabricksResource,
 		secretSyncResource.NewSecretSyncCloudflareWorkersResource,
+		secretSyncResource.NewSecretSyncSupabaseResource,
+		secretSyncResource.NewSecretSyncFlyioResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,

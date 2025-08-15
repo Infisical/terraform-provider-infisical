@@ -29,6 +29,8 @@ const (
 	AppConnectionAppBitbucket          AppConnectionApp = "bitbucket"
 	AppConnectionAppDatabricks         AppConnectionApp = "databricks"
 	AppConnectionAppCloudflare         AppConnectionApp = "cloudflare"
+	AppConnectionAppSupabase           AppConnectionApp = "supabase"
+	AppConnectionAppFlyio              AppConnectionApp = "flyio"
 )
 
 const (
