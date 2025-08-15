@@ -43,7 +43,7 @@ resource "infisical_secret_sync_cloudflare_workers" "cloudflare-workers-secret-s
   sync_options = {
     initial_sync_behavior   = "overwrite-destination" # Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
     disable_secret_deletion = false
-    key_schema              = "<key-schema>" # Optional: The format to use for structuring secret keys
+    key_schema              = "<key-schema>" # The format to use for structuring secret keys
   }
 
   destination_config = {
@@ -88,8 +88,8 @@ Required:
 Required:
 
 - `initial_sync_behavior` (String) Specify how Infisical should resolve the initial sync to the destination. Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
+- `key_schema` (String) The format to use for structuring secret keys in the Cloudflare Workers destination.
 
 Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Cloudflare Workers. Enable this option if you intend to manage some secrets manually outside of Infisical.
-- `key_schema` (String) The format to use for structuring secret keys in the Cloudflare Workers destination.

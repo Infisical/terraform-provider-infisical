@@ -49,7 +49,7 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 				Default:     booldefault.StaticBool(false),
 			},
 			"key_schema": schema.StringAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "The format to use for structuring secret keys in the Cloudflare Workers destination.",
 			},
 		},
@@ -77,9 +77,15 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 				syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			}
 
-			if !syncOptions.KeySchema.IsNull() && syncOptions.KeySchema.ValueString() != "" {
-				syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
+			if syncOptions.KeySchema.IsNull() || syncOptions.KeySchema.ValueString() == "" {
+				diags.AddError(
+					"Unable to create Cloudflare Workers secret sync",
+					"Key schema must be specified",
+				)
+				return nil, diags
 			}
+
+			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
 
 			return syncOptionsMap, diags
 		},
@@ -119,13 +125,16 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 			}
 
 			if syncOptionsFromPlan.KeySchema.IsUnknown() {
-				if !syncOptionsFromState.KeySchema.IsNull() {
-					syncOptionsMap["keySchema"] = syncOptionsFromState.KeySchema.ValueString()
-				}
+				syncOptionsMap["keySchema"] = syncOptionsFromState.KeySchema.ValueString()
 			} else {
-				if !syncOptionsFromPlan.KeySchema.IsNull() && syncOptionsFromPlan.KeySchema.ValueString() != "" {
-					syncOptionsMap["keySchema"] = syncOptionsFromPlan.KeySchema.ValueString()
+				if syncOptionsFromPlan.KeySchema.IsNull() || syncOptionsFromPlan.KeySchema.ValueString() == "" {
+					diags.AddError(
+						"Unable to update Cloudflare Workers secret sync",
+						"Key schema must be specified",
+					)
+					return nil, diags
 				}
+				syncOptionsMap["keySchema"] = syncOptionsFromPlan.KeySchema.ValueString()
 			}
 
 			return syncOptionsMap, diags
