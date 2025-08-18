@@ -82,9 +82,7 @@ func NewSecretSyncCloudflarePagesResource() resource.Resource {
 				syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			}
 
-			if !syncOptions.KeySchema.IsNull() && syncOptions.KeySchema.ValueString() != "" {
-				syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
-			}
+			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
 
 			return syncOptionsMap, diags
 		},
@@ -123,15 +121,7 @@ func NewSecretSyncCloudflarePagesResource() resource.Resource {
 				syncOptionsMap["disableSecretDeletion"] = syncOptionsFromPlan.DisableSecretDeletion.ValueBool()
 			}
 
-			if syncOptionsFromPlan.KeySchema.IsUnknown() {
-				if !syncOptionsFromState.KeySchema.IsNull() {
-					syncOptionsMap["keySchema"] = syncOptionsFromState.KeySchema.ValueString()
-				}
-			} else {
-				if !syncOptionsFromPlan.KeySchema.IsNull() && syncOptionsFromPlan.KeySchema.ValueString() != "" {
-					syncOptionsMap["keySchema"] = syncOptionsFromPlan.KeySchema.ValueString()
-				}
-			}
+			syncOptionsMap["keySchema"] = syncOptionsFromPlan.KeySchema.ValueString()
 
 			return syncOptionsMap, diags
 		},
@@ -160,17 +150,16 @@ func NewSecretSyncCloudflarePagesResource() resource.Resource {
 				disableSecretDeletionVal = false
 			}
 
-			keySchemaVal := ""
-			if keySchemaRaw, exists := secretSync.SyncOptions["keySchema"]; exists {
-				if keySchemaStr, ok := keySchemaRaw.(string); ok {
-					keySchemaVal = keySchemaStr
-				}
-			}
-
 			syncOptionsAttrValues := map[string]attr.Value{
 				"initial_sync_behavior":   types.StringValue(initialSyncBehaviorVal),
 				"disable_secret_deletion": types.BoolValue(disableSecretDeletionVal),
-				"key_schema":              types.StringValue(keySchemaVal),
+			}
+
+			keySchema, ok := secretSync.SyncOptions["keySchema"].(string)
+			if keySchema == "" || !ok {
+				syncOptionsAttrValues["key_schema"] = types.StringNull()
+			} else {
+				syncOptionsAttrValues["key_schema"] = types.StringValue(keySchema)
 			}
 
 			return types.ObjectValue(syncOptionsAttrTypes, syncOptionsAttrValues)
