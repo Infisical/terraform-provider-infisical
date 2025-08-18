@@ -49,7 +49,7 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 				Default:     booldefault.StaticBool(false),
 			},
 			"key_schema": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The format to use for structuring secret keys in the Cloudflare Workers destination.",
 			},
 		},
@@ -75,14 +75,6 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 
 			if !syncOptions.DisableSecretDeletion.IsNull() {
 				syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
-			}
-
-			if syncOptions.KeySchema.IsNull() || syncOptions.KeySchema.ValueString() == "" {
-				diags.AddError(
-					"Unable to create Cloudflare Workers secret sync",
-					"Key schema must be specified",
-				)
-				return nil, diags
 			}
 
 			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
@@ -124,18 +116,7 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 				syncOptionsMap["disableSecretDeletion"] = syncOptionsFromPlan.DisableSecretDeletion.ValueBool()
 			}
 
-			if syncOptionsFromPlan.KeySchema.IsUnknown() {
-				syncOptionsMap["keySchema"] = syncOptionsFromState.KeySchema.ValueString()
-			} else {
-				if syncOptionsFromPlan.KeySchema.IsNull() || syncOptionsFromPlan.KeySchema.ValueString() == "" {
-					diags.AddError(
-						"Unable to update Cloudflare Workers secret sync",
-						"Key schema must be specified",
-					)
-					return nil, diags
-				}
-				syncOptionsMap["keySchema"] = syncOptionsFromPlan.KeySchema.ValueString()
-			}
+			syncOptionsMap["keySchema"] = syncOptionsFromPlan.KeySchema.ValueString()
 
 			return syncOptionsMap, diags
 		},
@@ -164,17 +145,16 @@ func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 				disableSecretDeletionVal = false
 			}
 
-			keySchemaVal := ""
-			if keySchemaRaw, exists := secretSync.SyncOptions["keySchema"]; exists {
-				if keySchemaStr, ok := keySchemaRaw.(string); ok {
-					keySchemaVal = keySchemaStr
-				}
-			}
-
 			syncOptionsAttrValues := map[string]attr.Value{
 				"initial_sync_behavior":   types.StringValue(initialSyncBehaviorVal),
 				"disable_secret_deletion": types.BoolValue(disableSecretDeletionVal),
-				"key_schema":              types.StringValue(keySchemaVal),
+			}
+
+			keySchema, ok := secretSync.SyncOptions["keySchema"].(string)
+			if keySchema == "" || !ok {
+				syncOptionsAttrValues["key_schema"] = types.StringNull()
+			} else {
+				syncOptionsAttrValues["key_schema"] = types.StringValue(keySchema)
 			}
 
 			return types.ObjectValue(syncOptionsAttrTypes, syncOptionsAttrValues)
