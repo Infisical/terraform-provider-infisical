@@ -31,6 +31,7 @@ const (
 	AppConnectionAppCloudflare         AppConnectionApp = "cloudflare"
 	AppConnectionAppSupabase           AppConnectionApp = "supabase"
 	AppConnectionAppFlyio              AppConnectionApp = "flyio"
+	AppConnectionAppLdap               AppConnectionApp = "ldap"
 )
 
 const (
