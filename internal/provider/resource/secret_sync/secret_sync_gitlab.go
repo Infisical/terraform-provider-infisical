@@ -100,7 +100,7 @@ func NewSecretSyncGitlabResource() resource.Resource {
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
 			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
-			
+
 			if !syncOptions.KeySchema.IsNull() && syncOptions.KeySchema.ValueString() != "" {
 				syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
 			}
@@ -149,7 +149,7 @@ func NewSecretSyncGitlabResource() resource.Resource {
 
 			syncOptionsMap["initialSyncBehavior"] = syncOptions.InitialSyncBehavior.ValueString()
 			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
-			
+
 			if !syncOptions.KeySchema.IsNull() && syncOptions.KeySchema.ValueString() != "" {
 				syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
 			}
@@ -177,22 +177,22 @@ func NewSecretSyncGitlabResource() resource.Resource {
 
 			destinationConfig["scope"] = gitlabCfg.Scope.ValueString()
 			destinationConfig["projectId"] = gitlabCfg.ProjectId.ValueString()
-			
+
 			if !gitlabCfg.ProjectName.IsNull() && gitlabCfg.ProjectName.ValueString() != "" {
 				destinationConfig["projectName"] = gitlabCfg.ProjectName.ValueString()
 			}
-			
+
 			destinationConfig["targetEnvironment"] = gitlabCfg.TargetEnvironment.ValueString()
-			
+
 			// Add boolean flags
 			if !gitlabCfg.ShouldProtectSecrets.IsNull() {
 				destinationConfig["shouldProtectSecrets"] = gitlabCfg.ShouldProtectSecrets.ValueBool()
 			}
-			
+
 			if !gitlabCfg.ShouldMaskSecrets.IsNull() {
 				destinationConfig["shouldMaskSecrets"] = gitlabCfg.ShouldMaskSecrets.ValueBool()
 			}
-			
+
 			if !gitlabCfg.ShouldHideSecrets.IsNull() {
 				destinationConfig["shouldHideSecrets"] = gitlabCfg.ShouldHideSecrets.ValueBool()
 			}
@@ -220,22 +220,22 @@ func NewSecretSyncGitlabResource() resource.Resource {
 
 			destinationConfig["scope"] = gitlabCfg.Scope.ValueString()
 			destinationConfig["projectId"] = gitlabCfg.ProjectId.ValueString()
-			
+
 			if !gitlabCfg.ProjectName.IsNull() && gitlabCfg.ProjectName.ValueString() != "" {
 				destinationConfig["projectName"] = gitlabCfg.ProjectName.ValueString()
 			}
-			
+
 			destinationConfig["targetEnvironment"] = gitlabCfg.TargetEnvironment.ValueString()
-			
+
 			// Add boolean flags
 			if !gitlabCfg.ShouldProtectSecrets.IsNull() {
 				destinationConfig["shouldProtectSecrets"] = gitlabCfg.ShouldProtectSecrets.ValueBool()
 			}
-			
+
 			if !gitlabCfg.ShouldMaskSecrets.IsNull() {
 				destinationConfig["shouldMaskSecrets"] = gitlabCfg.ShouldMaskSecrets.ValueBool()
 			}
-			
+
 			if !gitlabCfg.ShouldHideSecrets.IsNull() {
 				destinationConfig["shouldHideSecrets"] = gitlabCfg.ShouldHideSecrets.ValueBool()
 			}
@@ -300,10 +300,10 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			}
 
 			return types.ObjectValue(map[string]attr.Type{
-				"scope":                 types.StringType,
-				"project_id":            types.StringType,
-				"project_name":          types.StringType,
-				"target_environment":    types.StringType,
+				"scope":                  types.StringType,
+				"project_id":             types.StringType,
+				"project_name":           types.StringType,
+				"target_environment":     types.StringType,
 				"should_protect_secrets": types.BoolType,
 				"should_mask_secrets":    types.BoolType,
 				"should_hide_secrets":    types.BoolType,
