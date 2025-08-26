@@ -374,6 +374,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionCloudflareResource,
 		appConnectionResource.NewAppConnectionSupabaseResource,
 		appConnectionResource.NewAppConnectionFlyioResource,
+		appConnectionResource.NewAppConnectionLdapResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
