@@ -127,7 +127,7 @@ Required:
 
 Optional:
 
-- `rotation_method` (String) The method to use for rotating the password.
+- `rotation_method` (String) The method to use for rotating the password. Supported options: connection-principal and target-principal (default: connection-principal)
 
 <a id="nestedatt--parameters--password_requirements"></a>
 ### Nested Schema for `parameters.password_requirements`

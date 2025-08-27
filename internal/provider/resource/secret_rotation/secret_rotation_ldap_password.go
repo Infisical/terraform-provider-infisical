@@ -86,7 +86,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 			},
 			"rotation_method": schema.StringAttribute{
 				Optional:    true,
-				Description: "The method to use for rotating the password.",
+				Description: "The method to use for rotating the password. Supported options: connection-principal and target-principal (default: connection-principal)",
 			},
 		},
 		SecretsMappingAttributes: map[string]schema.Attribute{
