@@ -26,8 +26,8 @@ provider "infisical" {
 
   auth = {
     universal = {
-      client_id     = var.infisical_client_id
-      client_secret = var.infisical_client_secret
+      client_id     = "<machine-identity-client-id>"
+      client_secret = "<machine-identity-client-secret>"
     }
   }
 }
@@ -54,10 +54,10 @@ variable "ldap_connection_id" {
 resource "infisical_secret_rotation_ldap_password" "example" {
   name          = "ldap-password-rotation"
   description   = "Rotation for LDAP user passwords"
-  project_id    = var.project_id
-  connection_id = var.ldap_connection_id
-  environment   = "prod"
-  secret_path   = "/ldap"
+  project_id    = "<project-id>"
+  environment   = "<environment-slug>"
+  secret_path   = "<secret-path>" # Root folder is /
+  connection_id = "<app-connection-id>"
 
   auto_rotation_enabled = true
   rotation_interval     = 30 # days
