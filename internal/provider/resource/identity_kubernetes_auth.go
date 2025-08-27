@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -153,7 +152,7 @@ func (r *IdentityKubernetesAuthResource) Configure(_ context.Context, req resour
 	r.client = client
 }
 
-func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, newIdentityKubernetesAuth *infisicalclient.IdentityKubernetesAuth) {
+func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, newIdentityKubernetesAuth *infisical.IdentityKubernetesAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityKubernetesAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityKubernetesAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityKubernetesAuth.AccessTokenNumUsesLimit)
@@ -275,7 +274,7 @@ func (r *IdentityKubernetesAuthResource) Read(ctx context.Context, req resource.
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {

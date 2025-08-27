@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,9 +16,9 @@ import (
 
 // AppConnectionBaseResource is the resource implementation.
 type AppConnectionBaseResource struct {
-	App                              infisicalclient.AppConnectionApp // used for identifying secret sync route
-	ResourceTypeName                 string                           // terraform resource name suffix
-	AppConnectionName                string                           // complete descriptive name of the app connection
+	App                              infisical.AppConnectionApp // used for identifying secret sync route
+	ResourceTypeName                 string                     // terraform resource name suffix
+	AppConnectionName                string                     // complete descriptive name of the app connection
 	client                           *infisical.Client
 	AllowedMethods                   []string
 	CredentialsAttributes            map[string]schema.Attribute
@@ -136,7 +135,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	appConnection, err := r.client.CreateAppConnection(infisicalclient.CreateAppConnectionRequest{
+	appConnection, err := r.client.CreateAppConnection(infisical.CreateAppConnectionRequest{
 		App:         r.App,
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
@@ -180,7 +179,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	appConnection, err := r.client.GetAppConnectionById(infisicalclient.GetAppConnectionByIdRequest{
+	appConnection, err := r.client.GetAppConnectionById(infisical.GetAppConnectionByIdRequest{
 		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
@@ -273,7 +272,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	appConnection, err := r.client.UpdateAppConnection(infisicalclient.UpdateAppConnectionRequest{
+	appConnection, err := r.client.UpdateAppConnection(infisical.UpdateAppConnectionRequest{
 		ID:          state.ID.ValueString(),
 		App:         r.App,
 		Name:        plan.Name.ValueString(),

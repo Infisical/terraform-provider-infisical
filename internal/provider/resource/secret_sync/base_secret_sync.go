@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,20 +16,20 @@ import (
 
 // SecretSyncBaseResource is the resource implementation.
 type SecretSyncBaseResource struct {
-	App                                    infisicalclient.SecretSyncApp // used for identifying secret sync route
-	ResourceTypeName                       string                        // terraform resource name suffix
-	SyncName                               string                        // complete descriptive name of the secret sync
-	AppConnection                          infisicalclient.AppConnectionApp
+	App                                    infisical.SecretSyncApp // used for identifying secret sync route
+	ResourceTypeName                       string                  // terraform resource name suffix
+	SyncName                               string                  // complete descriptive name of the secret sync
+	AppConnection                          infisical.AppConnectionApp
 	client                                 *infisical.Client
 	DestinationConfigAttributes            map[string]schema.Attribute
 	ReadDestinationConfigForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadDestinationConfigForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
+	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics)
 
 	SyncOptionsAttributes            map[string]schema.Attribute
 	ReadSyncOptionsForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadSyncOptionsForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadSyncOptionsFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
+	ReadSyncOptionsFromApi           func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics)
 }
 
 type SecretSyncBaseResourceModel struct {
@@ -181,7 +180,7 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	secretSync, err := r.client.CreateSecretSync(infisicalclient.CreateSecretSyncRequest{
+	secretSync, err := r.client.CreateSecretSync(infisical.CreateSecretSyncRequest{
 		App:               r.App,
 		Name:              plan.Name.ValueString(),
 		Description:       plan.Description.ValueString(),
@@ -229,7 +228,7 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	secretSync, err := r.client.GetSecretSyncById(infisicalclient.GetSecretSyncByIdRequest{
+	secretSync, err := r.client.GetSecretSyncById(infisical.GetSecretSyncByIdRequest{
 		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
@@ -336,7 +335,7 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	_, err := r.client.UpdateSecretSync(infisicalclient.UpdateSecretSyncRequest{
+	_, err := r.client.UpdateSecretSync(infisical.UpdateSecretSyncRequest{
 		App:               r.App,
 		ID:                state.ID.ValueString(),
 		Name:              plan.Name.ValueString(),

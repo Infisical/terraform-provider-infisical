@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -26,19 +25,19 @@ type RotateAtUtc struct {
 
 // SecretRotationBaseResource is the resource implementation.
 type SecretRotationBaseResource struct {
-	Provider           infisicalclient.SecretRotationProvider
+	Provider           infisical.SecretRotationProvider
 	ResourceTypeName   string // terraform resource name suffix
 	SecretRotationName string // complete descriptive name of the secret rotation
-	AppConnection      infisicalclient.AppConnectionApp
+	AppConnection      infisical.AppConnectionApp
 	client             *infisical.Client
 
 	ParametersAttributes   map[string]schema.Attribute
 	ReadParametersFromPlan func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadParametersFromApi  func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics)
+	ReadParametersFromApi  func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics)
 
 	SecretsMappingAttributes   map[string]schema.Attribute
 	ReadSecretsMappingFromPlan func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadSecretsMappingFromApi  func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics)
+	ReadSecretsMappingFromApi  func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics)
 }
 
 type SecretRotationBaseResourceModel struct {
@@ -204,7 +203,7 @@ func (r *SecretRotationBaseResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	secretRotation, err := r.client.CreateSecretRotation(infisicalclient.CreateSecretRotationRequest{
+	secretRotation, err := r.client.CreateSecretRotation(infisical.CreateSecretRotationRequest{
 		Provider:            r.Provider,
 		Name:                plan.Name.ValueString(),
 		Description:         plan.Description.ValueString(),
@@ -215,7 +214,7 @@ func (r *SecretRotationBaseResource) Create(ctx context.Context, req resource.Cr
 		SecretPath:          plan.SecretPath.ValueString(),
 
 		RotationInterval: plan.RotationInterval.ValueInt32(),
-		RotateAtUtc: infisicalclient.SecretRotationRotateAtUtc{
+		RotateAtUtc: infisical.SecretRotationRotateAtUtc{
 			Hours:   plan.RotateAtUtc.Hours.ValueInt64(),
 			Minutes: plan.RotateAtUtc.Minutes.ValueInt64(),
 		},
@@ -259,7 +258,7 @@ func (r *SecretRotationBaseResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	secretRotation, err := r.client.GetSecretRotationById(infisicalclient.GetSecretRotationByIdRequest{
+	secretRotation, err := r.client.GetSecretRotationById(infisical.GetSecretRotationByIdRequest{
 		Provider: r.Provider,
 		ID:       state.ID.ValueString(),
 	})
@@ -352,7 +351,7 @@ func (r *SecretRotationBaseResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	_, err := r.client.UpdateSecretRotation(infisicalclient.UpdateSecretRotationRequest{
+	_, err := r.client.UpdateSecretRotation(infisical.UpdateSecretRotationRequest{
 		Provider:            r.Provider,
 		ID:                  state.ID.ValueString(),
 		Name:                plan.Name.ValueString(),
@@ -363,7 +362,7 @@ func (r *SecretRotationBaseResource) Update(ctx context.Context, req resource.Up
 		SecretPath:          plan.SecretPath.ValueString(),
 
 		RotationInterval: plan.RotationInterval.ValueInt32(),
-		RotateAtUtc: infisicalclient.SecretRotationRotateAtUtc{
+		RotateAtUtc: infisical.SecretRotationRotateAtUtc{
 			Hours:   plan.RotateAtUtc.Hours.ValueInt64(),
 			Minutes: plan.RotateAtUtc.Minutes.ValueInt64(),
 		},

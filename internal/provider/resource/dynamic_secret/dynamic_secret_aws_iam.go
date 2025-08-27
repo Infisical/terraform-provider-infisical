@@ -2,7 +2,7 @@ package resource
 
 import (
 	"context"
-	infisicalclient "terraform-provider-infisical/internal/client"
+	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -37,7 +37,7 @@ type DynamicSecretAwsIamConfigurationModel struct {
 
 func NewDynamicSecretAwsIamResource() resource.Resource {
 	return &DynamicSecretBaseResource{
-		Provider:          infisicalclient.DynamicSecretProviderAWSIAM,
+		Provider:          infisical.DynamicSecretProviderAWSIAM,
 		ResourceTypeName:  "_dynamic_secret_aws_iam",
 		DynamicSecretName: "AWS IAM",
 		ConfigurationAttributes: map[string]schema.Attribute{
@@ -163,7 +163,7 @@ func NewDynamicSecretAwsIamResource() resource.Resource {
 			return configurationMap, diags
 		},
 
-		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
+		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			configuration := make(map[string]attr.Value)
 			configurationSchema := map[string]attr.Type{

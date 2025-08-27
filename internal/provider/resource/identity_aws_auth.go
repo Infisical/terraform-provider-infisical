@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -136,7 +135,7 @@ func (r *IdentityAwsAuthResource) Configure(_ context.Context, req resource.Conf
 	r.client = client
 }
 
-func updateAwsAuthTerraformStateFromApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAwsAuthResourceModel, newIdentityAwsAuth *infisicalclient.IdentityAwsAuth) {
+func updateAwsAuthTerraformStateFromApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAwsAuthResourceModel, newIdentityAwsAuth *infisical.IdentityAwsAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityAwsAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityAwsAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityAwsAuth.AccessTokenNumUsesLimit)
@@ -261,7 +260,7 @@ func (r *IdentityAwsAuthResource) Read(ctx context.Context, req resource.ReadReq
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -138,7 +137,7 @@ func (r *IdentityAzureAuthResource) Configure(_ context.Context, req resource.Co
 	r.client = client
 }
 
-func updateAzureAuthTerraformStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAzureAuthResourceModel, newIdentityAzureAuth *infisicalclient.IdentityAzureAuth) {
+func updateAzureAuthTerraformStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityAzureAuthResourceModel, newIdentityAzureAuth *infisical.IdentityAzureAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityAzureAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityAzureAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityAzureAuth.AccessTokenNumUsesLimit)
@@ -250,7 +249,7 @@ func (r *IdentityAzureAuthResource) Read(ctx context.Context, req resource.ReadR
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {
@@ -372,7 +371,7 @@ func (r *IdentityAzureAuthResource) ImportState(ctx context.Context, req resourc
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.Diagnostics.AddError(
 				"Identity not found",
 				"The identity with the given ID was not found",
