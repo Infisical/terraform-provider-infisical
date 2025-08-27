@@ -16,6 +16,7 @@ provider "infisical" {
     }
   }
 }
+
 resource "infisical_app_connection_gitlab" "gitlab_connection" {
   name        = "gitlab-connection"
   description = "GitLab connection for CI/CD variables sync"

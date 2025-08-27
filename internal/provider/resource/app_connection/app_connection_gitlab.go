@@ -33,12 +33,12 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				Sensitive:   true,
 			},
 			"instance_url": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The GitLab instance URL (e.g., https://gitlab.com for GitLab.com or your self-hosted GitLab URL).",
 			},
 			"access_token_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of access token. Must be 'project' for project access tokens.",
+				Description: "The type of access token. Supported options: 'project' and 'personal'",
 			},
 		},
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -58,10 +58,10 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentials.AccessTokenType.ValueString() != "project" {
+			if credentials.AccessTokenType.ValueString() != "project" || credentials.AccessTokenType.ValueString() != "personal" {
 				diags.AddError(
-					"Unable to create GitLab app connection",
-					"Invalid access_token_type. Only 'project' is supported.",
+					"Unable to update GitLab app connection",
+					"Invalid access_token_type. Only 'project' and 'personal' is supported.",
 				)
 				return nil, diags
 			}
@@ -95,10 +95,10 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromPlan.AccessTokenType.ValueString() != "project" {
+			if credentialsFromPlan.AccessTokenType.ValueString() != "project" || credentialsFromPlan.AccessTokenType.ValueString() != "personal" {
 				diags.AddError(
 					"Unable to update GitLab app connection",
-					"Invalid access_token_type. Only 'project' is supported.",
+					"Invalid access_token_type. Only 'project' and 'personal' is supported.",
 				)
 				return nil, diags
 			}
