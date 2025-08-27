@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -141,7 +140,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	groupResponse, err := r.client.GetGroupById(infisical.GetGroupByIdRequest{ID: state.ID.ValueString()})
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -237,7 +236,7 @@ func (r *GroupResource) ImportState(ctx context.Context, req resource.ImportStat
 
 	groupResponse, err := r.client.GetGroupById(infisical.GetGroupByIdRequest{ID: req.ID})
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.Diagnostics.AddError(
 				"Error importing group",
 				fmt.Sprintf("No group found with ID: %s", req.ID),

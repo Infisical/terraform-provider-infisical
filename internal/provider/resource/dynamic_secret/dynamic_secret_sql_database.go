@@ -2,7 +2,7 @@ package resource
 
 import (
 	"context"
-	infisicalclient "terraform-provider-infisical/internal/client"
+	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -45,7 +45,7 @@ type DynamicSecretSqlDatabaseConfigurationModel struct {
 
 func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 	return &DynamicSecretBaseResource{
-		Provider:          infisicalclient.DynamicSecretProviderSQLDatabase,
+		Provider:          infisical.DynamicSecretProviderSQLDatabase,
 		ResourceTypeName:  "_dynamic_secret_sql_database",
 		DynamicSecretName: "SQL Database",
 		ConfigurationAttributes: map[string]schema.Attribute{
@@ -182,7 +182,7 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 			return configurationMap, diags
 		},
 
-		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
+		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
 			clientVal, ok := dynamicSecret.Inputs["client"].(string)

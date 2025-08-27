@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -268,7 +267,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {

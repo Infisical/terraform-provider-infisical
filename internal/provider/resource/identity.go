@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -216,7 +215,7 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {
@@ -384,7 +383,7 @@ func (r *IdentityResource) ImportState(ctx context.Context, req resource.ImportS
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.Diagnostics.AddError(
 				"Error importing identity",
 				fmt.Sprintf("No identity found with ID: %s", req.ID),

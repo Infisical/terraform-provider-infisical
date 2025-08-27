@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -126,7 +125,7 @@ func NewSecretSyncCloudflarePagesResource() resource.Resource {
 			return syncOptionsMap, diags
 		},
 
-		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			syncOptionsAttrTypes := map[string]attr.Type{
 				"initial_sync_behavior":   types.StringType,
 				"disable_secret_deletion": types.BoolType,
@@ -240,7 +239,7 @@ func NewSecretSyncCloudflarePagesResource() resource.Resource {
 			return destinationConfigMap, diags
 		},
 
-		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			destinationConfigAttrTypes := map[string]attr.Type{
 				"project_name": types.StringType,
 				"environment":  types.StringType,

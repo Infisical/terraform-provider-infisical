@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -268,7 +267,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Co
 		for _, action := range planPermissionActions {
 			actions = append(actions, action.ValueString())
 		}
-		privilegePermission := infisicalclient.ProjectSpecificPrivilegePermissionRequest{
+		privilegePermission := infisical.ProjectSpecificPrivilegePermissionRequest{
 			Actions:    actions,
 			Subject:    plan.Permission.Subject.ValueString(),
 			Conditions: condition,
@@ -730,7 +729,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 		for _, action := range planPermissionActions {
 			actions = append(actions, action.ValueString())
 		}
-		privilegePermission := infisicalclient.ProjectSpecificPrivilegePermissionRequest{
+		privilegePermission := infisical.ProjectSpecificPrivilegePermissionRequest{
 			Actions:    actions,
 			Subject:    plan.Permission.Subject.ValueString(),
 			Conditions: condition,

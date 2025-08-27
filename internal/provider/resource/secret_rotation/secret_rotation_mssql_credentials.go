@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -65,7 +64,7 @@ func NewSecretRotationMsSqlCredentialsResource() resource.Resource {
 			return parametersMap, diags
 		},
 
-		ReadParametersFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
+		ReadParametersFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			parameters := make(map[string]attr.Value)
 			parametersSchema := map[string]attr.Type{
@@ -111,7 +110,7 @@ func NewSecretRotationMsSqlCredentialsResource() resource.Resource {
 			return secretsMappingMap, diags
 		},
 
-		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
+		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			secretsMapping := make(map[string]attr.Value)
 			secretsMappingSchema := map[string]attr.Type{
