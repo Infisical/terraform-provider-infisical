@@ -35,31 +35,28 @@ provider "infisical" {
 resource "infisical_app_connection_ldap" "ldap-demo" {
   name        = "ldap-demo"
   description = "This is a demo LDAP connection."
-  method      = "bind-credentials"
+  method      = "simple-bind"
   credentials = {
-    host          = "ldap.example.com"
-    port          = 389
-    bind_dn       = "cn=admin,dc=example,dc=com"
-    bind_password = "<password>"
-    base_dn       = "dc=example,dc=com"
-    tls_enabled   = false
+    provider                = "active-directory"
+    url                     = "ldap://ldap.example.com:389"
+    dn                      = "cn=admin,dc=example,dc=com"
+    password                = "<password>"
+    ssl_reject_unauthorized = true
   }
 }
 
-# Example with TLS enabled
-resource "infisical_app_connection_ldap" "ldap-demo-tls" {
-  name        = "ldap-demo-tls"
-  description = "This is a demo LDAP connection with TLS."
-  method      = "bind-credentials"
+# Example with LDAPS (secure LDAP)
+resource "infisical_app_connection_ldap" "ldap-demo-secure" {
+  name        = "ldap-demo-secure"
+  description = "This is a demo LDAP connection with SSL."
+  method      = "simple-bind"
   credentials = {
-    host            = "ldaps.example.com"
-    port            = 636
-    bind_dn         = "cn=admin,dc=example,dc=com"
-    bind_password   = "<password>"
-    base_dn         = "dc=example,dc=com"
-    tls_enabled     = true
-    tls_skip_verify = false
-    tls_ca          = file("${path.module}/ca.crt")
+    provider                = "openldap"
+    url                     = "ldaps://ldaps.example.com:636"
+    dn                      = "cn=admin,dc=example,dc=com"
+    password                = "<password>"
+    ssl_reject_unauthorized = false
+    ssl_certificate         = file("${path.module}/ca.crt")
   }
 }
 ```
@@ -70,7 +67,7 @@ resource "infisical_app_connection_ldap" "ldap-demo-tls" {
 ### Required
 
 - `credentials` (Attributes) The credentials for the LDAP App Connection (see [below for nested schema](#nestedatt--credentials))
-- `method` (String) The method used to authenticate with LDAP. Possible values are: bind-credentials
+- `method` (String) The method used to authenticate with LDAP. Possible values are: simple-bind
 - `name` (String) The name of the LDAP App Connection to create. Must be slug-friendly
 
 ### Optional
@@ -87,16 +84,12 @@ resource "infisical_app_connection_ldap" "ldap-demo-tls" {
 
 Required:
 
-- `bind_dn` (String) The Distinguished Name (DN) of the bind user for authentication.
-- `bind_password` (String, Sensitive) The password for the bind user.
-- `host` (String) The hostname or IP address of the LDAP server.
+- `dn` (String) The Distinguished Name (DN) for authentication.
+- `password` (String, Sensitive) The password for authentication.
+- `provider` (String) The LDAP provider (e.g., 'active-directory', 'openldap').
+- `url` (String) The LDAP server URL (e.g., 'ldap://example.com:389' or 'ldaps://example.com:636').
 
 Optional:
 
-- `base_dn` (String) The base Distinguished Name (DN) for LDAP searches.
-- `port` (Number) The port number of the LDAP server.
-- `tls_ca` (String) The TLS certificate authority certificate.
-- `tls_cert` (String, Sensitive) The TLS client certificate for authentication.
-- `tls_enabled` (Boolean) Whether to use TLS when connecting to the LDAP server.
-- `tls_key` (String, Sensitive) The TLS client key for authentication.
-- `tls_skip_verify` (Boolean) Whether to skip TLS certificate verification.
+- `ssl_certificate` (String) The SSL certificate for secure connections.
+- `ssl_reject_unauthorized` (Boolean) Whether to reject unauthorized SSL certificates.

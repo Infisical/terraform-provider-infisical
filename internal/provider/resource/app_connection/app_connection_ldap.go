@@ -9,82 +9,55 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32default"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // AppConnectionLdapCredentialsModel describes the data source data model.
 type AppConnectionLdapCredentialsModel struct {
-	Host          types.String `tfsdk:"host"`
-	Port          types.Int32  `tfsdk:"port"`
-	BindDn        types.String `tfsdk:"bind_dn"`
-	BindPassword  types.String `tfsdk:"bind_password"`
-	BaseDn        types.String `tfsdk:"base_dn"`
-	TlsEnabled    types.Bool   `tfsdk:"tls_enabled"`
-	TlsSkipVerify types.Bool   `tfsdk:"tls_skip_verify"`
-	TlsCert       types.String `tfsdk:"tls_cert"`
-	TlsKey        types.String `tfsdk:"tls_key"`
-	TlsCa         types.String `tfsdk:"tls_ca"`
+	Provider              types.String `tfsdk:"provider"`
+	Url                   types.String `tfsdk:"url"`
+	Dn                    types.String `tfsdk:"dn"`
+	Password              types.String `tfsdk:"password"`
+	SslRejectUnauthorized types.Bool   `tfsdk:"ssl_reject_unauthorized"`
+	SslCertificate        types.String `tfsdk:"ssl_certificate"`
 }
 
-const AppConnectionLdapAuthMethodBindCredentials = "bind-credentials"
+const AppConnectionLdapAuthMethodSimpleBind = "simple-bind"
 
 func NewAppConnectionLdapResource() resource.Resource {
 	return &AppConnectionBaseResource{
 		App:               infisical.AppConnectionAppLdap,
 		AppConnectionName: "LDAP",
 		ResourceTypeName:  "_app_connection_ldap",
-		AllowedMethods:    []string{AppConnectionLdapAuthMethodBindCredentials},
+		AllowedMethods:    []string{AppConnectionLdapAuthMethodSimpleBind},
 		CredentialsAttributes: map[string]schema.Attribute{
-			"host": schema.StringAttribute{
+			"provider": schema.StringAttribute{
 				Required:    true,
-				Description: "The hostname or IP address of the LDAP server.",
+				Description: "The LDAP provider (e.g., 'active-directory', 'openldap').",
 			},
-			"port": schema.Int32Attribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "The port number of the LDAP server.",
-				Default:     int32default.StaticInt32(389),
-			},
-			"bind_dn": schema.StringAttribute{
+			"url": schema.StringAttribute{
 				Required:    true,
-				Description: "The Distinguished Name (DN) of the bind user for authentication.",
+				Description: "The LDAP server URL (e.g., 'ldap://example.com:389' or 'ldaps://example.com:636').",
 			},
-			"bind_password": schema.StringAttribute{
+			"dn": schema.StringAttribute{
 				Required:    true,
-				Description: "The password for the bind user.",
+				Description: "The Distinguished Name (DN) for authentication.",
+			},
+			"password": schema.StringAttribute{
+				Required:    true,
+				Description: "The password for authentication.",
 				Sensitive:   true,
 			},
-			"base_dn": schema.StringAttribute{
-				Optional:    true,
-				Description: "The base Distinguished Name (DN) for LDAP searches.",
-			},
-			"tls_enabled": schema.BoolAttribute{
+			"ssl_reject_unauthorized": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether to use TLS when connecting to the LDAP server.",
-				Default:     booldefault.StaticBool(false),
+				Description: "Whether to reject unauthorized SSL certificates.",
+				Default:     booldefault.StaticBool(true),
 			},
-			"tls_skip_verify": schema.BoolAttribute{
+			"ssl_certificate": schema.StringAttribute{
 				Optional:    true,
-				Computed:    true,
-				Description: "Whether to skip TLS certificate verification.",
-				Default:     booldefault.StaticBool(false),
-			},
-			"tls_cert": schema.StringAttribute{
-				Optional:    true,
-				Description: "The TLS client certificate for authentication.",
-				Sensitive:   true,
-			},
-			"tls_key": schema.StringAttribute{
-				Optional:    true,
-				Description: "The TLS client key for authentication.",
-				Sensitive:   true,
-			},
-			"tls_ca": schema.StringAttribute{
-				Optional:    true,
-				Description: "The TLS certificate authority certificate.",
+				Description: "The SSL certificate for secure connections.",
 			},
 		},
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
@@ -96,34 +69,22 @@ func NewAppConnectionLdapResource() resource.Resource {
 				return nil, diags
 			}
 
-			if plan.Method.ValueString() != AppConnectionLdapAuthMethodBindCredentials {
+			if plan.Method.ValueString() != AppConnectionLdapAuthMethodSimpleBind {
 				diags.AddError(
 					"Unable to create LDAP app connection",
-					"Invalid method. Only bind-credentials method is supported",
+					"Invalid method. Only simple-bind method is supported",
 				)
 				return nil, diags
 			}
 
-			credentialsConfig["host"] = credentials.Host.ValueString()
-			credentialsConfig["port"] = credentials.Port.ValueInt32()
-			credentialsConfig["bindDn"] = credentials.BindDn.ValueString()
-			credentialsConfig["bindPassword"] = credentials.BindPassword.ValueString()
+			credentialsConfig["provider"] = credentials.Provider.ValueString()
+			credentialsConfig["url"] = credentials.Url.ValueString()
+			credentialsConfig["dn"] = credentials.Dn.ValueString()
+			credentialsConfig["password"] = credentials.Password.ValueString()
+			credentialsConfig["sslRejectUnauthorized"] = credentials.SslRejectUnauthorized.ValueBool()
 
-			if !credentials.BaseDn.IsNull() {
-				credentialsConfig["baseDn"] = credentials.BaseDn.ValueString()
-			}
-
-			credentialsConfig["tlsEnabled"] = credentials.TlsEnabled.ValueBool()
-			credentialsConfig["tlsSkipVerify"] = credentials.TlsSkipVerify.ValueBool()
-
-			if !credentials.TlsCert.IsNull() {
-				credentialsConfig["tlsCert"] = credentials.TlsCert.ValueString()
-			}
-			if !credentials.TlsKey.IsNull() {
-				credentialsConfig["tlsKey"] = credentials.TlsKey.ValueString()
-			}
-			if !credentials.TlsCa.IsNull() {
-				credentialsConfig["tlsCa"] = credentials.TlsCa.ValueString()
+			if !credentials.SslCertificate.IsNull() {
+				credentialsConfig["sslCertificate"] = credentials.SslCertificate.ValueString()
 			}
 
 			return credentialsConfig, diags
@@ -143,58 +104,34 @@ func NewAppConnectionLdapResource() resource.Resource {
 				return nil, diags
 			}
 
-			if plan.Method.ValueString() != AppConnectionLdapAuthMethodBindCredentials {
+			if plan.Method.ValueString() != AppConnectionLdapAuthMethodSimpleBind {
 				diags.AddError(
 					"Unable to update LDAP app connection",
-					"Invalid method. Only bind-credentials method is supported",
+					"Invalid method. Only simple-bind method is supported",
 				)
 				return nil, diags
 			}
 
-			if credentialsFromState.Host.ValueString() != credentialsFromPlan.Host.ValueString() {
-				credentialsConfig["host"] = credentialsFromPlan.Host.ValueString()
+			if credentialsFromState.Provider.ValueString() != credentialsFromPlan.Provider.ValueString() {
+				credentialsConfig["provider"] = credentialsFromPlan.Provider.ValueString()
 			}
-			if credentialsFromState.Port.ValueInt32() != credentialsFromPlan.Port.ValueInt32() {
-				credentialsConfig["port"] = credentialsFromPlan.Port.ValueInt32()
+			if credentialsFromState.Url.ValueString() != credentialsFromPlan.Url.ValueString() {
+				credentialsConfig["url"] = credentialsFromPlan.Url.ValueString()
 			}
-			if credentialsFromState.BindDn.ValueString() != credentialsFromPlan.BindDn.ValueString() {
-				credentialsConfig["bindDn"] = credentialsFromPlan.BindDn.ValueString()
+			if credentialsFromState.Dn.ValueString() != credentialsFromPlan.Dn.ValueString() {
+				credentialsConfig["dn"] = credentialsFromPlan.Dn.ValueString()
 			}
-			if credentialsFromState.BindPassword.ValueString() != credentialsFromPlan.BindPassword.ValueString() {
-				credentialsConfig["bindPassword"] = credentialsFromPlan.BindPassword.ValueString()
+			if credentialsFromState.Password.ValueString() != credentialsFromPlan.Password.ValueString() {
+				credentialsConfig["password"] = credentialsFromPlan.Password.ValueString()
 			}
-			if credentialsFromState.BaseDn.ValueString() != credentialsFromPlan.BaseDn.ValueString() {
-				if !credentialsFromPlan.BaseDn.IsNull() {
-					credentialsConfig["baseDn"] = credentialsFromPlan.BaseDn.ValueString()
+			if credentialsFromState.SslRejectUnauthorized.ValueBool() != credentialsFromPlan.SslRejectUnauthorized.ValueBool() {
+				credentialsConfig["sslRejectUnauthorized"] = credentialsFromPlan.SslRejectUnauthorized.ValueBool()
+			}
+			if credentialsFromState.SslCertificate.ValueString() != credentialsFromPlan.SslCertificate.ValueString() {
+				if !credentialsFromPlan.SslCertificate.IsNull() {
+					credentialsConfig["sslCertificate"] = credentialsFromPlan.SslCertificate.ValueString()
 				} else {
-					credentialsConfig["baseDn"] = ""
-				}
-			}
-			if credentialsFromState.TlsEnabled.ValueBool() != credentialsFromPlan.TlsEnabled.ValueBool() {
-				credentialsConfig["tlsEnabled"] = credentialsFromPlan.TlsEnabled.ValueBool()
-			}
-			if credentialsFromState.TlsSkipVerify.ValueBool() != credentialsFromPlan.TlsSkipVerify.ValueBool() {
-				credentialsConfig["tlsSkipVerify"] = credentialsFromPlan.TlsSkipVerify.ValueBool()
-			}
-			if credentialsFromState.TlsCert.ValueString() != credentialsFromPlan.TlsCert.ValueString() {
-				if !credentialsFromPlan.TlsCert.IsNull() {
-					credentialsConfig["tlsCert"] = credentialsFromPlan.TlsCert.ValueString()
-				} else {
-					credentialsConfig["tlsCert"] = ""
-				}
-			}
-			if credentialsFromState.TlsKey.ValueString() != credentialsFromPlan.TlsKey.ValueString() {
-				if !credentialsFromPlan.TlsKey.IsNull() {
-					credentialsConfig["tlsKey"] = credentialsFromPlan.TlsKey.ValueString()
-				} else {
-					credentialsConfig["tlsKey"] = ""
-				}
-			}
-			if credentialsFromState.TlsCa.ValueString() != credentialsFromPlan.TlsCa.ValueString() {
-				if !credentialsFromPlan.TlsCa.IsNull() {
-					credentialsConfig["tlsCa"] = credentialsFromPlan.TlsCa.ValueString()
-				} else {
-					credentialsConfig["tlsCa"] = ""
+					credentialsConfig["sslCertificate"] = ""
 				}
 			}
 
@@ -213,28 +150,20 @@ func NewAppConnectionLdapResource() resource.Resource {
 			// Create the credentials object with the same structure
 			credentialsObject, objDiags := types.ObjectValue(
 				map[string]attr.Type{
-					"host":            types.StringType,
-					"port":            types.Int32Type,
-					"bind_dn":         types.StringType,
-					"bind_password":   types.StringType,
-					"base_dn":         types.StringType,
-					"tls_enabled":     types.BoolType,
-					"tls_skip_verify": types.BoolType,
-					"tls_cert":        types.StringType,
-					"tls_key":         types.StringType,
-					"tls_ca":          types.StringType,
+					"provider":                types.StringType,
+					"url":                     types.StringType,
+					"dn":                      types.StringType,
+					"password":                types.StringType,
+					"ssl_reject_unauthorized": types.BoolType,
+					"ssl_certificate":         types.StringType,
 				},
 				map[string]attr.Value{
-					"host":            credentials.Host,
-					"port":            credentials.Port,
-					"bind_dn":         credentials.BindDn,
-					"bind_password":   credentials.BindPassword,
-					"base_dn":         credentials.BaseDn,
-					"tls_enabled":     credentials.TlsEnabled,
-					"tls_skip_verify": credentials.TlsSkipVerify,
-					"tls_cert":        credentials.TlsCert,
-					"tls_key":         credentials.TlsKey,
-					"tls_ca":          credentials.TlsCa,
+					"provider":                credentials.Provider,
+					"url":                     credentials.Url,
+					"dn":                      credentials.Dn,
+					"password":                credentials.Password,
+					"ssl_reject_unauthorized": credentials.SslRejectUnauthorized,
+					"ssl_certificate":         credentials.SslCertificate,
 				},
 			)
 			diags.Append(objDiags...)

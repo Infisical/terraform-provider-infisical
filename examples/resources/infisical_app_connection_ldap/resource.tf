@@ -20,30 +20,27 @@ provider "infisical" {
 resource "infisical_app_connection_ldap" "ldap-demo" {
   name        = "ldap-demo"
   description = "This is a demo LDAP connection."
-  method      = "bind-credentials"
+  method      = "simple-bind"
   credentials = {
-    host          = "ldap.example.com"
-    port          = 389
-    bind_dn       = "cn=admin,dc=example,dc=com"
-    bind_password = "<password>"
-    base_dn       = "dc=example,dc=com"
-    tls_enabled   = false
+    provider                = "active-directory"
+    url                     = "ldap://ldap.example.com:389"
+    dn                      = "cn=admin,dc=example,dc=com"
+    password                = "<password>"
+    ssl_reject_unauthorized = true
   }
 }
 
-# Example with TLS enabled
-resource "infisical_app_connection_ldap" "ldap-demo-tls" {
-  name        = "ldap-demo-tls"
-  description = "This is a demo LDAP connection with TLS."
-  method      = "bind-credentials"
+# Example with LDAPS (secure LDAP)
+resource "infisical_app_connection_ldap" "ldap-demo-secure" {
+  name        = "ldap-demo-secure"
+  description = "This is a demo LDAP connection with SSL."
+  method      = "simple-bind"
   credentials = {
-    host            = "ldaps.example.com"
-    port            = 636
-    bind_dn         = "cn=admin,dc=example,dc=com"
-    bind_password   = "<password>"
-    base_dn         = "dc=example,dc=com"
-    tls_enabled     = true
-    tls_skip_verify = false
-    tls_ca          = file("${path.module}/ca.crt")
+    provider                = "openldap"
+    url                     = "ldaps://ldaps.example.com:636"
+    dn                      = "cn=admin,dc=example,dc=com"
+    password                = "<password>"
+    ssl_reject_unauthorized = false
+    ssl_certificate         = file("${path.module}/ca.crt")
   }
 }
