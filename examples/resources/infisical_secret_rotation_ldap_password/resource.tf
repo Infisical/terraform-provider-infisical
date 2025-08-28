@@ -9,7 +9,6 @@ terraform {
 
 provider "infisical" {
   host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical
-
   auth = {
     universal = {
       client_id     = "<machine-identity-client-id>"

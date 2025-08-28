@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -155,7 +154,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				parametersMap["rotationMethod"] = parameters.RotationMethod.ValueString()
 			}
 
-			if parameters.RotationMethod.String() == "target-principal" && parameters.TargetPrincipalPassword.IsNull() {
+			if parameters.RotationMethod.ValueString() == "target-principal" && parameters.TargetPrincipalPassword.IsNull() {
 				diags.AddError("Plan Error", "Expected 'target_principal_password' (string) but got wrong type or missing")
 			}
 
@@ -172,7 +171,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 			return parametersMap, diags
 		},
 
-		ReadParametersFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
+		ReadParametersFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			parameters := make(map[string]attr.Value)
 			parametersSchema := map[string]attr.Type{
@@ -327,7 +326,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 			return secretsMappingMap, diags
 		},
 
-		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisicalclient.SecretRotation) (types.Object, diag.Diagnostics) {
+		ReadSecretsMappingFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			secretsMapping := make(map[string]attr.Value)
 			secretsMappingSchema := map[string]attr.Type{
