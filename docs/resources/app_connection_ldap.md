@@ -41,7 +41,7 @@ resource "infisical_app_connection_ldap" "ldap-demo" {
     url                     = "ldap://ldap.example.com:389"
     dn                      = "cn=admin,dc=example,dc=com"
     password                = "<password>"
-    ssl_reject_unauthorized = true
+    ssl_reject_unauthorized = false
   }
 }
 
@@ -51,12 +51,12 @@ resource "infisical_app_connection_ldap" "ldap-demo-secure" {
   description = "This is a demo LDAP connection with SSL."
   method      = "simple-bind"
   credentials = {
-    provider                = "openldap"
-    url                     = "ldaps://ldaps.example.com:636"
+    provider                = "active-directory"
+    url                     = "ldaps://ldap.example.com:636"
     dn                      = "cn=admin,dc=example,dc=com"
     password                = "<password>"
-    ssl_reject_unauthorized = false
-    ssl_certificate         = file("${path.module}/ca.crt")
+    ssl_reject_unauthorized = true
+    ssl_certificate         = file("${path.module}/ca.pem")
   }
 }
 ```
@@ -84,12 +84,12 @@ resource "infisical_app_connection_ldap" "ldap-demo-secure" {
 
 Required:
 
-- `dn` (String) The Distinguished Name (DN) for authentication.
-- `password` (String, Sensitive) The password for authentication.
-- `provider` (String) The LDAP provider (e.g., 'active-directory', 'openldap').
+- `dn` (String) The Distinguished Name (DN) or User Principal Name (UPN) of the principal to bind with (e.g., 'CN=John,CN=Users,DC=example,DC=com').
+- `password` (String, Sensitive) The password to bind with for authentication.
+- `provider` (String) The LDAP provider (e.g., 'active-directory').
 - `url` (String) The LDAP server URL (e.g., 'ldap://example.com:389' or 'ldaps://example.com:636').
 
 Optional:
 
-- `ssl_certificate` (String) The SSL certificate for secure connections.
-- `ssl_reject_unauthorized` (Boolean) Whether to reject unauthorized SSL certificates.
+- `ssl_certificate` (String) The SSL certificate (PEM format) to use for secure connection when using ldaps:// with a self-signed certificate.
+- `ssl_reject_unauthorized` (Boolean) Whether or not to reject unauthorized SSL certificates (true/false) when using ldaps://. Set to false only in test environments.

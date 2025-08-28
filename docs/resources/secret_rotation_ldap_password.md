@@ -16,6 +16,7 @@ Create and manage LDAP Password Secret Rotations
 terraform {
   required_providers {
     infisical = {
+      # version = <latest version>
       source = "infisical/infisical"
     }
   }
@@ -30,25 +31,6 @@ provider "infisical" {
       client_secret = "<machine-identity-client-secret>"
     }
   }
-}
-
-variable "infisical_client_id" {
-  type = string
-}
-
-variable "infisical_client_secret" {
-  type      = string
-  sensitive = true
-}
-
-variable "project_id" {
-  type        = string
-  description = "The ID of your Infisical project"
-}
-
-variable "ldap_connection_id" {
-  type        = string
-  description = "The ID of your LDAP app connection"
 }
 
 resource "infisical_secret_rotation_ldap_password" "example" {
@@ -71,19 +53,19 @@ resource "infisical_secret_rotation_ldap_password" "example" {
     dn = "cn=service-user,ou=users,dc=example,dc=com"
 
     password_requirements = {
-      length = 24
+      length = 48
 
       required = {
-        digits    = 4
-        lowercase = 4
-        uppercase = 4
-        symbols   = 2
+        digits    = 1
+        lowercase = 1
+        uppercase = 1
+        symbols   = 0
       }
 
-      allowed_symbols = "!@#$%^&*()_-+=[]{}|:;<>?,./"
+      allowed_symbols = "-_.~!*"
     }
 
-    rotation_method = "modify" # or "reset" depending on your LDAP setup
+    rotation_method = "connection-principal" # or "target-principal" depending on your LDAP setup
   }
 
   secrets_mapping = {

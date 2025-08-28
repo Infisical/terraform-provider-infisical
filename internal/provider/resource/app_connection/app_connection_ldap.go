@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -34,7 +35,7 @@ func NewAppConnectionLdapResource() resource.Resource {
 		CredentialsAttributes: map[string]schema.Attribute{
 			"provider": schema.StringAttribute{
 				Required:    true,
-				Description: "The LDAP provider (e.g., 'active-directory', 'openldap').",
+				Description: "The LDAP provider (e.g., 'active-directory').",
 			},
 			"url": schema.StringAttribute{
 				Required:    true,
@@ -42,22 +43,22 @@ func NewAppConnectionLdapResource() resource.Resource {
 			},
 			"dn": schema.StringAttribute{
 				Required:    true,
-				Description: "The Distinguished Name (DN) for authentication.",
+				Description: "The Distinguished Name (DN) or User Principal Name (UPN) of the principal to bind with (e.g., 'CN=John,CN=Users,DC=example,DC=com').",
 			},
 			"password": schema.StringAttribute{
 				Required:    true,
-				Description: "The password for authentication.",
+				Description: "The password to bind with for authentication.",
 				Sensitive:   true,
 			},
 			"ssl_reject_unauthorized": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether to reject unauthorized SSL certificates.",
+				Description: "Whether or not to reject unauthorized SSL certificates (true/false) when using ldaps://. Set to false only in test environments.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"ssl_certificate": schema.StringAttribute{
 				Optional:    true,
-				Description: "The SSL certificate for secure connections.",
+				Description: "The SSL certificate (PEM format) to use for secure connection when using ldaps:// with a self-signed certificate.",
 			},
 		},
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
@@ -81,7 +82,25 @@ func NewAppConnectionLdapResource() resource.Resource {
 			credentialsConfig["url"] = credentials.Url.ValueString()
 			credentialsConfig["dn"] = credentials.Dn.ValueString()
 			credentialsConfig["password"] = credentials.Password.ValueString()
-			credentialsConfig["sslRejectUnauthorized"] = credentials.SslRejectUnauthorized.ValueBool()
+
+			// Validate SSL settings based on URL scheme
+			url := credentials.Url.ValueString()
+			isLdaps := strings.HasPrefix(strings.ToLower(url), "ldaps://")
+
+			if !isLdaps {
+				// For ldap:// URLs, SSL is not used
+				if !credentials.SslRejectUnauthorized.IsNull() && credentials.SslRejectUnauthorized.ValueBool() {
+					diags.AddError(
+						"Invalid SSL configuration",
+						"ssl_reject_unauthorized cannot be true for ldap:// URLs since they don't use SSL. Use ldaps:// for secure connections or set ssl_reject_unauthorized to false.",
+					)
+					return nil, diags
+				}
+				// Default to false for ldap:// URLs
+				credentialsConfig["sslRejectUnauthorized"] = false
+			} else {
+				credentialsConfig["sslRejectUnauthorized"] = credentials.SslRejectUnauthorized.ValueBool()
+			}
 
 			if !credentials.SslCertificate.IsNull() {
 				credentialsConfig["sslCertificate"] = credentials.SslCertificate.ValueString()
@@ -112,66 +131,56 @@ func NewAppConnectionLdapResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.Provider.ValueString() != credentialsFromPlan.Provider.ValueString() {
-				credentialsConfig["provider"] = credentialsFromPlan.Provider.ValueString()
-			}
-			if credentialsFromState.Url.ValueString() != credentialsFromPlan.Url.ValueString() {
-				credentialsConfig["url"] = credentialsFromPlan.Url.ValueString()
-			}
-			if credentialsFromState.Dn.ValueString() != credentialsFromPlan.Dn.ValueString() {
-				credentialsConfig["dn"] = credentialsFromPlan.Dn.ValueString()
-			}
-			if credentialsFromState.Password.ValueString() != credentialsFromPlan.Password.ValueString() {
-				credentialsConfig["password"] = credentialsFromPlan.Password.ValueString()
-			}
-			if credentialsFromState.SslRejectUnauthorized.ValueBool() != credentialsFromPlan.SslRejectUnauthorized.ValueBool() {
+			credentialsConfig["provider"] = credentialsFromPlan.Provider.ValueString()
+			credentialsConfig["url"] = credentialsFromPlan.Url.ValueString()
+			credentialsConfig["dn"] = credentialsFromPlan.Dn.ValueString()
+			credentialsConfig["password"] = credentialsFromPlan.Password.ValueString()
+
+			// Validate SSL settings based on URL scheme for updates
+			url := credentialsFromPlan.Url.ValueString()
+			isLdaps := strings.HasPrefix(strings.ToLower(url), "ldaps://")
+
+			if !isLdaps {
+				// For ldap:// URLs, SSL is not used
+				if !credentialsFromPlan.SslRejectUnauthorized.IsNull() && credentialsFromPlan.SslRejectUnauthorized.ValueBool() {
+					diags.AddError(
+						"Invalid SSL configuration",
+						"ssl_reject_unauthorized cannot be true for ldap:// URLs since they don't use SSL. Use ldaps:// for secure connections or set ssl_reject_unauthorized to false.",
+					)
+					return nil, diags
+				}
+				// Always set to false for ldap:// URLs, regardless of state
+				credentialsConfig["sslRejectUnauthorized"] = false
+			} else {
 				credentialsConfig["sslRejectUnauthorized"] = credentialsFromPlan.SslRejectUnauthorized.ValueBool()
 			}
-			if credentialsFromState.SslCertificate.ValueString() != credentialsFromPlan.SslCertificate.ValueString() {
-				if !credentialsFromPlan.SslCertificate.IsNull() {
-					credentialsConfig["sslCertificate"] = credentialsFromPlan.SslCertificate.ValueString()
-				} else {
-					credentialsConfig["sslCertificate"] = ""
-				}
+
+			if !credentialsFromPlan.SslCertificate.IsNull() {
+				credentialsConfig["sslCertificate"] = credentialsFromPlan.SslCertificate.ValueString()
 			}
 
 			return credentialsConfig, diags
 		},
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
+			credentialsConfig := map[string]attr.Value{
+				"provider":                types.StringNull(),
+				"url":                     types.StringNull(),
+				"dn":                      types.StringNull(),
+				"password":                types.StringNull(),
+				"ssl_reject_unauthorized": types.BoolNull(),
+				"ssl_certificate":         types.StringNull(),
+			}
+
 			var diags diag.Diagnostics
+			state.Credentials, diags = types.ObjectValue(map[string]attr.Type{
+				"provider":                types.StringType,
+				"url":                     types.StringType,
+				"dn":                      types.StringType,
+				"password":                types.StringType,
+				"ssl_reject_unauthorized": types.BoolType,
+				"ssl_certificate":         types.StringType,
+			}, credentialsConfig)
 
-			// Parse existing credentials
-			var credentials AppConnectionLdapCredentialsModel
-			diags = state.Credentials.As(context.Background(), &credentials, basetypes.ObjectAsOptions{})
-			if diags.HasError() {
-				return diags
-			}
-
-			// Create the credentials object with the same structure
-			credentialsObject, objDiags := types.ObjectValue(
-				map[string]attr.Type{
-					"provider":                types.StringType,
-					"url":                     types.StringType,
-					"dn":                      types.StringType,
-					"password":                types.StringType,
-					"ssl_reject_unauthorized": types.BoolType,
-					"ssl_certificate":         types.StringType,
-				},
-				map[string]attr.Value{
-					"provider":                credentials.Provider,
-					"url":                     credentials.Url,
-					"dn":                      credentials.Dn,
-					"password":                credentials.Password,
-					"ssl_reject_unauthorized": credentials.SslRejectUnauthorized,
-					"ssl_certificate":         credentials.SslCertificate,
-				},
-			)
-			diags.Append(objDiags...)
-			if diags.HasError() {
-				return diags
-			}
-
-			state.Credentials = credentialsObject
 			return diags
 		},
 	}

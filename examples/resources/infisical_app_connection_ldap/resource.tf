@@ -26,7 +26,7 @@ resource "infisical_app_connection_ldap" "ldap-demo" {
     url                     = "ldap://ldap.example.com:389"
     dn                      = "cn=admin,dc=example,dc=com"
     password                = "<password>"
-    ssl_reject_unauthorized = true
+    ssl_reject_unauthorized = false
   }
 }
 
@@ -36,11 +36,11 @@ resource "infisical_app_connection_ldap" "ldap-demo-secure" {
   description = "This is a demo LDAP connection with SSL."
   method      = "simple-bind"
   credentials = {
-    provider                = "openldap"
-    url                     = "ldaps://ldaps.example.com:636"
+    provider                = "active-directory"
+    url                     = "ldaps://ldap.example.com:636"
     dn                      = "cn=admin,dc=example,dc=com"
     password                = "<password>"
-    ssl_reject_unauthorized = false
-    ssl_certificate         = file("${path.module}/ca.crt")
+    ssl_reject_unauthorized = true
+    ssl_certificate         = file("${path.module}/ca.pem")
   }
 }
