@@ -155,6 +155,14 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				parametersMap["rotationMethod"] = parameters.RotationMethod.ValueString()
 			}
 
+			if parameters.RotationMethod.String() == "target-principal" && parameters.TargetPrincipalPassword.IsNull() {
+				diags.AddError("Plan Error", "Expected 'target_principal_password' (string) but got wrong type or missing")
+			}
+
+			if diags.HasError() {
+				return nil, diags
+			}
+
 			if !parameters.TargetPrincipalPassword.IsNull() {
 				temporaryParams := make(map[string]any)
 				temporaryParams["targetPrincipalPassword"] = parameters.TargetPrincipalPassword.ValueString()
@@ -285,7 +293,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 			}
 
 			// Extract target principal password from temporaryParameters if present
-			if temporaryParams, ok := secretRotation.Parameters["temporaryParameters"].(map[string]interface{}); ok {
+			if temporaryParams, ok := secretRotation.Parameters["temporaryParameters"].(map[string]any); ok {
 				if targetPassword, ok := temporaryParams["targetPrincipalPassword"].(string); ok {
 					parameters["target_principal_password"] = types.StringValue(targetPassword)
 				} else {
