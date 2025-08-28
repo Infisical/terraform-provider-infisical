@@ -104,7 +104,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 		},
 		TemporaryParametersAttributes: map[string]schema.Attribute{
 			"password": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The password of the provided principal if 'parameters.rotation_method' is set to 'target-principal'.",
 			},
 		},

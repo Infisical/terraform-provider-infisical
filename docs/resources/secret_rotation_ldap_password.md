@@ -162,6 +162,6 @@ Optional:
 <a id="nestedatt--temporary_parameters"></a>
 ### Nested Schema for `temporary_parameters`
 
-Required:
+Optional:
 
 - `password` (String) The password of the provided principal if 'parameters.rotation_method' is set to 'target-principal'.
