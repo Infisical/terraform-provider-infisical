@@ -50,13 +50,15 @@ resource "infisical_secret_rotation_ldap_password" "example" {
     }
 
     rotation_method = "connection-principal" # or "target-principal" depending on your LDAP setup
-
-    # Required when rotation_method is "target-principal"
-    # target_principal_password = "temporary-password-for-target"
   }
 
   secrets_mapping = {
     dn       = "LDAP_DN"
     password = "LDAP_PASSWORD"
   }
+
+  # Required when parameters.rotation_method is "target-principal"
+  # temporary_parameters = {
+  #   password = "<temporary-password-for-target>"
+  # }
 }

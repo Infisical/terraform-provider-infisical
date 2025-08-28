@@ -24,7 +24,6 @@ terraform {
 
 provider "infisical" {
   host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical
-
   auth = {
     universal = {
       client_id     = "<machine-identity-client-id>"
@@ -66,15 +65,17 @@ resource "infisical_secret_rotation_ldap_password" "example" {
     }
 
     rotation_method = "connection-principal" # or "target-principal" depending on your LDAP setup
-
-    # Required when rotation_method is "target-principal"
-    # target_principal_password = "temporary-password-for-target"
   }
 
   secrets_mapping = {
     dn       = "LDAP_DN"
     password = "LDAP_PASSWORD"
   }
+
+  # Required when parameters.rotation_method is "target-principal"
+  # temporary_parameters = {
+  #   password = "<temporary-password-for-target>"
+  # }
 }
 ```
 
@@ -97,6 +98,7 @@ resource "infisical_secret_rotation_ldap_password" "example" {
 - `description` (String) The description of the secret rotation.
 - `rotate_at_utc` (Attributes) At which UTC time the rotation should occur. (see [below for nested schema](#nestedatt--rotate_at_utc))
 - `rotation_interval` (Number) How many days to wait between each rotation.
+- `temporary_parameters` (Attributes) Temporary parameters to modify how secrets are rotated. (see [below for nested schema](#nestedatt--temporary_parameters))
 
 ### Read-Only
 
@@ -113,7 +115,6 @@ Required:
 Optional:
 
 - `rotation_method` (String) The method to use for rotating the password. Supported options: connection-principal and target-principal (default: connection-principal)
-- `target_principal_password` (String, Sensitive) The temporary password for the target principal. Required when rotation_method is 'target-principal'.
 
 <a id="nestedatt--parameters--password_requirements"></a>
 ### Nested Schema for `parameters.password_requirements`
@@ -156,3 +157,11 @@ Optional:
 
 - `hours` (Number) The hour at which the rotation should occur (UTC).
 - `minutes` (Number) The minute at which the rotation should occur (UTC).
+
+
+<a id="nestedatt--temporary_parameters"></a>
+### Nested Schema for `temporary_parameters`
+
+Required:
+
+- `password` (String) The password of the provided principal if 'parameters.rotation_method' is set to 'target-principal'.
