@@ -13,10 +13,9 @@ import (
 )
 
 type SecretRotationLdapPasswordParametersModel struct {
-	Dn                      types.String `tfsdk:"dn"`
-	PasswordRequirements    types.Object `tfsdk:"password_requirements"`
-	RotationMethod          types.String `tfsdk:"rotation_method"`
-	TargetPrincipalPassword types.String `tfsdk:"target_principal_password"`
+	Dn                   types.String `tfsdk:"dn"`
+	PasswordRequirements types.Object `tfsdk:"password_requirements"`
+	RotationMethod       types.String `tfsdk:"rotation_method"`
 }
 
 type PasswordRequirementsModel struct {
@@ -34,6 +33,10 @@ type RequiredCharactersModel struct {
 
 type SecretRotationLdapPasswordSecretsMappingModel struct {
 	Dn       types.String `tfsdk:"dn"`
+	Password types.String `tfsdk:"password"`
+}
+
+type SecretRotationLdapPasswordTemporaryParametersModel struct {
 	Password types.String `tfsdk:"password"`
 }
 
@@ -88,11 +91,6 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				Optional:    true,
 				Description: "The method to use for rotating the password. Supported options: connection-principal and target-principal (default: connection-principal)",
 			},
-			"target_principal_password": schema.StringAttribute{
-				Optional:    true,
-				Sensitive:   true,
-				Description: "The temporary password for the target principal. Required when rotation_method is 'target-principal'.",
-			},
 		},
 		SecretsMappingAttributes: map[string]schema.Attribute{
 			"dn": schema.StringAttribute{
@@ -102,6 +100,12 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 			"password": schema.StringAttribute{
 				Required:    true,
 				Description: "The name of the secret that the generated password will be mapped to.",
+			},
+		},
+		TemporaryParametersAttributes: map[string]schema.Attribute{
+			"password": schema.StringAttribute{
+				Required:    true,
+				Description: "The password of the provided principal if 'parameters.rotation_method' is set to 'target-principal'.",
 			},
 		},
 
@@ -154,18 +158,20 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				parametersMap["rotationMethod"] = parameters.RotationMethod.ValueString()
 			}
 
-			if parameters.RotationMethod.ValueString() == "target-principal" && parameters.TargetPrincipalPassword.IsNull() {
-				diags.AddError("Plan Error", "Expected 'target_principal_password' (string) but got wrong type or missing")
+			var temporaryParameters SecretRotationLdapPasswordTemporaryParametersModel
+			if !plan.TemporaryParameters.IsNull() && !plan.TemporaryParameters.IsUnknown() {
+				diags = plan.TemporaryParameters.As(ctx, &temporaryParameters, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, diags
+				}
+			}
+
+			if parameters.RotationMethod.ValueString() == "target-principal" && (plan.TemporaryParameters.IsNull() || temporaryParameters.Password.IsNull()) {
+				diags.AddError("Plan Error", "When 'rotation_method' is 'target-principal', the 'temporary_parameters.password' attribute is required.")
 			}
 
 			if diags.HasError() {
 				return nil, diags
-			}
-
-			if !parameters.TargetPrincipalPassword.IsNull() {
-				temporaryParams := make(map[string]any)
-				temporaryParams["targetPrincipalPassword"] = parameters.TargetPrincipalPassword.ValueString()
-				parametersMap["temporaryParameters"] = temporaryParams
 			}
 
 			return parametersMap, diags
@@ -190,8 +196,7 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 						"allowed_symbols": types.StringType,
 					},
 				},
-				"rotation_method":           types.StringType,
-				"target_principal_password": types.StringType,
+				"rotation_method": types.StringType,
 			}
 
 			// Extract DN
@@ -291,17 +296,6 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				parameters["rotation_method"] = types.StringNull()
 			}
 
-			// Extract target principal password from temporaryParameters if present
-			if temporaryParams, ok := secretRotation.Parameters["temporaryParameters"].(map[string]any); ok {
-				if targetPassword, ok := temporaryParams["targetPrincipalPassword"].(string); ok {
-					parameters["target_principal_password"] = types.StringValue(targetPassword)
-				} else {
-					parameters["target_principal_password"] = types.StringNull()
-				}
-			} else {
-				parameters["target_principal_password"] = types.StringNull()
-			}
-
 			obj, objDiags := types.ObjectValue(parametersSchema, parameters)
 			diags.Append(objDiags...)
 			if diags.HasError() {
@@ -352,6 +346,53 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 			diags.Append(objDiags...)
 			if diags.HasError() {
 				return types.ObjectNull(secretsMappingSchema), diags
+			}
+
+			return obj, diags
+		},
+
+		ReadTemporaryParametersFromPlan: func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+			if plan.TemporaryParameters.IsNull() || plan.TemporaryParameters.IsUnknown() {
+				return nil, nil
+			}
+
+			temporaryParametersMap := make(map[string]interface{})
+			var temporaryParameters SecretRotationLdapPasswordTemporaryParametersModel
+
+			diags := plan.TemporaryParameters.As(ctx, &temporaryParameters, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			if !temporaryParameters.Password.IsNull() {
+				temporaryParametersMap["password"] = temporaryParameters.Password.ValueString()
+			}
+
+			return temporaryParametersMap, diags
+		},
+
+		ReadTemporaryParametersFromApi: func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics) {
+			var diags diag.Diagnostics
+			temporaryParameters := make(map[string]attr.Value)
+			temporaryParametersSchema := map[string]attr.Type{
+				"password": types.StringType,
+			}
+
+			if secretRotation.TemporaryParameters == nil {
+				return types.ObjectNull(temporaryParametersSchema), nil
+			}
+
+			passwordVal, ok := secretRotation.TemporaryParameters["password"].(string)
+			if !ok {
+				diags.AddError("API Reading Error", "Expected 'password' (string) but got wrong type or missing")
+				return types.ObjectNull(temporaryParametersSchema), diags
+			}
+			temporaryParameters["password"] = types.StringValue(passwordVal)
+
+			obj, objDiags := types.ObjectValue(temporaryParametersSchema, temporaryParameters)
+			diags.Append(objDiags...)
+			if diags.HasError() {
+				return types.ObjectNull(temporaryParametersSchema), diags
 			}
 
 			return obj, diags
