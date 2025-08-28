@@ -14,9 +14,10 @@ import (
 )
 
 type SecretRotationLdapPasswordParametersModel struct {
-	Dn                   types.String `tfsdk:"dn"`
-	PasswordRequirements types.Object `tfsdk:"password_requirements"`
-	RotationMethod       types.String `tfsdk:"rotation_method"`
+	Dn                      types.String `tfsdk:"dn"`
+	PasswordRequirements    types.Object `tfsdk:"password_requirements"`
+	RotationMethod          types.String `tfsdk:"rotation_method"`
+	TargetPrincipalPassword types.String `tfsdk:"target_principal_password"`
 }
 
 type PasswordRequirementsModel struct {
@@ -88,6 +89,11 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				Optional:    true,
 				Description: "The method to use for rotating the password. Supported options: connection-principal and target-principal (default: connection-principal)",
 			},
+			"target_principal_password": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "The temporary password for the target principal. Required when rotation_method is 'target-principal'.",
+			},
 		},
 		SecretsMappingAttributes: map[string]schema.Attribute{
 			"dn": schema.StringAttribute{
@@ -149,6 +155,12 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				parametersMap["rotationMethod"] = parameters.RotationMethod.ValueString()
 			}
 
+			if !parameters.TargetPrincipalPassword.IsNull() {
+				temporaryParams := make(map[string]any)
+				temporaryParams["targetPrincipalPassword"] = parameters.TargetPrincipalPassword.ValueString()
+				parametersMap["temporaryParameters"] = temporaryParams
+			}
+
 			return parametersMap, diags
 		},
 
@@ -171,7 +183,8 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 						"allowed_symbols": types.StringType,
 					},
 				},
-				"rotation_method": types.StringType,
+				"rotation_method":           types.StringType,
+				"target_principal_password": types.StringType,
 			}
 
 			// Extract DN
@@ -269,6 +282,17 @@ func NewSecretRotationLdapPasswordResource() resource.Resource {
 				parameters["rotation_method"] = types.StringValue(rotationMethodVal)
 			} else {
 				parameters["rotation_method"] = types.StringNull()
+			}
+
+			// Extract target principal password from temporaryParameters if present
+			if temporaryParams, ok := secretRotation.Parameters["temporaryParameters"].(map[string]interface{}); ok {
+				if targetPassword, ok := temporaryParams["targetPrincipalPassword"].(string); ok {
+					parameters["target_principal_password"] = types.StringValue(targetPassword)
+				} else {
+					parameters["target_principal_password"] = types.StringNull()
+				}
+			} else {
+				parameters["target_principal_password"] = types.StringNull()
 			}
 
 			obj, objDiags := types.ObjectValue(parametersSchema, parameters)

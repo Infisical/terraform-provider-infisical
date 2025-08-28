@@ -35,7 +35,7 @@ resource "infisical_secret_rotation_ldap_password" "example" {
   }
 
   parameters = {
-    dn = "cn=service-user,ou=users,dc=example,dc=com"
+    dn = "CN=John,OU=Users,DC=example,DC=com"
 
     password_requirements = {
       length = 48
@@ -51,10 +51,13 @@ resource "infisical_secret_rotation_ldap_password" "example" {
     }
 
     rotation_method = "connection-principal" # or "target-principal" depending on your LDAP setup
+
+    # Required when rotation_method is "target-principal"
+    # target_principal_password = "temporary-password-for-target"
   }
 
   secrets_mapping = {
-    dn       = "LDAP_USER_DN"
-    password = "LDAP_USER_PASSWORD"
+    dn       = "LDAP_DN"
+    password = "LDAP_PASSWORD"
   }
 }

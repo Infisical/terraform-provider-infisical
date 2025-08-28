@@ -50,7 +50,7 @@ resource "infisical_secret_rotation_ldap_password" "example" {
   }
 
   parameters = {
-    dn = "cn=service-user,ou=users,dc=example,dc=com"
+    dn = "CN=John,OU=Users,DC=example,DC=com"
 
     password_requirements = {
       length = 48
@@ -66,11 +66,14 @@ resource "infisical_secret_rotation_ldap_password" "example" {
     }
 
     rotation_method = "connection-principal" # or "target-principal" depending on your LDAP setup
+
+    # Required when rotation_method is "target-principal"
+    # target_principal_password = "temporary-password-for-target"
   }
 
   secrets_mapping = {
-    dn       = "LDAP_USER_DN"
-    password = "LDAP_USER_PASSWORD"
+    dn       = "LDAP_DN"
+    password = "LDAP_PASSWORD"
   }
 }
 ```
@@ -110,6 +113,7 @@ Required:
 Optional:
 
 - `rotation_method` (String) The method to use for rotating the password. Supported options: connection-principal and target-principal (default: connection-principal)
+- `target_principal_password` (String, Sensitive) The temporary password for the target principal. Required when rotation_method is 'target-principal'.
 
 <a id="nestedatt--parameters--password_requirements"></a>
 ### Nested Schema for `parameters.password_requirements`
