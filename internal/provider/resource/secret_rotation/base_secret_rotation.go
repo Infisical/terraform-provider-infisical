@@ -38,6 +38,10 @@ type SecretRotationBaseResource struct {
 	SecretsMappingAttributes   map[string]schema.Attribute
 	ReadSecretsMappingFromPlan func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadSecretsMappingFromApi  func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics)
+
+	TemporaryParametersAttributes   map[string]schema.Attribute
+	ReadTemporaryParametersFromPlan func(ctx context.Context, plan SecretRotationBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadTemporaryParametersFromApi  func(ctx context.Context, secretRotation infisical.SecretRotation) (types.Object, diag.Diagnostics)
 }
 
 type SecretRotationBaseResourceModel struct {
@@ -53,8 +57,9 @@ type SecretRotationBaseResourceModel struct {
 	RotationInterval types.Int32 `tfsdk:"rotation_interval"`
 	RotateAtUtc      RotateAtUtc `tfsdk:"rotate_at_utc"`
 
-	Parameters     types.Object `tfsdk:"parameters"`
-	SecretsMapping types.Object `tfsdk:"secrets_mapping"`
+	Parameters          types.Object `tfsdk:"parameters"`
+	SecretsMapping      types.Object `tfsdk:"secrets_mapping"`
+	TemporaryParameters types.Object `tfsdk:"temporary_parameters"`
 }
 
 // Metadata returns the resource type name.
@@ -149,6 +154,11 @@ func (r *SecretRotationBaseResource) Schema(_ context.Context, _ resource.Schema
 				Description: "Secret mappings to modify how secrets are rotated.",
 				Attributes:  r.SecretsMappingAttributes,
 			},
+			"temporary_parameters": schema.SingleNestedAttribute{
+				Optional:    true,
+				Description: "Temporary parameters to modify how secrets are rotated.",
+				Attributes:  r.TemporaryParametersAttributes,
+			},
 		},
 	}
 }
@@ -203,6 +213,21 @@ func (r *SecretRotationBaseResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
+	var temporaryParameters map[string]interface{}
+	if r.ReadTemporaryParametersFromPlan != nil {
+		if !(plan.TemporaryParameters.IsNull() || plan.TemporaryParameters.IsUnknown()) {
+			temporaryParameters, diags = r.ReadTemporaryParametersFromPlan(ctx, plan)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		} else {
+			temporaryParameters = nil
+		}
+	} else {
+		temporaryParameters = nil
+	}
+
 	secretRotation, err := r.client.CreateSecretRotation(infisical.CreateSecretRotationRequest{
 		Provider:            r.Provider,
 		Name:                plan.Name.ValueString(),
@@ -219,8 +244,9 @@ func (r *SecretRotationBaseResource) Create(ctx context.Context, req resource.Cr
 			Minutes: plan.RotateAtUtc.Minutes.ValueInt64(),
 		},
 
-		Parameters:     parameters,
-		SecretsMapping: secretsMapping,
+		Parameters:          parameters,
+		SecretsMapping:      secretsMapping,
+		TemporaryParameters: temporaryParameters,
 	})
 
 	if err != nil {
@@ -311,6 +337,14 @@ func (r *SecretRotationBaseResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	if r.ReadTemporaryParametersFromApi != nil {
+		state.TemporaryParameters, diags = r.ReadTemporaryParametersFromApi(ctx, secretRotation)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -351,6 +385,21 @@ func (r *SecretRotationBaseResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
+	var temporaryParameters map[string]interface{}
+	if r.ReadTemporaryParametersFromPlan != nil {
+		if !(plan.TemporaryParameters.IsNull() || plan.TemporaryParameters.IsUnknown()) {
+			temporaryParameters, diags = r.ReadTemporaryParametersFromPlan(ctx, plan)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		} else {
+			temporaryParameters = nil
+		}
+	} else {
+		temporaryParameters = nil
+	}
+
 	_, err := r.client.UpdateSecretRotation(infisical.UpdateSecretRotationRequest{
 		Provider:            r.Provider,
 		ID:                  state.ID.ValueString(),
@@ -367,8 +416,9 @@ func (r *SecretRotationBaseResource) Update(ctx context.Context, req resource.Up
 			Minutes: plan.RotateAtUtc.Minutes.ValueInt64(),
 		},
 
-		Parameters:     parameters,
-		SecretsMapping: secretsMapping,
+		Parameters:          parameters,
+		SecretsMapping:      secretsMapping,
+		TemporaryParameters: temporaryParameters,
 	})
 
 	if err != nil {

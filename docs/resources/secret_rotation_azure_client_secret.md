@@ -70,6 +70,7 @@ resource "infisical_secret_rotation_azure_client_secret" "azure-client-secret" {
 - `description` (String) The description of the secret rotation.
 - `rotate_at_utc` (Attributes) At which UTC time the rotation should occur. (see [below for nested schema](#nestedatt--rotate_at_utc))
 - `rotation_interval` (Number) How many days to wait between each rotation.
+- `temporary_parameters` (Attributes) Temporary parameters to modify how secrets are rotated. (see [below for nested schema](#nestedatt--temporary_parameters))
 
 ### Read-Only
 
@@ -100,3 +101,7 @@ Optional:
 
 - `hours` (Number) The hour at which the rotation should occur (UTC).
 - `minutes` (Number) The minute at which the rotation should occur (UTC).
+
+
+<a id="nestedatt--temporary_parameters"></a>
+### Nested Schema for `temporary_parameters`
