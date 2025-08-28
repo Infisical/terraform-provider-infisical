@@ -2305,7 +2305,7 @@ type CreateSecretRotationRequest struct {
 
 	Parameters          map[string]any `json:"parameters"`
 	SecretsMapping      map[string]any `json:"secretsMapping"`
-	TemporaryParameters map[string]any `json:"temporaryParameters"`
+	TemporaryParameters map[string]any `json:"temporaryParameters,omitempty"`
 }
 
 type CreateSecretRotationResponse struct {
