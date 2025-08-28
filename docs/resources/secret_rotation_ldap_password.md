@@ -23,12 +23,11 @@ terraform {
 }
 
 provider "infisical" {
-  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical
-
+  host = "http://proxyman.debug:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
     universal = {
-      client_id     = "<machine-identity-client-id>"
-      client_secret = "<machine-identity-client-secret>"
+      client_id     = "86c17800-00b9-4556-89a8-ea11ac6f8371"
+      client_secret = "0250d9bec1df4f6d2ad735013d77ec579ca18a04011b7f8067965bb10206e59d"
     }
   }
 }
@@ -36,10 +35,10 @@ provider "infisical" {
 resource "infisical_secret_rotation_ldap_password" "example" {
   name          = "ldap-password-rotation"
   description   = "Rotation for LDAP user passwords"
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "<secret-path>" # Root folder is /
-  connection_id = "<app-connection-id>"
+  project_id    = "95907e47-75b5-4524-92f3-98b5b5b70b00"
+  environment   = "dev"
+  secret_path   = "/" # Root folder is /
+  connection_id = "dbf5cfcd-edad-43a4-a8c2-5be1c69f11f6"
 
   auto_rotation_enabled = true
   rotation_interval     = 30 # days
@@ -50,7 +49,7 @@ resource "infisical_secret_rotation_ldap_password" "example" {
   }
 
   parameters = {
-    dn = "CN=John,OU=Users,DC=example,DC=com"
+    dn = "uid=Sid,ou=Users,o=68778456376b92ad5afaa82f,dc=jumpcloud,dc=com"
 
     password_requirements = {
       length = 48
@@ -65,15 +64,15 @@ resource "infisical_secret_rotation_ldap_password" "example" {
       allowed_symbols = "-_.~!*"
     }
 
-    rotation_method = "connection-principal" # or "target-principal" depending on your LDAP setup
+    rotation_method = "target-principal" # or "target-principal" depending on your LDAP setup
 
     # Required when rotation_method is "target-principal"
     # target_principal_password = "temporary-password-for-target"
   }
 
   secrets_mapping = {
-    dn       = "LDAP_DN"
-    password = "LDAP_PASSWORD"
+    dn       = "uid=Sid,ou=Users,o=68778456376b92ad5afaa82f,dc=jumpcloud,dc=com"
+    password = "GR^caiygF2?#T2N"
   }
 }
 ```
