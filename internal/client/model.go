@@ -2250,7 +2250,7 @@ type DeleteGroupRequest struct {
 
 type SecretRotationProviderObject struct {
 	Provider SecretRotationProvider `json:"type"`
-	Inputs   map[string]interface{} `json:"inputs"`
+	Inputs   map[string]any         `json:"inputs"`
 }
 
 type SecretRotationConnection struct {
@@ -2284,8 +2284,9 @@ type SecretRotation struct {
 	RotationInterval int32                      `json:"rotationInterval"`
 	RotateAtUtc      *SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
 
-	Parameters     map[string]interface{} `json:"parameters"`
-	SecretsMapping map[string]interface{} `json:"secretsMapping"`
+	Parameters          map[string]any `json:"parameters"`
+	SecretsMapping      map[string]any `json:"secretsMapping"`
+	TemporaryParameters map[string]any `json:"temporaryParameters"`
 }
 
 type CreateSecretRotationRequest struct {
@@ -2302,8 +2303,9 @@ type CreateSecretRotationRequest struct {
 	RotationInterval int32                     `json:"rotationInterval"`
 	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
 
-	Parameters     map[string]interface{} `json:"parameters"`
-	SecretsMapping map[string]interface{} `json:"secretsMapping"`
+	Parameters          map[string]any `json:"parameters"`
+	SecretsMapping      map[string]any `json:"secretsMapping"`
+	TemporaryParameters map[string]any `json:"temporaryParameters,omitempty"`
 }
 
 type CreateSecretRotationResponse struct {
@@ -2333,8 +2335,9 @@ type UpdateSecretRotationRequest struct {
 	RotationInterval int32                     `json:"rotationInterval,omitempty"`
 	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
 
-	Parameters     map[string]interface{} `json:"parameters,omitempty"`
-	SecretsMapping map[string]interface{} `json:"secretsMapping,omitempty"`
+	Parameters          map[string]any `json:"parameters,omitempty"`
+	SecretsMapping      map[string]any `json:"secretsMapping,omitempty"`
+	TemporaryParameters map[string]any `json:"temporaryParameters,omitempty"`
 }
 
 type UpdateSecretRotationResponse struct {
