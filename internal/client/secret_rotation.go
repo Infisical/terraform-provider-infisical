@@ -14,6 +14,7 @@ const (
 	SecretRotationProviderOracleCredentials   SecretRotationProvider = "oracledb-credentials"
 	SecretRotationProviderAzureClientSecret   SecretRotationProvider = "azure-client-secret"
 	SecretRotationProviderAwsIamUserSecret    SecretRotationProvider = "aws-iam-user-secret"
+	SecretRotationProviderLdapPassword        SecretRotationProvider = "ldap-password"
 )
 
 const (

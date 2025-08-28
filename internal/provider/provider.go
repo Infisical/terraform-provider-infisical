@@ -374,6 +374,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionCloudflareResource,
 		appConnectionResource.NewAppConnectionSupabaseResource,
 		appConnectionResource.NewAppConnectionFlyioResource,
+		appConnectionResource.NewAppConnectionLdapResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
@@ -398,6 +399,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationOracleDbCredentialsResource,
 		secretRotationResource.NewSecretRotationAzureClientSecretResource,
 		secretRotationResource.NewSecretRotationAwsIamUserSecretResource,
+		secretRotationResource.NewSecretRotationLdapPasswordResource,
 		infisicalResource.NewProjectTemplateResource,
 	}
 }
