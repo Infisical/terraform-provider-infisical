@@ -32,6 +32,7 @@ const (
 	AppConnectionAppSupabase           AppConnectionApp = "supabase"
 	AppConnectionAppFlyio              AppConnectionApp = "flyio"
 	AppConnectionAppLdap               AppConnectionApp = "ldap"
+	AppConnectionAppGitlab             AppConnectionApp = "gitlab"
 )
 
 const (

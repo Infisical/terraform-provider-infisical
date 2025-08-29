@@ -24,6 +24,7 @@ const (
 	SecretSyncAppCloudflarePages       SecretSyncApp = "cloudflare-pages"
 	SecretSyncAppSupabase              SecretSyncApp = "supabase"
 	SecretSyncAppFlyio                 SecretSyncApp = "flyio"
+	SecretSyncAppGitlab                SecretSyncApp = "gitlab"
 )
 
 type SecretSyncBehavior string
