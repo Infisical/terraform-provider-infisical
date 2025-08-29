@@ -68,9 +68,9 @@ resource "infisical_app_connection_gitlab" "gitlab_connection" {
 
 Required:
 
-- `access_token` (String, Sensitive) The GitLab access token for authentication.
-- `access_token_type` (String) The type of access token. Supported options: 'project' and 'personal'
+- `access_token` (String, Sensitive) The Access Token used to access GitLab.
+- `access_token_type` (String) The type of token used to connect with GitLab. Supported options: 'project' and 'personal'
 
 Optional:
 
-- `instance_url` (String) The GitLab instance URL (e.g., https://gitlab.com for GitLab.com or your self-hosted GitLab URL).
+- `instance_url` (String) The GitLab instance URL to connect with.

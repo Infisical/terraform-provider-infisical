@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -29,16 +30,16 @@ func NewAppConnectionGitlabResource() resource.Resource {
 		CredentialsAttributes: map[string]schema.Attribute{
 			"access_token": schema.StringAttribute{
 				Required:    true,
-				Description: "The GitLab access token for authentication.",
+				Description: "The Access Token used to access GitLab.",
 				Sensitive:   true,
 			},
 			"instance_url": schema.StringAttribute{
 				Optional:    true,
-				Description: "The GitLab instance URL (e.g., https://gitlab.com for GitLab.com or your self-hosted GitLab URL).",
+				Description: "The GitLab instance URL to connect with.",
 			},
 			"access_token_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of access token. Supported options: 'project' and 'personal'",
+				Description: "The type of token used to connect with GitLab. Supported options: 'project' and 'personal'",
 			},
 		},
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -58,17 +59,19 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentials.AccessTokenType.ValueString() != "project" || credentials.AccessTokenType.ValueString() != "personal" {
+			accessTokenType := credentials.AccessTokenType.ValueString()
+
+			if accessTokenType != "project" && accessTokenType != "personal" {
 				diags.AddError(
 					"Unable to update GitLab app connection",
-					"Invalid access_token_type. Only 'project' and 'personal' is supported.",
+					fmt.Sprintf("Invalid access_token_type. Only 'project' and 'personal' is supported - got %s", accessTokenType),
 				)
 				return nil, diags
 			}
 
 			credentialsConfig["accessToken"] = credentials.AccessToken.ValueString()
 			credentialsConfig["instanceUrl"] = credentials.InstanceUrl.ValueString()
-			credentialsConfig["accessTokenType"] = credentials.AccessTokenType.ValueString()
+			credentialsConfig["accessTokenType"] = accessTokenType
 
 			return credentialsConfig, diags
 		},
@@ -95,23 +98,19 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromPlan.AccessTokenType.ValueString() != "project" || credentialsFromPlan.AccessTokenType.ValueString() != "personal" {
+			accessTokenType := credentialsFromPlan.AccessToken.ValueString()
+
+			if accessTokenType != "project" && accessTokenType != "personal" {
 				diags.AddError(
 					"Unable to update GitLab app connection",
-					"Invalid access_token_type. Only 'project' and 'personal' is supported.",
+					fmt.Sprintf("Invalid access_token_type. Only 'project' and 'personal' is supported - got %s", accessTokenType),
 				)
 				return nil, diags
 			}
 
-			if credentialsFromState.AccessToken.ValueString() != credentialsFromPlan.AccessToken.ValueString() {
-				credentialsConfig["accessToken"] = credentialsFromPlan.AccessToken.ValueString()
-			}
-			if credentialsFromState.InstanceUrl.ValueString() != credentialsFromPlan.InstanceUrl.ValueString() {
-				credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
-			}
-			if credentialsFromState.AccessTokenType.ValueString() != credentialsFromPlan.AccessTokenType.ValueString() {
-				credentialsConfig["accessTokenType"] = credentialsFromPlan.AccessTokenType.ValueString()
-			}
+			credentialsConfig["accessToken"] = credentialsFromPlan.AccessToken.ValueString()
+			credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
+			credentialsConfig["accessTokenType"] = credentialsFromPlan.AccessTokenType.ValueString()
 
 			return credentialsConfig, diags
 		},
