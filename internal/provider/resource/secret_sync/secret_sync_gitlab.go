@@ -2,8 +2,9 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
+	"terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -14,10 +15,94 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
+type GitlabSyncScope string
+
+const (
+	GitlabSyncScopeProject GitlabSyncScope = "project"
+	GitlabSyncScopeGroup   GitlabSyncScope = "group"
+)
+
+func verifyGitlabDestinationConfigState(destinationConfig map[string]attr.Value, diags *diag.Diagnostics) bool {
+	scopeAttr, exists := destinationConfig["scope"]
+	if !exists {
+		diags.AddError("Invalid destination config", "Expected 'scope' to be present")
+		return false
+	}
+
+	scopeVal, ok := scopeAttr.(types.String)
+	if !ok {
+		diags.AddError("Invalid destination config", "Expected 'scope' to be a string type")
+		return false
+	}
+
+	if scopeVal.IsNull() || scopeVal.IsUnknown() {
+		diags.AddError("Invalid destination config", "Expected 'scope' to have a value")
+		return false
+	}
+
+	scope := GitlabSyncScope(scopeVal.ValueString())
+	requiredFields := []string{"scope", "target_environment"}
+	optionalFields := []string{"should_protect_secrets", "should_mask_secrets", "should_hide_secrets"}
+
+	switch scope {
+	case GitlabSyncScopeProject:
+		requiredFields = append(requiredFields, "project_id")
+		optionalFields = append(optionalFields, "project_name")
+
+	case GitlabSyncScopeGroup:
+		requiredFields = append(requiredFields, "group_id")
+		optionalFields = append(optionalFields, "group_name")
+
+	default:
+		diags.AddError("Invalid destination config", fmt.Sprintf("Invalid scope '%s'. Must be 'project' or 'group'", scope))
+		return false
+	}
+
+	// Check required fields are not empty
+	for _, field := range requiredFields {
+		value, exists := destinationConfig[field]
+		if !exists {
+			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be present when scope is '%s'", field, scope))
+			return false
+		}
+
+		// Check if the value is null, unknown, or empty based on its type
+		if terraform.IsAttrValueEmpty(value) {
+			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be set when scope is '%s'", field, scope))
+			return false
+		}
+	}
+
+	// Build allowed fields map
+	allowedFieldsMap := make(map[string]bool)
+	for _, field := range requiredFields {
+		allowedFieldsMap[field] = true
+	}
+	for _, field := range optionalFields {
+		allowedFieldsMap[field] = true
+	}
+
+	// Check for unexpected fields
+	for field := range destinationConfig {
+		if !allowedFieldsMap[field] {
+			if terraform.IsAttrValueEmpty(destinationConfig[field]) {
+				continue
+			}
+
+			diags.AddError("Invalid destination config", fmt.Sprintf("Unexpected field '%s' for scope '%s'", field, scope))
+			return false
+		}
+	}
+
+	return true
+}
+
 type SecretSyncGitlabDestinationConfigModel struct {
 	Scope                types.String `tfsdk:"scope"`
 	ProjectId            types.String `tfsdk:"project_id"`
 	ProjectName          types.String `tfsdk:"project_name"`
+	GroupId              types.String `tfsdk:"group_id"`
+	GroupName            types.String `tfsdk:"group_name"`
 	TargetEnvironment    types.String `tfsdk:"target_environment"`
 	ShouldProtectSecrets types.Bool   `tfsdk:"should_protect_secrets"`
 	ShouldMaskSecrets    types.Bool   `tfsdk:"should_mask_secrets"`
@@ -39,36 +124,44 @@ func NewSecretSyncGitlabResource() resource.Resource {
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{
 				Required:    true,
-				Description: "The scope to sync the secrets to. Must be 'project' for GitLab project variables.",
+				Description: "The GitLab scope that secrets should be synced to. Supported options: 'project', 'group'",
 			},
 			"project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The GitLab project ID to sync secrets to. This is the numeric project ID, not the project path.",
+				Optional:    true,
+				Description: "The GitLab Project ID to sync secrets to. Required when scope is 'project'.",
 			},
 			"project_name": schema.StringAttribute{
 				Optional:    true,
-				Description: "The GitLab project name for reference (optional, not used in API calls).",
+				Description: "The GitLab Project Name to sync secrets to. Optional when scope is 'project'.",
+			},
+			"group_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "The GitLab Group ID to sync secrets to. Required when scope is 'group'.",
+			},
+			"group_name": schema.StringAttribute{
+				Optional:    true,
+				Description: "The GitLab Group Name to sync secrets to. Optional when scope is 'group'.",
 			},
 			"target_environment": schema.StringAttribute{
 				Required:    true,
-				Description: "The target environment for the GitLab CI/CD variables. Use '*' for all environments or specify a specific environment name.",
+				Description: "The GitLab environment scope that secrets should be synced to. (default: *)",
 			},
 			"should_protect_secrets": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether to protect the GitLab CI/CD variables (only available in protected branches and tags).",
+				Description: "Whether variables should be protected",
 				Default:     booldefault.StaticBool(false),
 			},
 			"should_mask_secrets": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether to mask the GitLab CI/CD variables in job logs.",
+				Description: "Whether variables should be masked in logs",
 				Default:     booldefault.StaticBool(true),
 			},
 			"should_hide_secrets": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether to hide the GitLab CI/CD variables from the UI (only shows variable names, not values).",
+				Description: "Whether variables should be hidden",
 				Default:     booldefault.StaticBool(false),
 			},
 		},
@@ -89,8 +182,8 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			},
 		},
 
-		ReadSyncOptionsForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			syncOptionsMap := make(map[string]interface{})
+		ReadSyncOptionsForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			syncOptionsMap := make(map[string]any)
 
 			var syncOptions SecretSyncGitlabSyncOptionsModel
 			diags := plan.SyncOptions.As(ctx, &syncOptions, basetypes.ObjectAsOptions{})
@@ -108,7 +201,7 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			return syncOptionsMap, nil
 		},
 
-		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			syncOptionsMap := make(map[string]attr.Value)
 
 			initialSyncBehavior, ok := secretSync.SyncOptions["initialSyncBehavior"].(string)
@@ -138,8 +231,8 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			}, syncOptionsMap)
 		},
 
-		ReadSyncOptionsForUpdateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			syncOptionsMap := make(map[string]interface{})
+		ReadSyncOptionsForUpdateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel, _ SecretSyncBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			syncOptionsMap := make(map[string]any)
 
 			var syncOptions SecretSyncGitlabSyncOptionsModel
 			diags := plan.SyncOptions.As(ctx, &syncOptions, basetypes.ObjectAsOptions{})
@@ -157,8 +250,8 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			return syncOptionsMap, nil
 		},
 
-		ReadDestinationConfigForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			destinationConfig := make(map[string]interface{})
+		ReadDestinationConfigForCreateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			destinationConfig := make(map[string]any)
 
 			var gitlabCfg SecretSyncGitlabDestinationConfigModel
 			diags := plan.DestinationConfig.As(ctx, &gitlabCfg, basetypes.ObjectAsOptions{})
@@ -166,23 +259,42 @@ func NewSecretSyncGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			// Validate scope
-			if gitlabCfg.Scope.ValueString() != "project" {
-				diags.AddError(
-					"Invalid destination config",
-					"Expected 'scope' to be 'project' for GitLab sync",
-				)
+			// Convert to map for validation
+			destinationConfigAttrMap := map[string]attr.Value{
+				"scope":                  gitlabCfg.Scope,
+				"project_id":             gitlabCfg.ProjectId,
+				"project_name":           gitlabCfg.ProjectName,
+				"group_id":               gitlabCfg.GroupId,
+				"group_name":             gitlabCfg.GroupName,
+				"target_environment":     gitlabCfg.TargetEnvironment,
+				"should_protect_secrets": gitlabCfg.ShouldProtectSecrets,
+				"should_mask_secrets":    gitlabCfg.ShouldMaskSecrets,
+				"should_hide_secrets":    gitlabCfg.ShouldHideSecrets,
+			}
+
+			// Validate configuration
+			if !verifyGitlabDestinationConfigState(destinationConfigAttrMap, &diags) {
 				return nil, diags
 			}
 
-			destinationConfig["scope"] = gitlabCfg.Scope.ValueString()
-			destinationConfig["projectId"] = gitlabCfg.ProjectId.ValueString()
-
-			if !gitlabCfg.ProjectName.IsNull() && gitlabCfg.ProjectName.ValueString() != "" {
-				destinationConfig["projectName"] = gitlabCfg.ProjectName.ValueString()
-			}
-
+			// Build config based on scope
+			scope := GitlabSyncScope(gitlabCfg.Scope.ValueString())
+			destinationConfig["scope"] = string(scope)
 			destinationConfig["targetEnvironment"] = gitlabCfg.TargetEnvironment.ValueString()
+
+			switch scope {
+			case GitlabSyncScopeProject:
+				destinationConfig["projectId"] = gitlabCfg.ProjectId.ValueString()
+				if !gitlabCfg.ProjectName.IsNull() && gitlabCfg.ProjectName.ValueString() != "" {
+					destinationConfig["projectName"] = gitlabCfg.ProjectName.ValueString()
+				}
+
+			case GitlabSyncScopeGroup:
+				destinationConfig["groupId"] = gitlabCfg.GroupId.ValueString()
+				if !gitlabCfg.GroupName.IsNull() && gitlabCfg.GroupName.ValueString() != "" {
+					destinationConfig["groupName"] = gitlabCfg.GroupName.ValueString()
+				}
+			}
 
 			// Add boolean flags
 			if !gitlabCfg.ShouldProtectSecrets.IsNull() {
@@ -200,8 +312,8 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			return destinationConfig, diags
 		},
 
-		ReadDestinationConfigForUpdateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel, _ SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			destinationConfig := make(map[string]interface{})
+		ReadDestinationConfigForUpdateFromPlan: func(ctx context.Context, plan SecretSyncBaseResourceModel, _ SecretSyncBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			destinationConfig := make(map[string]any)
 
 			var gitlabCfg SecretSyncGitlabDestinationConfigModel
 			diags := plan.DestinationConfig.As(ctx, &gitlabCfg, basetypes.ObjectAsOptions{})
@@ -209,25 +321,43 @@ func NewSecretSyncGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			// Validate scope
-			if gitlabCfg.Scope.ValueString() != "project" {
-				diags.AddError(
-					"Invalid destination config",
-					"Expected 'scope' to be 'project' for GitLab sync",
-				)
+			// Convert to map for validation
+			destinationConfigAttrMap := map[string]attr.Value{
+				"scope":                  gitlabCfg.Scope,
+				"project_id":             gitlabCfg.ProjectId,
+				"project_name":           gitlabCfg.ProjectName,
+				"group_id":               gitlabCfg.GroupId,
+				"group_name":             gitlabCfg.GroupName,
+				"target_environment":     gitlabCfg.TargetEnvironment,
+				"should_protect_secrets": gitlabCfg.ShouldProtectSecrets,
+				"should_mask_secrets":    gitlabCfg.ShouldMaskSecrets,
+				"should_hide_secrets":    gitlabCfg.ShouldHideSecrets,
+			}
+
+			// Validate configuration
+			if !verifyGitlabDestinationConfigState(destinationConfigAttrMap, &diags) {
 				return nil, diags
 			}
 
-			destinationConfig["scope"] = gitlabCfg.Scope.ValueString()
-			destinationConfig["projectId"] = gitlabCfg.ProjectId.ValueString()
-
-			if !gitlabCfg.ProjectName.IsNull() && gitlabCfg.ProjectName.ValueString() != "" {
-				destinationConfig["projectName"] = gitlabCfg.ProjectName.ValueString()
-			}
-
+			// Build config based on scope
+			scope := GitlabSyncScope(gitlabCfg.Scope.ValueString())
+			destinationConfig["scope"] = string(scope)
 			destinationConfig["targetEnvironment"] = gitlabCfg.TargetEnvironment.ValueString()
 
-			// Add boolean flags
+			switch scope {
+			case GitlabSyncScopeProject:
+				destinationConfig["projectId"] = gitlabCfg.ProjectId.ValueString()
+				if !gitlabCfg.ProjectName.IsNull() && gitlabCfg.ProjectName.ValueString() != "" {
+					destinationConfig["projectName"] = gitlabCfg.ProjectName.ValueString()
+				}
+
+			case GitlabSyncScopeGroup:
+				destinationConfig["groupId"] = gitlabCfg.GroupId.ValueString()
+				if !gitlabCfg.GroupName.IsNull() && gitlabCfg.GroupName.ValueString() != "" {
+					destinationConfig["groupName"] = gitlabCfg.GroupName.ValueString()
+				}
+			}
+
 			if !gitlabCfg.ShouldProtectSecrets.IsNull() {
 				destinationConfig["shouldProtectSecrets"] = gitlabCfg.ShouldProtectSecrets.ValueBool()
 			}
@@ -243,7 +373,7 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			return destinationConfig, diags
 		},
 
-		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
 			scopeVal, ok := secretSync.DestinationConfig["scope"].(string)
@@ -271,6 +401,20 @@ func NewSecretSyncGitlabResource() resource.Resource {
 				destinationConfig["project_name"] = types.StringValue(projectNameVal)
 			} else {
 				destinationConfig["project_name"] = types.StringNull()
+			}
+
+			// Read group ID
+			if groupIdVal, ok := secretSync.DestinationConfig["groupId"].(string); ok {
+				destinationConfig["group_id"] = types.StringValue(groupIdVal)
+			} else {
+				destinationConfig["group_id"] = types.StringNull()
+			}
+
+			// Read group name (optional)
+			if groupNameVal, ok := secretSync.DestinationConfig["groupName"].(string); ok && groupNameVal != "" {
+				destinationConfig["group_name"] = types.StringValue(groupNameVal)
+			} else {
+				destinationConfig["group_name"] = types.StringNull()
 			}
 
 			// Read target environment
@@ -303,6 +447,8 @@ func NewSecretSyncGitlabResource() resource.Resource {
 				"scope":                  types.StringType,
 				"project_id":             types.StringType,
 				"project_name":           types.StringType,
+				"group_id":               types.StringType,
+				"group_name":             types.StringType,
 				"target_environment":     types.StringType,
 				"should_protect_secrets": types.BoolType,
 				"should_mask_secrets":    types.BoolType,
