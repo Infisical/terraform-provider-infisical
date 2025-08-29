@@ -16,35 +16,20 @@ Create and manage GitLab App Connection
 terraform {
   required_providers {
     infisical = {
+      # version = <latest version>
       source = "infisical/infisical"
     }
   }
 }
 
 provider "infisical" {
-  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical
-
+  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
     universal = {
-      client_id     = var.infisical_client_id
-      client_secret = var.infisical_client_secret
+      client_id     = "<machine-identity-client-id>"
+      client_secret = "<machine-identity-client-secret>"
     }
   }
-}
-
-variable "infisical_client_id" {
-  type = string
-}
-
-variable "infisical_client_secret" {
-  type      = string
-  sensitive = true
-}
-
-variable "gitlab_access_token" {
-  type        = string
-  sensitive   = true
-  description = "GitLab project access token with api scope"
 }
 
 resource "infisical_app_connection_gitlab" "gitlab_connection" {
@@ -53,9 +38,9 @@ resource "infisical_app_connection_gitlab" "gitlab_connection" {
   method      = "access-token"
 
   credentials = {
-    access_token      = var.gitlab_access_token
+    access_token      = "<access-token>"
     instance_url      = "https://gitlab.com" # Or your self-hosted GitLab URL
-    access_token_type = "project"
+    access_token_type = "project"            # Or "personal"
   }
 }
 ```

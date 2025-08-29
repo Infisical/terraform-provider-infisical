@@ -25,6 +25,6 @@ resource "infisical_app_connection_gitlab" "gitlab_connection" {
   credentials = {
     access_token      = "<access-token>"
     instance_url      = "https://gitlab.com" # Or your self-hosted GitLab URL
-    access_token_type = "project" # Or "personal"
+    access_token_type = "project"            # Or "personal"
   }
 }
