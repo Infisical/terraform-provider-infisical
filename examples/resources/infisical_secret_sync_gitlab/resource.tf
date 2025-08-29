@@ -49,7 +49,7 @@ resource "infisical_secret_sync_gitlab" "gitlab-group-sync" {
   description   = "Demo of GitLab group secret sync"
   project_id    = "<project-id>"
   environment   = "<environment-slug>"
-  secret_path   = "/api"
+  secret_path   = "/"
   connection_id = "<gitlab-app-connection-id>"
 
   sync_options = {
