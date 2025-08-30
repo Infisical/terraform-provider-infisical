@@ -525,6 +525,7 @@ type RawV3Secret struct {
 	Workspace     string `json:"workspace"`
 	Type          string `json:"type"`
 	Environment   string `json:"environment"`
+	SecretPath    string `json:"secretPath"`
 	SecretKey     string `json:"secretKey"`
 	SecretValue   string `json:"secretValue"`
 	SecretComment string `json:"secretComment"`

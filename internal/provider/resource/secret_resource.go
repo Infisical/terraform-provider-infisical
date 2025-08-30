@@ -9,6 +9,7 @@ import (
 	"terraform-provider-infisical/internal/crypto"
 	"time"
 
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -695,41 +696,95 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func (r *secretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	var workspace, environment, secretPath, secretName, secretValue string
+	var tags []string
+	var secretReminder SecretReminder
 
-	secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
-		ID: req.ID,
-	})
+	if _, err := uuid.ParseUUID(req.ID); err == nil {
+		secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+			ID: req.ID,
+		})
 
-	if err != nil {
-		if err == infisical.ErrNotFound {
+		if err != nil {
+			if err == infisical.ErrNotFound {
+				resp.Diagnostics.AddError(
+					"Secret not found",
+					"The secret with the given ID was not found",
+				)
+			} else {
+				resp.Diagnostics.AddError(
+					"Error fetching secret",
+					"Couldn't fetch secret from Infisical, unexpected error: "+err.Error(),
+				)
+			}
+			return
+		}
+
+		for _, tag := range secret.Secret.Tags {
+			tags = append(tags, tag.ID)
+		}
+
+		secretReminder.Note = types.StringValue(secret.Secret.SecretReminderNote)
+		secretReminder.RepeatDays = types.Int64Value(secret.Secret.SecretReminderRepeatDays)
+
+		workspace = secret.Secret.Workspace
+		environment = secret.Secret.Environment
+		secretPath = secret.Secret.SecretPath
+		secretName = secret.Secret.SecretKey
+		secretValue = secret.Secret.SecretValue
+	} else {
+		parts := strings.SplitN(req.ID, ":", 4)
+
+		if len(parts) != 4 {
 			resp.Diagnostics.AddError(
-				"Secret not found",
-				"The secret with the given ID was not found",
+				"Invalid ID Format",
+				"The secret ID must be a uuid or in the format of '<workspace>:<env>:<secret-path>:<secret-name>'",
 			)
 		} else {
-			resp.Diagnostics.AddError(
-				"Error fetching secret",
-				"Couldn't fetch secret from Infisical, unexpected error: "+err.Error(),
-			)
+			secret, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
+				WorkspaceId: parts[0],
+				Environment: parts[1],
+				SecretPath:  parts[2],
+				SecretName:  parts[3],
+				Type:        "shared", // Just use the secret uuid instead if (type is 'personal')
+			})
+
+			if err != nil {
+				if err == infisical.ErrNotFound {
+					resp.Diagnostics.AddError(
+						"Secret not found",
+						"The secret with the given ID was not found",
+					)
+				} else {
+					resp.Diagnostics.AddError(
+						"Error fetching secret",
+						"Couldn't fetch secret from Infisical, unexpected error: "+err.Error(),
+					)
+				}
+				return
+			}
+
+			for _, tag := range secret.Secret.Tags {
+				tags = append(tags, tag.ID)
+			}
+
+			secretReminder.Note = types.StringValue(secret.Secret.SecretReminderNote)
+			secretReminder.RepeatDays = types.Int64Value(secret.Secret.SecretReminderRepeatDays)
+
+			workspace = secret.Secret.Workspace
+			environment = secret.Secret.Environment
+			secretPath = secret.Secret.SecretPath
+			secretName = secret.Secret.SecretKey
+			secretValue = secret.Secret.SecretValue
 		}
-		return
+
 	}
 
-	tagIds := []string{}
-	for _, tag := range secret.Secret.Tags {
-		tagIds = append(tagIds, tag.ID)
-	}
-	secretReminder := SecretReminder{
-		Note:       types.StringValue(secret.Secret.SecretReminderNote),
-		RepeatDays: types.Int64Value(secret.Secret.SecretReminderRepeatDays),
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), secret.Secret.Workspace)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("env_slug"), secret.Secret.Environment)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), secret.Secret.SecretPath)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), secret.Secret.SecretKey)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secret.Secret.SecretValue)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tagIds)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), workspace)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("env_slug"), environment)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), secretPath)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), secretName)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secretValue)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tags)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("secret_reminder"), secretReminder)...)
-
 }
