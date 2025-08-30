@@ -73,10 +73,8 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
-			// The inputs are directly on the dynamicSecret struct
 			inputs := dynamicSecret.Inputs
 
-			// Build the configuration attributes map
 			configAttrs := map[string]attr.Value{
 				"public_key":  types.StringValue(getStringFromMap(inputs, "publicKey")),
 				"private_key": types.StringValue(getStringFromMap(inputs, "privateKey")),
@@ -84,14 +82,12 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				"roles":       types.StringValue(getStringFromMap(inputs, "roles")),
 			}
 
-			// Handle optional scopes field
 			if scopes := getStringFromMap(inputs, "scopes"); scopes != "" {
 				configAttrs["scopes"] = types.StringValue(scopes)
 			} else {
 				configAttrs["scopes"] = types.StringNull()
 			}
 
-			// Create the configuration object type
 			configType := map[string]attr.Type{
 				"public_key":  types.StringType,
 				"private_key": types.StringType,
@@ -110,7 +106,6 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 	}
 }
 
-// Helper function to safely extract string values from map
 func getStringFromMap(m map[string]interface{}, key string) string {
 	if val, ok := m[key]; ok {
 		if strVal, ok := val.(string); ok {
