@@ -35,7 +35,8 @@ func NewAppConnectionGitlabResource() resource.Resource {
 			},
 			"instance_url": schema.StringAttribute{
 				Optional:    true,
-				Description: "The GitLab instance URL to connect with.",
+				Description: "The GitLab instance URL to connect with. (default: https://gitlab.com)",
+				Computed:    true,
 			},
 			"access_token_type": schema.StringAttribute{
 				Required:    true,
@@ -57,6 +58,10 @@ func NewAppConnectionGitlabResource() resource.Resource {
 					"Invalid method. Only access-token method is supported. Note: GitLab OAuth connections must be created through the Infisical UI.",
 				)
 				return nil, diags
+			}
+
+			if credentials.InstanceUrl.IsNull() || credentials.InstanceUrl.String() == "" {
+				credentials.InstanceUrl = types.StringValue("https://gitlab.com")
 			}
 
 			accessTokenType := credentials.AccessTokenType.ValueString()
@@ -98,7 +103,11 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			accessTokenType := credentialsFromPlan.AccessToken.ValueString()
+			if credentialsFromPlan.InstanceUrl.IsNull() || credentialsFromPlan.InstanceUrl.String() == "" {
+				credentialsFromPlan.InstanceUrl = types.StringValue("https://gitlab.com")
+			}
+
+			accessTokenType := credentialsFromPlan.AccessTokenType.ValueString()
 
 			if accessTokenType != "project" && accessTokenType != "personal" {
 				diags.AddError(
