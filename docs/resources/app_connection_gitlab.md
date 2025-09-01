@@ -23,12 +23,11 @@ terraform {
 }
 
 provider "infisical" {
-  # host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  host = "http://proxyman.debug:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
+  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
     universal = {
-      client_id     = "86c17800-00b9-4556-89a8-ea11ac6f8371"
-      client_secret = "0250d9bec1df4f6d2ad735013d77ec579ca18a04011b7f8067965bb10206e59d"
+      client_id     = "<machine-identity-client-id>"
+      client_secret = "<machine-identity-client-secret>"
     }
   }
 }
@@ -39,9 +38,9 @@ resource "infisical_app_connection_gitlab" "gitlab_connection" {
   method      = "access-token"
 
   credentials = {
-    access_token = "glpat-NaUKLGZaXqzw-rOdNiQXVm86MQp1Omh0cHB1Cw.01.120vuniu2"
-    # instance_url      = "https://gitlab.com" # Or your self-hosted GitLab URL
-    access_token_type = "personal" # Or "personal"
+    access_token      = "<access-token>"
+    instance_url      = "https://gitlab.com" # Or your self-hosted GitLab URL
+    access_token_type = "project"            # Or "personal"
   }
 }
 ```
