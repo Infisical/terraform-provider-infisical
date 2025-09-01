@@ -13,11 +13,11 @@ import (
 )
 
 type DynamicSecretMongoAtlasConfigurationModel struct {
-	PublicKey  types.String `tfsdk:"public_key"`
-	PrivateKey types.String `tfsdk:"private_key"`
-	GroupId    types.String `tfsdk:"group_id"`
-	Roles      types.String `tfsdk:"roles"`
-	Scopes     types.String `tfsdk:"scopes"`
+	AdminPublicKey  types.String `tfsdk:"admin_public_key"`
+	AdminPrivateKey types.String `tfsdk:"admin_private_key"`
+	GroupId         types.String `tfsdk:"group_id"`
+	Roles           types.List   `tfsdk:"roles"`
+	Scopes          types.List   `tfsdk:"scopes"`
 }
 
 func NewDynamicSecretMongoAtlasResource() resource.Resource {
@@ -26,26 +26,52 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 		ResourceTypeName:  "_dynamic_secret_mongo_atlas",
 		DynamicSecretName: "MongoDB Atlas",
 		ConfigurationAttributes: map[string]schema.Attribute{
-			"public_key": schema.StringAttribute{
+			"admin_public_key": schema.StringAttribute{
 				Required:    true,
-				Description: "The MongoDB Atlas public API key for authentication.",
+				Description: "Admin user public api key",
 			},
-			"private_key": schema.StringAttribute{
+			"admin_private_key": schema.StringAttribute{
 				Required:    true,
-				Description: "The MongoDB Atlas private API key for authentication.",
+				Description: "Admin user private api key",
 				Sensitive:   true,
 			},
 			"group_id": schema.StringAttribute{
 				Required:    true,
-				Description: "The MongoDB Atlas project ID (also known as group ID).",
+				Description: "TUnique 24-hexadecimal digit string that identifies your project. This is same as project id",
 			},
-			"roles": schema.StringAttribute{
-				Required:    true,
-				Description: "Comma-separated list of roles to assign to the created database user. Example: 'readWrite@mydb,read@admin'",
+			"roles": schema.ListNestedAttribute{
+				Required: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"database_name": schema.StringAttribute{
+							Description: "Database to which the user is granted access privileges.",
+							Required:    true,
+						},
+						"role_name": schema.StringAttribute{
+							Description: "Human-readable label that identifies a group of privileges assigned to a database user. This value can either be a built-in role or a custom role. Refer to https://infisical.com/docs/api-reference/endpoints/dynamic-secrets/create#option-8 for supported options.",
+							Required:    true,
+						},
+						"collection_name": schema.StringAttribute{
+							Description: "Collection on which this role applies.",
+							Optional:    true,
+						},
+					},
+				},
 			},
-			"scopes": schema.StringAttribute{
-				Optional:    true,
-				Description: "Comma-separated list of cluster names or data lake names to restrict the database user to. If not specified, the user will have access to all clusters and data lakes in the project.",
+			"scopes": schema.ListNestedAttribute{
+				Required: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Human-readable label that identifies the cluster or MongoDB Atlas Data Lake that this database user can access.",
+							Required:    true,
+						},
+						"type": schema.StringAttribute{
+							Description: "Category of resource that this database user can access. Supported options: CLUSTER, DATA_LAKE, STREAM",
+							Required:    true,
+						},
+					},
+				},
 			},
 		},
 
@@ -58,13 +84,45 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				return nil, diags
 			}
 
-			configurationMap["publicKey"] = configuration.PublicKey.ValueString()
-			configurationMap["privateKey"] = configuration.PrivateKey.ValueString()
+			configurationMap["publicKey"] = configuration.AdminPublicKey.ValueString()
+			configurationMap["privateKey"] = configuration.AdminPrivateKey.ValueString()
 			configurationMap["groupId"] = configuration.GroupId.ValueString()
-			configurationMap["roles"] = configuration.Roles.ValueString()
 
+			// Process roles list
+			if !configuration.Roles.IsNull() && !configuration.Roles.IsUnknown() {
+				var roles []interface{}
+				elements := configuration.Roles.Elements()
+				for _, elem := range elements {
+					if objVal, ok := elem.(types.Object); ok {
+						attrs := objVal.Attributes()
+						roleMap := map[string]interface{}{
+							"databaseName": attrs["database_name"].(types.String).ValueString(),
+							"roleName":     attrs["role_name"].(types.String).ValueString(),
+						}
+						if collectionName, ok := attrs["collection_name"].(types.String); ok && !collectionName.IsNull() {
+							roleMap["collectionName"] = collectionName.ValueString()
+						}
+						roles = append(roles, roleMap)
+					}
+				}
+				configurationMap["roles"] = roles
+			}
+
+			// Process scopes list
 			if !configuration.Scopes.IsNull() && !configuration.Scopes.IsUnknown() {
-				configurationMap["scopes"] = configuration.Scopes.ValueString()
+				var scopes []interface{}
+				elements := configuration.Scopes.Elements()
+				for _, elem := range elements {
+					if objVal, ok := elem.(types.Object); ok {
+						attrs := objVal.Attributes()
+						scopeMap := map[string]interface{}{
+							"name": attrs["name"].(types.String).ValueString(),
+							"type": attrs["type"].(types.String).ValueString(),
+						}
+						scopes = append(scopes, scopeMap)
+					}
+				}
+				configurationMap["scopes"] = scopes
 			}
 
 			return configurationMap, diags
@@ -75,25 +133,100 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 
 			inputs := dynamicSecret.Inputs
 
+			// Process roles from API
+			var rolesList []attr.Value
+			if rolesData, ok := inputs["roles"].([]interface{}); ok {
+				for _, role := range rolesData {
+					if roleMap, ok := role.(map[string]interface{}); ok {
+						roleAttrs := map[string]attr.Value{
+							"database_name": types.StringValue(getStringFromMap(roleMap, "databaseName")),
+							"role_name":     types.StringValue(getStringFromMap(roleMap, "roleName")),
+						}
+						if collectionName := getStringFromMap(roleMap, "collectionName"); collectionName != "" {
+							roleAttrs["collection_name"] = types.StringValue(collectionName)
+						} else {
+							roleAttrs["collection_name"] = types.StringNull()
+						}
+						roleObj, _ := types.ObjectValue(map[string]attr.Type{
+							"database_name":   types.StringType,
+							"role_name":       types.StringType,
+							"collection_name": types.StringType,
+						}, roleAttrs)
+						rolesList = append(rolesList, roleObj)
+					}
+				}
+			}
+			rolesListValue, _ := types.ListValue(types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"database_name":   types.StringType,
+					"role_name":       types.StringType,
+					"collection_name": types.StringType,
+				},
+			}, rolesList)
+
+			// Process scopes from API
+			var scopesList []attr.Value
+			if scopesData, ok := inputs["scopes"].([]interface{}); ok {
+				for _, scope := range scopesData {
+					if scopeMap, ok := scope.(map[string]interface{}); ok {
+						scopeAttrs := map[string]attr.Value{
+							"name": types.StringValue(getStringFromMap(scopeMap, "name")),
+							"type": types.StringValue(getStringFromMap(scopeMap, "type")),
+						}
+						scopeObj, _ := types.ObjectValue(map[string]attr.Type{
+							"name": types.StringType,
+							"type": types.StringType,
+						}, scopeAttrs)
+						scopesList = append(scopesList, scopeObj)
+					}
+				}
+			}
+			scopesListValue, _ := types.ListValue(types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"name": types.StringType,
+					"type": types.StringType,
+				},
+			}, scopesList)
+
 			configAttrs := map[string]attr.Value{
-				"public_key":  types.StringValue(getStringFromMap(inputs, "publicKey")),
-				"private_key": types.StringValue(getStringFromMap(inputs, "privateKey")),
-				"group_id":    types.StringValue(getStringFromMap(inputs, "groupId")),
-				"roles":       types.StringValue(getStringFromMap(inputs, "roles")),
+				"admin_public_key":  types.StringValue(getStringFromMap(inputs, "publicKey")),
+				"admin_private_key": types.StringValue(getStringFromMap(inputs, "privateKey")),
+				"group_id":          types.StringValue(getStringFromMap(inputs, "groupId")),
+				"roles":             rolesListValue,
 			}
 
-			if scopes := getStringFromMap(inputs, "scopes"); scopes != "" {
-				configAttrs["scopes"] = types.StringValue(scopes)
+			if len(scopesList) > 0 {
+				configAttrs["scopes"] = scopesListValue
 			} else {
-				configAttrs["scopes"] = types.StringNull()
+				configAttrs["scopes"] = types.ListNull(types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"name": types.StringType,
+						"type": types.StringType,
+					},
+				})
 			}
 
 			configType := map[string]attr.Type{
-				"public_key":  types.StringType,
-				"private_key": types.StringType,
-				"group_id":    types.StringType,
-				"roles":       types.StringType,
-				"scopes":      types.StringType,
+				"admin_public_key":  types.StringType,
+				"admin_private_key": types.StringType,
+				"group_id":          types.StringType,
+				"roles": types.ListType{
+					ElemType: types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"database_name":   types.StringType,
+							"role_name":       types.StringType,
+							"collection_name": types.StringType,
+						},
+					},
+				},
+				"scopes": types.ListType{
+					ElemType: types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"name": types.StringType,
+							"type": types.StringType,
+						},
+					},
+				},
 			}
 
 			configObject, diags := types.ObjectValue(configType, configAttrs)
