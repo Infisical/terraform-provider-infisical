@@ -66,7 +66,7 @@ resource "infisical_dynamic_secret_mongo_atlas" "mongo-atlas" {
 
 ### Optional
 
-- `max_ttl` (String) The maximum limit a TTL can be leases or renewed.
+- `max_ttl` (String) The maximum limit a TTL can be leased or renewed.
 - `metadata` (Attributes Set) The metadata associated with this dynamic secret (see [below for nested schema](#nestedatt--metadata))
 - `username_template` (String) The username template of the dynamic secret
 
