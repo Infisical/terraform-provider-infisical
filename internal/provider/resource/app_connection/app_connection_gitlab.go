@@ -36,15 +36,14 @@ func NewAppConnectionGitlabResource() resource.Resource {
 			"instance_url": schema.StringAttribute{
 				Optional:    true,
 				Description: "The GitLab instance URL to connect with. (default: https://gitlab.com)",
-				Computed:    true,
 			},
 			"access_token_type": schema.StringAttribute{
 				Required:    true,
 				Description: "The type of token used to connect with GitLab. Supported options: 'project' and 'personal'",
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionGitlabCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -60,10 +59,6 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentials.InstanceUrl.IsNull() || credentials.InstanceUrl.String() == "" {
-				credentials.InstanceUrl = types.StringValue("https://gitlab.com")
-			}
-
 			accessTokenType := credentials.AccessTokenType.ValueString()
 
 			if accessTokenType != "project" && accessTokenType != "personal" {
@@ -74,14 +69,17 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
+			if !credentials.InstanceUrl.IsNull() {
+				credentialsConfig["instanceUrl"] = credentials.InstanceUrl.ValueString()
+			}
+
 			credentialsConfig["accessToken"] = credentials.AccessToken.ValueString()
-			credentialsConfig["instanceUrl"] = credentials.InstanceUrl.ValueString()
 			credentialsConfig["accessTokenType"] = accessTokenType
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionGitlabCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -103,10 +101,6 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromPlan.InstanceUrl.IsNull() || credentialsFromPlan.InstanceUrl.String() == "" {
-				credentialsFromPlan.InstanceUrl = types.StringValue("https://gitlab.com")
-			}
-
 			accessTokenType := credentialsFromPlan.AccessTokenType.ValueString()
 
 			if accessTokenType != "project" && accessTokenType != "personal" {
@@ -117,8 +111,11 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				return nil, diags
 			}
 
+			if !credentialsFromPlan.InstanceUrl.IsNull() {
+				credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
+			}
+
 			credentialsConfig["accessToken"] = credentialsFromPlan.AccessToken.ValueString()
-			credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
 			credentialsConfig["accessTokenType"] = credentialsFromPlan.AccessTokenType.ValueString()
 
 			return credentialsConfig, diags
