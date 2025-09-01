@@ -740,44 +740,45 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 				"Invalid ID Format",
 				"The secret ID must be a uuid or in the format of '<workspace>:<env>:<secret-path>:<secret-name>'",
 			)
-		} else {
-			secret, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
-				WorkspaceId: parts[0],
-				Environment: parts[1],
-				SecretPath:  parts[2],
-				SecretName:  parts[3],
-				Type:        "shared", // Just use the secret uuid instead if (type is 'personal')
-			})
 
-			if err != nil {
-				if err == infisical.ErrNotFound {
-					resp.Diagnostics.AddError(
-						"Secret not found",
-						"The secret with the given ID was not found",
-					)
-				} else {
-					resp.Diagnostics.AddError(
-						"Error fetching secret",
-						"Couldn't fetch secret from Infisical, unexpected error: "+err.Error(),
-					)
-				}
-				return
-			}
-
-			for _, tag := range secret.Secret.Tags {
-				tags = append(tags, tag.ID)
-			}
-
-			secretReminder.Note = types.StringValue(secret.Secret.SecretReminderNote)
-			secretReminder.RepeatDays = types.Int64Value(secret.Secret.SecretReminderRepeatDays)
-
-			workspace = secret.Secret.Workspace
-			environment = secret.Secret.Environment
-			secretPath = secret.Secret.SecretPath
-			secretName = secret.Secret.SecretKey
-			secretValue = secret.Secret.SecretValue
+			return
 		}
 
+		secret, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
+			WorkspaceId: parts[0],
+			Environment: parts[1],
+			SecretPath:  parts[2],
+			SecretName:  parts[3],
+			Type:        "shared", // Just use the secret uuid instead if (type is 'personal')
+		})
+
+		if err != nil {
+			if err == infisical.ErrNotFound {
+				resp.Diagnostics.AddError(
+					"Secret not found",
+					"The secret with the given ID was not found",
+				)
+			} else {
+				resp.Diagnostics.AddError(
+					"Error fetching secret",
+					"Couldn't fetch secret from Infisical, unexpected error: "+err.Error(),
+				)
+			}
+			return
+		}
+
+		for _, tag := range secret.Secret.Tags {
+			tags = append(tags, tag.ID)
+		}
+
+		secretReminder.Note = types.StringValue(secret.Secret.SecretReminderNote)
+		secretReminder.RepeatDays = types.Int64Value(secret.Secret.SecretReminderRepeatDays)
+
+		workspace = secret.Secret.Workspace
+		environment = secret.Secret.Environment
+		secretPath = secret.Secret.SecretPath
+		secretName = secret.Secret.SecretKey
+		secretValue = secret.Secret.SecretValue
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), workspace)...)
