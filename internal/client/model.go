@@ -268,6 +268,7 @@ type ProjectRole struct {
 type ProjectWithEnvironments struct {
 	ID                    string               `json:"id"`
 	Name                  string               `json:"name"`
+	Type                  string               `json:"type"`
 	Description           string               `json:"description"`
 	Slug                  string               `json:"slug"`
 	AutoCapitalization    bool                 `json:"autoCapitalization"`
@@ -614,6 +615,7 @@ type CreateProjectRequest struct {
 	KmsSecretManagerKeyId   string `json:"kmsKeyId,omitempty"`
 	ShouldCreateDefaultEnvs bool   `json:"shouldCreateDefaultEnvs"`
 	HasDeleteProtection     bool   `json:"hasDeleteProtection"`
+	Type                    string `json:"type"`
 }
 
 type DeleteProjectRequest struct {
