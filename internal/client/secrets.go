@@ -133,6 +133,9 @@ func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Requ
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSingleSecretByNameSecretResponse{}, ErrNotFound
+		}
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
 		return GetSingleSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleSecretByNameV3, response, &additionalContext)
 	}
@@ -273,6 +276,11 @@ func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3R
 	}
 
 	if response.IsError() {
+
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSingleRawSecretByNameSecretResponse{}, ErrNotFound
+		}
+
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
 		return GetSingleRawSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleRawSecretByNameV3, response, &additionalContext)
 	}

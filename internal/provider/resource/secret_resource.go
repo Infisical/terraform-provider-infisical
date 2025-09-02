@@ -370,10 +370,14 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		})
 
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Reading Infisical secret",
-				"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
-			)
+			if err == infisical.ErrNotFound {
+				resp.State.RemoveResource(ctx)
+			} else {
+				resp.Diagnostics.AddError(
+					"Error Reading Infisical secret",
+					"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
+				)
+			}
 			return
 		}
 
@@ -466,10 +470,14 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		})
 
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Reading Infisical secret",
-				"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
-			)
+			if err == infisical.ErrNotFound {
+				resp.State.RemoveResource(ctx)
+			} else {
+				resp.Diagnostics.AddError(
+					"Error Reading Infisical secret",
+					"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
+				)
+			}
 			return
 		}
 
