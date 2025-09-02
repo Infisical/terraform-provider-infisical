@@ -95,9 +95,12 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				for _, elem := range elements {
 					if objVal, ok := elem.(types.Object); ok {
 						attrs := objVal.Attributes()
-						roleMap := map[string]any{
-							"databaseName": attrs["database_name"].(types.String).ValueString(),
-							"roleName":     attrs["role_name"].(types.String).ValueString(),
+						roleMap := map[string]any{}
+						if dbName, ok := attrs["database_name"].(types.String); ok {
+							roleMap["databaseName"] = dbName.ValueString()
+						}
+						if roleName, ok := attrs["role_name"].(types.String); ok {
+							roleMap["roleName"] = roleName.ValueString()
 						}
 						if collectionName, ok := attrs["collection_name"].(types.String); ok && !collectionName.IsNull() {
 							roleMap["collectionName"] = collectionName.ValueString()
@@ -115,9 +118,12 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				for _, elem := range elements {
 					if objVal, ok := elem.(types.Object); ok {
 						attrs := objVal.Attributes()
-						scopeMap := map[string]any{
-							"name": attrs["name"].(types.String).ValueString(),
-							"type": attrs["type"].(types.String).ValueString(),
+						scopeMap := map[string]any{}
+						if name, ok := attrs["name"].(types.String); ok {
+							scopeMap["name"] = name.ValueString()
+						}
+						if typeVal, ok := attrs["type"].(types.String); ok {
+							scopeMap["type"] = typeVal.ValueString()
 						}
 						scopes = append(scopes, scopeMap)
 					}
