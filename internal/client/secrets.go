@@ -52,7 +52,7 @@ func (client Client) GetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncr
 	return secretsResponse, nil
 }
 
-func (client Client) CreateSecretsV3(request CreateSecretV3Request) error {
+func (client Client) CreateSecretsV3(request CreateSecretV3Request) (EncryptedSecretV3, error) {
 	var secretsResponse EncryptedSecretV3
 	response, err := client.Config.HttpClient.
 		R().
@@ -62,15 +62,15 @@ func (client Client) CreateSecretsV3(request CreateSecretV3Request) error {
 		Post(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
 	if err != nil {
-		return errors.NewGenericRequestError(operationCreateSecretsV3, err)
+		return EncryptedSecretV3{}, errors.NewGenericRequestError(operationCreateSecretsV3, err)
 	}
 
 	if response.IsError() {
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
-		return errors.NewAPIErrorWithResponse(operationCreateSecretsV3, response, &additionalContext)
+		return EncryptedSecretV3{}, errors.NewAPIErrorWithResponse(operationCreateSecretsV3, response, &additionalContext)
 	}
 
-	return nil
+	return secretsResponse, nil
 }
 
 func (client Client) DeleteSecretsV3(request DeleteSecretV3Request) error {
@@ -193,8 +193,8 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 	return secretsResponse, nil
 }
 
-func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) error {
-	var secretsResponse EncryptedSecretV3
+func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) (RawV3Secret, error) {
+	var secretsResponse RawV3Secret
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
@@ -203,15 +203,15 @@ func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) error 
 		Post(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretKey))
 
 	if err != nil {
-		return errors.NewGenericRequestError(operationCreateRawSecretsV3, err)
+		return RawV3Secret{}, errors.NewGenericRequestError(operationCreateRawSecretsV3, err)
 	}
 
 	if response.IsError() {
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
-		return errors.NewAPIErrorWithResponse(operationCreateRawSecretsV3, response, &additionalContext)
+		return RawV3Secret{}, errors.NewAPIErrorWithResponse(operationCreateRawSecretsV3, response, &additionalContext)
 	}
 
-	return nil
+	return secretsResponse, nil
 }
 
 func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {

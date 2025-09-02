@@ -439,6 +439,7 @@ type GetEncryptedWorkspaceKeyResponse struct {
 
 // encrypted secret.
 type EncryptedSecret struct {
+	ID                      string `json:"id"`
 	SecretName              string `json:"secretName"`
 	WorkspaceID             string `json:"workspaceId"`
 	Type                    string `json:"type"`
@@ -521,6 +522,7 @@ type GetRawSecretsV3Request struct {
 }
 
 type RawV3Secret struct {
+	ID            string `json:"id"`
 	Version       int    `json:"version"`
 	Workspace     string `json:"workspace"`
 	Type          string `json:"type"`

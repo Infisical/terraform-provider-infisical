@@ -50,6 +50,7 @@ type secretResourceModel struct {
 	WorkspaceId    types.String    `tfsdk:"workspace_id"`
 	LastUpdated    types.String    `tfsdk:"last_updated"`
 	Tags           types.List      `tfsdk:"tag_ids"`
+	ID             types.String    `tfsdk:"id"`
 }
 
 // Metadata returns the resource type name.
@@ -119,6 +120,11 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				},
 				Optional: true,
 				Computed: false,
+			},
+			"id": schema.StringAttribute{
+				Description:   "The ID of the secret",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -226,7 +232,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			return
 		}
 
-		err = r.client.CreateSecretsV3(infisical.CreateSecretV3Request{
+		secret, err := r.client.CreateSecretsV3(infisical.CreateSecretV3Request{
 			Environment: plan.EnvSlug.ValueString(),
 			SecretName:  plan.Name.ValueString(),
 			Type:        "shared",
@@ -253,6 +259,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 		// Set state to fully populated data
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
+		plan.ID = types.StringValue(secret.ID)
 	} else if r.client.Config.IsMachineIdentityAuth {
 
 		// null check secret reminder
@@ -264,7 +271,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			secretReminderRepeatDays = plan.SecretReminder.RepeatDays.ValueInt64()
 		}
 
-		err := r.client.CreateRawSecretsV3(infisical.CreateRawSecretV3Request{
+		secret, err := r.client.CreateRawSecretsV3(infisical.CreateRawSecretV3Request{
 			Environment:              plan.EnvSlug.ValueString(),
 			WorkspaceID:              plan.WorkspaceId.ValueString(),
 			Type:                     "shared",
@@ -283,6 +290,8 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			)
 			return
 		}
+
+		plan.ID = types.StringValue(secret.ID)
 
 		// No need to set workspace ID as it is already set in the plan
 		//plan.WorkspaceId = plan.WorkspaceId
@@ -444,6 +453,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 		state.Name = types.StringValue(string(plainTextKey))
 		state.Value = types.StringValue(string(plainTextValue))
+		state.ID = types.StringValue(response.Secret.ID)
 
 	} else if r.client.Config.IsMachineIdentityAuth {
 		// Get refreshed order value from HashiCups
@@ -465,6 +475,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 		state.Name = types.StringValue(response.Secret.SecretKey)
 		state.Value = types.StringValue(response.Secret.SecretValue)
+		state.ID = types.StringValue(response.Secret.ID)
 	} else {
 		resp.Diagnostics.AddError(
 			"Error Reading Infisical secret",
@@ -696,7 +707,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func (r *secretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	var workspace, environment, secretPath, secretName, secretValue string
+	var workspace, environment, secretPath, secretName, secretValue, secretId string
 	var tags []string
 	var secretReminder SecretReminder
 
@@ -732,6 +743,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretPath = secret.Secret.SecretPath
 		secretName = secret.Secret.SecretKey
 		secretValue = secret.Secret.SecretValue
+		secretId = secret.Secret.ID
 	} else {
 		parts := strings.SplitN(req.ID, ":", 4)
 
@@ -779,6 +791,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretPath = secret.Secret.SecretPath
 		secretName = secret.Secret.SecretKey
 		secretValue = secret.Secret.SecretValue
+		secretId = secret.Secret.ID
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), workspace)...)
@@ -788,4 +801,5 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secretValue)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tags)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("secret_reminder"), secretReminder)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretId)...)
 }
