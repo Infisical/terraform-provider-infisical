@@ -41,11 +41,32 @@ resource "infisical_dynamic_secret_mongo_atlas" "mongo-atlas" {
   max_ttl          = "24h"
 
   configuration = {
-    public_key  = "YOUR_MONGO_ATLAS_PUBLIC_KEY"
-    private_key = "YOUR_MONGO_ATLAS_PRIVATE_KEY"
-    group_id    = "YOUR_MONGO_ATLAS_PROJECT_ID"
-    roles       = "readWrite@myDatabase,read@admin"
-    scopes      = "myCluster1,myCluster2" # Optional - restrict to specific clusters
+    admin_public_key  = "<your-mongo-atlas-public-key>"
+    admin_private_key = "<your-mongo-atlas-private-key>"
+    group_id          = "<your-mongo-atlas-project-id"
+
+    roles = [
+      {
+        database_name = "test"
+        role_name     = "readWrite"
+      },
+      {
+        database_name = "admin"
+        role_name     = "read"
+      }
+    ]
+
+    # Required - specify clusters or data lakes the user can access
+    scopes = [
+      {
+        name = "myCluster1"
+        type = "CLUSTER"
+      },
+      {
+        name = "myCluster2"
+        type = "CLUSTER"
+      }
+    ]
   }
 
   username_template = "{{randomUsername}}"
@@ -79,14 +100,33 @@ resource "infisical_dynamic_secret_mongo_atlas" "mongo-atlas" {
 
 Required:
 
-- `group_id` (String) The MongoDB Atlas project ID (also known as group ID).
-- `private_key` (String, Sensitive) The MongoDB Atlas private API key for authentication.
-- `public_key` (String) The MongoDB Atlas public API key for authentication.
-- `roles` (String) Comma-separated list of roles to assign to the created database user. Example: 'readWrite@mydb,read@admin'
+- `admin_private_key` (String, Sensitive) Admin user private api key
+- `admin_public_key` (String) Admin user public api key
+- `group_id` (String) TUnique 24-hexadecimal digit string that identifies your project. This is same as project id
+- `roles` (Attributes List) (see [below for nested schema](#nestedatt--configuration--roles))
+- `scopes` (Attributes List) (see [below for nested schema](#nestedatt--configuration--scopes))
+
+<a id="nestedatt--configuration--roles"></a>
+### Nested Schema for `configuration.roles`
+
+Required:
+
+- `database_name` (String) Database to which the user is granted access privileges.
+- `role_name` (String) Human-readable label that identifies a group of privileges assigned to a database user. This value can either be a built-in role or a custom role. Refer to https://infisical.com/docs/api-reference/endpoints/dynamic-secrets/create#option-8 for supported options.
 
 Optional:
 
-- `scopes` (String) Comma-separated list of cluster names or data lake names to restrict the database user to. If not specified, the user will have access to all clusters and data lakes in the project.
+- `collection_name` (String) Collection on which this role applies.
+
+
+<a id="nestedatt--configuration--scopes"></a>
+### Nested Schema for `configuration.scopes`
+
+Required:
+
+- `name` (String) Human-readable label that identifies the cluster or MongoDB Atlas Data Lake that this database user can access.
+- `type` (String) Category of resource that this database user can access. Supported options: CLUSTER, DATA_LAKE, STREAM
+
 
 
 <a id="nestedatt--metadata"></a>

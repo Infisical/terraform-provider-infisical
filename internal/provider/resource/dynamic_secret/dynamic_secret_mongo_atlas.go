@@ -75,8 +75,8 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			},
 		},
 
-		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			configurationMap := make(map[string]interface{})
+		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			configurationMap := make(map[string]any)
 			var configuration DynamicSecretMongoAtlasConfigurationModel
 
 			diags := plan.Configuration.As(ctx, &configuration, basetypes.ObjectAsOptions{})
@@ -84,18 +84,18 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				return nil, diags
 			}
 
-			configurationMap["publicKey"] = configuration.AdminPublicKey.ValueString()
-			configurationMap["privateKey"] = configuration.AdminPrivateKey.ValueString()
+			configurationMap["adminPublicKey"] = configuration.AdminPublicKey.ValueString()
+			configurationMap["adminPrivateKey"] = configuration.AdminPrivateKey.ValueString()
 			configurationMap["groupId"] = configuration.GroupId.ValueString()
 
 			// Process roles list
 			if !configuration.Roles.IsNull() && !configuration.Roles.IsUnknown() {
-				var roles []interface{}
+				var roles []any
 				elements := configuration.Roles.Elements()
 				for _, elem := range elements {
 					if objVal, ok := elem.(types.Object); ok {
 						attrs := objVal.Attributes()
-						roleMap := map[string]interface{}{
+						roleMap := map[string]any{
 							"databaseName": attrs["database_name"].(types.String).ValueString(),
 							"roleName":     attrs["role_name"].(types.String).ValueString(),
 						}
@@ -110,12 +110,12 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 
 			// Process scopes list
 			if !configuration.Scopes.IsNull() && !configuration.Scopes.IsUnknown() {
-				var scopes []interface{}
+				var scopes []any
 				elements := configuration.Scopes.Elements()
 				for _, elem := range elements {
 					if objVal, ok := elem.(types.Object); ok {
 						attrs := objVal.Attributes()
-						scopeMap := map[string]interface{}{
+						scopeMap := map[string]any{
 							"name": attrs["name"].(types.String).ValueString(),
 							"type": attrs["type"].(types.String).ValueString(),
 						}
@@ -135,9 +135,9 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 
 			// Process roles from API
 			var rolesList []attr.Value
-			if rolesData, ok := inputs["roles"].([]interface{}); ok {
+			if rolesData, ok := inputs["roles"].([]any); ok {
 				for _, role := range rolesData {
-					if roleMap, ok := role.(map[string]interface{}); ok {
+					if roleMap, ok := role.(map[string]any); ok {
 						roleAttrs := map[string]attr.Value{
 							"database_name": types.StringValue(getStringFromMap(roleMap, "databaseName")),
 							"role_name":     types.StringValue(getStringFromMap(roleMap, "roleName")),
@@ -166,9 +166,9 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 
 			// Process scopes from API
 			var scopesList []attr.Value
-			if scopesData, ok := inputs["scopes"].([]interface{}); ok {
+			if scopesData, ok := inputs["scopes"].([]any); ok {
 				for _, scope := range scopesData {
-					if scopeMap, ok := scope.(map[string]interface{}); ok {
+					if scopeMap, ok := scope.(map[string]any); ok {
 						scopeAttrs := map[string]attr.Value{
 							"name": types.StringValue(getStringFromMap(scopeMap, "name")),
 							"type": types.StringValue(getStringFromMap(scopeMap, "type")),
@@ -189,8 +189,8 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			}, scopesList)
 
 			configAttrs := map[string]attr.Value{
-				"admin_public_key":  types.StringValue(getStringFromMap(inputs, "publicKey")),
-				"admin_private_key": types.StringValue(getStringFromMap(inputs, "privateKey")),
+				"admin_public_key":  types.StringValue(getStringFromMap(inputs, "adminPublicKey")),
+				"admin_private_key": types.StringValue(getStringFromMap(inputs, "adminPrivateKey")),
 				"group_id":          types.StringValue(getStringFromMap(inputs, "groupId")),
 				"roles":             rolesListValue,
 			}
@@ -239,7 +239,7 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 	}
 }
 
-func getStringFromMap(m map[string]interface{}, key string) string {
+func getStringFromMap(m map[string]any, key string) string {
 	if val, ok := m[key]; ok {
 		if strVal, ok := val.(string); ok {
 			return strVal
