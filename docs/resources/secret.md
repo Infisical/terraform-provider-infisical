@@ -97,6 +97,7 @@ ephemeral "infisical_secret" "ephemeral-secret" {
 
 ### Read-Only
 
+- `id` (String) The ID of the secret
 - `last_updated` (String)
 
 <a id="nestedatt--secret_reminder"></a>
