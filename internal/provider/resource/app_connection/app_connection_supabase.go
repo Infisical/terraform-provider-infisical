@@ -36,8 +36,8 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 				Description: "The Supabase instance URL (e.g., https://your-domain.com).",
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionSupabaseCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -60,8 +60,8 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionSupabaseCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -83,11 +83,20 @@ func NewAppConnectionSupabaseResource() resource.Resource {
 				return nil, diags
 			}
 
-			credentialsConfig["accessKey"] = credentialsFromPlan.AccessKey.ValueString()
-			if credentialsFromState.InstanceUrl.ValueString() != credentialsFromPlan.InstanceUrl.ValueString() {
-				if !credentialsFromPlan.InstanceUrl.IsNull() && !credentialsFromPlan.InstanceUrl.IsUnknown() {
-					credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
-				}
+			accessKey := credentialsFromPlan.AccessKey
+			if credentialsFromPlan.AccessKey.IsUnknown() {
+				accessKey = credentialsFromState.AccessKey
+			}
+			if !accessKey.IsNull() {
+				credentialsConfig["accessKey"] = accessKey.ValueString()
+			}
+
+			instanceUrl := credentialsFromPlan.InstanceUrl
+			if credentialsFromPlan.InstanceUrl.IsUnknown() {
+				instanceUrl = credentialsFromState.InstanceUrl
+			}
+			if !instanceUrl.IsNull() {
+				credentialsConfig["instanceUrl"] = instanceUrl.ValueString()
 			}
 
 			return credentialsConfig, diags

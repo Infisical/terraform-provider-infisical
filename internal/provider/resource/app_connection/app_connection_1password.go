@@ -38,8 +38,8 @@ func NewAppConnection1PasswordResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnection1PasswordCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -60,8 +60,8 @@ func NewAppConnection1PasswordResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnection1PasswordCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -83,12 +83,20 @@ func NewAppConnection1PasswordResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.InstanceUrl.ValueString() != credentialsFromPlan.InstanceUrl.ValueString() {
-				credentialsConfig["instanceUrl"] = credentialsFromPlan.InstanceUrl.ValueString()
+			instanceUrl := credentialsFromPlan.InstanceUrl
+			if credentialsFromPlan.InstanceUrl.IsUnknown() {
+				instanceUrl = credentialsFromState.InstanceUrl
+			}
+			if !instanceUrl.IsNull() {
+				credentialsConfig["instanceUrl"] = instanceUrl.ValueString()
 			}
 
-			if credentialsFromState.ApiToken.ValueString() != credentialsFromPlan.ApiToken.ValueString() {
-				credentialsConfig["apiToken"] = credentialsFromPlan.ApiToken.ValueString()
+			apiToken := credentialsFromPlan.ApiToken
+			if credentialsFromPlan.ApiToken.IsUnknown() {
+				apiToken = credentialsFromState.ApiToken
+			}
+			if !apiToken.IsNull() {
+				credentialsConfig["apiToken"] = apiToken.ValueString()
 			}
 
 			return credentialsConfig, diags

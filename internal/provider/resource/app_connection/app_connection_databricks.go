@@ -87,14 +87,28 @@ func NewAppConnectionDatabricksResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.ClientId.ValueString() != credentialsFromPlan.ClientId.ValueString() {
-				credentialsConfig["clientId"] = credentialsFromPlan.ClientId.ValueString()
+			clientId := credentialsFromPlan.ClientId
+			if credentialsFromPlan.ClientId.IsUnknown() {
+				clientId = credentialsFromState.ClientId
 			}
-			if credentialsFromState.ClientSecret.ValueString() != credentialsFromPlan.ClientSecret.ValueString() {
-				credentialsConfig["clientSecret"] = credentialsFromPlan.ClientSecret.ValueString()
+			if !clientId.IsNull() {
+				credentialsConfig["clientId"] = clientId.ValueString()
 			}
-			if credentialsFromState.WorkspaceUrl.ValueString() != credentialsFromPlan.WorkspaceUrl.ValueString() {
-				credentialsConfig["workspaceUrl"] = credentialsFromPlan.WorkspaceUrl.ValueString()
+
+			clientSecret := credentialsFromPlan.ClientSecret
+			if credentialsFromPlan.ClientSecret.IsUnknown() {
+				clientSecret = credentialsFromState.ClientSecret
+			}
+			if !clientSecret.IsNull() {
+				credentialsConfig["clientSecret"] = clientSecret.ValueString()
+			}
+
+			workspaceUrl := credentialsFromPlan.WorkspaceUrl
+			if credentialsFromPlan.WorkspaceUrl.IsUnknown() {
+				workspaceUrl = credentialsFromState.WorkspaceUrl
+			}
+			if !workspaceUrl.IsNull() {
+				credentialsConfig["workspaceUrl"] = workspaceUrl.ValueString()
 			}
 
 			return credentialsConfig, diags

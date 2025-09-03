@@ -36,8 +36,8 @@ func NewAppConnectionBitbucketResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionBitbucketCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -58,8 +58,8 @@ func NewAppConnectionBitbucketResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionBitbucketCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -81,11 +81,20 @@ func NewAppConnectionBitbucketResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.Email.ValueString() != credentialsFromPlan.Email.ValueString() {
-				credentialsConfig["email"] = credentialsFromPlan.Email.ValueString()
+			email := credentialsFromPlan.Email
+			if credentialsFromPlan.Email.IsUnknown() {
+				email = credentialsFromState.Email
 			}
-			if credentialsFromState.ApiToken.ValueString() != credentialsFromPlan.ApiToken.ValueString() {
-				credentialsConfig["apiToken"] = credentialsFromPlan.ApiToken.ValueString()
+			if !email.IsNull() {
+				credentialsConfig["email"] = email.ValueString()
+			}
+
+			apiToken := credentialsFromPlan.ApiToken
+			if credentialsFromPlan.ApiToken.IsUnknown() {
+				apiToken = credentialsFromState.ApiToken
+			}
+			if !apiToken.IsNull() {
+				credentialsConfig["apiToken"] = apiToken.ValueString()
 			}
 
 			return credentialsConfig, diags

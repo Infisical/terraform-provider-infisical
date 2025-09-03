@@ -131,18 +131,52 @@ func NewAppConnectionLdapResource() resource.Resource {
 				return nil, diags
 			}
 
-			credentialsConfig["provider"] = credentialsFromPlan.Provider.ValueString()
-			credentialsConfig["url"] = credentialsFromPlan.Url.ValueString()
-			credentialsConfig["dn"] = credentialsFromPlan.Dn.ValueString()
-			credentialsConfig["password"] = credentialsFromPlan.Password.ValueString()
+			provider := credentialsFromPlan.Provider
+			if credentialsFromPlan.Provider.IsUnknown() {
+				provider = credentialsFromState.Provider
+			}
+			if !provider.IsNull() {
+				credentialsConfig["provider"] = provider.ValueString()
+			}
+
+			url := credentialsFromPlan.Url
+			if credentialsFromPlan.Url.IsUnknown() {
+				url = credentialsFromState.Url
+			}
+
+			finalUrlString := ""
+			if !url.IsNull() {
+				finalUrlString = url.ValueString()
+				credentialsConfig["url"] = url.ValueString()
+			}
+
+			dn := credentialsFromPlan.Dn
+			if credentialsFromPlan.Dn.IsUnknown() {
+				dn = credentialsFromState.Dn
+			}
+			if !dn.IsNull() {
+				credentialsConfig["dn"] = dn.ValueString()
+			}
+
+			password := credentialsFromPlan.Password
+			if credentialsFromPlan.Password.IsUnknown() {
+				password = credentialsFromState.Password
+			}
+			if !password.IsNull() {
+				credentialsConfig["password"] = password.ValueString()
+			}
 
 			// Validate SSL settings based on URL scheme for updates
-			url := credentialsFromPlan.Url.ValueString()
-			isLdaps := strings.HasPrefix(strings.ToLower(url), "ldaps://")
+			isLdaps := strings.HasPrefix(strings.ToLower(finalUrlString), "ldaps://")
+
+			sslRejectUnauthorized := credentialsFromPlan.SslRejectUnauthorized
+			if credentialsFromPlan.SslRejectUnauthorized.IsUnknown() {
+				sslRejectUnauthorized = credentialsFromState.SslRejectUnauthorized
+			}
 
 			if !isLdaps {
 				// For ldap:// URLs, SSL is not used
-				if !credentialsFromPlan.SslRejectUnauthorized.IsNull() && credentialsFromPlan.SslRejectUnauthorized.ValueBool() {
+				if !sslRejectUnauthorized.IsNull() && sslRejectUnauthorized.ValueBool() {
 					diags.AddError(
 						"Invalid SSL configuration",
 						"ssl_reject_unauthorized cannot be true for ldap:// URLs since they don't use SSL. Use ldaps:// for secure connections or set ssl_reject_unauthorized to false.",
@@ -152,11 +186,17 @@ func NewAppConnectionLdapResource() resource.Resource {
 				// Always set to false for ldap:// URLs, regardless of state
 				credentialsConfig["sslRejectUnauthorized"] = false
 			} else {
-				credentialsConfig["sslRejectUnauthorized"] = credentialsFromPlan.SslRejectUnauthorized.ValueBool()
+				if !sslRejectUnauthorized.IsNull() {
+					credentialsConfig["sslRejectUnauthorized"] = sslRejectUnauthorized.ValueBool()
+				}
 			}
 
-			if !credentialsFromPlan.SslCertificate.IsNull() {
-				credentialsConfig["sslCertificate"] = credentialsFromPlan.SslCertificate.ValueString()
+			sslCertificate := credentialsFromPlan.SslCertificate
+			if credentialsFromPlan.SslCertificate.IsUnknown() {
+				sslCertificate = credentialsFromState.SslCertificate
+			}
+			if !sslCertificate.IsNull() {
+				credentialsConfig["sslCertificate"] = sslCertificate.ValueString()
 			}
 
 			return credentialsConfig, diags

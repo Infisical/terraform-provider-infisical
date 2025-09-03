@@ -32,8 +32,8 @@ func NewAppConnectionRenderResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionRenderCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -53,8 +53,8 @@ func NewAppConnectionRenderResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionRenderCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -76,8 +76,12 @@ func NewAppConnectionRenderResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.ApiKey.ValueString() != credentialsFromPlan.ApiKey.ValueString() {
-				credentialsConfig["apiKey"] = credentialsFromPlan.ApiKey.ValueString()
+			apiKey := credentialsFromPlan.ApiKey
+			if credentialsFromPlan.ApiKey.IsUnknown() {
+				apiKey = credentialsFromState.ApiKey
+			}
+			if !apiKey.IsNull() {
+				credentialsConfig["apiKey"] = apiKey.ValueString()
 			}
 
 			return credentialsConfig, diags

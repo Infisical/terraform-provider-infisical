@@ -44,8 +44,8 @@ func NewAppConnectionAzureResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionAzureCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -85,8 +85,8 @@ func NewAppConnectionAzureResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionAzureCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -101,7 +101,22 @@ func NewAppConnectionAzureResource() resource.Resource {
 			}
 
 			if plan.Method.ValueString() == AzureAppConnectionClientSecretsMethod {
-				if credentialsFromPlan.TenantId.IsNull() || credentialsFromPlan.TenantId.ValueString() == "" {
+				tenantId := credentialsFromPlan.TenantId
+				if credentialsFromPlan.TenantId.IsUnknown() {
+					tenantId = credentialsFromState.TenantId
+				}
+
+				clientId := credentialsFromPlan.ClientId
+				if credentialsFromPlan.ClientId.IsUnknown() {
+					clientId = credentialsFromState.ClientId
+				}
+
+				clientSecret := credentialsFromPlan.ClientSecret
+				if credentialsFromPlan.ClientSecret.IsUnknown() {
+					clientSecret = credentialsFromState.ClientSecret
+				}
+
+				if tenantId.IsNull() || tenantId.ValueString() == "" {
 					diags.AddError(
 						"Unable to update Azure app connection",
 						"Tenant ID field must be defined in client-secret method",
@@ -109,7 +124,7 @@ func NewAppConnectionAzureResource() resource.Resource {
 					return nil, diags
 				}
 
-				if credentialsFromPlan.ClientId.IsNull() || credentialsFromPlan.ClientId.ValueString() == "" {
+				if clientId.IsNull() || clientId.ValueString() == "" {
 					diags.AddError(
 						"Unable to update Azure app connection",
 						"Client ID field must be defined in client-secret method",
@@ -117,7 +132,7 @@ func NewAppConnectionAzureResource() resource.Resource {
 					return nil, diags
 				}
 
-				if credentialsFromPlan.ClientSecret.IsNull() || credentialsFromPlan.ClientSecret.ValueString() == "" {
+				if clientSecret.IsNull() || clientSecret.ValueString() == "" {
 					diags.AddError(
 						"Unable to update Azure app connection",
 						"Client secret field must be defined in client-secret method",
@@ -125,9 +140,9 @@ func NewAppConnectionAzureResource() resource.Resource {
 					return nil, diags
 				}
 
-				credentialsConfig["tenantId"] = credentialsFromPlan.TenantId.ValueString()
-				credentialsConfig["clientId"] = credentialsFromPlan.ClientId.ValueString()
-				credentialsConfig["clientSecret"] = credentialsFromPlan.ClientSecret.ValueString()
+				credentialsConfig["tenantId"] = tenantId.ValueString()
+				credentialsConfig["clientId"] = clientId.ValueString()
+				credentialsConfig["clientSecret"] = clientSecret.ValueString()
 			}
 
 			return credentialsConfig, diags

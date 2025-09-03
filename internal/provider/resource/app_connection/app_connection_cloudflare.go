@@ -37,8 +37,8 @@ func NewAppConnectionCloudflareResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionCloudflareCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -67,8 +67,8 @@ func NewAppConnectionCloudflareResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionCloudflareCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -82,31 +82,34 @@ func NewAppConnectionCloudflareResource() resource.Resource {
 				return nil, diags
 			}
 
+			accountId := credentialsFromPlan.AccountId
 			if credentialsFromPlan.AccountId.IsUnknown() {
-				credentialsConfig["accountId"] = credentialsFromState.AccountId.ValueString()
-			} else {
-				if credentialsFromPlan.AccountId.IsNull() || credentialsFromPlan.AccountId.ValueString() == "" {
-					diags.AddError(
-						"Unable to update Cloudflare app connection",
-						"Account ID field must be defined",
-					)
-					return nil, diags
-				}
-				credentialsConfig["accountId"] = credentialsFromPlan.AccountId.ValueString()
+				accountId = credentialsFromState.AccountId
 			}
 
+			apiToken := credentialsFromPlan.ApiToken
 			if credentialsFromPlan.ApiToken.IsUnknown() {
-				credentialsConfig["apiToken"] = credentialsFromState.ApiToken.ValueString()
-			} else {
-				if credentialsFromPlan.ApiToken.IsNull() || credentialsFromPlan.ApiToken.ValueString() == "" {
-					diags.AddError(
-						"Unable to update Cloudflare app connection",
-						"API token field must be defined",
-					)
-					return nil, diags
-				}
-				credentialsConfig["apiToken"] = credentialsFromPlan.ApiToken.ValueString()
+				apiToken = credentialsFromState.ApiToken
 			}
+
+			if accountId.IsNull() || accountId.ValueString() == "" {
+				diags.AddError(
+					"Unable to update Cloudflare app connection",
+					"Account ID field must be defined",
+				)
+				return nil, diags
+			}
+
+			if apiToken.IsNull() || apiToken.ValueString() == "" {
+				diags.AddError(
+					"Unable to update Cloudflare app connection",
+					"API token field must be defined",
+				)
+				return nil, diags
+			}
+
+			credentialsConfig["accountId"] = accountId.ValueString()
+			credentialsConfig["apiToken"] = apiToken.ValueString()
 
 			return credentialsConfig, diags
 		},
