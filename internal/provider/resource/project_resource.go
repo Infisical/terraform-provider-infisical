@@ -38,6 +38,7 @@ type projectResourceModel struct {
 	ID                      types.String `tfsdk:"id"`
 	KmsSecretManagerKeyId   types.String `tfsdk:"kms_secret_manager_key_id"`
 	Name                    types.String `tfsdk:"name"`
+	Type                    types.String `tfsdk:"type"`
 	Description             types.String `tfsdk:"description"`
 	LastUpdated             types.String `tfsdk:"last_updated"`
 	TemplateName            types.String `tfsdk:"template_name"`
@@ -66,6 +67,10 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Description: "The name of the project",
 				Required:    true,
+			},
+			"type": schema.StringAttribute{
+				Description: "The project type to create. Defaults to empty string which will create secrets project",
+				Optional:    true,
 			},
 			"description": schema.StringAttribute{
 				Description: "The description of the project",
@@ -161,6 +166,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		KmsSecretManagerKeyId:   plan.KmsSecretManagerKeyId.ValueString(),
 		ShouldCreateDefaultEnvs: shouldCreateDefaultEnvs,
 		HasDeleteProtection:     plan.HasDeleteProtection.ValueBool(),
+		Type:                    plan.Type.ValueString(),
 	})
 
 	if err != nil {
@@ -258,6 +264,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	state.ID = types.StringValue(project.ID)
 	state.Name = types.StringValue(project.Name)
+	state.Type = types.StringValue(project.Type)
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	state.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	state.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
