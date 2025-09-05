@@ -30,8 +30,8 @@ func NewAppConnectionGcpResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionGcpCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -51,8 +51,8 @@ func NewAppConnectionGcpResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionGcpCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -66,7 +66,12 @@ func NewAppConnectionGcpResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromPlan.ServiceAccountEmail.IsNull() || credentialsFromPlan.ServiceAccountEmail.ValueString() == "" {
+			serviceAccountEmail := credentialsFromPlan.ServiceAccountEmail
+			if credentialsFromPlan.ServiceAccountEmail.IsUnknown() {
+				serviceAccountEmail = credentialsFromState.ServiceAccountEmail
+			}
+
+			if serviceAccountEmail.IsNull() || serviceAccountEmail.ValueString() == "" {
 				diags.AddError(
 					"Unable to update GCP app connection",
 					"Service account email field must be defined",
@@ -74,8 +79,8 @@ func NewAppConnectionGcpResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.ServiceAccountEmail.ValueString() != credentialsFromPlan.ServiceAccountEmail.ValueString() {
-				credentialsConfig["serviceAccountEmail"] = credentialsFromPlan.ServiceAccountEmail.ValueString()
+			if !serviceAccountEmail.IsNull() {
+				credentialsConfig["serviceAccountEmail"] = serviceAccountEmail.ValueString()
 			}
 
 			return credentialsConfig, diags

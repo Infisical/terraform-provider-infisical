@@ -22,8 +22,8 @@ type AppConnectionBaseResource struct {
 	client                           *infisical.Client
 	AllowedMethods                   []string
 	CredentialsAttributes            map[string]schema.Attribute
-	ReadCredentialsForCreateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadCredentialsForCreateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
+	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	OverwriteCredentialsFields       func(state *AppConnectionBaseResourceModel) diag.Diagnostics
 }
 

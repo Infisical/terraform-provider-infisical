@@ -31,8 +31,8 @@ func NewAppConnectionFlyioResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionFlyioCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -52,8 +52,8 @@ func NewAppConnectionFlyioResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionFlyioCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -75,8 +75,12 @@ func NewAppConnectionFlyioResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.AccessToken.ValueString() != credentialsFromPlan.AccessToken.ValueString() {
-				credentialsConfig["accessToken"] = credentialsFromPlan.AccessToken.ValueString()
+			accessToken := credentialsFromPlan.AccessToken
+			if credentialsFromPlan.AccessToken.IsUnknown() {
+				accessToken = credentialsFromState.AccessToken
+			}
+			if !accessToken.IsNull() {
+				credentialsConfig["accessToken"] = accessToken.ValueString()
 			}
 
 			return credentialsConfig, diags

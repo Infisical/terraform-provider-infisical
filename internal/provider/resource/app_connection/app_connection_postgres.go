@@ -126,30 +126,68 @@ func NewAppConnectionPostgresResource() resource.Resource {
 				return nil, diags
 			}
 
-			if credentialsFromState.Host.ValueString() != credentialsFromPlan.Host.ValueString() {
-				credentialsConfig["host"] = credentialsFromPlan.Host.ValueString()
+			host := credentialsFromPlan.Host
+			if credentialsFromPlan.Host.IsUnknown() {
+				host = credentialsFromState.Host
 			}
-			if credentialsFromState.Port.ValueInt32() != credentialsFromPlan.Port.ValueInt32() {
-				credentialsConfig["port"] = credentialsFromPlan.Port.ValueInt32()
+			if !host.IsNull() {
+				credentialsConfig["host"] = host.ValueString()
 			}
-			if credentialsFromState.Database.ValueString() != credentialsFromPlan.Database.ValueString() {
-				credentialsConfig["database"] = credentialsFromPlan.Database.ValueString()
+
+			port := credentialsFromPlan.Port
+			if credentialsFromPlan.Port.IsUnknown() {
+				port = credentialsFromState.Port
 			}
-			if credentialsFromState.Username.ValueString() != credentialsFromPlan.Username.ValueString() {
-				credentialsConfig["username"] = credentialsFromPlan.Username.ValueString()
+			if !port.IsNull() {
+				credentialsConfig["port"] = port.ValueInt32()
 			}
-			if credentialsFromState.Password.ValueString() != credentialsFromPlan.Password.ValueString() {
-				credentialsConfig["password"] = credentialsFromPlan.Password.ValueString()
+
+			database := credentialsFromPlan.Database
+			if credentialsFromPlan.Database.IsUnknown() {
+				database = credentialsFromState.Database
 			}
-			// Corrected: Ensure consistent camelCase keys for SSL fields for the backend API
-			if credentialsFromState.SslEnabled.ValueBool() != credentialsFromPlan.SslEnabled.ValueBool() {
-				credentialsConfig["sslEnabled"] = credentialsFromPlan.SslEnabled.ValueBool()
+			if !database.IsNull() {
+				credentialsConfig["database"] = database.ValueString()
 			}
-			if credentialsFromState.SslRejectUnauthorized.ValueBool() != credentialsFromPlan.SslRejectUnauthorized.ValueBool() {
-				credentialsConfig["sslRejectUnauthorized"] = credentialsFromPlan.SslRejectUnauthorized.ValueBool()
+
+			username := credentialsFromPlan.Username
+			if credentialsFromPlan.Username.IsUnknown() {
+				username = credentialsFromState.Username
 			}
-			if credentialsFromState.SslCertificate.ValueString() != credentialsFromPlan.SslCertificate.ValueString() {
-				credentialsConfig["sslCertificate"] = credentialsFromPlan.SslCertificate.ValueString()
+			if !username.IsNull() {
+				credentialsConfig["username"] = username.ValueString()
+			}
+
+			password := credentialsFromPlan.Password
+			if credentialsFromPlan.Password.IsUnknown() {
+				password = credentialsFromState.Password
+			}
+			if !password.IsNull() {
+				credentialsConfig["password"] = password.ValueString()
+			}
+
+			sslEnabled := credentialsFromPlan.SslEnabled
+			if credentialsFromPlan.SslEnabled.IsUnknown() {
+				sslEnabled = credentialsFromState.SslEnabled
+			}
+			if !sslEnabled.IsNull() {
+				credentialsConfig["sslEnabled"] = sslEnabled.ValueBool()
+			}
+
+			sslRejectUnauthorized := credentialsFromPlan.SslRejectUnauthorized
+			if credentialsFromPlan.SslRejectUnauthorized.IsUnknown() {
+				sslRejectUnauthorized = credentialsFromState.SslRejectUnauthorized
+			}
+			if !sslRejectUnauthorized.IsNull() {
+				credentialsConfig["sslRejectUnauthorized"] = sslRejectUnauthorized.ValueBool()
+			}
+
+			sslCertificate := credentialsFromPlan.SslCertificate
+			if credentialsFromPlan.SslCertificate.IsUnknown() {
+				sslCertificate = credentialsFromState.SslCertificate
+			}
+			if !sslCertificate.IsNull() {
+				credentialsConfig["sslCertificate"] = sslCertificate.ValueString()
 			}
 
 			return credentialsConfig, diags
