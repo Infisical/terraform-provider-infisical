@@ -80,7 +80,7 @@ func (r *DynamicSecretBaseResource) Schema(_ context.Context, _ resource.SchemaR
 				Required:    true,
 			},
 			"max_ttl": schema.StringAttribute{
-				Description: "The maximum limit a TTL can be leases or renewed.",
+				Description: "The maximum limit a TTL can be leased or renewed.",
 				Optional:    true,
 			},
 			"configuration": schema.SingleNestedAttribute{
