@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"strconv"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -37,7 +38,7 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			},
 			"group_id": schema.StringAttribute{
 				Required:    true,
-				Description: "Unique 24-hexadecimal digit string that identifies your project. This is same as project id",
+				Description: "Unique 24-hexadecimal digit string that identifies your project. This is the same as the project ID.",
 			},
 			"roles": schema.ListNestedAttribute{
 				Required: true,
@@ -189,7 +190,7 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				if !ok {
 					diags.AddError(
 						"Invalid role element type",
-						"Expected role at index "+string(rune(i))+" to be an object but got something else.",
+						"Expected role at index "+strconv.Itoa(i)+" to be an object but got something else.",
 					)
 					continue
 				}
@@ -257,7 +258,7 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				if !ok {
 					diags.AddError(
 						"Invalid scope element type",
-						"Expected scope at index "+string(rune(i))+" to be an object but got something else.",
+						"Expected scope at index "+strconv.Itoa(i)+" to be an object but got something else.",
 					)
 					continue
 				}

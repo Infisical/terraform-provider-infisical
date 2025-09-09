@@ -80,7 +80,7 @@ resource "infisical_dynamic_secret_mongo_atlas" "mongo-atlas" {
 
 ### Optional
 
-- `max_ttl` (String) The maximum limit a TTL can be leases or renewed.
+- `max_ttl` (String) The maximum limit a TTL can be leased or renewed for.
 - `metadata` (Attributes Set) The metadata associated with this dynamic secret (see [below for nested schema](#nestedatt--metadata))
 - `username_template` (String) The username template of the dynamic secret
 
@@ -95,7 +95,7 @@ Required:
 
 - `admin_private_key` (String, Sensitive) Admin user private API key
 - `admin_public_key` (String) Admin user public API key
-- `group_id` (String) Unique 24-hexadecimal digit string that identifies your project. This is same as project id
+- `group_id` (String) Unique 24-hexadecimal digit string that identifies your project. This is the same as the project ID.
 - `roles` (Attributes List) (see [below for nested schema](#nestedatt--configuration--roles))
 
 Optional:
