@@ -12,6 +12,7 @@ const (
 	DynamicSecretProviderSQLDatabase DynamicSecretProvider = "sql-database"
 	DynamicSecretProviderAWSIAM      DynamicSecretProvider = "aws-iam"
 	DynamicSecretProviderKubernetes  DynamicSecretProvider = "kubernetes"
+	DynamicSecretProviderMongoDb     DynamicSecretProvider = "mongo-db"
 )
 
 const (
