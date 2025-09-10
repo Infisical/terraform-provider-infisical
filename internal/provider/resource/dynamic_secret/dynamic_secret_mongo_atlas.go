@@ -61,6 +61,7 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			},
 			"scopes": schema.ListNestedAttribute{
 				Optional: true,
+				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{

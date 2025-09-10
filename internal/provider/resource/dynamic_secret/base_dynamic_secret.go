@@ -191,6 +191,12 @@ func (r *DynamicSecretBaseResource) Create(ctx context.Context, req resource.Cre
 
 	plan.ID = types.StringValue(dynamicSecret.Id)
 
+	plan.Configuration, diags = r.ReadConfigurationFromApi(ctx, dynamicSecret, plan.Configuration)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -321,7 +327,7 @@ func (r *DynamicSecretBaseResource) Update(ctx context.Context, req resource.Upd
 		newName = plan.Name.ValueString()
 	}
 
-	_, err := r.client.UpdateDynamicSecret(infisical.UpdateDynamicSecretRequest{
+	dynamicSecret, err := r.client.UpdateDynamicSecret(infisical.UpdateDynamicSecretRequest{
 		Name:            state.Name.ValueString(),
 		ProjectSlug:     state.ProjectSlug.ValueString(),
 		EnvironmentSlug: state.EnvironmentSlug.ValueString(),
@@ -341,6 +347,12 @@ func (r *DynamicSecretBaseResource) Update(ctx context.Context, req resource.Upd
 			"Error updating dynamic secret",
 			"Couldn't update dynamic secret, unexpected error: "+err.Error(),
 		)
+		return
+	}
+
+	plan.Configuration, diags = r.ReadConfigurationFromApi(ctx, dynamicSecret, plan.Configuration)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
