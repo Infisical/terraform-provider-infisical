@@ -42,9 +42,9 @@ resource "infisical_dynamic_secret_mongo_db" "mongo-db" {
 
   configuration = {
     host     = "host.docker.internal"
-    port     = "27017"
+    port     = 27017
     username = "infisical"
-    password = "infisical"
+    password = "your-password"
     database = "default"
     roles    = ["readWrite"]
   }

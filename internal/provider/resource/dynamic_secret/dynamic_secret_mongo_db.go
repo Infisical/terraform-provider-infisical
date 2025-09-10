@@ -60,8 +60,8 @@ func NewDynamicSecretMongoDbResource() resource.Resource {
 			},
 		},
 
-		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			configurationMap := make(map[string]interface{})
+		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			configurationMap := make(map[string]any)
 			var configuration DynamicSecretMongoDbConfigurationModel
 
 			diags := plan.Configuration.As(ctx, &configuration, basetypes.ObjectAsOptions{})
@@ -98,15 +98,18 @@ func NewDynamicSecretMongoDbResource() resource.Resource {
 				return types.ObjectNull(map[string]attr.Type{}), diags
 			}
 
-			portFloat, ok := dynamicSecret.Inputs["port"].(float64)
-			if !ok {
-				diags.AddError(
-					"Invalid port type",
-					"Expected 'port' to be a float64 but got something else",
-				)
-				return types.ObjectNull(map[string]attr.Type{}), diags
+			portValue := types.Int64Null()
+			if portInput, ok := dynamicSecret.Inputs["port"]; ok && portInput != nil {
+				if portFloat, ok := portInput.(float64); ok {
+					portValue = types.Int64Value(int64(portFloat))
+				} else {
+					diags.AddError(
+						"Invalid port type",
+						"Expected 'port' to be a number but got something else",
+					)
+					return types.ObjectNull(map[string]attr.Type{}), diags
+				}
 			}
-			portVal := int64(portFloat)
 
 			usernameVal, ok := dynamicSecret.Inputs["username"].(string)
 			if !ok {
@@ -145,7 +148,7 @@ func NewDynamicSecretMongoDbResource() resource.Resource {
 				caValue = types.StringValue(caVal)
 			}
 
-			rolesVal, ok := dynamicSecret.Inputs["roles"].([]interface{})
+			rolesVal, ok := dynamicSecret.Inputs["roles"].([]any)
 			if !ok {
 				diags.AddError(
 					"Invalid roles type",
@@ -175,7 +178,7 @@ func NewDynamicSecretMongoDbResource() resource.Resource {
 
 			configuration := map[string]attr.Value{
 				"host":     types.StringValue(hostVal),
-				"port":     types.Int64Value(portVal),
+				"port":     portValue,
 				"username": types.StringValue(usernameVal),
 				"password": types.StringValue(passwordVal),
 				"database": types.StringValue(databaseVal),
