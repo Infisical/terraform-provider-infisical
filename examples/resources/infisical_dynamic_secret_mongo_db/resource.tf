@@ -26,9 +26,9 @@ resource "infisical_dynamic_secret_mongo_db" "mongo-db" {
   max_ttl          = "24h"
 
   configuration = {
-    host     = "host.docker.internal"
+    host     = "your-host"
     port     = 27017
-    username = "infisical"
+    username = "your-username"
     password = "your-password"
     database = "default"
     roles    = ["readWrite"]
