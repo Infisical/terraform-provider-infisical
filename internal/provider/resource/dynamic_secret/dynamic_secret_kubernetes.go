@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"strconv"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -387,7 +388,7 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 					if !ok {
 						diags.AddError(
 							"Invalid audience element type",
-							"Expected audience at index "+string(rune(i))+" to be a string but got something else.",
+							"Expected audience at index "+strconv.Itoa(i)+" to be a string but got something else.",
 						)
 						return types.ObjectNull(map[string]attr.Type{}), diags
 					}
