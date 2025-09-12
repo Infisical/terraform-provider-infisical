@@ -396,6 +396,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,
 		dynamicSecretResource.NewDynamicSecretMongoAtlasResource,
+		dynamicSecretResource.NewDynamicSecretMongoDbResource,
 		secretRotationResource.NewSecretRotationMySqlCredentialsResource,
 		secretRotationResource.NewSecretRotationMsSqlCredentialsResource,
 		secretRotationResource.NewSecretRotationPostgresCredentialsResource,
