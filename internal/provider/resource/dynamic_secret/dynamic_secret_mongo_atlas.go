@@ -13,6 +13,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
+type DynamicSecretMongoAtlasRolePlanModel struct {
+	CollectionName types.String `tfsdk:"collection_name"`
+	DatabaseName   types.String `tfsdk:"database_name"`
+	RoleName       types.String `tfsdk:"role_name"`
+}
+
+type DynamicSecretMongoAtlasScopePlanModel struct {
+	Name types.String `tfsdk:"name"`
+	Type types.String `tfsdk:"type"`
+}
+
 type DynamicSecretMongoAtlasConfigurationModel struct {
 	AdminPublicKey  types.String `tfsdk:"admin_public_key"`
 	AdminPrivateKey types.String `tfsdk:"admin_private_key"`
@@ -91,45 +102,42 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			configurationMap["groupId"] = configuration.GroupId.ValueString()
 
 			if !configuration.Roles.IsNull() && !configuration.Roles.IsUnknown() {
-				var roles []any
-				elements := configuration.Roles.Elements()
-				for _, elem := range elements {
-					if objVal, ok := elem.(types.Object); ok {
-						attrs := objVal.Attributes()
-						roleMap := map[string]any{}
-						if collectionName, ok := attrs["collection_name"].(types.String); ok && !collectionName.IsNull() {
-							roleMap["collectionName"] = collectionName.ValueString()
-						}
-						if dbName, ok := attrs["database_name"].(types.String); ok {
-							roleMap["databaseName"] = dbName.ValueString()
-						}
-						if roleName, ok := attrs["role_name"].(types.String); ok {
-							roleMap["roleName"] = roleName.ValueString()
-						}
-						roles = append(roles, roleMap)
-					}
+				var tfRoles []DynamicSecretMongoAtlasRolePlanModel
+				diags.Append(configuration.Roles.ElementsAs(ctx, &tfRoles, false)...)
+				if diags.HasError() {
+					return nil, diags
 				}
-				configurationMap["roles"] = roles
+
+				apiRoles := make([]any, 0, len(tfRoles))
+				for _, tfRole := range tfRoles {
+					roleMap := make(map[string]any)
+					if !tfRole.CollectionName.IsNull() && !tfRole.CollectionName.IsUnknown() {
+						roleMap["collectionName"] = tfRole.CollectionName.ValueString()
+					}
+					roleMap["databaseName"] = tfRole.DatabaseName.ValueString()
+					roleMap["roleName"] = tfRole.RoleName.ValueString()
+					apiRoles = append(apiRoles, roleMap)
+				}
+				configurationMap["roles"] = apiRoles
 			}
 
-			scopes := []any{}
+			apiScopes := make([]any, 0)
 			if !configuration.Scopes.IsNull() && !configuration.Scopes.IsUnknown() {
-				elements := configuration.Scopes.Elements()
-				for _, elem := range elements {
-					if objVal, ok := elem.(types.Object); ok {
-						attrs := objVal.Attributes()
-						scopeMap := map[string]any{}
-						if name, ok := attrs["name"].(types.String); ok {
-							scopeMap["name"] = name.ValueString()
-						}
-						if typeVal, ok := attrs["type"].(types.String); ok {
-							scopeMap["type"] = typeVal.ValueString()
-						}
-						scopes = append(scopes, scopeMap)
-					}
+				var tfScopes []DynamicSecretMongoAtlasScopePlanModel
+				diags.Append(configuration.Scopes.ElementsAs(ctx, &tfScopes, false)...)
+				if diags.HasError() {
+					return nil, diags
+				}
+
+				apiScopes = make([]any, 0, len(tfScopes))
+				for _, tfScope := range tfScopes {
+					apiScopes = append(apiScopes, map[string]any{
+						"name": tfScope.Name.ValueString(),
+						"type": tfScope.Type.ValueString(),
+					})
 				}
 			}
-			configurationMap["scopes"] = scopes
+			configurationMap["scopes"] = apiScopes
 
 			return configurationMap, diags
 		},
@@ -249,8 +257,15 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			configuration["roles"] = rolesListValue
 
 			var scopesRaw []any
-			if scopes, ok := dynamicSecret.Inputs["scopes"].([]any); ok {
-				scopesRaw = scopes
+			if scopes, ok := dynamicSecret.Inputs["scopes"]; ok {
+				scopesRaw, ok = scopes.([]any)
+				if !ok {
+					diags.AddError(
+						"Invalid scopes type",
+						"Expected 'scopes' to be a list but got something else.",
+					)
+					return types.ObjectNull(configState.AttributeTypes(ctx)), diags
+				}
 			}
 
 			var scopesList []attr.Value
