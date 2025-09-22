@@ -214,6 +214,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			"Error creating secret",
 			"Could not get secret value, unexpected error: "+err.Error(),
 		)
+		return
 	}
 
 	planSecretTagIds := make([]types.String, 0, len(plan.Tags.Elements()))
@@ -580,6 +581,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			"Error updating secret",
 			"Could not get secret value, unexpected error: "+err.Error(),
 		)
+		return
 	}
 
 	var state secretResourceModel
