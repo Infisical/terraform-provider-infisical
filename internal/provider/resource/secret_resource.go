@@ -127,7 +127,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Sensitive: true,
 			},
 			"value_wo": schema.StringAttribute{
-				Description: "The value of the secret in plain text as a write-only secret. If set, the secret value will not be stored in state. This is required if `value` is not set.",
+				Description: "The value of the secret in plain text as a write-only secret. If set, the secret value will not be stored in state. This is required if `value` is not set. Requires Terraform version 1.11.0 or higher.",
 				Optional:    true,
 				Computed:    false,
 				WriteOnly:   true,
