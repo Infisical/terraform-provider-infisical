@@ -12,6 +12,7 @@ import (
 
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -63,11 +64,12 @@ type SecretData struct {
 }
 
 func (m *secretResourceModel) getSecretValue(ctx context.Context, config tfsdk.Config, diags *diag.Diagnostics) (SecretData, error) {
-	// check normal value first
-	if m.Value.ValueString() != "" {
+	// Check if regular value was configured (even if empty)
+
+	if !m.Value.IsNull() && !m.Value.IsUnknown() {
 		return SecretData{
 			IsWriteOnly: false,
-			Value:       m.Value.ValueString(),
+			Value:       m.Value.ValueString(), // Could be empty string ""
 		}, nil
 	}
 
@@ -117,9 +119,12 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 			"value": schema.StringAttribute{
 				Description: "The value of the secret in plain text. This is required if `value_wo` is not set.",
-				Optional:    true,
-				Computed:    false,
-				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("value_wo")),
+				},
+				Optional:  true,
+				Computed:  false,
+				Sensitive: true,
 			},
 			"value_wo": schema.StringAttribute{
 				Description: "The value of the secret in plain text as a write-only secret. If set, the secret value will not be stored in state. This is required if `value` is not set.",
