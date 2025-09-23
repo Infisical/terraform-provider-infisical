@@ -8,6 +8,7 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"terraform-provider-infisical/internal/crypto"
+	pkg "terraform-provider-infisical/internal/pkg/strings"
 	"time"
 
 	"github.com/hashicorp/go-uuid"
@@ -52,6 +53,7 @@ type secretResourceModel struct {
 	SecretReminder *SecretReminder `tfsdk:"secret_reminder"`
 	Value          types.String    `tfsdk:"value"`
 	ValueWO        types.String    `tfsdk:"value_wo"`
+	ValueWOVersion types.Int64     `tfsdk:"value_wo_version"`
 	WorkspaceId    types.String    `tfsdk:"workspace_id"`
 	LastUpdated    types.String    `tfsdk:"last_updated"`
 	Tags           types.List      `tfsdk:"tag_ids"`
@@ -59,17 +61,18 @@ type secretResourceModel struct {
 }
 
 type SecretData struct {
-	IsWriteOnly bool
-	Value       string
+	IsWriteOnly       bool
+	ShouldUpdateValue bool
+	Value             string
 }
 
-func (m *secretResourceModel) getSecretValue(ctx context.Context, config tfsdk.Config, diags *diag.Diagnostics) (SecretData, error) {
-	// Check if regular value was configured (even if empty)
-
+func (m *secretResourceModel) getSecretValue(ctx context.Context, config tfsdk.Config, state *tfsdk.State, diags *diag.Diagnostics) (SecretData, error) {
+	// check if normal value was configured
 	if !m.Value.IsNull() && !m.Value.IsUnknown() {
 		return SecretData{
-			IsWriteOnly: false,
-			Value:       m.Value.ValueString(), // Could be empty string ""
+			IsWriteOnly:       false,
+			ShouldUpdateValue: true,
+			Value:             m.Value.ValueString(),
 		}, nil
 	}
 
@@ -81,9 +84,35 @@ func (m *secretResourceModel) getSecretValue(ctx context.Context, config tfsdk.C
 	}
 
 	if !secretValue.IsNull() && !secretValue.IsUnknown() {
+		shouldUpdateValue := true
+
+		// if state exists we know its an update operation, so we need to compare versions
+		if state != nil && !state.Raw.IsNull() {
+			var newVersion types.Int64
+			diags.Append(config.GetAttribute(ctx, path.Root("value_wo_version"), &newVersion)...)
+
+			var stateModel secretResourceModel
+			diags.Append(state.Get(ctx, &stateModel)...)
+
+			if !diags.HasError() {
+				oldVersion := int64(0)
+				if !stateModel.ValueWOVersion.IsNull() {
+					oldVersion = stateModel.ValueWOVersion.ValueInt64()
+				}
+
+				if oldVersion > newVersion.ValueInt64() {
+					return SecretData{}, errors.New("new value write-only version is less than old version")
+				}
+
+				shouldUpdateValue = newVersion.ValueInt64() != oldVersion
+
+			}
+		}
+
 		return SecretData{
-			IsWriteOnly: true,
-			Value:       secretValue.ValueString(),
+			IsWriteOnly:       true,
+			Value:             secretValue.ValueString(),
+			ShouldUpdateValue: shouldUpdateValue,
 		}, nil
 	}
 
@@ -121,6 +150,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Description: "The value of the secret in plain text. This is required if `value_wo` is not set.",
 				Validators: []validator.String{
 					stringvalidator.ConflictsWith(path.MatchRoot("value_wo")),
+					stringvalidator.ConflictsWith(path.MatchRoot("value_wo_version")),
 				},
 				Optional:  true,
 				Computed:  false,
@@ -131,6 +161,22 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:    true,
 				Computed:    false,
 				WriteOnly:   true,
+
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRoot("value_wo_version"),
+					}...),
+				},
+			},
+			"value_wo_version": schema.Int64Attribute{
+				Description: "The version of the write-only secret. When you increment this version number, the value_wo attribute will be used to update the Infisical secret.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AlsoRequires(path.Expressions{
+						path.MatchRoot("value_wo"),
+					}...),
+				},
 			},
 			"workspace_id": schema.StringAttribute{
 				Description:   "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
@@ -207,7 +253,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	secretData, err := plan.getSecretValue(ctx, req.Config, &resp.Diagnostics)
+	secretData, err := plan.getSecretValue(ctx, req.Config, nil, &resp.Diagnostics)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -575,7 +621,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	secretData, err := plan.getSecretValue(ctx, req.Config, &resp.Diagnostics)
+	secretData, err := plan.getSecretValue(ctx, req.Config, &req.State, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating secret",
@@ -669,17 +715,22 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			return
 		}
 
-		err = r.client.UpdateSecretsV3(infisical.UpdateSecretByNameV3Request{
-			Environment:           plan.EnvSlug.ValueString(),
-			SecretName:            plan.Name.ValueString(),
-			Type:                  "shared",
-			SecretPath:            plan.FolderPath.ValueString(),
-			WorkspaceID:           serviceTokenDetails.Workspace,
-			TagIDs:                secretTagIds,
-			SecretValueCiphertext: base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText),
-			SecretValueIV:         base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce),
-			SecretValueTag:        base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag),
-		})
+		updateRequest := infisical.UpdateSecretByNameV3Request{
+			Environment: plan.EnvSlug.ValueString(),
+			SecretName:  plan.Name.ValueString(),
+			Type:        "shared",
+			SecretPath:  plan.FolderPath.ValueString(),
+			WorkspaceID: serviceTokenDetails.Workspace,
+			TagIDs:      secretTagIds,
+		}
+
+		if secretData.ShouldUpdateValue {
+			updateRequest.SecretValueCiphertext = pkg.StringToPtr(base64.StdEncoding.EncodeToString(encryptedSecretValue.CipherText))
+			updateRequest.SecretValueIV = pkg.StringToPtr(base64.StdEncoding.EncodeToString(encryptedSecretValue.Nonce))
+			updateRequest.SecretValueTag = pkg.StringToPtr(base64.StdEncoding.EncodeToString(encryptedSecretValue.AuthTag))
+		}
+
+		err = r.client.UpdateSecretsV3(updateRequest)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -693,17 +744,23 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plan.WorkspaceId = types.StringValue(serviceTokenDetails.Workspace)
 
 	} else if r.client.Config.IsMachineIdentityAuth {
-		err := r.client.UpdateRawSecretV3(infisical.UpdateRawSecretByNameV3Request{
+
+		updateRequest := infisical.UpdateRawSecretByNameV3Request{
 			Environment:              plan.EnvSlug.ValueString(),
 			WorkspaceID:              plan.WorkspaceId.ValueString(),
 			Type:                     "shared",
 			TagIDs:                   secretTagIds,
 			SecretPath:               plan.FolderPath.ValueString(),
 			SecretName:               plan.Name.ValueString(),
-			SecretValue:              secretData.Value,
 			SecretReminderNote:       secretReminderNote,
 			SecretReminderRepeatDays: secretReminderRepeatDays,
-		})
+		}
+
+		if secretData.ShouldUpdateValue {
+			updateRequest.SecretValue = pkg.StringToPtr(secretData.Value)
+		}
+
+		err := r.client.UpdateRawSecretV3(updateRequest)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
