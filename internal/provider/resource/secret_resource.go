@@ -169,7 +169,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				},
 			},
 			"value_wo_version": schema.Int64Attribute{
-				Description: "The version of the write-only secret. When you increment this version number, the value_wo attribute will be used to update the Infisical secret.",
+				Description: "Used together with value_wo to trigger an update. Increment this value when an update to the value_wo is required.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),

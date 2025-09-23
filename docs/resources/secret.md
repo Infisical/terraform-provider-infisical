@@ -94,7 +94,7 @@ ephemeral "infisical_secret" "ephemeral-secret" {
 - `tag_ids` (List of String) Tag ids to be attached for the secrets.
 - `value` (String, Sensitive) The value of the secret in plain text. This is required if `value_wo` is not set.
 - `value_wo` (String) The value of the secret in plain text as a write-only secret. If set, the secret value will not be stored in state. This is required if `value` is not set. Requires Terraform version 1.11.0 or higher.
-- `value_wo_version` (Number) The version of the write-only secret. When you increment this version number, the value_wo attribute will be used to update the Infisical secret.
+- `value_wo_version` (Number) Used together with value_wo to trigger an update. Increment this value when an update to the value_wo is required.
 - `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only
