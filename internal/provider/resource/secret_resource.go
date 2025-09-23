@@ -772,7 +772,6 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 		// No need to set workspace ID as it is already set in the plan
 		//plan.WorkspaceId = plan.WorkspaceId
-		plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	} else {
 		resp.Diagnostics.AddError(
@@ -782,6 +781,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
