@@ -27,3 +27,7 @@ func NormalizeJSON(input string) (string, error) {
 
 	return string(normalized), nil
 }
+
+func StringToPtr(s string) *string {
+	return &s
+}

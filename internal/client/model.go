@@ -491,9 +491,9 @@ type UpdateSecretByNameV3Request struct {
 	Environment           string   `json:"environment"`
 	Type                  string   `json:"type"`
 	SecretPath            string   `json:"secretPath"`
-	SecretValueCiphertext string   `json:"secretValueCiphertext"`
-	SecretValueIV         string   `json:"secretValueIV"`
-	SecretValueTag        string   `json:"secretValueTag"`
+	SecretValueCiphertext *string  `json:"secretValueCiphertext,omitempty"`
+	SecretValueIV         *string  `json:"secretValueIV,omitempty"`
+	SecretValueTag        *string  `json:"secretValueTag,omitempty"`
 	TagIDs                []string `json:"tags,omitempty"`
 }
 
@@ -604,7 +604,7 @@ type UpdateRawSecretByNameV3Request struct {
 	SecretPath               string   `json:"secretPath"`
 	SecretReminderNote       string   `json:"secretReminderNote"`
 	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
-	SecretValue              string   `json:"secretValue"`
+	SecretValue              *string  `json:"secretValue,omitempty"`
 	TagIDs                   []string `json:"tagIds"`
 }
 
