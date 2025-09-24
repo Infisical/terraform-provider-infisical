@@ -29,6 +29,7 @@ type ProjectDataSourceModel struct {
 	ID                 types.String                         `tfsdk:"id"`
 	Name               types.String                         `tfsdk:"name"`
 	Slug               types.String                         `tfsdk:"slug"`
+	Type               types.String                         `tfsdk:"type"`
 	AutoCapitalization types.Bool                           `tfsdk:"auto_capitalization"`
 	OrgID              types.String                         `tfsdk:"org_id"`
 	CreatedAt          types.String                         `tfsdk:"created_at"`
@@ -65,6 +66,11 @@ func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 
 			"name": schema.StringAttribute{
 				Description: "The name of the project",
+				Computed:    true,
+			},
+
+			"type": schema.StringAttribute{
+				Description: "The type of the project ('secret-manager' or 'kms')",
 				Computed:    true,
 			},
 
@@ -175,6 +181,7 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		ID:                 types.StringValue(project.ID),
 		Name:               types.StringValue(project.Name),
 		Slug:               types.StringValue(project.Slug),
+		Type:               types.StringValue(project.Type),
 		AutoCapitalization: types.BoolValue(project.AutoCapitalization),
 		OrgID:              types.StringValue(project.OrgID),
 		CreatedAt:          types.StringValue(project.CreatedAt.Format(time.RFC3339Nano)),

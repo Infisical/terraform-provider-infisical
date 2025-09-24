@@ -327,6 +327,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewSecretFolderDataSource,
 		infisicalDatasource.NewGroupsDataSource,
 		infisicalDatasource.NewIdentityDetailsDataSource,
+		infisicalDatasource.NewKMSKeyDataSource,
 	}
 }
 
@@ -405,6 +406,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationAwsIamUserSecretResource,
 		secretRotationResource.NewSecretRotationLdapPasswordResource,
 		infisicalResource.NewProjectTemplateResource,
+		infisicalResource.NewKMSKeyResource,
 	}
 }
 
