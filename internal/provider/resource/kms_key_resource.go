@@ -211,9 +211,10 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		plan.IsDisabled = types.BoolValue(kmsKey.Key.IsDisabled)
 	} else {
 		if plan.IsDisabled.ValueBool() != kmsKey.Key.IsDisabled {
+			isDisabled := plan.IsDisabled.ValueBool()
 			updateRequest := infisical.UpdateKMSKeyRequest{
 				KeyId:      kmsKey.Key.ID,
-				IsDisabled: &[]bool{plan.IsDisabled.ValueBool()}[0],
+				IsDisabled: &isDisabled,
 			}
 
 			updatedKey, err := r.client.UpdateKMSKey(updateRequest)
