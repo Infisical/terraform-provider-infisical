@@ -19,13 +19,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// Ensure the implementation satisfies the expected interfaces.
-var (
-	_                   resource.Resource = &projectRoleResource{}
-	PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-templates", "kms", "pki-alerts", "pki-collections"}
-)
-
 // NewProjectResource is a helper function to simplify the provider implementation.
 func NewProjectRoleResource() resource.Resource {
 	return &projectRoleResource{}
@@ -50,7 +43,7 @@ type ProjectRolePermissionV2JSON struct {
 	Conditions map[string]interface{} `json:"conditions,omitempty"`
 }
 
-// projectRoleResourceSourceModel describes the data source data model.
+// projectRoleResourceModel describes the resource model.
 type projectRoleResourceModel struct {
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
@@ -68,7 +61,7 @@ func (r *projectRoleResource) Metadata(_ context.Context, req resource.MetadataR
 // Schema defines the schema for the resource.
 func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this data source.",
+		Description: "Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
 				Description: "The slug for the new role",
@@ -242,7 +235,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project role",
-			"Couldn't save project role to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save project role to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -296,7 +289,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading project role",
-			"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -485,7 +478,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating project role",
-			"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update project role from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -523,7 +516,7 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project role",
-			"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project role from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
