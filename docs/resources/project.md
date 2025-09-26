@@ -36,17 +36,21 @@ resource "infisical_project" "gcp-project" {
   name        = "GCP Project"
   slug        = "gcp-project"
   description = "This is a GCP project"
+  type        = "secret-manager" # Default project type
 }
 
 resource "infisical_project" "aws-project" {
   name        = "AWS Project"
   slug        = "aws-project"
   description = "This is an AWS project"
+  type        = "secret-manager"
 }
 
-resource "infisical_project" "azure-project" {
-  name = "Azure Project"
-  slug = "azure-project"
+resource "infisical_project" "kms-project" {
+  name        = "KMS Project"
+  slug        = "kms-project"
+  description = "This is a KMS project for key management"
+  type        = "kms"
 }
 ```
 
@@ -66,6 +70,7 @@ resource "infisical_project" "azure-project" {
 - `kms_secret_manager_key_id` (String) The ID of the KMS secret manager key to use for the project
 - `should_create_default_envs` (Boolean) Whether to create default environments for the project (dev, staging, prod), defaults to true
 - `template_name` (String) The name of the template to use for the project
+- `type` (String) The type of the project. Supported values: 'secret-manager' (default), 'kms'. Defaults to 'secret-manager'.
 
 ### Read-Only
 

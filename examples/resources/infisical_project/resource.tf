@@ -21,15 +21,19 @@ resource "infisical_project" "gcp-project" {
   name        = "GCP Project"
   slug        = "gcp-project"
   description = "This is a GCP project"
+  type        = "secret-manager" # Default project type
 }
 
 resource "infisical_project" "aws-project" {
   name        = "AWS Project"
   slug        = "aws-project"
   description = "This is an AWS project"
+  type        = "secret-manager"
 }
 
-resource "infisical_project" "azure-project" {
-  name = "Azure Project"
-  slug = "azure-project"
+resource "infisical_project" "kms-project" {
+  name        = "KMS Project"
+  slug        = "kms-project"
+  description = "This is a KMS project for key management"
+  type        = "kms"
 }

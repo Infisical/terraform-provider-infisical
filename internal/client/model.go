@@ -44,6 +44,7 @@ type Project struct {
 	Name               string    `json:"name"`
 	Description        string    `json:"description"`
 	Slug               string    `json:"slug"`
+	Type               string    `json:"type"`
 	AutoCapitalization bool      `json:"autoCapitalization"`
 	OrgID              string    `json:"orgId"`
 	CreatedAt          time.Time `json:"createdAt"`
@@ -270,6 +271,7 @@ type ProjectWithEnvironments struct {
 	Name                  string               `json:"name"`
 	Description           string               `json:"description"`
 	Slug                  string               `json:"slug"`
+	Type                  string               `json:"type"`
 	AutoCapitalization    bool                 `json:"autoCapitalization"`
 	OrgID                 string               `json:"orgId"`
 	CreatedAt             time.Time            `json:"createdAt"`
@@ -614,6 +616,7 @@ type CreateProjectRequest struct {
 	Slug                    string `json:"slug"`
 	OrganizationSlug        string `json:"organizationSlug"`
 	Template                string `json:"template,omitempty"`
+	Type                    string `json:"type,omitempty"`
 	KmsSecretManagerKeyId   string `json:"kmsKeyId,omitempty"`
 	ShouldCreateDefaultEnvs bool   `json:"shouldCreateDefaultEnvs"`
 	HasDeleteProtection     bool   `json:"hasDeleteProtection"`
@@ -2438,4 +2441,96 @@ type IdentityDetails struct {
 
 type GetIdentityDetailsResponse struct {
 	IdentityDetails IdentityDetails `json:"identityDetails"`
+}
+
+type KMSKey struct {
+	ID                  string    `json:"id"`
+	Description         string    `json:"description"`
+	IsDisabled          bool      `json:"isDisabled"`
+	OrgId               string    `json:"orgId"`
+	Name                string    `json:"name"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
+	ProjectId           string    `json:"projectId"`
+	KeyUsage            string    `json:"keyUsage"`
+	Version             int       `json:"version"`
+	EncryptionAlgorithm string    `json:"encryptionAlgorithm"`
+}
+
+type CreateKMSKeyRequest struct {
+	ProjectId           string `json:"projectId"`
+	Name                string `json:"name"`
+	Description         string `json:"description,omitempty"`
+	KeyUsage            string `json:"keyUsage,omitempty"`
+	EncryptionAlgorithm string `json:"encryptionAlgorithm,omitempty"`
+}
+
+type CreateKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type GetKMSKeyRequest struct {
+	KeyId string
+}
+
+type GetKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type GetKMSKeyByNameRequest struct {
+	KeyName   string
+	ProjectId string
+}
+
+type GetKMSKeyByNameResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type ListKMSKeysRequest struct {
+	ProjectId      string
+	Offset         *int
+	Limit          *int
+	OrderBy        *string
+	OrderDirection *string
+	Search         *string
+}
+
+type ListKMSKeysResponse struct {
+	Keys       []KMSKey `json:"keys"`
+	TotalCount int      `json:"totalCount"`
+}
+
+type UpdateKMSKeyRequest struct {
+	KeyId       string `json:"-"`
+	Name        string `json:"name,omitempty"`
+	IsDisabled  *bool  `json:"isDisabled,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+type UpdateKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type DeleteKMSKeyRequest struct {
+	KeyId string
+}
+
+type DeleteKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type GetKMSKeyPublicKeyRequest struct {
+	KeyId string
+}
+
+type GetKMSKeyPublicKeyResponse struct {
+	PublicKey string `json:"publicKey"`
+}
+
+type GetKMSKeySigningAlgorithmsRequest struct {
+	KeyId string
+}
+
+type GetKMSKeySigningAlgorithmsResponse struct {
+	SigningAlgorithms []string `json:"signingAlgorithms"`
 }
