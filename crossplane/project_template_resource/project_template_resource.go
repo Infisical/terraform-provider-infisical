@@ -53,18 +53,6 @@ type RoleJSON struct {
 	Permissions []PermissionJSON `json:"permissions,omitempty"`
 }
 
-type RoleModel struct {
-	Name        types.String `tfsdk:"name"`
-	Slug        types.String `tfsdk:"slug"`
-	Permissions types.List   `tfsdk:"permissions"`
-}
-
-type EnvironmentModel struct {
-	Name     types.String `tfsdk:"name"`
-	Slug     types.String `tfsdk:"slug"`
-	Position types.Int64  `tfsdk:"position"`
-}
-
 type ProjectTemplateResourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
