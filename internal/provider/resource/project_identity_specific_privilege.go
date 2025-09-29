@@ -141,10 +141,10 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 					"actions": schema.ListAttribute{
 						ElementType: types.StringType,
 						Required:    true,
-						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(PERMISSION_ACTIONS, ",")),
+						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(SPECIFIC_PRIVILEGE_PERMISSION_ACTIONS, ",")),
 					},
 					"subject": schema.StringAttribute{
-						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(PERMISSION_SUBJECTS, ",")),
+						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS, ",")),
 						Required:    true,
 					},
 					"conditions": schema.SingleNestedAttribute{

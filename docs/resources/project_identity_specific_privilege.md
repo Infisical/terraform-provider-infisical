@@ -103,7 +103,7 @@ Required:
 
 - `actions` (List of String) Describe what action an entity can take. Enum: create,edit,delete,read
 - `conditions` (Attributes) The conditions to scope permissions (see [below for nested schema](#nestedatt--permission--conditions))
-- `subject` (String) Describe what action an entity can take. Enum: role,member,groups,settings,integrations,webhooks,service-tokens,environments,tags,audit-logs,ip-allowlist,workspace,secrets,secret-rollback,secret-approval,secret-rotation,identity,certificate-authorities,certificates,certificate-templates,kms,pki-alerts,pki-collections
+- `subject` (String) Describe what action an entity can take. Enum: secrets
 
 <a id="nestedatt--permission--conditions"></a>
 ### Nested Schema for `permission.conditions`
