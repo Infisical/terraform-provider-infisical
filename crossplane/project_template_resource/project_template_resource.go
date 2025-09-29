@@ -108,7 +108,6 @@ func (r *ProjectTemplateResource) Schema(_ context.Context, _ resource.SchemaReq
 			"environments": schema.StringAttribute{
 				Description: "The environments for the project template as a JSON string",
 				Optional:    true,
-				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					pkg.UnorderedJsonEquivalentModifier{},
 				},
