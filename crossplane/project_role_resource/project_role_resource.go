@@ -50,7 +50,7 @@ type projectRoleResourceModel struct {
 	Slug          types.String `tfsdk:"slug"`
 	ProjectSlug   types.String `tfsdk:"project_slug"`
 	ID            types.String `tfsdk:"id"`
-	PermissionsV2 types.String `tfsdk:"permissions_v2"`
+	PermissionsV2 types.String `tfsdk:"permissions"`
 }
 
 // Metadata returns the resource type name.
@@ -89,9 +89,9 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"permissions_v2": schema.StringAttribute{
+			"permissions": schema.StringAttribute{
 				Optional:    true,
-				Description: "The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
+				Description: "The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. Legacy permissions (V1) is not supported for this resource.",
 
 				PlanModifiers: []planmodifier.String{
 					pkg.UnorderedJsonEquivalentModifier{},
@@ -158,7 +158,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project role",
-			"Failed to parse permissions_v2 JSON: "+err.Error(),
+			"Failed to parse permissions JSON: "+err.Error(),
 		)
 		return
 	}
@@ -335,7 +335,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading project role",
-			"Couldn't parse permissions_v2 property, unexpected error: "+err.Error(),
+			"Couldn't parse permissions property, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -400,7 +400,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating project role",
-			"Failed to parse permissions_v2 JSON: "+err.Error(),
+			"Failed to parse permissions JSON: "+err.Error(),
 		)
 		return
 	}
