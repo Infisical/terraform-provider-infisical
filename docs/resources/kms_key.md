@@ -62,15 +62,14 @@ resource "infisical_kms_key" "signing_key" {
 ### Optional
 
 - `description` (String) The description of the KMS key. Maximum 500 characters.
-- `encryption_algorithm` (String) The encryption algorithm for the key. Options: 'aes-256-gcm', 'aes-128-gcm', 'RSA_4096', 'ECC_NIST_P256'. Defaults to 'aes-256-gcm'.
+- `encryption_algorithm` (String) The encryption algorithm for the key. Options: aes-256-gcm, aes-128-gcm, RSA_4096, ECC_NIST_P256. Defaults to 'aes-256-gcm'.
 - `is_disabled` (Boolean) Whether the key is disabled. Defaults to false.
-- `key_usage` (String) The usage of the key. Options: 'encrypt-decrypt', 'sign-verify'. Defaults to 'encrypt-decrypt'.
+- `key_usage` (String) The usage of the key. Options: encrypt-decrypt, sign-verify. Defaults to 'encrypt-decrypt'.
 
 ### Read-Only
 
 - `created_at` (String) The creation timestamp of the key.
 - `id` (String) The ID of the KMS key.
-- `last_updated` (String) The last update timestamp of the resource.
 - `org_id` (String) The ID of the organization.
 - `updated_at` (String) The last update timestamp of the key.
 - `version` (Number) The version of the key.
