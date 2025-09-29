@@ -36,6 +36,12 @@ if [ -d "$SOURCE_DIR/project_role_resource" ]; then
   cp -f "$SOURCE_DIR/project_role_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_role/"
 fi
 
+if [ -d "$SOURCE_DIR/project_template_resource" ]; then
+  echo "Replacing project_template_resource"
+  cp -f "$SOURCE_DIR/project_template_resource/project_template_resource.go" "$DESTINATION_DIR/"
+  cp -f "$SOURCE_DIR/project_template_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_template/"
+fi
+
 # Regenerate documentation
 echo "Regenerating documentation..."
 go generate ./...
