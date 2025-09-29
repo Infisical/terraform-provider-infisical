@@ -23,9 +23,9 @@ resource "infisical_project" "example" {
 }
 
 resource "infisical_project_role" "biller" {
-  project_slug   = infisical_project.example.slug
-  name           = "Tester"
-  description    = "A test role"
-  slug           = "tester"
-  permissions_v2 = "[{\"action\":[\"read\",\"create\"],\"subject\":\"integrations\"},{\"action\":[\"read\",\"edit\"],\"subject\":\"secrets\",\"conditions\":{\"environment\":{\"$eq\":\"dev\",\"$in\":[\"dev\",\"prod\"]},\"secretPath\":{\"$eq\":\"/\"}}}]"
+  project_slug = infisical_project.example.slug
+  name         = "Tester"
+  description  = "A test role"
+  slug         = "tester"
+  permissions  = "[{\"action\":[\"read\",\"create\"],\"subject\":\"integrations\"},{\"action\":[\"read\",\"edit\"],\"subject\":\"secrets\",\"conditions\":{\"environment\":{\"$eq\":\"dev\",\"$in\":[\"dev\",\"prod\"]},\"secretPath\":{\"$eq\":\"/\"}}}]"
 }
