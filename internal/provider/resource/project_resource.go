@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -16,6 +17,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	PROJECT_TYPE_SECRET_MANAGER = "secret-manager"
+	PROJECT_TYPE_KMS            = "kms"
+	SUPPORTED_PROJECT_TYPES     = []string{PROJECT_TYPE_SECRET_MANAGER, PROJECT_TYPE_KMS}
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -70,14 +77,14 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of the project. Supported values: 'secret-manager' (default), 'kms'. Defaults to 'secret-manager'.",
+				Description: "The type of the project. Supported values: " + strings.Join(SUPPORTED_PROJECT_TYPES, ", ") + ". Defaults to '" + PROJECT_TYPE_SECRET_MANAGER + "'.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf("secret-manager", "kms"),
+					stringvalidator.OneOf(SUPPORTED_PROJECT_TYPES...),
 				},
 			},
 			"description": schema.StringAttribute{
@@ -166,7 +173,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		shouldCreateDefaultEnvs = plan.ShouldCreateDefaultEnvs.ValueBool()
 	}
 
-	projectType := "secret-manager" // default type
+	projectType := PROJECT_TYPE_SECRET_MANAGER // default type
 	if !plan.Type.IsNull() && !plan.Type.IsUnknown() {
 		projectType = plan.Type.ValueString()
 	}
@@ -190,7 +197,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	if !plan.AuditLogRetentionDays.IsUnknown() {
+	if !plan.AuditLogRetentionDays.IsNull() && !plan.AuditLogRetentionDays.IsUnknown() {
 		_, err := r.client.UpdateProjectAuditLogRetention(infisical.UpdateProjectAuditLogRetentionRequest{
 			ProjectSlug: plan.Slug.ValueString(),
 			Days:        plan.AuditLogRetentionDays.ValueInt64(),
@@ -376,7 +383,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if state.AuditLogRetentionDays != plan.AuditLogRetentionDays {
+	if state.AuditLogRetentionDays != plan.AuditLogRetentionDays && !plan.AuditLogRetentionDays.IsNull() && !plan.AuditLogRetentionDays.IsUnknown() {
 		_, err := r.client.UpdateProjectAuditLogRetention(infisical.UpdateProjectAuditLogRetentionRequest{
 			ProjectSlug: plan.Slug.ValueString(),
 			Days:        plan.AuditLogRetentionDays.ValueInt64(),

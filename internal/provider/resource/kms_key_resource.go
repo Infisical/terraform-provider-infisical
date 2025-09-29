@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	infisical "terraform-provider-infisical/internal/client"
@@ -17,6 +18,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	ENCRYPTION_KEY_USAGE = "encrypt-decrypt"
+	SIGNING_KEY_USAGE    = "sign-verify"
+	SUPPORTED_KEY_USAGES = []string{ENCRYPTION_KEY_USAGE, SIGNING_KEY_USAGE}
+
+	ENCRYPTION_ALGORITHM_AES_256_GCM   = "aes-256-gcm"
+	ENCRYPTION_ALGORITHM_AES_128_GCM   = "aes-128-gcm"
+	ENCRYPTION_ALGORITHM_RSA_4096      = "RSA_4096"
+	ENCRYPTION_ALGORITHM_ECC_NIST_P256 = "ECC_NIST_P256"
+	SUPPORTED_ENCRYPTION_ALGORITHMS    = []string{ENCRYPTION_ALGORITHM_AES_256_GCM, ENCRYPTION_ALGORITHM_AES_128_GCM, ENCRYPTION_ALGORITHM_RSA_4096, ENCRYPTION_ALGORITHM_ECC_NIST_P256}
 )
 
 var (
@@ -45,7 +58,6 @@ type kmsKeyResourceModel struct {
 	Version             types.Int64  `tfsdk:"version"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
-	LastUpdated         types.String `tfsdk:"last_updated"`
 }
 
 func (r *kmsKeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -88,27 +100,27 @@ func (r *kmsKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				},
 			},
 			"key_usage": schema.StringAttribute{
-				Description: "The usage of the key. Options: 'encrypt-decrypt', 'sign-verify'. Defaults to 'encrypt-decrypt'.",
+				Description: "The usage of the key. Options: " + strings.Join(SUPPORTED_KEY_USAGES, ", ") + ". Defaults to '" + ENCRYPTION_KEY_USAGE + "'.",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("encrypt-decrypt"),
+				Default:     stringdefault.StaticString(ENCRYPTION_KEY_USAGE),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf("encrypt-decrypt", "sign-verify"),
+					stringvalidator.OneOf(SUPPORTED_KEY_USAGES...),
 				},
 			},
 			"encryption_algorithm": schema.StringAttribute{
-				Description: "The encryption algorithm for the key. Options: 'aes-256-gcm', 'aes-128-gcm', 'RSA_4096', 'ECC_NIST_P256'. Defaults to 'aes-256-gcm'.",
+				Description: "The encryption algorithm for the key. Options: " + strings.Join(SUPPORTED_ENCRYPTION_ALGORITHMS, ", ") + ". Defaults to '" + ENCRYPTION_ALGORITHM_AES_256_GCM + "'.",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("aes-256-gcm"),
+				Default:     stringdefault.StaticString(ENCRYPTION_ALGORITHM_AES_256_GCM),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf("aes-256-gcm", "aes-128-gcm", "RSA_4096", "ECC_NIST_P256"),
+					stringvalidator.OneOf(SUPPORTED_ENCRYPTION_ALGORITHMS...),
 				},
 			},
 			"is_disabled": schema.BoolAttribute{
@@ -131,10 +143,6 @@ func (r *kmsKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "The last update timestamp of the key.",
-				Computed:    true,
-			},
-			"last_updated": schema.StringAttribute{
-				Description: "The last update timestamp of the resource.",
 				Computed:    true,
 			},
 		},
@@ -197,7 +205,6 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	plan.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	plan.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
 	plan.UpdatedAt = types.StringValue(kmsKey.Key.UpdatedAt.Format(time.RFC3339))
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC3339))
 
 	if plan.KeyUsage.IsNull() || plan.KeyUsage.IsUnknown() {
 		plan.KeyUsage = types.StringValue(kmsKey.Key.KeyUsage)
@@ -314,7 +321,6 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	plan.Version = types.Int64Value(int64(updatedKey.Key.Version))
 	plan.CreatedAt = types.StringValue(updatedKey.Key.CreatedAt.Format(time.RFC3339))
 	plan.UpdatedAt = types.StringValue(updatedKey.Key.UpdatedAt.Format(time.RFC3339))
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC3339))
 
 	plan.Name = types.StringValue(updatedKey.Key.Name)
 	plan.Description = types.StringValue(updatedKey.Key.Description)
