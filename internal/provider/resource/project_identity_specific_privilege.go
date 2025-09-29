@@ -26,7 +26,7 @@ import (
 var (
 	_                                      resource.Resource = &projectIdentitySpecificPrivilegeResourceResource{}
 	SPECIFIC_PRIVILEGE_PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS                   = []string{"secrets"}
+	SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-templates", "kms", "pki-alerts", "pki-collections"}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
