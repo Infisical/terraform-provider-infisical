@@ -267,15 +267,13 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// Permissions V2
-
 	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: state.ProjectSlug.ValueString(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading project role",
+			"Error reading project",
 			"Unexpected error: "+err.Error(),
 		)
 		return
@@ -287,6 +285,10 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 	})
 
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading project role",
 			"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
@@ -334,7 +336,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading project role",
+			"Error parsing permissions",
 			"Couldn't parse permissions property, unexpected error: "+err.Error(),
 		)
 		return

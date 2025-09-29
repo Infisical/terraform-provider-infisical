@@ -2,6 +2,7 @@ package infisicalclient
 
 import (
 	"fmt"
+	"net/http"
 	"terraform-provider-infisical/internal/errors"
 )
 
@@ -149,6 +150,9 @@ func (client Client) GetProjectRoleBySlugV2(request GetProjectRoleBySlugV2Reques
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectRoleBySlugV2Response{}, ErrNotFound
+		}
 		return GetProjectRoleBySlugV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleBySlugV2, response, nil)
 	}
 
