@@ -25,7 +25,7 @@ type SecretSyncAzureDevOpsSyncOptionsModel struct {
 
 func NewSecretSyncAzureDevOpsResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: true,
+		CrossplaneCompatible: false,
 		App:                  infisical.SecretSyncAppAzureDevOps,
 		SyncName:             "Azure DevOps",
 		ResourceTypeName:     "_secret_sync_azure_devops",

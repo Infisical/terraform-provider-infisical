@@ -37,7 +37,7 @@ type SecretSyncAwsSecretsManagerSyncOptionsModel struct {
 
 func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: true,
+		CrossplaneCompatible: false,
 		App:                  infisical.SecretSyncAppAWSSecretsManager,
 		SyncName:             "AWS Secrets Manager",
 		ResourceTypeName:     "_secret_sync_aws_secrets_manager",

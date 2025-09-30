@@ -27,7 +27,7 @@ type SecretSyncCloudflarePagesSyncOptionsModel struct {
 
 func NewSecretSyncCloudflarePagesResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: true,
+		CrossplaneCompatible: false,
 		App:                  infisical.SecretSyncAppCloudflarePages,
 		SyncName:             "Cloudflare Pages",
 		ResourceTypeName:     "_secret_sync_cloudflare_pages",

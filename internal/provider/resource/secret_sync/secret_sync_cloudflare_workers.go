@@ -26,7 +26,7 @@ type SecretSyncCloudflareWorkersSyncOptionsModel struct {
 
 func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: true,
+		CrossplaneCompatible: false,
 		App:                  infisical.SecretSyncAppCloudflareWorkers,
 		SyncName:             "Cloudflare Workers",
 		ResourceTypeName:     "_secret_sync_cloudflare_workers",

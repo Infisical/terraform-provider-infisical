@@ -28,7 +28,7 @@ type SecretSyncAzureAppConfigurationSyncOptionsModel struct {
 
 func NewSecretSyncAzureAppConfigurationResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: true,
+		CrossplaneCompatible: false,
 		App:                  infisical.SecretSyncAppAzureAppConfiguration,
 		SyncName:             "Azure App Configuration",
 		ResourceTypeName:     "_secret_sync_azure_app_configuration",

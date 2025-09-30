@@ -104,7 +104,7 @@ type SecretSyncBitbucketSyncOptionsModel struct {
 
 func NewSecretSyncBitbucketResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: true,
+		CrossplaneCompatible: false,
 		App:                  infisical.SecretSyncAppBitbucket,
 		SyncName:             "Bitbucket",
 		ResourceTypeName:     "_secret_sync_bitbucket",
