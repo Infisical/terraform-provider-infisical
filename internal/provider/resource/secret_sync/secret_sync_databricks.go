@@ -79,10 +79,11 @@ type SecretSyncDatabricksSyncOptionsModel struct {
 
 func NewSecretSyncDatabricksResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppDatabricks,
-		SyncName:         "Databricks",
-		ResourceTypeName: "_secret_sync_databricks",
-		AppConnection:    infisical.AppConnectionAppDatabricks,
+		CrossplaneCompatible: false,
+		App:                  infisical.SecretSyncAppDatabricks,
+		SyncName:             "Databricks",
+		ResourceTypeName:     "_secret_sync_databricks",
+		AppConnection:        infisical.AppConnectionAppDatabricks,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{
 				Required:    true,

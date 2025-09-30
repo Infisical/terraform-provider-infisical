@@ -37,10 +37,11 @@ type SecretSyncAwsSecretsManagerSyncOptionsModel struct {
 
 func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppAWSSecretsManager,
-		SyncName:         "AWS Secrets Manager",
-		ResourceTypeName: "_secret_sync_aws_secrets_manager",
-		AppConnection:    infisical.AppConnectionAppAWS,
+		CrossplaneCompatible: true,
+		App:                  infisical.SecretSyncAppAWSSecretsManager,
+		SyncName:             "AWS Secrets Manager",
+		ResourceTypeName:     "_secret_sync_aws_secrets_manager",
+		AppConnection:        infisical.AppConnectionAppAWS,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,

@@ -81,10 +81,11 @@ type SecretSyncFlyioSyncOptionsModel struct {
 
 func NewSecretSyncFlyioResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppFlyio,
-		SyncName:         "Fly.io",
-		ResourceTypeName: "_secret_sync_flyio",
-		AppConnection:    infisical.AppConnectionAppFlyio,
+		CrossplaneCompatible: false,
+		App:                  infisical.SecretSyncAppFlyio,
+		SyncName:             "Fly.io",
+		ResourceTypeName:     "_secret_sync_flyio",
+		AppConnection:        infisical.AppConnectionAppFlyio,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"app_id": schema.StringAttribute{
 				Required:    true,

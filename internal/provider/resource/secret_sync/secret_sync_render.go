@@ -132,10 +132,11 @@ type SecretSyncRenderSyncOptionsModel struct {
 
 func NewSecretSyncRenderResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppRender,
-		SyncName:         "Render",
-		ResourceTypeName: "_secret_sync_render",
-		AppConnection:    infisical.AppConnectionAppRender,
+		CrossplaneCompatible: false,
+		App:                  infisical.SecretSyncAppRender,
+		SyncName:             "Render",
+		ResourceTypeName:     "_secret_sync_render",
+		AppConnection:        infisical.AppConnectionAppRender,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{
 				Required:    true,

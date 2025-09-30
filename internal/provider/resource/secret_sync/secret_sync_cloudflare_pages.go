@@ -27,10 +27,11 @@ type SecretSyncCloudflarePagesSyncOptionsModel struct {
 
 func NewSecretSyncCloudflarePagesResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppCloudflarePages,
-		SyncName:         "Cloudflare Pages",
-		ResourceTypeName: "_secret_sync_cloudflare_pages",
-		AppConnection:    infisical.AppConnectionAppCloudflare,
+		CrossplaneCompatible: true,
+		App:                  infisical.SecretSyncAppCloudflarePages,
+		SyncName:             "Cloudflare Pages",
+		ResourceTypeName:     "_secret_sync_cloudflare_pages",
+		AppConnection:        infisical.AppConnectionAppCloudflare,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"project_name": schema.StringAttribute{
 				Required:    true,

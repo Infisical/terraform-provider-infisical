@@ -30,10 +30,11 @@ type SecretSyncGcpSecretManagerSyncOptionsModel struct {
 
 func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppGCPSecretManager,
-		SyncName:         "GCP Secret Manager",
-		ResourceTypeName: "_secret_sync_gcp_secret_manager",
-		AppConnection:    "GCP",
+		CrossplaneCompatible: false,
+		App:                  infisical.SecretSyncAppGCPSecretManager,
+		SyncName:             "GCP Secret Manager",
+		ResourceTypeName:     "_secret_sync_gcp_secret_manager",
+		AppConnection:        "GCP",
 		SyncOptionsAttributes: map[string]schema.Attribute{
 			"initial_sync_behavior": schema.StringAttribute{
 				Required:    true,

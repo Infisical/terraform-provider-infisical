@@ -26,10 +26,11 @@ type SecretSyncAzureKeyVaultSyncOptionsModel struct {
 
 func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppAzureKeyVault,
-		SyncName:         "Azure Key Vault",
-		ResourceTypeName: "_secret_sync_azure_key_vault",
-		AppConnection:    infisical.AppConnectionAppAzure,
+		CrossplaneCompatible: true,
+		App:                  infisical.SecretSyncAppAzureKeyVault,
+		SyncName:             "Azure Key Vault",
+		ResourceTypeName:     "_secret_sync_azure_key_vault",
+		AppConnection:        infisical.AppConnectionAppAzure,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vault_base_url": schema.StringAttribute{
 				Required:    true,

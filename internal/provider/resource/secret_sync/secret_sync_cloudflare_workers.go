@@ -26,10 +26,11 @@ type SecretSyncCloudflareWorkersSyncOptionsModel struct {
 
 func NewSecretSyncCloudflareWorkersResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		App:              infisical.SecretSyncAppCloudflareWorkers,
-		SyncName:         "Cloudflare Workers",
-		ResourceTypeName: "_secret_sync_cloudflare_workers",
-		AppConnection:    infisical.AppConnectionAppCloudflare,
+		CrossplaneCompatible: true,
+		App:                  infisical.SecretSyncAppCloudflareWorkers,
+		SyncName:             "Cloudflare Workers",
+		ResourceTypeName:     "_secret_sync_cloudflare_workers",
+		AppConnection:        infisical.AppConnectionAppCloudflare,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"script_id": schema.StringAttribute{
 				Required:    true,
