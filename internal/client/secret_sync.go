@@ -36,10 +36,11 @@ const (
 )
 
 const (
-	operationCreateSecretSync  = "CallCreateSecretSync"
-	operationUpdateSecretSync  = "CallUpdateSecretSync"
-	operationGetSecretSyncById = "CallGetSecretSyncById"
-	operationDeleteSecretSync  = "CallDeleteSecretSync"
+	operationCreateSecretSync          = "CallCreateSecretSync"
+	operationUpdateSecretSync          = "CallUpdateSecretSync"
+	operationGetSecretSyncById         = "CallGetSecretSyncById"
+	operationDeleteSecretSync          = "CallDeleteSecretSync"
+	operationCheckDuplicateDestination = "CallCheckDuplicateDestination"
 )
 
 func (client Client) CreateSecretSync(request CreateSecretSyncRequest) (SecretSync, error) {
@@ -122,4 +123,24 @@ func (client Client) DeleteSecretSync(request DeleteSecretSyncRequest) (SecretSy
 	}
 
 	return body.SecretSync, nil
+}
+
+func (client Client) CheckDuplicateDestination(request CheckDuplicateDestinationRequest) (CheckDuplicateDestinationResponse, error) {
+	var body CheckDuplicateDestinationResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post(fmt.Sprintf("api/v1/secret-syncs/%s/check-destination", string(request.App)))
+
+	if err != nil {
+		return CheckDuplicateDestinationResponse{}, errors.NewGenericRequestError(operationCheckDuplicateDestination, err)
+	}
+
+	if response.IsError() {
+		return CheckDuplicateDestinationResponse{}, errors.NewAPIErrorWithResponse(operationCheckDuplicateDestination, response, nil)
+	}
+
+	return body, nil
 }
