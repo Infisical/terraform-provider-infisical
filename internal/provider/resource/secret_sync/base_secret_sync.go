@@ -195,7 +195,7 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		}
 
 		// convert map to types.Object (with snake_case keys because this is the convention we follow for all map attributes across all secret syncs)
-		destConfigObj, d := mapToTypesObject(ctx, tempDestConfigMap, r.DestinationConfigAttributes)
+		destConfigObj, d := mapToTypesObject(tempDestConfigMap, r.DestinationConfigAttributes)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -383,10 +383,16 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		req.State.GetAttribute(ctx, path.Root("destination_config"), &currentDestConfig)
 
 		var currentSyncOptsMap map[string]interface{}
-		json.Unmarshal([]byte(currentSyncOpts.ValueString()), &currentSyncOptsMap)
+		if err := json.Unmarshal([]byte(currentSyncOpts.ValueString()), &currentSyncOptsMap); err != nil {
+			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse sync_options: %s", err.Error()))
+			return
+		}
 
 		var currentDestConfigMap map[string]interface{}
-		json.Unmarshal([]byte(currentDestConfig.ValueString()), &currentDestConfigMap)
+		if err := json.Unmarshal([]byte(currentDestConfig.ValueString()), &currentDestConfigMap); err != nil {
+			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse destination_config: %s", err.Error()))
+			return
+		}
 
 		syncOptsObj, d := r.ReadSyncOptionsFromApi(ctx, secretSync)
 		resp.Diagnostics.Append(d...)
@@ -528,7 +534,7 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 			return
 		}
 		// we gotta keep the snake_case keys for any potential validation like in the github secret sync
-		destConfigObj, d := mapToTypesObject(ctx, tempDestConfigMap, r.DestinationConfigAttributes)
+		destConfigObj, d := mapToTypesObject(tempDestConfigMap, r.DestinationConfigAttributes)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -547,7 +553,7 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 			return
 		}
 
-		stateDestConfigObj, d := mapToTypesObject(ctx, tempStateDestConfigMap, r.DestinationConfigAttributes)
+		stateDestConfigObj, d := mapToTypesObject(tempStateDestConfigMap, r.DestinationConfigAttributes)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -783,7 +789,7 @@ func areJSONEquivalent(json1, json2 string) bool {
 }
 
 // helper for converting map[string] to types.Object
-func mapToTypesObject(ctx context.Context, m map[string]interface{}, attrTypes map[string]schema.Attribute) (types.Object, diag.Diagnostics) {
+func mapToTypesObject(m map[string]interface{}, attrTypes map[string]schema.Attribute) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	attrTypeMap := make(map[string]attr.Type)

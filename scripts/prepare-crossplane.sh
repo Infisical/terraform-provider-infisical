@@ -52,8 +52,8 @@ for file in "$DESTINATION_DIR/secret_sync"/*.go; do
 
     # Get the file name without the extension
     file_name="$(basename "$file" .go)"
-    # In the EXAMPLES_DIR/infisical_${file_name} folder, remove the resource.tf file, and rename the crossplane-resource to resource.tf
-    mv "$EXAMPLES_DIR/infisical_${file_name}/crossplane-resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
+    # In the EXAMPLES_DIR/infisical_${file_name} folder, remove the resource.tf file, and rename the crossplane_resource to resource.tf
+    mv "$EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
 
     echo "Prepared $file for Crossplane compatibility"
   fi

@@ -17,15 +17,15 @@ provider "infisical" {
   }
 }
 
-resource "infisical_secret_sync_azure_key_vault" "app-configuration-demo" {
+resource "infisical_secret_sync_azure_devops" "demo-azure-devops-sync" {
   name          = "demo-sync"
   description   = "This is a demo sync."
   project_id    = "<project-id>"
   environment   = "dev"
   secret_path   = "/"
-  connection_id = "<app-connection-id>" # The ID of your Azure App Connection
+  connection_id = "<app-connection-id>" # The ID of your Azure DevOps App Connection
 
-  sync_options = "{\"initial_sync_behavior\":\"overwrite-destination\"}"
+  sync_options = "{}"
 
-  destination_config = "{\"vault_base_url\":\"<vault-base-url>\"}"
+  destination_config = "{\"devops_project_id\":\"<devops-project-id>\"}"
 }

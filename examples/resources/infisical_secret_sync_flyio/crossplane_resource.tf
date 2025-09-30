@@ -27,7 +27,6 @@ resource "infisical_secret_sync_flyio" "example" {
 
   auto_sync_enabled = true
 
-
   sync_options = "{\"initial_sync_behavior\":\"overwrite-destination\",\"disable_secret_deletion\":false,\"key_schema\":\"{{secretKey}}-{{environment}}\"}"
 
   destination_config = "{\"app_id\":\"<flyio-app-id>\"}"
