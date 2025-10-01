@@ -51,6 +51,12 @@ for file in "$DESTINATION_DIR/secret_sync"/*.go; do
     rm -f "${file}.bak"
 
     file_name="$(basename "$file" .go)"
+
+    if [ ! -f "$EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf" ]; then
+      echo "Error: crossplane_resource.tf file not found at $EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf. Make sure you create crossplane resource examples for all secret syncs."
+      exit 1
+    fi
+
     # Renames the crossplane_resource.tf file to resource.tf
     mv "$EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
 
