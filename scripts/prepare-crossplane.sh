@@ -12,6 +12,12 @@ if [ ! -d "$SOURCE_DIR" ]; then
   exit 1
 fi
 
+if [ -d "$SOURCE_DIR/access_approval_policy_resource" ]; then
+  echo "Replacing access_approval_policy_resource"
+  cp -f "$SOURCE_DIR/access_approval_policy_resource/access_approval_policy_resource.go" "$DESTINATION_DIR/"
+  cp -f "$SOURCE_DIR/access_approval_policy_resource/resource.tf" "$EXAMPLES_DIR/infisical_access_approval_policy/"
+fi
+
 if [ -d "$SOURCE_DIR/project_identity_resource" ]; then
   echo "Replacing project_identity_resource"
   cp -f "$SOURCE_DIR/project_identity_resource/project_identity_resource.go" "$DESTINATION_DIR/"
