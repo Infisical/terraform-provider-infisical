@@ -788,7 +788,7 @@ func areJSONEquivalent(json1, json2 string) bool {
 	return reflect.DeepEqual(obj1, obj2)
 }
 
-// helper for converting map[string] to types.Object
+// helper for converting map[string] to types.Object.
 func mapToTypesObject(m map[string]interface{}, attrTypes map[string]schema.Attribute) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
