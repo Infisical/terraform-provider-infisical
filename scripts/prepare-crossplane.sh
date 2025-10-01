@@ -44,15 +44,14 @@ fi
 
 
 
-# In the SOURCE_DIR/secret_sync folder, it should recursively go over each file except the base_secret_sync.go file, and replace `CrossplaneCompatible: false` with `CrossplaneCompatible: true`
+# In the SOURCE_DIR/secret_sync folder, we recursively go over each file except the base_secret_sync.go file, and replace `CrossplaneCompatible: false` with `CrossplaneCompatible: true`
 for file in "$DESTINATION_DIR/secret_sync"/*.go; do
   if [ "$(basename "$file")" != "base_secret_sync.go" ]; then
     sed -i.bak 's/CrossplaneCompatible: false/CrossplaneCompatible: true/g' "$file"
     rm -f "${file}.bak"
 
-    # Get the file name without the extension
     file_name="$(basename "$file" .go)"
-    # In the EXAMPLES_DIR/infisical_${file_name} folder, remove the resource.tf file, and rename the crossplane_resource to resource.tf
+    # Renames the crossplane_resource.tf file to resource.tf
     mv "$EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
 
     echo "Prepared $file for Crossplane compatibility"
