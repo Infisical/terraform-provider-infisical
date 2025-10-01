@@ -3,11 +3,13 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -15,6 +17,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	PROJECT_TYPE_SECRET_MANAGER = "secret-manager"
+	PROJECT_TYPE_KMS            = "kms"
+	SUPPORTED_PROJECT_TYPES     = []string{PROJECT_TYPE_SECRET_MANAGER, PROJECT_TYPE_KMS}
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -36,6 +44,7 @@ type projectResource struct {
 type projectResourceModel struct {
 	Slug                    types.String `tfsdk:"slug"`
 	ID                      types.String `tfsdk:"id"`
+	Type                    types.String `tfsdk:"type"`
 	KmsSecretManagerKeyId   types.String `tfsdk:"kms_secret_manager_key_id"`
 	Name                    types.String `tfsdk:"name"`
 	Description             types.String `tfsdk:"description"`
@@ -66,6 +75,17 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Description: "The name of the project",
 				Required:    true,
+			},
+			"type": schema.StringAttribute{
+				Description: "The type of the project. Supported values: " + strings.Join(SUPPORTED_PROJECT_TYPES, ", ") + ". Defaults to '" + PROJECT_TYPE_SECRET_MANAGER + "'.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				Validators: []validator.String{
+					stringvalidator.OneOf(SUPPORTED_PROJECT_TYPES...),
+				},
 			},
 			"description": schema.StringAttribute{
 				Description: "The description of the project",
@@ -153,10 +173,16 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		shouldCreateDefaultEnvs = plan.ShouldCreateDefaultEnvs.ValueBool()
 	}
 
+	projectType := PROJECT_TYPE_SECRET_MANAGER // default type
+	if !plan.Type.IsNull() && !plan.Type.IsUnknown() {
+		projectType = plan.Type.ValueString()
+	}
+
 	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
 		ProjectName:             plan.Name.ValueString(),
 		ProjectDescription:      plan.Description.ValueString(),
 		Slug:                    plan.Slug.ValueString(),
+		Type:                    projectType,
 		Template:                plan.TemplateName.ValueString(),
 		KmsSecretManagerKeyId:   plan.KmsSecretManagerKeyId.ValueString(),
 		ShouldCreateDefaultEnvs: shouldCreateDefaultEnvs,
@@ -171,7 +197,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	if !plan.AuditLogRetentionDays.IsUnknown() {
+	if !plan.AuditLogRetentionDays.IsNull() && !plan.AuditLogRetentionDays.IsUnknown() {
 		_, err := r.client.UpdateProjectAuditLogRetention(infisical.UpdateProjectAuditLogRetentionRequest{
 			ProjectSlug: plan.Slug.ValueString(),
 			Days:        plan.AuditLogRetentionDays.ValueInt64(),
@@ -198,6 +224,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	plan.LastUpdated = types.StringValue(newProject.Project.UpdatedAt.Format(time.RFC850))
 	plan.ID = types.StringValue(newProject.Project.ID)
+	plan.Type = types.StringValue(projectType)
 	plan.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
 	plan.AuditLogRetentionDays = types.Int64Value(project.AuditLogRetentionDays)
@@ -258,6 +285,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	state.ID = types.StringValue(project.ID)
 	state.Name = types.StringValue(project.Name)
+	state.Type = types.StringValue(project.Type)
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	state.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	state.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
@@ -319,6 +347,14 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	if state.Type != plan.Type {
+		resp.Diagnostics.AddError(
+			"Unable to update project",
+			"Project type cannot be updated after creation",
+		)
+		return
+	}
+
 	if state.KmsSecretManagerKeyId != plan.KmsSecretManagerKeyId {
 		resp.Diagnostics.AddError(
 			"Unable to update project",
@@ -347,7 +383,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if state.AuditLogRetentionDays != plan.AuditLogRetentionDays {
+	if state.AuditLogRetentionDays != plan.AuditLogRetentionDays && !plan.AuditLogRetentionDays.IsNull() && !plan.AuditLogRetentionDays.IsUnknown() {
 		_, err := r.client.UpdateProjectAuditLogRetention(infisical.UpdateProjectAuditLogRetentionRequest{
 			ProjectSlug: plan.Slug.ValueString(),
 			Days:        plan.AuditLogRetentionDays.ValueInt64(),
@@ -445,6 +481,7 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), project.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), project.Slug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), project.Name)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("type"), project.Type)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), project.Description)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("last_updated"), project.UpdatedAt.Format(time.RFC850))...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("has_delete_protection"), project.HasDeleteProtection)...)

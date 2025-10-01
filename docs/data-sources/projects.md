@@ -62,6 +62,7 @@ output "entire-project" {
 - `id` (String) The ID of the project
 - `name` (String) The name of the project
 - `org_id` (String) The ID of the organization to which the project belongs
+- `type` (String) The type of the project ('secret-manager' or 'kms')
 - `updated_at` (String) The last update date of the project
 - `upgrade_status` (String) The upgrade status of the project
 - `version` (Number) The version of the project
