@@ -86,11 +86,10 @@ type SecretSyncSupabaseSyncOptionsModel struct {
 
 func NewSecretSyncSupabaseResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncAppSupabase,
-		SyncName:             "Supabase",
-		ResourceTypeName:     "_secret_sync_supabase",
-		AppConnection:        infisical.AppConnectionAppSupabase,
+		App:              infisical.SecretSyncAppSupabase,
+		SyncName:         "Supabase",
+		ResourceTypeName: "_secret_sync_supabase",
+		AppConnection:    infisical.AppConnectionAppSupabase,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Required:    true,

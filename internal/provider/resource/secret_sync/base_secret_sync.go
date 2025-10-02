@@ -2,16 +2,10 @@ package resource
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"reflect"
-	"sort"
-	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -32,7 +26,6 @@ type SecretSyncBaseResource struct {
 	ReadDestinationConfigForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics)
 
-	CrossplaneCompatible             bool
 	SyncOptionsAttributes            map[string]schema.Attribute
 	ReadSyncOptionsForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadSyncOptionsForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
@@ -58,77 +51,56 @@ func (r *SecretSyncBaseResource) Metadata(_ context.Context, req resource.Metada
 }
 
 func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-
-	attributes := map[string]schema.Attribute{
-		"id": schema.StringAttribute{
-			Description:   fmt.Sprintf("The ID of the %s secret sync", r.SyncName),
-			Computed:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-		},
-		"connection_id": schema.StringAttribute{
-			Required:    true,
-			Description: fmt.Sprintf("The ID of the %s Connection to use for syncing.", r.AppConnection),
-		},
-		"name": schema.StringAttribute{
-			Required:    true,
-			Description: fmt.Sprintf("The name of the %s sync to create. Must be slug-friendly.", r.SyncName),
-		},
-		"project_id": schema.StringAttribute{
-			Required:      true,
-			Description:   "The ID of the Infisical project to create the sync in.",
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-		},
-		"environment": schema.StringAttribute{
-			Required:    true,
-			Description: "The slug of the project environment to sync secrets from.",
-		},
-		"secret_path": schema.StringAttribute{
-			Required:    true,
-			Description: "The folder path to sync secrets from.",
-		},
-		"description": schema.StringAttribute{
-			Optional:    true,
-			Description: fmt.Sprintf("An optional description for the %s sync.", r.SyncName),
-		},
-		"auto_sync_enabled": schema.BoolAttribute{
-			Optional:    true,
-			Description: "Whether secrets should be automatically synced when changes occur at the source location or not.",
-			Default:     booldefault.StaticBool(true),
-			Computed:    true,
-		},
-	}
-
-	if r.CrossplaneCompatible {
-		attributes["sync_options"] = schema.StringAttribute{
-			Required: true,
-			Description: buildJSONSchemaDescription(
-				"Parameters to modify how secrets are synced.",
-				r.SyncOptionsAttributes,
-			),
-		}
-		attributes["destination_config"] = schema.StringAttribute{
-			Required: true,
-			Description: buildJSONSchemaDescription(
-				"The destination configuration for the secret sync.",
-				r.DestinationConfigAttributes,
-			),
-		}
-	} else {
-		attributes["sync_options"] = schema.SingleNestedAttribute{
-			Required:    true,
-			Description: "Parameters to modify how secrets are synced.",
-			Attributes:  r.SyncOptionsAttributes,
-		}
-		attributes["destination_config"] = schema.SingleNestedAttribute{
-			Required:    true,
-			Description: "The destination configuration for the secret sync.",
-			Attributes:  r.DestinationConfigAttributes,
-		}
-	}
-
 	resp.Schema = schema.Schema{
 		Description: fmt.Sprintf("Create and manage %s secret syncs", r.SyncName),
-		Attributes:  attributes,
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description:   fmt.Sprintf("The ID of the %s secret sync", r.SyncName),
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"connection_id": schema.StringAttribute{
+				Required:    true,
+				Description: fmt.Sprintf("The ID of the %s Connection to use for syncing.", r.AppConnection),
+			},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: fmt.Sprintf("The name of the %s sync to create. Must be slug-friendly.", r.SyncName),
+			},
+			"project_id": schema.StringAttribute{
+				Required:      true,
+				Description:   "The ID of the Infisical project to create the sync in.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"environment": schema.StringAttribute{
+				Required:    true,
+				Description: "The slug of the project environment to sync secrets from.",
+			},
+			"secret_path": schema.StringAttribute{
+				Required:    true,
+				Description: "The folder path to sync secrets from.",
+			},
+			"description": schema.StringAttribute{
+				Optional:    true,
+				Description: fmt.Sprintf("An optional description for the %s sync.", r.SyncName),
+			},
+			"auto_sync_enabled": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Whether secrets should be automatically synced when changes occur at the source location or not.",
+				Default:     booldefault.StaticBool(true),
+				Computed:    true,
+			},
+			"sync_options": schema.SingleNestedAttribute{
+				Required:    true,
+				Description: "Parameters to modify how secrets are synced.",
+				Attributes:  r.SyncOptionsAttributes,
+			},
+			"destination_config": schema.SingleNestedAttribute{
+				Required:    true,
+				Description: "The destination configuration for the secret sync.",
+				Attributes:  r.DestinationConfigAttributes,
+			},
+		},
 	}
 }
 
@@ -162,100 +134,26 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	var syncOptions map[string]interface{}
-	var destinationConfigMap map[string]interface{}
-
-	if r.CrossplaneCompatible {
-		// first we parse sync_options and destination_config from the plan
-		var syncOptsJSON types.String
-		diags := req.Plan.GetAttribute(ctx, path.Root("sync_options"), &syncOptsJSON)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		if err := json.Unmarshal([]byte(syncOptsJSON.ValueString()), &syncOptions); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse sync_options: %s", err.Error()))
-			return
-		}
-		// transform sync_options since we're not calling a function for it
-		syncOptions = transformMapKeys(syncOptions)
-
-		var destConfigJSON types.String
-		diags = req.Plan.GetAttribute(ctx, path.Root("destination_config"), &destConfigJSON)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		var tempDestConfigMap map[string]interface{}
-		if err := json.Unmarshal([]byte(destConfigJSON.ValueString()), &tempDestConfigMap); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse destination_config: %s", err.Error()))
-			return
-		}
-
-		// convert map to types.Object (with snake_case keys because this is the convention we follow for all map attributes across all secret syncs)
-		destConfigObj, d := mapToTypesObject(tempDestConfigMap, r.DestinationConfigAttributes)
-		resp.Diagnostics.Append(d...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// create temporary plan model that we pass into the ReadDestinationConfigForCreateFromPlan function for the validation
-		tempPlan := SecretSyncBaseResourceModel{
-			DestinationConfig: destConfigObj,
-			SyncOptions:       types.ObjectNull(nil),
-		}
-
-		// This function validates with snake_case keys and transforms to API format (camelCase)
-		destinationConfigMap, diags = r.ReadDestinationConfigForCreateFromPlan(ctx, tempPlan)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	} else {
-		// regular terraform mode
-		var plan SecretSyncBaseResourceModel
-		diags := req.Plan.Get(ctx, &plan)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		syncOptions, diags = r.ReadSyncOptionsForCreateFromPlan(ctx, plan)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		destinationConfigMap, diags = r.ReadDestinationConfigForCreateFromPlan(ctx, plan)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	// Retrieve values from plan
+	var plan SecretSyncBaseResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	// get the rest of the plan fields (common to both modes)
-	// we have to get them individually because if we try to read the whole plan at once, we'll get type errors when trying to read the sync_options and destination_config attributes. there's no pretty way to do this
-	var planName types.String
-	var planDescription types.String
-	var planProjectID types.String
-	var planConnectionID types.String
-	var planEnvironment types.String
-	var planSecretPath types.String
-	var planAutoSyncEnabled types.Bool
+	syncOptions, diags := r.ReadSyncOptionsForCreateFromPlan(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	req.Plan.GetAttribute(ctx, path.Root("name"), &planName)
-	req.Plan.GetAttribute(ctx, path.Root("description"), &planDescription)
-	req.Plan.GetAttribute(ctx, path.Root("project_id"), &planProjectID)
-	req.Plan.GetAttribute(ctx, path.Root("connection_id"), &planConnectionID)
-	req.Plan.GetAttribute(ctx, path.Root("environment"), &planEnvironment)
-	req.Plan.GetAttribute(ctx, path.Root("secret_path"), &planSecretPath)
-	req.Plan.GetAttribute(ctx, path.Root("auto_sync_enabled"), &planAutoSyncEnabled)
-
-	// Validation
 	initialSyncBehavior, ok := syncOptions["initialSyncBehavior"].(string)
-	if !ok || initialSyncBehavior == "" {
+	if !ok {
+		initialSyncBehavior = ""
+	}
+
+	if initialSyncBehavior == "" {
 		resp.Diagnostics.AddError(
 			"Unable to create secret sync",
 			"Failed to parse initial_sync_behavior field",
@@ -276,15 +174,21 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
+	destinationConfigMap, diags := r.ReadDestinationConfigForCreateFromPlan(ctx, plan)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
 	secretSync, err := r.client.CreateSecretSync(infisical.CreateSecretSyncRequest{
 		App:               r.App,
-		Name:              planName.ValueString(),
-		Description:       planDescription.ValueString(),
-		ProjectID:         planProjectID.ValueString(),
-		ConnectionID:      planConnectionID.ValueString(),
-		Environment:       planEnvironment.ValueString(),
-		SecretPath:        planSecretPath.ValueString(),
-		AutoSyncEnabled:   planAutoSyncEnabled.ValueBool(),
+		Name:              plan.Name.ValueString(),
+		Description:       plan.Description.ValueString(),
+		ProjectID:         plan.ProjectID.ValueString(),
+		ConnectionID:      plan.ConnectionID.ValueString(),
+		Environment:       plan.Environment.ValueString(),
+		SecretPath:        plan.SecretPath.ValueString(),
+		AutoSyncEnabled:   plan.AutoSyncEnabled.ValueBool(),
 		SyncOptions:       syncOptions,
 		DestinationConfig: destinationConfigMap,
 	})
@@ -297,46 +201,12 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	// set the state
-	var plan SecretSyncBaseResourceModel
 	plan.ID = types.StringValue(secretSync.ID)
-	plan.Name = planName
-	plan.Description = planDescription
-	plan.ProjectID = planProjectID
-	plan.ConnectionID = planConnectionID
-	plan.Environment = planEnvironment
-	plan.SecretPath = planSecretPath
-	plan.AutoSyncEnabled = planAutoSyncEnabled
 
-	if r.CrossplaneCompatible {
-		// get the original json strings from plan
-		var syncOptsJSON types.String
-		req.Plan.GetAttribute(ctx, path.Root("sync_options"), &syncOptsJSON)
-		resp.State.SetAttribute(ctx, path.Root("sync_options"), syncOptsJSON.ValueString())
-
-		var destConfigJSON types.String
-		req.Plan.GetAttribute(ctx, path.Root("destination_config"), &destConfigJSON)
-		resp.State.SetAttribute(ctx, path.Root("destination_config"), destConfigJSON.ValueString())
-
-		plan.SyncOptions = types.ObjectNull(nil)
-		plan.DestinationConfig = types.ObjectNull(nil)
-
-		// set other fields (again no pretty way to do this)
-		resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)
-		resp.State.SetAttribute(ctx, path.Root("name"), plan.Name)
-		resp.State.SetAttribute(ctx, path.Root("description"), plan.Description)
-		resp.State.SetAttribute(ctx, path.Root("project_id"), plan.ProjectID)
-		resp.State.SetAttribute(ctx, path.Root("connection_id"), plan.ConnectionID)
-		resp.State.SetAttribute(ctx, path.Root("environment"), plan.Environment)
-		resp.State.SetAttribute(ctx, path.Root("secret_path"), plan.SecretPath)
-		resp.State.SetAttribute(ctx, path.Root("auto_sync_enabled"), plan.AutoSyncEnabled)
-	} else {
-		// get from plan for objects (normal terraform, here we can get the sync options and destination config directly)
-		req.Plan.GetAttribute(ctx, path.Root("sync_options"), &plan.SyncOptions)
-		req.Plan.GetAttribute(ctx, path.Root("destination_config"), &plan.DestinationConfig)
-
-		diags := resp.State.Set(ctx, plan)
-		resp.Diagnostics.Append(diags...)
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 }
 
@@ -350,8 +220,9 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	var stateID types.String
-	diags := req.State.GetAttribute(ctx, path.Root("id"), &stateID)
+	// Get current state
+	var state SecretSyncBaseResourceModel
+	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -359,7 +230,7 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 
 	secretSync, err := r.client.GetSecretSyncById(infisical.GetSecretSyncByIdRequest{
 		App: r.App,
-		ID:  stateID.ValueString(),
+		ID:  state.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -375,117 +246,31 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		}
 	}
 
-	if r.CrossplaneCompatible {
-		// get current state values to preserve structure
-		var currentSyncOpts types.String
-		var currentDestConfig types.String
-		req.State.GetAttribute(ctx, path.Root("sync_options"), &currentSyncOpts)
-		req.State.GetAttribute(ctx, path.Root("destination_config"), &currentDestConfig)
+	state.ConnectionID = types.StringValue(secretSync.Connection.ConnectionID)
+	state.Name = types.StringValue(secretSync.Name)
+	state.ProjectID = types.StringValue(secretSync.ProjectID)
+	state.Environment = types.StringValue(secretSync.Environment.Slug)
+	state.SecretPath = types.StringValue(secretSync.SecretFolder.Path)
+	state.AutoSyncEnabled = types.BoolValue(secretSync.AutoSyncEnabled)
 
-		var currentSyncOptsMap map[string]interface{}
-		if err := json.Unmarshal([]byte(currentSyncOpts.ValueString()), &currentSyncOptsMap); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse sync_options: %s", err.Error()))
-			return
-		}
-
-		var currentDestConfigMap map[string]interface{}
-		if err := json.Unmarshal([]byte(currentDestConfig.ValueString()), &currentDestConfigMap); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse destination_config: %s", err.Error()))
-			return
-		}
-
-		syncOptsObj, d := r.ReadSyncOptionsFromApi(ctx, secretSync)
-		resp.Diagnostics.Append(d...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		destConfigObj, d := r.ReadDestinationConfigFromApi(ctx, secretSync)
-		resp.Diagnostics.Append(d...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// update only the keys that exist in current state
-		for k := range currentSyncOptsMap {
-			if attr, ok := syncOptsObj.Attributes()[k]; ok {
-				currentSyncOptsMap[k] = extractAttrValue(attr)
-			}
-		}
-
-		for k := range currentDestConfigMap {
-			if attr, ok := destConfigObj.Attributes()[k]; ok {
-				currentDestConfigMap[k] = extractAttrValue(attr)
-			}
-		}
-
-		syncOptsJSON, err := json.Marshal(currentSyncOptsMap)
-		if err != nil {
-			resp.Diagnostics.AddError("Error marshalling sync options", "Couldn't marshal sync options, unexpected error: "+err.Error())
-			return
-		}
-		destConfigJSON, err := json.Marshal(currentDestConfigMap)
-		if err != nil {
-			resp.Diagnostics.AddError("Error marshalling destination config", "Couldn't marshal destination config, unexpected error: "+err.Error())
-			return
-		}
-
-		finalSyncOpts := string(syncOptsJSON)
-		if areJSONEquivalent(currentSyncOpts.ValueString(), finalSyncOpts) {
-			finalSyncOpts = currentSyncOpts.ValueString() // Keep original formatting
-		}
-
-		finalDestConfig := string(destConfigJSON)
-		if areJSONEquivalent(currentDestConfig.ValueString(), finalDestConfig) {
-			finalDestConfig = currentDestConfig.ValueString() // Keep original formatting
-		}
-
-		// Set all attributes
-		resp.State.SetAttribute(ctx, path.Root("id"), types.StringValue(secretSync.ID))
-		resp.State.SetAttribute(ctx, path.Root("connection_id"), types.StringValue(secretSync.Connection.ConnectionID))
-		resp.State.SetAttribute(ctx, path.Root("name"), types.StringValue(secretSync.Name))
-		resp.State.SetAttribute(ctx, path.Root("project_id"), types.StringValue(secretSync.ProjectID))
-		resp.State.SetAttribute(ctx, path.Root("environment"), types.StringValue(secretSync.Environment.Slug))
-		resp.State.SetAttribute(ctx, path.Root("secret_path"), types.StringValue(secretSync.SecretFolder.Path))
-		resp.State.SetAttribute(ctx, path.Root("auto_sync_enabled"), types.BoolValue(secretSync.AutoSyncEnabled))
-		resp.State.SetAttribute(ctx, path.Root("description"), types.StringValue(secretSync.Description))
-		resp.State.SetAttribute(ctx, path.Root("sync_options"), finalSyncOpts)
-		resp.State.SetAttribute(ctx, path.Root("destination_config"), finalDestConfig)
-	} else {
-		// normal terraform mode
-		var state SecretSyncBaseResourceModel
-		diags := req.State.Get(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		state.ConnectionID = types.StringValue(secretSync.Connection.ConnectionID)
-		state.Name = types.StringValue(secretSync.Name)
-		state.ProjectID = types.StringValue(secretSync.ProjectID)
-		state.Environment = types.StringValue(secretSync.Environment.Slug)
-		state.SecretPath = types.StringValue(secretSync.SecretFolder.Path)
-		state.AutoSyncEnabled = types.BoolValue(secretSync.AutoSyncEnabled)
-
-		if !(state.Description.IsNull() && secretSync.Description == "") {
-			state.Description = types.StringValue(secretSync.Description)
-		}
-
-		state.SyncOptions, diags = r.ReadSyncOptionsFromApi(ctx, secretSync)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		state.DestinationConfig, diags = r.ReadDestinationConfigFromApi(ctx, secretSync)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		diags = resp.State.Set(ctx, state)
-		resp.Diagnostics.Append(diags...)
+	if !(state.Description.IsNull() && secretSync.Description == "") {
+		state.Description = types.StringValue(secretSync.Description)
 	}
+
+	state.SyncOptions, diags = r.ReadSyncOptionsFromApi(ctx, secretSync)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	state.DestinationConfig, diags = r.ReadDestinationConfigFromApi(ctx, secretSync)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	diags = resp.State.Set(ctx, state)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -497,118 +282,33 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	var secretSyncPlan map[string]interface{}
-	var destinationConfigMap map[string]interface{}
-	var stateID types.String
-
-	if r.CrossplaneCompatible {
-		diags := req.State.GetAttribute(ctx, path.Root("id"), &stateID)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// parse sync_options and transform keys (snake to camel for API calls)
-		var syncOptsJSON types.String
-		diags = req.Plan.GetAttribute(ctx, path.Root("sync_options"), &syncOptsJSON)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		if err := json.Unmarshal([]byte(syncOptsJSON.ValueString()), &secretSyncPlan); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse sync_options: %s", err.Error()))
-			return
-		}
-		secretSyncPlan = transformMapKeys(secretSyncPlan)
-
-		var destConfigJSON types.String
-		diags = req.Plan.GetAttribute(ctx, path.Root("destination_config"), &destConfigJSON)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		var tempDestConfigMap map[string]interface{}
-		if err := json.Unmarshal([]byte(destConfigJSON.ValueString()), &tempDestConfigMap); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse destination_config: %s", err.Error()))
-			return
-		}
-		// we gotta keep the snake_case keys for any potential validation like in the github secret sync
-		destConfigObj, d := mapToTypesObject(tempDestConfigMap, r.DestinationConfigAttributes)
-		resp.Diagnostics.Append(d...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		var stateDestConfigJSON types.String
-		diags = req.State.GetAttribute(ctx, path.Root("destination_config"), &stateDestConfigJSON)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		var tempStateDestConfigMap map[string]interface{}
-		if err := json.Unmarshal([]byte(stateDestConfigJSON.ValueString()), &tempStateDestConfigMap); err != nil {
-			resp.Diagnostics.AddError("Invalid JSON", fmt.Sprintf("Failed to parse state destination_config: %s", err.Error()))
-			return
-		}
-
-		stateDestConfigObj, d := mapToTypesObject(tempStateDestConfigMap, r.DestinationConfigAttributes)
-		resp.Diagnostics.Append(d...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		tempPlan := SecretSyncBaseResourceModel{
-			DestinationConfig: destConfigObj,
-			SyncOptions:       types.ObjectNull(nil),
-		}
-
-		tempState := SecretSyncBaseResourceModel{
-			DestinationConfig: stateDestConfigObj,
-			SyncOptions:       types.ObjectNull(nil),
-		}
-
-		destinationConfigMap, diags = r.ReadDestinationConfigForUpdateFromPlan(ctx, tempPlan, tempState)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-	} else {
-		// normal terraform mode
-		var plan SecretSyncBaseResourceModel
-		diags := req.Plan.Get(ctx, &plan)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		var state SecretSyncBaseResourceModel
-		diags = req.State.Get(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		stateID = state.ID
-
-		secretSyncPlan, diags = r.ReadSyncOptionsForUpdateFromPlan(ctx, plan, state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		destinationConfigMap, diags = r.ReadDestinationConfigForUpdateFromPlan(ctx, plan, state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	// Retrieve values from plan
+	var plan SecretSyncBaseResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	// Validation
+	var state SecretSyncBaseResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretSyncPlan, diags := r.ReadSyncOptionsForUpdateFromPlan(ctx, plan, state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	initialSyncBehavior, ok := secretSyncPlan["initialSyncBehavior"].(string)
-	if !ok || initialSyncBehavior == "" {
+	if !ok {
+		initialSyncBehavior = ""
+	}
+
+	if initialSyncBehavior == "" {
 		resp.Diagnostics.AddError(
 			"Unable to update secret sync",
 			"Failed to parse initial_sync_behavior field",
@@ -629,28 +329,22 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	// Get other plan fields
-	var planName, planDescription, planProjectID, planConnectionID, planEnvironment, planSecretPath types.String
-	var planAutoSyncEnabled types.Bool
-
-	req.Plan.GetAttribute(ctx, path.Root("name"), &planName)
-	req.Plan.GetAttribute(ctx, path.Root("description"), &planDescription)
-	req.Plan.GetAttribute(ctx, path.Root("project_id"), &planProjectID)
-	req.Plan.GetAttribute(ctx, path.Root("connection_id"), &planConnectionID)
-	req.Plan.GetAttribute(ctx, path.Root("environment"), &planEnvironment)
-	req.Plan.GetAttribute(ctx, path.Root("secret_path"), &planSecretPath)
-	req.Plan.GetAttribute(ctx, path.Root("auto_sync_enabled"), &planAutoSyncEnabled)
+	destinationConfigMap, diags := r.ReadDestinationConfigForUpdateFromPlan(ctx, plan, state)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	_, err := r.client.UpdateSecretSync(infisical.UpdateSecretSyncRequest{
 		App:               r.App,
-		ID:                stateID.ValueString(),
-		Name:              planName.ValueString(),
-		Description:       planDescription.ValueString(),
-		ProjectID:         planProjectID.ValueString(),
-		ConnectionID:      planConnectionID.ValueString(),
-		Environment:       planEnvironment.ValueString(),
-		SecretPath:        planSecretPath.ValueString(),
-		AutoSyncEnabled:   planAutoSyncEnabled.ValueBool(),
+		ID:                state.ID.ValueString(),
+		Name:              plan.Name.ValueString(),
+		Description:       plan.Description.ValueString(),
+		ProjectID:         plan.ProjectID.ValueString(),
+		ConnectionID:      plan.ConnectionID.ValueString(),
+		Environment:       plan.Environment.ValueString(),
+		SecretPath:        plan.SecretPath.ValueString(),
+		AutoSyncEnabled:   plan.AutoSyncEnabled.ValueBool(),
 		SyncOptions:       secretSyncPlan,
 		DestinationConfig: destinationConfigMap,
 	})
@@ -663,30 +357,10 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	if r.CrossplaneCompatible {
-		// get original JSON strings from plan to preserve formatting
-		var syncOptsJSON types.String
-		var destConfigJSON types.String
-		req.Plan.GetAttribute(ctx, path.Root("sync_options"), &syncOptsJSON)
-		req.Plan.GetAttribute(ctx, path.Root("destination_config"), &destConfigJSON)
-
-		resp.State.SetAttribute(ctx, path.Root("id"), stateID)
-		resp.State.SetAttribute(ctx, path.Root("name"), planName)
-		resp.State.SetAttribute(ctx, path.Root("description"), planDescription)
-		resp.State.SetAttribute(ctx, path.Root("project_id"), planProjectID)
-		resp.State.SetAttribute(ctx, path.Root("connection_id"), planConnectionID)
-		resp.State.SetAttribute(ctx, path.Root("environment"), planEnvironment)
-		resp.State.SetAttribute(ctx, path.Root("secret_path"), planSecretPath)
-		resp.State.SetAttribute(ctx, path.Root("auto_sync_enabled"), planAutoSyncEnabled)
-		resp.State.SetAttribute(ctx, path.Root("sync_options"), syncOptsJSON.ValueString())
-		resp.State.SetAttribute(ctx, path.Root("destination_config"), destConfigJSON.ValueString())
-	} else {
-		// normal terraform mode
-		var plan SecretSyncBaseResourceModel
-		req.Plan.Get(ctx, &plan)
-
-		diags := resp.State.Set(ctx, plan)
-		resp.Diagnostics.Append(diags...)
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 }
 
@@ -699,8 +373,8 @@ func (r *SecretSyncBaseResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	var stateID types.String
-	diags := req.State.GetAttribute(ctx, path.Root("id"), &stateID)
+	var state SecretSyncBaseResourceModel
+	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -708,7 +382,7 @@ func (r *SecretSyncBaseResource) Delete(ctx context.Context, req resource.Delete
 
 	_, err := r.client.DeleteSecretSync(infisical.DeleteSecretSyncRequest{
 		App: r.App,
-		ID:  stateID.ValueString(),
+		ID:  state.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -717,182 +391,4 @@ func (r *SecretSyncBaseResource) Delete(ctx context.Context, req resource.Delete
 			"Couldn't delete secret sync from Infisical, unexpected error: "+err.Error(),
 		)
 	}
-}
-
-func snakeToCamel(s string) string {
-	parts := strings.Split(s, "_")
-	for i := 1; i < len(parts); i++ {
-		if len(parts[i]) > 0 {
-			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
-		}
-	}
-	return strings.Join(parts, "")
-}
-
-func transformMapKeys(m map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	for k, v := range m {
-		camelKey := snakeToCamel(k)
-
-		// incase of nested maps we recursively transform the keys
-		if nestedMap, ok := v.(map[string]interface{}); ok {
-			result[camelKey] = transformMapKeys(nestedMap)
-		} else {
-			result[camelKey] = v
-		}
-	}
-	return result
-}
-
-func extractAttrValue(v attr.Value) interface{} {
-	if v.IsNull() || v.IsUnknown() {
-		return nil
-	}
-
-	switch val := v.(type) {
-	case types.String:
-		return val.ValueString()
-	case types.Bool:
-		return val.ValueBool()
-	case types.Int64:
-		return val.ValueInt64()
-	case types.Float64:
-		return val.ValueFloat64()
-	case types.List:
-		result := make([]interface{}, 0)
-		for _, elem := range val.Elements() {
-			result = append(result, extractAttrValue(elem))
-		}
-		return result
-	case types.Object:
-		result := make(map[string]interface{})
-		for k, elem := range val.Attributes() {
-			result[k] = extractAttrValue(elem)
-		}
-		return result
-	default:
-		return nil
-	}
-}
-
-func areJSONEquivalent(json1, json2 string) bool {
-	var obj1, obj2 interface{}
-
-	if err := json.Unmarshal([]byte(json1), &obj1); err != nil {
-		return false
-	}
-	if err := json.Unmarshal([]byte(json2), &obj2); err != nil {
-		return false
-	}
-
-	return reflect.DeepEqual(obj1, obj2)
-}
-
-// helper for converting map[string] to types.Object.
-func mapToTypesObject(m map[string]interface{}, attrTypes map[string]schema.Attribute) (types.Object, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	attrTypeMap := make(map[string]attr.Type)
-	attrValues := make(map[string]attr.Value)
-
-	for key, schemaAttr := range attrTypes {
-		// Determine the type from schema
-		switch a := schemaAttr.(type) {
-		case schema.StringAttribute:
-			attrTypeMap[key] = types.StringType
-			if val, ok := m[key].(string); ok {
-				attrValues[key] = types.StringValue(val)
-			} else {
-				attrValues[key] = types.StringNull()
-			}
-		case schema.BoolAttribute:
-			attrTypeMap[key] = types.BoolType
-			if val, ok := m[key].(bool); ok {
-				attrValues[key] = types.BoolValue(val)
-			} else {
-				attrValues[key] = types.BoolNull()
-			}
-		case schema.Int64Attribute:
-			attrTypeMap[key] = types.Int64Type
-			if val, ok := m[key].(float64); ok {
-				attrValues[key] = types.Int64Value(int64(val))
-			} else {
-				attrValues[key] = types.Int64Null()
-			}
-		case schema.ListAttribute:
-			attrTypeMap[key] = types.ListType{ElemType: a.ElementType}
-			if val, ok := m[key].([]interface{}); ok {
-				elemValues := make([]attr.Value, len(val))
-				for i, v := range val {
-					if a.ElementType == types.Int64Type {
-						if fVal, ok := v.(float64); ok {
-							elemValues[i] = types.Int64Value(int64(fVal))
-						}
-					}
-				}
-				listVal, d := types.ListValue(a.ElementType, elemValues)
-				diags.Append(d...)
-				attrValues[key] = listVal
-			} else {
-				attrValues[key] = types.ListNull(a.ElementType)
-			}
-		}
-	}
-
-	obj, d := types.ObjectValue(attrTypeMap, attrValues)
-	diags.Append(d...)
-	return obj, diags
-}
-
-func buildJSONSchemaDescription(baseDesc string, attrs map[string]schema.Attribute) string {
-	var fields []string
-
-	for name, attr := range attrs {
-		var fieldDesc string
-		var required string
-
-		switch a := attr.(type) {
-		case schema.StringAttribute:
-			if a.Required {
-				required = "required"
-			} else {
-				required = "optional"
-			}
-			fieldDesc = fmt.Sprintf("  - `%s` (%s): %s", name, required, a.Description)
-
-		case schema.BoolAttribute:
-			if a.Required {
-				required = "required"
-			} else {
-				required = "optional"
-			}
-			fieldDesc = fmt.Sprintf("  - `%s` (%s): %s", name, required, a.Description)
-
-		case schema.Int64Attribute:
-			if a.Required {
-				required = "required"
-			} else {
-				required = "optional"
-			}
-			fieldDesc = fmt.Sprintf("  - `%s` (%s): %s", name, required, a.Description)
-
-		case schema.ListAttribute:
-			if a.Required {
-				required = "required"
-			} else {
-				required = "optional"
-			}
-			fieldDesc = fmt.Sprintf("  - `%s` (%s): %s", name, required, a.Description)
-		}
-
-		if fieldDesc != "" {
-			fields = append(fields, fieldDesc)
-		}
-	}
-
-	// Sort alphabetically for consistency
-	sort.Strings(fields)
-
-	return fmt.Sprintf("%s Must be a JSON string with the following structure:\n\n%s",
-		baseDesc, strings.Join(fields, "\n"))
 }

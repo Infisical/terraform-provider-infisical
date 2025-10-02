@@ -25,11 +25,10 @@ type SecretSyncAzureDevOpsSyncOptionsModel struct {
 
 func NewSecretSyncAzureDevOpsResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncAppAzureDevOps,
-		SyncName:             "Azure DevOps",
-		ResourceTypeName:     "_secret_sync_azure_devops",
-		AppConnection:        infisical.AppConnectionAppAzure,
+		App:              infisical.SecretSyncAppAzureDevOps,
+		SyncName:         "Azure DevOps",
+		ResourceTypeName: "_secret_sync_azure_devops",
+		AppConnection:    infisical.AppConnectionAppAzure,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"devops_project_id": schema.StringAttribute{
 				Required:    true,

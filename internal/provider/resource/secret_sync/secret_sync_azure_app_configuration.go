@@ -28,11 +28,10 @@ type SecretSyncAzureAppConfigurationSyncOptionsModel struct {
 
 func NewSecretSyncAzureAppConfigurationResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncAppAzureAppConfiguration,
-		SyncName:             "Azure App Configuration",
-		ResourceTypeName:     "_secret_sync_azure_app_configuration",
-		AppConnection:        infisical.AppConnectionAppAzure,
+		App:              infisical.SecretSyncAppAzureAppConfiguration,
+		SyncName:         "Azure App Configuration",
+		ResourceTypeName: "_secret_sync_azure_app_configuration",
+		AppConnection:    infisical.AppConnectionAppAzure,
 		SyncOptionsAttributes: map[string]schema.Attribute{
 			"initial_sync_behavior": schema.StringAttribute{
 				Required:    true,

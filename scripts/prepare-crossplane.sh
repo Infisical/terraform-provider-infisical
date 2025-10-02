@@ -43,26 +43,27 @@ if [ -d "$SOURCE_DIR/project_template_resource" ]; then
 fi
 
 
-
-# In the SOURCE_DIR/secret_sync folder, we recursively go over each file except the base_secret_sync.go file, and replace `CrossplaneCompatible: false` with `CrossplaneCompatible: true`
 for file in "$DESTINATION_DIR/secret_sync"/*.go; do
-  if [ "$(basename "$file")" != "base_secret_sync.go" ]; then
-    sed -i.bak 's/CrossplaneCompatible: false/CrossplaneCompatible: true/g' "$file"
-    rm -f "${file}.bak"
 
-    file_name="$(basename "$file" .go)"
-
-    if [ ! -f "$EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf" ]; then
-      echo "Error: crossplane_resource.tf file not found at $EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf. Make sure you create crossplane resource examples for all secret syncs."
-      exit 1
-    fi
-
-    # Renames the crossplane_resource.tf file to resource.tf
-    mv "$EXAMPLES_DIR/infisical_${file_name}/crossplane_resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
-
-    echo "Prepared $file for Crossplane compatibility"
+  if [ "$(basename "$file")" = "base_secret_sync.go" ]; then
+    echo "Replacing base_secret_sync.go"
+    mv -f "$SOURCE_DIR/secret_sync/base_secret_sync.go" "$DESTINATION_DIR/secret_sync/base_secret_sync.go"
+    continue
   fi
+
+  file_name="$(basename "$file" .go)"
+
+  if [ ! -f "$EXAMPLES_DIR/infisical_${file_name}/resource.tf" ]; then
+    echo "Error: resource.tf file not found at $EXAMPLES_DIR/infisical_${file_name}/resource.tf. Make sure you create crossplane resource examples for all secret syncs."
+    exit 1
+  fi
+
+  mv "$EXAMPLES_DIR/infisical_${file_name}/resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
+
+  echo "Prepared $file for Crossplane compatibility"
 done
+
+
 
 # Regenerate documentation
 echo "Regenerating documentation..."

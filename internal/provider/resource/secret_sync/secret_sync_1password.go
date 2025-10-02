@@ -27,11 +27,10 @@ type SecretSync1PasswordSyncOptionsModel struct {
 
 func NewSecretSync1PasswordResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncApp1Password,
-		SyncName:             "1Password",
-		ResourceTypeName:     "_secret_sync_1password",
-		AppConnection:        infisical.AppConnectionApp1Password,
+		App:              infisical.SecretSyncApp1Password,
+		SyncName:         "1Password",
+		ResourceTypeName: "_secret_sync_1password",
+		AppConnection:    infisical.AppConnectionApp1Password,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vault_id": schema.StringAttribute{
 				Required:    true,

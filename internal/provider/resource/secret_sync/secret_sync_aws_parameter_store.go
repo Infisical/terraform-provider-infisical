@@ -35,11 +35,10 @@ type SecretSyncAwsParameterStoreSyncOptionsModel struct {
 
 func NewSecretSyncAwsParameterStoreResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncAppAWSParameterStore,
-		SyncName:             "AWS Parameter Store",
-		ResourceTypeName:     "_secret_sync_aws_parameter_store",
-		AppConnection:        infisical.AppConnectionAppAWS,
+		App:              infisical.SecretSyncAppAWSParameterStore,
+		SyncName:         "AWS Parameter Store",
+		ResourceTypeName: "_secret_sync_aws_parameter_store",
+		AppConnection:    infisical.AppConnectionAppAWS,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,

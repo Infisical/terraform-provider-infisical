@@ -130,11 +130,10 @@ type SecretSyncGithubSyncOptionsModel struct {
 
 func NewSecretSyncGithubResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncAppGithub,
-		SyncName:             "Github",
-		ResourceTypeName:     "_secret_sync_github",
-		AppConnection:        infisical.AppConnectionAppGithub,
+		App:              infisical.SecretSyncAppGithub,
+		SyncName:         "Github",
+		ResourceTypeName: "_secret_sync_github",
+		AppConnection:    infisical.AppConnectionAppGithub,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{
 				Required:    true,

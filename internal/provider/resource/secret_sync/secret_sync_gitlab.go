@@ -117,11 +117,10 @@ type SecretSyncGitlabSyncOptionsModel struct {
 
 func NewSecretSyncGitlabResource() resource.Resource {
 	return &SecretSyncBaseResource{
-		CrossplaneCompatible: false,
-		App:                  infisical.SecretSyncAppGitlab,
-		SyncName:             "GitLab",
-		ResourceTypeName:     "_secret_sync_gitlab",
-		AppConnection:        infisical.AppConnectionAppGitlab,
+		App:              infisical.SecretSyncAppGitlab,
+		SyncName:         "GitLab",
+		ResourceTypeName: "_secret_sync_gitlab",
+		AppConnection:    infisical.AppConnectionAppGitlab,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{
 				Required:    true,
