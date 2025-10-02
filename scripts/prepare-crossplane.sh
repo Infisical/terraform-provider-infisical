@@ -43,24 +43,26 @@ if [ -d "$SOURCE_DIR/project_template_resource" ]; then
 fi
 
 
-for file in "$DESTINATION_DIR/secret_sync"/*.go; do
-
-  if [ "$(basename "$file")" = "base_secret_sync.go" ]; then
+for item in "$DESTINATION_DIR/secret_sync"/* "$SOURCE_DIR/secret_sync"/*/; do
+  # Skip if doesn't exist
+  [ -e "$item" ] || continue
+  
+  # Handle base_secret_sync.go file
+  if [ "$(basename "$item")" = "base_secret_sync.go" ]; then
     echo "Replacing base_secret_sync.go"
     mv -f "$SOURCE_DIR/secret_sync/base_secret_sync.go" "$DESTINATION_DIR/secret_sync/base_secret_sync.go"
     continue
   fi
-
-  file_name="$(basename "$file" .go)"
-
-  if [ ! -f "$EXAMPLES_DIR/infisical_${file_name}/resource.tf" ]; then
-    echo "Error: resource.tf file not found at $EXAMPLES_DIR/infisical_${file_name}/resource.tf. Make sure you create crossplane resource examples for all secret syncs."
-    exit 1
+  
+  # Handle directories - copy resource.tf files
+  if [ -d "$item" ] && [[ "$item" == "$SOURCE_DIR"* ]]; then
+    folder_name="$(basename "$item")"
+    
+    if [ -f "$item/resource.tf" ]; then
+      echo "Copying resource.tf for $folder_name"
+      cp -f "$item/resource.tf" "$EXAMPLES_DIR/infisical_${folder_name}/"
+    fi
   fi
-
-  mv "$EXAMPLES_DIR/infisical_${file_name}/resource.tf" "$EXAMPLES_DIR/infisical_${file_name}/resource.tf"
-
-  echo "Prepared $file for Crossplane compatibility"
 done
 
 
