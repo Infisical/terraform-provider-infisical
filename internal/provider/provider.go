@@ -211,9 +211,9 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	serviceToken := os.Getenv(infisical.INFISICAL_SERVICE_TOKEN_NAME)
 
 	// Machine Identity
-	clientId := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME)         // done
-	clientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME) // done
-	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)            // done
+	clientId := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME)
+	clientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME)
+	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)
 	oidcTokenEnvName := os.Getenv(infisical.INFISICAL_OIDC_AUTH_TOKEN_NAME)
 	token := os.Getenv(infisical.INFISICAL_TOKEN_NAME)
 	serviceAccountToken := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_NAME)
