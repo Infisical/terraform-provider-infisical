@@ -292,8 +292,8 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		}
 	}
 
+	// strict env vars check:
 	if authStrategy == "" {
-		// strict env vars check:
 
 		// ? note(daniel): this fix only works for universal auth and token auth.
 		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
@@ -301,8 +301,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = envVarToken
-		}
-		if envVarClientId, envVarClientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME), os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME); envVarClientId != "" && envVarClientSecret != "" {
+		} else if envVarClientId, envVarClientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME), os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME); envVarClientId != "" && envVarClientSecret != "" {
 			authStrategy = infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
 			clientId = envVarClientId
 			clientSecret = envVarClientSecret
