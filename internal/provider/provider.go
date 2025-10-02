@@ -211,9 +211,9 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	serviceToken := os.Getenv(infisical.INFISICAL_SERVICE_TOKEN_NAME)
 
 	// Machine Identity
-	clientId := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME)
-	clientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME)
-	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)
+	clientId := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME)         // done
+	clientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME) // done
+	identityId := os.Getenv(infisical.INFISICAL_MACHINE_IDENTITY_ID_NAME)            // done
 	oidcTokenEnvName := os.Getenv(infisical.INFISICAL_OIDC_AUTH_TOKEN_NAME)
 	token := os.Getenv(infisical.INFISICAL_TOKEN_NAME)
 	serviceAccountToken := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_NAME)
@@ -235,6 +235,10 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		clientSecret = config.ClientSecret.ValueString()
 	}
 
+	if config.Auth != nil && !config.Auth.Token.IsNull() {
+		token = config.Auth.Token.ValueString()
+	}
+
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
@@ -244,7 +248,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	var authStrategy infisical.AuthStrategyType
+	var authStrategy infisical.AuthStrategyType = ""
 
 	if config.Auth != nil {
 		if config.Auth.Oidc != nil {
@@ -286,6 +290,24 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = config.Auth.Token.ValueString()
 		}
+	}
+
+	if authStrategy == "" {
+		// strict env vars check:
+
+		// ? note(daniel): this fix only works for universal auth and token auth.
+		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
+		// ? We should have a field for specifying the target auth strategy, like we do for the CLI (--method=aws-auth as an example)
+		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
+			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
+			token = envVarToken
+		}
+		if envVarClientId, envVarClientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME), os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME); envVarClientId != "" && envVarClientSecret != "" {
+			authStrategy = infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
+			clientId = envVarClientId
+			clientSecret = envVarClientSecret
+		}
+
 	}
 
 	client, err := infisical.NewClient(infisical.Config{
