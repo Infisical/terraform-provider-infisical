@@ -244,7 +244,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	var authStrategy infisical.AuthStrategyType
+	var authStrategy infisical.AuthStrategyType = ""
 
 	if config.Auth != nil {
 		if config.Auth.Oidc != nil {
@@ -286,6 +286,18 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = config.Auth.Token.ValueString()
 		}
+	}
+
+	// strict env vars check:
+	if authStrategy == "" {
+		// ? note(daniel): this fix only works for token auth.
+		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
+		// ? We should have a field for specifying the target auth strategy, like we do for the CLI (--method=aws-auth as an example)
+		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
+			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
+			token = envVarToken
+		}
+
 	}
 
 	client, err := infisical.NewClient(infisical.Config{
