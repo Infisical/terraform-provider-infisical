@@ -42,6 +42,31 @@ if [ -d "$SOURCE_DIR/project_template_resource" ]; then
   cp -f "$SOURCE_DIR/project_template_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_template/"
 fi
 
+
+for item in "$DESTINATION_DIR/secret_sync"/* "$SOURCE_DIR/secret_sync"/*/; do
+  # Skip if doesn't exist
+  [ -e "$item" ] || continue
+  
+  # Handle base_secret_sync.go file
+  if [ "$(basename "$item")" = "base_secret_sync.go" ]; then
+    echo "Replacing base_secret_sync.go"
+    mv -f "$SOURCE_DIR/secret_sync/base_secret_sync.go" "$DESTINATION_DIR/secret_sync/base_secret_sync.go"
+    continue
+  fi
+  
+  # Handle directories - copy resource.tf files
+  if [ -d "$item" ] && [[ "$item" == "$SOURCE_DIR"* ]]; then
+    folder_name="$(basename "$item")"
+    
+    if [ -f "$item/resource.tf" ]; then
+      echo "Copying resource.tf for $folder_name"
+      cp -f "$item/resource.tf" "$EXAMPLES_DIR/infisical_${folder_name}/"
+    fi
+  fi
+done
+
+
+
 # Regenerate documentation
 echo "Regenerating documentation..."
 go generate ./...
