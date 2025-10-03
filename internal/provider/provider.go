@@ -235,10 +235,6 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		clientSecret = config.ClientSecret.ValueString()
 	}
 
-	if config.Auth != nil && !config.Auth.Token.IsNull() {
-		token = config.Auth.Token.ValueString()
-	}
-
 	// set default to cloud infisical if host is empty
 	if host == "" {
 		host = "https://app.infisical.com"
@@ -294,17 +290,12 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 
 	// strict env vars check:
 	if authStrategy == "" {
-
-		// ? note(daniel): this fix only works for universal auth and token auth.
+		// ? note(daniel): this fix only works for token auth.
 		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
 		// ? We should have a field for specifying the target auth strategy, like we do for the CLI (--method=aws-auth as an example)
 		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = envVarToken
-		} else if envVarClientId, envVarClientSecret := os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID_NAME), os.Getenv(infisical.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET_NAME); envVarClientId != "" && envVarClientSecret != "" {
-			authStrategy = infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY
-			clientId = envVarClientId
-			clientSecret = envVarClientSecret
 		}
 
 	}
