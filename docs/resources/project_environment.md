@@ -68,6 +68,6 @@ resource "infisical_project_environment" "pre-prod" {
 Import is supported using the following syntax:
 
 ```shell
-# This will import the resource by its identity ID
+# This will import the project environment by the project environment ID
 terraform import infisical_project_environment.example <project_environment_id>
 ```
