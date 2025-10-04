@@ -311,6 +311,15 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
+	// Crossplane will attempt to call the Read() function even before the resource is created.
+	// When that happens, the state ID will be empty, which means it will try to call "api/v1/secret-syncs/${APP}/${stateId}" <- This will fail.
+	// It will fail because ${stateId} is empty. This makes it call the LIST secret syncs endpoint, which requires a project ID.
+	// Finally, crossplane will fail with a zod validation error, because it's hitting the wrong endpoint!
+	if stateID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	secretSync, err := r.client.GetSecretSyncById(infisical.GetSecretSyncByIdRequest{
 		App: r.App,
 		ID:  stateID.ValueString(),
