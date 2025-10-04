@@ -76,3 +76,12 @@ resource "infisical_project" "kms-project" {
 
 - `id` (String) The ID of the project
 - `last_updated` (String)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the project by the project ID
+terraform import infisical_project.example <project_id>
+```
