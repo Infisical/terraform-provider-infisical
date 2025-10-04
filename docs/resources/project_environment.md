@@ -62,3 +62,12 @@ resource "infisical_project_environment" "pre-prod" {
 ### Read-Only
 
 - `id` (String) The ID of the environment
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the resource by its identity ID
+terraform import infisical_project_environment.example <project_environment_id>
+```
