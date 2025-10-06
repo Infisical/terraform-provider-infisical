@@ -19,11 +19,20 @@ provider "infisical" {
 
 
 resource "infisical_access_approval_policy" "prod-policy" {
-  project_id         = "5156a345-e460-416b-84fc-b14b426b1cb3"
-  name               = "my-approval-policy"
-  environment_slugs  = ["prod"]
-  secret_path        = "/"
-  approvers          = "[{\"type\":\"group\",\"id\":\"60782603-18bd-4f83-a312-6a9c501f4914\"},{\"type\":\"user\",\"username\":\"vlad@infisical.com\"}]"
+  project_id        = "5156a345-e460-416b-84fc-b14b426b1cb3"
+  name              = "my-approval-policy"
+  environment_slugs = ["prod"]
+  secret_path       = "/"
+
+  group_approvers = [
+    // array of group IDs
+    "60782603-18bd-4f83-a312-6a9c501f4914",
+  ]
+  user_approvers = [
+    // array of usernames
+    "vlad@infisical.com",
+  ]
+
   required_approvals = 1
   enforcement_level  = "soft"
 }
