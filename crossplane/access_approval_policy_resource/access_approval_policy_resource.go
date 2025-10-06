@@ -2,7 +2,6 @@ package resource
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
@@ -13,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -46,7 +44,8 @@ type accessApprovalPolicyResourceModel struct {
 	Name              types.String `tfsdk:"name"`
 	EnvironmentSlugs  types.List   `tfsdk:"environment_slugs"`
 	SecretPath        types.String `tfsdk:"secret_path"`
-	Approvers         types.String `tfsdk:"approvers"` // comes in as a string, and then we parse it to []AccessApproverJSON, and then to []AccessApprover
+	GroupApprovers    types.List   `tfsdk:"group_approvers"` // array of group IDs
+	UserApprovers     types.List   `tfsdk:"user_approvers"`  // array of usernames
 	RequiredApprovals types.Int64  `tfsdk:"required_approvals"`
 	EnforcementLevel  types.String `tfsdk:"enforcement_level"`
 }
@@ -77,23 +76,26 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"environment_slugs": schema.ListAttribute{
-				Description: "The environments to apply the access approval policy to",
-				Required:    true,
-				ElementType: types.StringType,
+				Description:   "The environments to apply the access approval policy to",
+				Required:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"secret_path": schema.StringAttribute{
 				Description: "The secret path to apply the access approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.StringAttribute{
-				Required:    true,
-				Description: "The required approvers",
-				PlanModifiers: []planmodifier.String{
-					pkg.UnorderedJsonEquivalentModifier{},
-				},
-				Validators: []validator.String{
-					infisicaltf.JsonStringValidator,
-				},
+			"group_approvers": schema.ListAttribute{
+				Required:      true,
+				Description:   "Array of group IDs belonging to the groups to assign as approvers. Note either group IDs, usernames, or both must be provided.",
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
+			},
+			"user_approvers": schema.ListAttribute{
+				Required:      true,
+				Description:   "Array of usernames belonging to the users to assign as approvers",
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"required_approvals": schema.Int64Attribute{
 				Description: "The number of required approvers",
@@ -159,57 +161,56 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	var approversJSON []AccessApproverJSON
-	err = json.Unmarshal([]byte(plan.Approvers.ValueString()), &approversJSON)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing approvers JSON",
-			fmt.Sprintf("Failed to parse approvers JSON: %s", err.Error()),
-		)
-		return
+	groupApprovers := make([]string, 0)
+	userApprovers := make([]string, 0)
+
+	if approvers := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.GroupApprovers); approvers != nil {
+		groupApprovers = append(groupApprovers, approvers...)
 	}
 
-	var approvers []infisical.CreateAccessApprovalPolicyApprover
-	for _, el := range approversJSON {
-		if el.Type == "user" {
-			if el.Name == "" {
-				resp.Diagnostics.AddError(
-					"Field username is required for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-			if el.ID != "" {
-				resp.Diagnostics.AddError(
-					"Field ID cannot be used for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
+	if approvers := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.UserApprovers); approvers != nil {
+		userApprovers = append(userApprovers, approvers...)
+	}
+
+	var combinedApprovers []infisical.CreateAccessApprovalPolicyApprover
+	for idx, username := range userApprovers {
+
+		if username == "" {
+			resp.Diagnostics.AddError(
+				"Username for user approvers is required",
+				fmt.Sprintf("Must provide username for user approvers at index %d", idx),
+			)
+			return
 		}
 
-		if el.Type == "group" {
-			if el.ID == "" {
-				resp.Diagnostics.AddError(
-					"Field ID is required for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-			if el.Name != "" {
-				resp.Diagnostics.AddError(
-					"Field username cannot be used for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-		}
-
-		approvers = append(approvers, infisical.CreateAccessApprovalPolicyApprover{
-			ID:   el.ID,
-			Name: el.Name,
-			Type: el.Type,
+		combinedApprovers = append(combinedApprovers, infisical.CreateAccessApprovalPolicyApprover{
+			Name: username,
+			Type: "user",
 		})
+
+		for idx, groupId := range groupApprovers {
+
+			if groupId == "" {
+				resp.Diagnostics.AddError(
+					"Group ID for group approvers is required",
+					fmt.Sprintf("Must provide group_id for group approvers at index %d", idx),
+				)
+				return
+			}
+
+			combinedApprovers = append(combinedApprovers, infisical.CreateAccessApprovalPolicyApprover{
+				ID:   groupId,
+				Type: "group",
+			})
+		}
+	}
+
+	if len(combinedApprovers) == 0 {
+		resp.Diagnostics.AddError(
+			"No approvers provided",
+			"Must provide at least one approver, either group IDs or user usernames must be provided",
+		)
+		return
 	}
 
 	environments := make([]string, 0)
@@ -219,18 +220,12 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		environments = append(environments, envSlugs...)
 	}
 
-	var environment string
-	if len(environments) > 0 {
-		environment = environments[0]
-	}
-
 	accessApprovalPolicy, err := r.client.CreateAccessApprovalPolicy(infisical.CreateAccessApprovalPolicyRequest{
 		Name:              plan.Name.ValueString(),
 		ProjectSlug:       projectDetail.Slug,
 		Environments:      environments,
-		Environment:       environment,
 		SecretPath:        plan.SecretPath.ValueString(),
-		Approvers:         approvers,
+		Approvers:         combinedApprovers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
 	})
@@ -282,7 +277,7 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching access approval policy from your project",
-				"Couldn't read access approval policy from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read access approval policy from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -293,31 +288,31 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequiredApprovals = types.Int64Value(accessApprovalPolicy.AccessApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(accessApprovalPolicy.AccessApprovalPolicy.EnforcementLevel)
 
-	approvers := make([]AccessApproverJSON, len(accessApprovalPolicy.AccessApprovalPolicy.Approvers))
-	for i, el := range accessApprovalPolicy.AccessApprovalPolicy.Approvers {
+	groupApprovers := make([]string, 0)
+	userApprovers := make([]string, 0)
+
+	for _, el := range accessApprovalPolicy.AccessApprovalPolicy.Approvers {
 		if el.Type == "user" {
-			approvers[i] = AccessApproverJSON{
-				Name: el.Name,
-				Type: el.Type,
-			}
+			userApprovers = append(userApprovers, el.Name)
 		} else {
-			approvers[i] = AccessApproverJSON{
-				ID:   el.ID,
-				Type: el.Type,
-			}
+			groupApprovers = append(groupApprovers, el.ID)
 		}
 	}
 
-	approversJSON, err := json.Marshal(approvers)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error marshalling approvers",
-			"Couldn't marshall approvers, unexpected error: "+err.Error(),
-		)
-		return
+	if len(groupApprovers) > 0 {
+		state.GroupApprovers, diags = types.ListValueFrom(ctx, types.StringType, groupApprovers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
-
-	state.Approvers = types.StringValue(string(approversJSON))
+	if len(userApprovers) > 0 {
+		state.UserApprovers, diags = types.ListValueFrom(ctx, types.StringType, userApprovers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 
 	if len(accessApprovalPolicy.AccessApprovalPolicy.Environments) > 0 {
 		// Extract environment slugs from the environment objects
@@ -382,67 +377,63 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	var approvers []infisical.UpdateAccessApprovalPolicyApprover
+	var combinedApprovers []infisical.UpdateAccessApprovalPolicyApprover
 
-	var approversJSON []AccessApproverJSON
-	err := json.Unmarshal([]byte(plan.Approvers.ValueString()), &approversJSON)
-	if err != nil {
+	groupApprovers := make([]string, 0)
+	userApprovers := make([]string, 0)
+
+	if approvers := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.GroupApprovers); approvers != nil {
+		groupApprovers = append(groupApprovers, approvers...)
+	}
+
+	if approvers := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.UserApprovers); approvers != nil {
+		userApprovers = append(userApprovers, approvers...)
+	}
+
+	for idx, username := range userApprovers {
+		if username == "" {
+			resp.Diagnostics.AddError(
+				"Username for user approvers is required",
+				fmt.Sprintf("Must provide username for user approvers at index %d", idx),
+			)
+			return
+		}
+
+		combinedApprovers = append(combinedApprovers, infisical.UpdateAccessApprovalPolicyApprover{
+			Name: username,
+			Type: "user",
+		})
+	}
+	for idx, groupId := range groupApprovers {
+		if groupId == "" {
+			resp.Diagnostics.AddError(
+				"Group ID for group approvers is required",
+				fmt.Sprintf("Must provide group_id for group approvers at index %d", idx),
+			)
+			return
+		}
+
+		combinedApprovers = append(combinedApprovers, infisical.UpdateAccessApprovalPolicyApprover{
+			ID:   groupId,
+			Type: "group",
+		})
+	}
+
+	if len(combinedApprovers) == 0 {
 		resp.Diagnostics.AddError(
-			"Error parsing approvers JSON",
-			fmt.Sprintf("Failed to parse approvers JSON: %s", err.Error()),
+			"No approvers provided",
+			"Must provide at least one approver, either group IDs or user usernames must be provided",
 		)
 		return
 	}
 
-	for _, el := range approversJSON {
-		if el.Type == "user" {
-			if el.Name == "" {
-				resp.Diagnostics.AddError(
-					"Field username is required for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-			if el.ID != "" {
-				resp.Diagnostics.AddError(
-					"Field ID cannot be used for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-		}
-
-		if el.Type == "group" {
-			if el.ID == "" {
-				resp.Diagnostics.AddError(
-					"Field ID is required for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-			if el.Name != "" {
-				resp.Diagnostics.AddError(
-					"Field username cannot be used for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-		}
-
-		approvers = append(approvers, infisical.UpdateAccessApprovalPolicyApprover{
-			ID:   el.ID,
-			Name: el.Name,
-			Type: el.Type,
-		})
-	}
-
 	environments := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
 
-	_, err = r.client.UpdateAccessApprovalPolicy(infisical.UpdateAccessApprovalPolicyRequest{
+	_, err := r.client.UpdateAccessApprovalPolicy(infisical.UpdateAccessApprovalPolicyRequest{
 		ID:                plan.ID.ValueString(),
 		Name:              plan.Name.ValueString(),
 		SecretPath:        plan.SecretPath.ValueString(),
-		Approvers:         approvers,
+		Approvers:         combinedApprovers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:  plan.EnforcementLevel.ValueString(),
 		Environments:      environments,
