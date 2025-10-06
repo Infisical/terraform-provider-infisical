@@ -86,13 +86,13 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Required:    true,
 			},
 			"group_approvers": schema.ListAttribute{
-				Required:      true,
+				Optional:      true,
 				Description:   "Array of group IDs belonging to the groups to assign as approvers. Note either group IDs, usernames, or both must be provided.",
 				ElementType:   types.StringType,
 				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"user_approvers": schema.ListAttribute{
-				Required:      true,
+				Optional:      true,
 				Description:   "Array of usernames belonging to the users to assign as approvers",
 				ElementType:   types.StringType,
 				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
