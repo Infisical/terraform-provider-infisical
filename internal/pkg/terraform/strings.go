@@ -26,23 +26,6 @@ func StringListToGoStringSlice(ctx context.Context, diagnostics diag.Diagnostics
 	return output
 }
 
-func StringSetToGoStringSlice(ctx context.Context, diagnostics diag.Diagnostics, stringSet basetypes.SetValue) []string {
-	tfStringSlice := make([]types.String, 0, len(stringSet.Elements()))
-	if !stringSet.IsNull() && !stringSet.IsUnknown() {
-		diags := stringSet.ElementsAs(ctx, &tfStringSlice, false)
-		diagnostics.Append(diags...)
-		if diagnostics.HasError() {
-			return nil
-		}
-	}
-
-	output := make([]string, 0, len(tfStringSlice))
-	for _, el := range tfStringSlice {
-		output = append(output, el.ValueString())
-	}
-	return output
-}
-
 func IsAttrValueEmpty(value attr.Value) bool {
 	if value.IsNull() || value.IsUnknown() {
 		return true
