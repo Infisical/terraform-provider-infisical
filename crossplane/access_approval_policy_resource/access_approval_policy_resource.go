@@ -187,22 +187,22 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 			Name: username,
 			Type: "user",
 		})
+	}
 
-		for idx, groupId := range groupApprovers {
+	for idx, groupId := range groupApprovers {
 
-			if groupId == "" {
-				resp.Diagnostics.AddError(
-					"Group ID for group approvers is required",
-					fmt.Sprintf("Must provide group_id for group approvers at index %d", idx),
-				)
-				return
-			}
-
-			combinedApprovers = append(combinedApprovers, infisical.CreateAccessApprovalPolicyApprover{
-				ID:   groupId,
-				Type: "group",
-			})
+		if groupId == "" {
+			resp.Diagnostics.AddError(
+				"Group ID for group approvers is required",
+				fmt.Sprintf("Must provide group_id for group approvers at index %d", idx),
+			)
+			return
 		}
+
+		combinedApprovers = append(combinedApprovers, infisical.CreateAccessApprovalPolicyApprover{
+			ID:   groupId,
+			Type: "group",
+		})
 	}
 
 	if len(combinedApprovers) == 0 {
