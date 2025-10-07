@@ -372,7 +372,7 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 	if infisicaltf.IsAttrValueEmpty(plan.EnvironmentSlugs) {
 		resp.Diagnostics.AddError(
 			"Unable to update access approval policy",
-			fmt.Sprintf("Cannot change environment, previous environment: %s, new environment: %s", state.EnvironmentSlugs, plan.EnvironmentSlugs),
+			fmt.Sprintf("Cannot change environment to empty list. previous environment: %s, new environment: %s", state.EnvironmentSlugs, plan.EnvironmentSlugs),
 		)
 		return
 	}
