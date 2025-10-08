@@ -266,6 +266,11 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	accessApprovalPolicy, err := r.client.GetAccessApprovalPolicyByID(infisical.GetAccessApprovalPolicyByIDRequest{
 		ID: state.ID.ValueString(),
 	})
