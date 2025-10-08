@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -69,9 +70,10 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"environment_slugs": schema.ListAttribute{
-				Description: "The environments to apply the access approval policy to",
-				Optional:    true,
-				ElementType: types.StringType,
+				Description:   "The environments to apply the access approval policy to",
+				Optional:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"environment_slug": schema.StringAttribute{
 				Description: "(DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to",
@@ -225,16 +227,23 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 	} else {
 		environments = append(environments, plan.EnvironmentSlug.ValueString())
 	}
-	var environment string
-	if len(environments) > 0 {
-		environment = environments[0]
+
+	if plan.EnvironmentSlug.ValueString() != "" && len(environments) > 0 {
+		resp.Diagnostics.AddError(
+			"Error creating access approval policy",
+			"Cannot provide both environment_slugs and environment_slug",
+		)
+		return
+	}
+
+	if !plan.EnvironmentSlug.IsNull() && plan.EnvironmentSlug.ValueString() != "" {
+		environments = append(environments, plan.EnvironmentSlug.ValueString())
 	}
 
 	accessApprovalPolicy, err := r.client.CreateAccessApprovalPolicy(infisical.CreateAccessApprovalPolicyRequest{
 		Name:              plan.Name.ValueString(),
 		ProjectSlug:       projectDetail.Slug,
 		Environments:      environments,
-		Environment:       environment,
 		SecretPath:        plan.SecretPath.ValueString(),
 		Approvers:         approvers,
 		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
