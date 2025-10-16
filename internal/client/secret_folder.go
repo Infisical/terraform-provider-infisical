@@ -112,7 +112,7 @@ func (client Client) DeleteSecretFolder(request DeleteSecretFolderRequest) (Dele
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Delete("api/v1/folders/" + request.ID)
+		Delete("api/v2/folders/" + request.ID)
 
 	if err != nil {
 		return DeleteSecretFolderResponse{}, errors.NewGenericRequestError(operationDeleteSecretFolder, err)
