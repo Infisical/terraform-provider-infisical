@@ -34,6 +34,7 @@ type projectSecretFolderResourceModel struct {
 	EnvironmentSlug types.String `tfsdk:"environment_slug"`
 	FolderPath      types.String `tfsdk:"folder_path"`
 	Path            types.String `tfsdk:"path"`
+	ForceDelete     types.Bool   `tfsdk:"force_delete"`
 }
 
 // Metadata returns the resource type name.
@@ -77,6 +78,10 @@ func (r *projectSecretFolderResource) Schema(_ context.Context, _ resource.Schem
 			"path": schema.StringAttribute{
 				Description: "The full path of the folder, including its name.",
 				Computed:    true,
+			},
+			"force_delete": schema.BoolAttribute{
+				Description: "Whether to force delete the folder even if it contains resources.",
+				Optional:    true,
 			},
 		},
 	}
@@ -266,6 +271,7 @@ func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.D
 		ProjectID:   state.ProjectID.ValueString(),
 		Environment: state.EnvironmentSlug.ValueString(),
 		SecretPath:  state.FolderPath.ValueString(),
+		ForceDelete: state.ForceDelete.ValueBool(),
 	})
 
 	if err != nil {

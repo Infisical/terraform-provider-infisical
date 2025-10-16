@@ -1195,6 +1195,7 @@ type DeleteSecretFolderRequest struct {
 	Environment string `json:"environment"`
 	ProjectID   string `json:"workspaceId"`
 	SecretPath  string `json:"path"`
+	ForceDelete bool   `json:"forceDelete"`
 }
 
 type DeleteSecretFolderResponse struct {

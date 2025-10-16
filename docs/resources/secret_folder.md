@@ -22,6 +22,10 @@ Create secret folder & save to Infisical.
 - `name` (String) The name for the folder
 - `project_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
+### Optional
+
+- `force_delete` (Boolean) Whether to force delete the folder even if it contains resources.
+
 ### Read-Only
 
 - `environment_id` (String) The ID of the environment

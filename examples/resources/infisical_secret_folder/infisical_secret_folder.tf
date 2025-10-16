@@ -22,6 +22,7 @@ resource "infisical_secret_folder" "folder-1" {
   environment_slug = "dev"
   project_id       = "<PROJECT-ID>"
   folder_path      = "/"
+  # force_delete     = true
 }
 
 resource "infisical_secret_folder" "folder-2" {
@@ -29,5 +30,6 @@ resource "infisical_secret_folder" "folder-2" {
   environment_slug = "prod"
   project_id       = "<PROJECT-ID>"
   folder_path      = "/nested"
+  # force_delete     = false
 }
 
