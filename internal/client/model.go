@@ -1193,7 +1193,7 @@ type UpdateSecretFolderResponse struct {
 type DeleteSecretFolderRequest struct {
 	ID          string `json:"id"`
 	Environment string `json:"environment"`
-	ProjectID   string `json:"workspaceId"`
+	ProjectID   string `json:"projectId"`
 	SecretPath  string `json:"path"`
 	ForceDelete bool   `json:"forceDelete"`
 }
