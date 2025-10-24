@@ -211,8 +211,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.Slug.ValueString(),
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
+		ID: plan.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -260,8 +260,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Get the latest data from the API
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.Slug.ValueString(),
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
+		ID: state.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -287,6 +287,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.Name = types.StringValue(project.Name)
 	state.Type = types.StringValue(project.Type)
 	state.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
+	state.Slug = types.StringValue(project.Slug)
 	state.KmsSecretManagerKeyId = types.StringValue(project.KmsSecretManagerKeyId)
 	state.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
 	state.AuditLogRetentionDays = types.Int64Value(project.AuditLogRetentionDays)
@@ -339,14 +340,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if state.Slug != plan.Slug {
-		resp.Diagnostics.AddError(
-			"Unable to update project",
-			"Slug cannot be updated",
-		)
-		return
-	}
-
 	if state.Type != plan.Type {
 		resp.Diagnostics.AddError(
 			"Unable to update project",
@@ -365,7 +358,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	updateRequest := infisical.UpdateProjectRequest{
 		ProjectName:         plan.Name.ValueString(),
-		Slug:                plan.Slug.ValueString(),
+		ProjectId:           plan.ID.ValueString(),
+		ProjectSlug:         plan.Slug.ValueString(),
 		HasDeleteProtection: plan.HasDeleteProtection.ValueBool(),
 	}
 
@@ -373,7 +367,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		updateRequest.ProjectDescription = plan.Description.ValueString()
 	}
 
-	updatedProject, err := r.client.UpdateProject(updateRequest)
+	_, err := r.client.UpdateProject(updateRequest)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -397,8 +391,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.Slug.ValueString(),
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
+		ID: plan.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -409,14 +403,17 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if !plan.Description.IsNull() {
-		plan.Description = types.StringValue(updatedProject.Description)
+	if project.Description == "" {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(project.Description)
 	}
 
-	plan.LastUpdated = types.StringValue(updatedProject.UpdatedAt.Format(time.RFC850))
-	plan.Name = types.StringValue(plan.Name.ValueString())
+	plan.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
+	plan.Name = types.StringValue(project.Name)
 	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
 	plan.AuditLogRetentionDays = types.Int64Value(project.AuditLogRetentionDays)
+	plan.Slug = types.StringValue(project.Slug)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

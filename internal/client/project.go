@@ -92,7 +92,7 @@ func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectR
 		SetResult(&projectResponse).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch(fmt.Sprintf("api/v2/workspace/%s", request.Slug))
+		Patch(fmt.Sprintf("api/v1/projects/%s", request.ProjectId))
 
 	if err != nil {
 		return UpdateProjectResponse{}, errors.NewGenericRequestError(operationUpdateProject, err)
