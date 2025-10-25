@@ -204,6 +204,8 @@ type IdentityKubernetesAuth struct {
 	AllowedAudience            string                  `json:"allowedAudience"`
 	CACERT                     string                  `json:"caCert"`
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
+	TokenReviewerMode          string                  `json:"tokenReviewMode"`
+	GatewayID                  string                  `json:"gatewayId"`
 }
 
 type IdentityOidcAuth struct {
@@ -1544,9 +1546,9 @@ type RevokeIdentityGcpAuthResponse struct {
 
 type CreateIdentityKubernetesAuthRequest struct {
 	IdentityID              string                         `json:"identityId"`
-	KubernetesHost          string                         `json:"kubernetesHost"`
-	CACERT                  string                         `json:"caCert"`
-	TokenReviewerJwt        string                         `json:"tokenReviewerJwt"`
+	KubernetesHost          *string                        `json:"kubernetesHost"`
+	CACERT                  string                         `json:"caCert,omitempty"`
+	TokenReviewerJwt        string                         `json:"tokenReviewerJwt,omitempty"`
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
@@ -1554,6 +1556,8 @@ type CreateIdentityKubernetesAuthRequest struct {
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	TokenReviewerMode       string                         `json:"tokenReviewMode"`
+	GatewayID               *string                        `json:"gatewayId"`
 }
 
 type CreateIdentityKubernetesAuthResponse struct {
@@ -1562,9 +1566,9 @@ type CreateIdentityKubernetesAuthResponse struct {
 
 type UpdateIdentityKubernetesAuthRequest struct {
 	IdentityID              string                         `json:"identityId"`
-	KubernetesHost          string                         `json:"kubernetesHost"`
-	CACERT                  string                         `json:"caCert"`
-	TokenReviewerJwt        string                         `json:"tokenReviewerJwt"`
+	KubernetesHost          *string                        `json:"kubernetesHost"`
+	CACERT                  string                         `json:"caCert,omitempty"`
+	TokenReviewerJwt        string                         `json:"tokenReviewerJwt,omitempty"`
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
@@ -1572,6 +1576,8 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	TokenReviewerMode       string                         `json:"tokenReviewMode"`
+	GatewayID               *string                        `json:"gatewayId"`
 }
 
 type CreateIdentityOidcAuthResponse struct {
