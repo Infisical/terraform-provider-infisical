@@ -26,7 +26,7 @@ resource "infisical_identity" "machine-identity-demo-1" {
 }
 
 resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-1" {
-  identity_id               = infisical_identity.machine-identity-1.id
+  identity_id               = infisical_identity.machine-identity-demo-1.id
   kubernetes_host           = "http://<your-kubernetes-host>"
   token_reviewer_jwt        = "ey<example>"
   kubernetes_ca_certificate = "<your-kubernetes-ca-certificate>"
@@ -49,7 +49,7 @@ resource "infisical_identity" "machine-identity-demo-2" {
 
 # When using gateway as reviewer, you do not need to specify the kubernetes host, token reviewer JWT, or CA certificate as they're all provided by the gateway.
 resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-2" {
-  identity_id = infisical_identity.machine-identity-2.id
+  identity_id = infisical_identity.machine-identity-demo-2.id
 
   allowed_namespaces            = ["infisical-ns"]
   allowed_service_account_names = ["infisical-sa", "infisical-sa-2"]
@@ -59,5 +59,3 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-2" {
   token_reviewer_mode = "gateway"
   gateway_id          = "<your-gateway-id>"
 }
-
-resource "infisical_identity_kubernetes_auth" "import" {}
