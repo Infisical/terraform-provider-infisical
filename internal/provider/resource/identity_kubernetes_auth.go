@@ -229,7 +229,7 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenTrustedIps = stateAccessTokenTrustedIps
 }
 
-func validateTokenReviewerMode(ctx context.Context, diagnose *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel) {
+func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel) {
 
 	if plan == nil {
 		diagnose.AddError(
@@ -324,7 +324,7 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 		return
 	}
 
-	validateTokenReviewerMode(ctx, &resp.Diagnostics, &plan)
+	validateTokenReviewerMode(&resp.Diagnostics, &plan)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -447,7 +447,7 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		return
 	}
 
-	validateTokenReviewerMode(ctx, &resp.Diagnostics, &plan)
+	validateTokenReviewerMode(&resp.Diagnostics, &plan)
 	if resp.Diagnostics.HasError() {
 		return
 	}
