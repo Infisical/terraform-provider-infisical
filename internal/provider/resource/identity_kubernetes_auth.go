@@ -274,21 +274,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 	} else if tokenReviewerMode == TOKEN_REVIEWER_MODE_API {
-		if plan.GatewayID.ValueString() != "" {
-			diagnose.AddError(
-				"Cannot set gateway ID",
-				"Gateway ID is not allowed when token reviewer mode is api. Please remove the gateway ID.",
-			)
-			return
-		}
-
-		if plan.TokenReviewerJWT.ValueString() == "" {
-			diagnose.AddError(
-				"Token reviewer JWT is required",
-				"Token reviewer JWT is required when token reviewer mode is api. Please provide a valid token reviewer JWT.",
-			)
-			return
-		}
+		// plan.TokenReviewerJWT is optional. if set to nothing, the auth method will act as self-reviewer.
 
 		if plan.KubernetesHost.ValueString() == "" {
 			diagnose.AddError(
@@ -464,6 +450,12 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		gatewayID = &gId
 	}
 
+	var tokenReviewerJwt *string = nil
+	if !plan.TokenReviewerJWT.IsNull() && !plan.TokenReviewerJWT.IsUnknown() && plan.TokenReviewerJWT.ValueString() != "" {
+		reviewerJwt := plan.TokenReviewerJWT.ValueString()
+		tokenReviewerJwt = &reviewerJwt
+	}
+
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
 
 	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
@@ -478,7 +470,7 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
 		KubernetesHost:          kubernetesHost,
 		CACERT:                  plan.CaCertificate.ValueString(),
-		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
+		TokenReviewerJwt:        tokenReviewerJwt,
 		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
 		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),

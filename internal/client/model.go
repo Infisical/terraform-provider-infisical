@@ -1567,8 +1567,8 @@ type CreateIdentityKubernetesAuthResponse struct {
 type UpdateIdentityKubernetesAuthRequest struct {
 	IdentityID              string                         `json:"identityId"`
 	KubernetesHost          *string                        `json:"kubernetesHost"`
-	CACERT                  string                         `json:"caCert,omitempty"`
-	TokenReviewerJwt        string                         `json:"tokenReviewerJwt,omitempty"`
+	CACERT                  string                         `json:"caCert"`
+	TokenReviewerJwt        *string                        `json:"tokenReviewerJwt"`
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
