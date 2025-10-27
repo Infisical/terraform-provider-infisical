@@ -9,12 +9,16 @@ import (
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -42,6 +46,9 @@ type IdentityKubernetesAuthResourceModel struct {
 	AccessTokenMaxTTL          types.Int64  `tfsdk:"access_token_max_ttl"`
 	AccessTokenNumUsesLimit    types.Int64  `tfsdk:"access_token_num_uses_limit"`
 	AccessTokenTrustedIps      types.List   `tfsdk:"access_token_trusted_ips"`
+
+	GatewayID         types.String `tfsdk:"gateway_id"`
+	TokenReviewerMode types.String `tfsdk:"token_reviewer_mode"` // api|gateway (default is api)
 }
 
 type IdentityKubernetesAuthResourceTrustedIps struct {
@@ -52,6 +59,11 @@ type IdentityKubernetesAuthResourceTrustedIps struct {
 func (r *IdentityKubernetesAuthResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_identity_kubernetes_auth"
 }
+
+const (
+	TOKEN_REVIEWER_MODE_API     = "api"
+	TOKEN_REVIEWER_MODE_GATEWAY = "gateway"
+)
 
 // Schema defines the schema for the resource.
 func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -70,13 +82,28 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"kubernetes_host": schema.StringAttribute{
 				Description: "The host string, host:port pair, or URL to the base of the Kubernetes API server. This can usually be obtained by running `kubectl cluster-info`.",
-				Required:    true,
+				Optional:    true,
 			},
 			"token_reviewer_jwt": schema.StringAttribute{
 				Description:         "A long-lived service account JWT token for Infisical to access the TokenReview API to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5.",
 				MarkdownDescription: "A long-lived service account JWT token for Infisical to access the [TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5.",
-				Required:            true,
+				Optional:            true,
 			},
+
+			"gateway_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "Select a gateway for private cluster access. If not specified, the Internet Gateway will be used.",
+			},
+			"token_reviewer_mode": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Choose between Token ('api') or 'gateway' authentication. If using Gateway, the Gateway must be deployed in your Kubernetes cluster.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(TOKEN_REVIEWER_MODE_API, TOKEN_REVIEWER_MODE_GATEWAY),
+				},
+				Default: stringdefault.StaticString(TOKEN_REVIEWER_MODE_API),
+			},
+
 			"kubernetes_ca_certificate": schema.StringAttribute{
 				Description:         "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
 				MarkdownDescription: "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
@@ -158,6 +185,11 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityKubernetesAuth.AccessTokenNumUsesLimit)
 	plan.AllowedAudience = types.StringValue(newIdentityKubernetesAuth.AllowedAudience)
 	plan.CaCertificate = types.StringValue(newIdentityKubernetesAuth.CACERT)
+	plan.TokenReviewerMode = types.StringValue(newIdentityKubernetesAuth.TokenReviewerMode)
+
+	if newIdentityKubernetesAuth.GatewayID != "" {
+		plan.GatewayID = types.StringValue(newIdentityKubernetesAuth.GatewayID)
+	}
 
 	planAccessTokenTrustedIps := make([]IdentityKubernetesAuthResourceTrustedIps, len(newIdentityKubernetesAuth.AccessTokenTrustedIPS))
 	for i, el := range newIdentityKubernetesAuth.AccessTokenTrustedIPS {
@@ -197,6 +229,69 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenTrustedIps = stateAccessTokenTrustedIps
 }
 
+func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel) {
+
+	if plan == nil {
+		diagnose.AddError(
+			"Invalid plan",
+			"Plan is nil",
+		)
+		return
+	}
+
+	tokenReviewerMode := plan.TokenReviewerMode.ValueString()
+
+	if tokenReviewerMode == TOKEN_REVIEWER_MODE_GATEWAY {
+		if plan.GatewayID.ValueString() == "" {
+			diagnose.AddError(
+				"Gateway ID is required",
+				"Gateway ID is required when token reviewer mode is gateway. Please provide a valid gateway ID.",
+			)
+			return
+		}
+
+		if plan.CaCertificate.ValueString() != "" {
+			diagnose.AddError(
+				"Cannot set CA certificate",
+				"CA certificate is not allowed when token reviewer mode is gateway. Please remove the CA certificate.",
+			)
+			return
+		}
+
+		if plan.KubernetesHost.ValueString() != "" {
+			diagnose.AddError(
+				"Cannot set Kubernetes host",
+				"Kubernetes host is not allowed when token reviewer mode is gateway. Please remove the Kubernetes host.",
+			)
+			return
+		}
+
+		if plan.TokenReviewerJWT.ValueString() != "" {
+			diagnose.AddError(
+				"Cannot set Token reviewer JWT",
+				"Token reviewer JWT is not allowed when token reviewer mode is gateway. Please remove the Token reviewer JWT.",
+			)
+			return
+		}
+	} else if tokenReviewerMode == TOKEN_REVIEWER_MODE_API {
+		// plan.TokenReviewerJWT is optional. if set to nothing, the auth method will act as self-reviewer.
+
+		if plan.KubernetesHost.ValueString() == "" {
+			diagnose.AddError(
+				"Kubernetes host is required",
+				"Kubernetes host is required when token reviewer mode is api. Please provide a valid Kubernetes host.",
+			)
+			return
+		}
+	} else {
+		diagnose.AddError(
+			"Invalid token reviewer mode",
+			"Invalid token reviewer mode. Please provide a valid token reviewer mode. Must be one of: "+TOKEN_REVIEWER_MODE_API+" or "+TOKEN_REVIEWER_MODE_GATEWAY,
+		)
+		return
+	}
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
@@ -215,16 +310,35 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 		return
 	}
 
+	validateTokenReviewerMode(&resp.Diagnostics, &plan)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var kubernetesHost *string = nil
+	if !plan.KubernetesHost.IsNull() && !plan.KubernetesHost.IsUnknown() && plan.KubernetesHost.ValueString() != "" {
+		host := plan.KubernetesHost.ValueString()
+		kubernetesHost = &host
+	}
+
+	var gatewayID *string = nil
+	if !plan.GatewayID.IsNull() && !plan.GatewayID.IsUnknown() && plan.GatewayID.ValueString() != "" {
+		gId := plan.GatewayID.ValueString()
+		gatewayID = &gId
+	}
+
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
 	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
 	allowedNames := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountNames)
 	newIdentityKubernetesAuth, err := r.client.CreateIdentityKubernetesAuth(infisical.CreateIdentityKubernetesAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
+		TokenReviewerMode:       plan.TokenReviewerMode.ValueString(),
+		GatewayID:               gatewayID,
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
 		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		KubernetesHost:          plan.KubernetesHost.ValueString(),
+		KubernetesHost:          kubernetesHost,
 		CACERT:                  plan.CaCertificate.ValueString(),
 		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
 		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
@@ -319,6 +433,29 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		return
 	}
 
+	validateTokenReviewerMode(&resp.Diagnostics, &plan)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var kubernetesHost *string = nil
+	if !plan.KubernetesHost.IsNull() && !plan.KubernetesHost.IsUnknown() && plan.KubernetesHost.ValueString() != "" {
+		host := plan.KubernetesHost.ValueString()
+		kubernetesHost = &host
+	}
+
+	var gatewayID *string = nil
+	if !plan.GatewayID.IsNull() && !plan.GatewayID.IsUnknown() && plan.GatewayID.ValueString() != "" {
+		gId := plan.GatewayID.ValueString()
+		gatewayID = &gId
+	}
+
+	var tokenReviewerJwt *string = nil
+	if !plan.TokenReviewerJWT.IsNull() && !plan.TokenReviewerJWT.IsUnknown() && plan.TokenReviewerJWT.ValueString() != "" {
+		reviewerJwt := plan.TokenReviewerJWT.ValueString()
+		tokenReviewerJwt = &reviewerJwt
+	}
+
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
 
 	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
@@ -326,12 +463,14 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 	updatedIdentityKubernetesAuth, err := r.client.UpdateIdentityKubernetesAuth(infisical.UpdateIdentityKubernetesAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
+		TokenReviewerMode:       plan.TokenReviewerMode.ValueString(),
+		GatewayID:               gatewayID,
 		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
 		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
 		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
-		KubernetesHost:          plan.KubernetesHost.ValueString(),
+		KubernetesHost:          kubernetesHost,
 		CACERT:                  plan.CaCertificate.ValueString(),
-		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
+		TokenReviewerJwt:        tokenReviewerJwt,
 		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
 		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),
@@ -384,4 +523,16 @@ func (r *IdentityKubernetesAuthResource) Delete(ctx context.Context, req resourc
 		return
 	}
 
+}
+
+func (r *IdentityKubernetesAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity kubernetes auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	resource.ImportStatePassthroughID(ctx, path.Root("identity_id"), req, resp)
 }
