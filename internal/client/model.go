@@ -2166,6 +2166,17 @@ type DeleteSecretSyncResponse struct {
 	SecretSync SecretSync `json:"secretSync"`
 }
 
+type CheckDuplicateDestinationRequest struct {
+	App               SecretSyncApp
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	ExcludeSyncId     string                 `json:"excludeSyncId,omitempty"`
+	ProjectID         string                 `json:"projectId"`
+}
+
+type CheckDuplicateDestinationResponse struct {
+	HasDuplicate bool `json:"hasDuplicate"`
+}
+
 type DynamicSecret struct {
 	Id               string                 `json:"id"`
 	Name             string                 `json:"name"`
