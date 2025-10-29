@@ -637,7 +637,8 @@ type GetProjectByIdRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Slug                string `json:"slug"`
+	ProjectId           string `json:"projectId"`
+	ProjectSlug         string `json:"slug"`
 	ProjectName         string `json:"name"`
 	ProjectDescription  string `json:"description"`
 	HasDeleteProtection bool   `json:"hasDeleteProtection"`
