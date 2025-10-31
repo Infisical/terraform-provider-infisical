@@ -63,7 +63,7 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description:   "The id of the group.",
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			},
 			"group_name": schema.StringAttribute{
 				Description: "The name of the group.",
@@ -356,14 +356,6 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.AddError(
 			"Unable to update project ID",
 			fmt.Sprintf("Cannot change project ID, previous project: %s, new project: %s", state.ProjectID, plan.ProjectID),
-		)
-		return
-	}
-
-	if plan.GroupID != state.GroupID {
-		resp.Diagnostics.AddError(
-			"Unable to update project group",
-			fmt.Sprintf("Cannot change group ID, previous group: %s, new group: %s", state.GroupID, plan.GroupID),
 		)
 		return
 	}
