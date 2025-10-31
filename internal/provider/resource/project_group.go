@@ -273,7 +273,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading project group membership",
-				"Couldn't read project group membership from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project group membership from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -293,7 +293,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 			TemporaryAccessStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
 
-		if el.CustomRoleId != "" {
+		if el.Role == "custom" && el.CustomRoleSlug != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 
