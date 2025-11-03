@@ -24,6 +24,6 @@ resource "infisical_identity" "machine-identity-1" {
 }
 
 resource "infisical_identity_token_auth" "token-auth" {
-  identity_id     = infisical_identity.machine-identity-1.id
+  identity_id = infisical_identity.machine-identity-1.id
 }
 
