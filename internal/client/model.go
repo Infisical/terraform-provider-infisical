@@ -226,6 +226,17 @@ type IdentityOidcAuth struct {
 	CACERT                  string                  `json:"caCert"`
 }
 
+type IdentityTokenAuth struct {
+	ID                      string                  `json:"id"`
+	AccessTokenTTL          int64                   `json:"accessTokenTTL"`
+	AccessTokenMaxTTL       int64                   `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit int64                   `json:"accessTokenNumUsesLimit"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIp `json:"accessTokenTrustedIps"`
+	CreatedAt               string                  `json:"createdAt"`
+	UpdatedAt               string                  `json:"updatedAt"`
+	IdentityID              string                  `json:"identityId"`
+}
+
 type IdentityAuthTrustedIp struct {
 	Type      string `json:"type"`
 	Prefix    *int   `json:"prefix,omitempty"`
@@ -1637,6 +1648,46 @@ type UpdateIdentityOidcAuthRequest struct {
 
 type UpdateIdentityKubernetesAuthResponse struct {
 	IdentityKubernetesAuth IdentityKubernetesAuth `json:"identityKubernetesAuth"`
+}
+
+type CreateIdentityTokenAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type CreateIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
+}
+
+type UpdateIdentityTokenAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
+}
+
+type GetIdentityTokenAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type GetIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
+}
+
+type RevokeIdentityTokenAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
 }
 
 type GetIdentityKubernetesAuthRequest struct {
