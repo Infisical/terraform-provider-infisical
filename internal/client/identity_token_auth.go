@@ -22,7 +22,7 @@ func (client Client) GetIdentityTokenAuth(request GetIdentityTokenAuthRequest) (
 
 	response, err := httpRequest.Get("api/v1/auth/token-auth/identities/" + request.IdentityID)
 
-	if response.StatusCode() == http.StatusNotFound {
+	if response != nil && (response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusBadRequest) {
 		return IdentityTokenAuth{}, ErrNotFound
 	}
 
