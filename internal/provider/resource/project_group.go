@@ -63,7 +63,7 @@ func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description:   "The id of the group.",
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			},
 			"group_name": schema.StringAttribute{
 				Description: "The name of the group.",
@@ -273,7 +273,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading project group membership",
-				"Couldn't read project group membership from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project group membership from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -293,7 +293,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 			TemporaryAccessStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
 
-		if el.CustomRoleId != "" {
+		if el.Role == "custom" && el.CustomRoleSlug != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 
@@ -356,14 +356,6 @@ func (r *ProjectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.AddError(
 			"Unable to update project ID",
 			fmt.Sprintf("Cannot change project ID, previous project: %s, new project: %s", state.ProjectID, plan.ProjectID),
-		)
-		return
-	}
-
-	if plan.GroupID != state.GroupID {
-		resp.Diagnostics.AddError(
-			"Unable to update project group",
-			fmt.Sprintf("Cannot change group ID, previous group: %s, new group: %s", state.GroupID, plan.GroupID),
 		)
 		return
 	}
