@@ -212,7 +212,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
-		ID: plan.ID.ValueString(),
+		ID: newProject.Project.ID,
 	})
 
 	if err != nil {
