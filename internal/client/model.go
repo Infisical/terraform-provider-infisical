@@ -255,6 +255,23 @@ type IdentityUniversalAuthClientSecret struct {
 	IdentityUAID             string `json:"identityUAId"`
 	IsClientSecretRevoked    bool   `json:"isClientSecretRevoked"`
 }
+type IdentityTokenAuthToken struct {
+	ID                       string    `json:"id"`
+	AccessTokenTTL           int64     `json:"accessTokenTTL"`
+	AccessTokenMaxTTL        int64     `json:"accessTokenMaxTTL"`
+	AccessTokenNumUses       int64     `json:"accessTokenNumUses"`
+	AccessTokenNumUsesLimit  int64     `json:"accessTokenNumUsesLimit"`
+	AccessTokenLastUsedAt    time.Time `json:"accessTokenLastUsedAt"`
+	AccessTokenLastRenewedAt time.Time `json:"accessTokenLastRenewedAt"`
+	IsAccessTokenRevoked     bool      `json:"isAccessTokenRevoked"`
+	IdentityUAClientSecretId string    `json:"identityUAClientSecretId"`
+	IdentityID               string    `json:"identityId"`
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
+	Name                     string    `json:"name"`
+	AuthMethod               string    `json:"authMethod"`
+	AccessTokenPeriod        int64     `json:"accessTokenPeriod"`
+}
 
 type ProjectIdentitySpecificPrivilege struct {
 	ID                       string    `json:"id"`
@@ -1414,6 +1431,43 @@ type RevokeIdentityUniversalAuthClientSecretRequest struct {
 
 type RevokeIdentityUniversalAuthClientSecretResponse struct {
 	ClientSecretData IdentityUniversalAuthClientSecret `json:"clientSecretData"`
+}
+
+type CreateIdentityTokenAuthTokenRequest struct {
+	IdentityID string `json:"identityId"`
+	Name       string `json:"name"`
+}
+
+type CreateIdentityTokenAuthTokenResponse struct {
+	AccessToken string                 `json:"accessToken"`
+	TokenData   IdentityTokenAuthToken `json:"tokenData"`
+}
+
+type UpdateIdentityTokenAuthTokenRequest struct {
+	TokenID string `json:"tokenId"`
+	Name    string `json:"name"`
+}
+
+type UpdateIdentityTokenAuthTokenResponse struct {
+	Token IdentityTokenAuthToken `json:"token"`
+}
+
+type GetIdentityTokenAuthTokenRequest struct {
+	IdentityID string `json:"identityId"`
+	TokenID    string `json:"tokenId"`
+}
+
+type GetIdentityTokenAuthTokenResponse struct {
+	Token IdentityTokenAuthToken `json:"token"`
+}
+
+type RevokeIdentityTokenAuthTokenRequest struct {
+	IdentityID string `json:"identityId"`
+	TokenID    string `json:"tokenId"`
+}
+
+type RevokeIdentityTokenAuthTokenResponse struct {
+	Token IdentityTokenAuthToken `json:"token"`
 }
 
 type CreateIdentityAwsAuthRequest struct {
