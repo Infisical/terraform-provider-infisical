@@ -365,6 +365,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityAzureAuthResource,
 		infisicalResource.NewIdentityOidcAuthResource,
 		infisicalResource.NewIdentityTokenAuthResource,
+		infisicalResource.NewIdentityTokenAuthTokenResource,
 		infisicalResource.NewIntegrationGcpSecretManagerResource,
 		infisicalResource.NewIntegrationAwsParameterStoreResource,
 		infisicalResource.NewIntegrationAwsSecretsManagerResource,

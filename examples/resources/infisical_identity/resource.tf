@@ -111,3 +111,15 @@ resource "infisical_identity" "token-auth" {
 resource "infisical_identity_token_auth" "token-auth" {
   identity_id = infisical_identity.token-auth.id
 }
+
+resource "infisical_identity_token_auth_token" "token-auth-token" {
+  identity_id = infisical_identity.token-auth.id
+  name        = "token-auth-token"
+
+  depends_on = [infisical_identity_token_auth.token-auth]
+}
+
+output "token-auth-token" {
+  sensitive = true
+  value     = infisical_identity_token_auth_token.token-auth-token.token
+}
