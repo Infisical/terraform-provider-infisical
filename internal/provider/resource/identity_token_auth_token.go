@@ -201,6 +201,7 @@ func (r *IdentityTokenAuthTokenResource) Read(ctx context.Context, req resource.
 	state.NumberOfUses = types.Int64Value(tokenData.AccessTokenNumUses)
 	state.NumberOfUsesLimit = types.Int64Value(tokenData.AccessTokenNumUsesLimit)
 	state.TTL = types.Int64Value(tokenData.AccessTokenTTL)
+	state.Name = types.StringValue(tokenData.Name)
 	state.CreatedAt = types.StringValue(tokenData.CreatedAt.Format(time.RFC3339))
 	// Note: The token value itself is not returned in the read response for security reasons
 	// It's only available during creation
