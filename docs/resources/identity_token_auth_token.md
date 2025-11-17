@@ -25,7 +25,7 @@ Create and manage identity token auth token in Infisical.
 
 ### Read-Only
 
-- `created_at` (String) The UTC timestamp of the created at.
+- `created_at` (String) The UTC timestamp of the created at date.
 - `id` (String) The ID of the token auth token
 - `is_revoked` (Boolean) A flag indicating token has been revoked
 - `number_of_uses` (Number) The number of times that the token is used
