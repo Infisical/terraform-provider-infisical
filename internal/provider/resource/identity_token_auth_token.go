@@ -54,7 +54,6 @@ func (r *IdentityTokenAuthTokenResource) Schema(_ context.Context, _ resource.Sc
 			"name": schema.StringAttribute{
 				Description:   "The name of the token auth token",
 				Optional:      true,
-				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"identity_id": schema.StringAttribute{
@@ -76,7 +75,7 @@ func (r *IdentityTokenAuthTokenResource) Schema(_ context.Context, _ resource.Sc
 				Sensitive:   true,
 			},
 			"created_at": schema.StringAttribute{
-				Description:   "The UTC timestamp of the created at.",
+				Description:   "The UTC timestamp of the created at date.",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -194,6 +193,11 @@ func (r *IdentityTokenAuthTokenResource) Read(ctx context.Context, req resource.
 			)
 			return
 		}
+	}
+
+	if tokenData.IsAccessTokenRevoked {
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
 	// Update state with latest data
