@@ -81,7 +81,7 @@ func (r *IdentityUniversalAuthClientSecretResource) Schema(_ context.Context, _ 
 				Sensitive:   true,
 			},
 			"created_at": schema.StringAttribute{
-				Description:   "The UTC timestamp of the created at.",
+				Description:   "The UTC timestamp of the created at date.",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},

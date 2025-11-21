@@ -29,7 +29,7 @@ Create and manage identity universal auth client secret in Infisical.
 
 - `client_id` (String) The client ID of the secret.
 - `client_secret` (String, Sensitive) The client secret.
-- `created_at` (String) The UTC timestamp of the created at.
+- `created_at` (String) The UTC timestamp of the created at date.
 - `id` (String) The ID of the universal auth client secret
 - `is_revoked` (Boolean) A flag indicating token has been revoked
 - `number_of_uses` (Number) The number of times that the client secret is used
