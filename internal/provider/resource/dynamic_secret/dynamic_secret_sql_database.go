@@ -4,6 +4,7 @@ import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -185,6 +186,15 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
+			// Extract existing config state to preserve user formatting when values are equivalent after trimming
+			var existingConfig DynamicSecretSqlDatabaseConfigurationModel
+			if !configState.IsNull() {
+				configDiags := configState.As(ctx, &existingConfig, basetypes.ObjectAsOptions{})
+				if configDiags.HasError() {
+					diags.Append(configDiags...)
+				}
+			}
+
 			clientVal, ok := dynamicSecret.Inputs["client"].(string)
 			if !ok {
 				diags.AddError(
@@ -288,6 +298,15 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				caValue = types.StringValue(caVal)
 			}
 
+			creationStatementFinal := infisicaltf.PreserveStringIfTrimmedEqual(creationStatementVal, existingConfig.CreationStatement)
+			revocationStatementFinal := infisicaltf.PreserveStringIfTrimmedEqual(revocationStatementVal, existingConfig.RevocationStatement)
+			renewStatementFinal := infisicaltf.PreserveStringIfTrimmedEqual(renewStatementVal, existingConfig.RenewStatement)
+
+			renewStatementValue = types.StringNull()
+			if renewStatementFinal != "" {
+				renewStatementValue = types.StringValue(renewStatementFinal)
+			}
+
 			configuration := map[string]attr.Value{
 				"client":               types.StringValue(clientVal),
 				"host":                 types.StringValue(hostVal),
@@ -295,8 +314,8 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				"database":             types.StringValue(databaseVal),
 				"username":             types.StringValue(usernameVal),
 				"password":             types.StringValue(passwordVal),
-				"creation_statement":   types.StringValue(creationStatementVal),
-				"revocation_statement": types.StringValue(revocationStatementVal),
+				"creation_statement":   types.StringValue(creationStatementFinal),
+				"revocation_statement": types.StringValue(revocationStatementFinal),
 				"renew_statement":      renewStatementValue,
 				"ca":                   caValue,
 				"gateway_id":           gatewayIdValue,
