@@ -283,11 +283,6 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				gatewayIdVal = ""
 			}
 
-			renewStatementValue := types.StringNull()
-			if renewStatementVal != "" {
-				renewStatementValue = types.StringValue(renewStatementVal)
-			}
-
 			gatewayIdValue := types.StringNull()
 			if gatewayIdVal != "" {
 				gatewayIdValue = types.StringValue(gatewayIdVal)
@@ -302,7 +297,7 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 			revocationStatementFinal := infisicaltf.PreserveStringIfTrimmedEqual(revocationStatementVal, existingConfig.RevocationStatement)
 			renewStatementFinal := infisicaltf.PreserveStringIfTrimmedEqual(renewStatementVal, existingConfig.RenewStatement)
 
-			renewStatementValue = types.StringNull()
+			renewStatementValue := types.StringNull()
 			if renewStatementFinal != "" {
 				renewStatementValue = types.StringValue(renewStatementFinal)
 			}
