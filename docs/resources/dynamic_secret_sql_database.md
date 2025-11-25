@@ -69,7 +69,7 @@ resource "infisical_dynamic_secret_sql_database" "sql-database" {
         symbols   = 2
         uppercase = 2
       }
-      allowed_symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?`~"
+      allowed_symbols = "!@#$%^&*()_+-=[]{}|:,.<>?`~"
     }
 
   }
