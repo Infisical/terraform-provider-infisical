@@ -2519,7 +2519,7 @@ type CreateProjectTemplateRequest struct {
 	Description  string        `json:"description"`
 	Type         string        `json:"type"`
 	Roles        []Role        `json:"roles,omitempty"`
-	Environments []Environment `json:"environments,omitempty"`
+	Environments []Environment `json:"environments"`
 }
 
 type CreateProjectTemplateResponse struct {
@@ -2540,7 +2540,7 @@ type UpdateProjectTemplateRequest struct {
 	Description  string        `json:"description"`
 	Type         string        `json:"type"`
 	Roles        []Role        `json:"roles,omitempty"`
-	Environments []Environment `json:"environments,omitempty"`
+	Environments []Environment `json:"environments"`
 }
 
 type UpdateProjectTemplateResponse struct {
