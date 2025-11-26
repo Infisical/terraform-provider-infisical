@@ -23,6 +23,9 @@ import (
 // can be customized.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 
+// Update documentation subcategories for Terraform Registry sidebar organization
+//go:generate ./scripts/update-doc-subcategories.sh
+
 var (
 	// these will be set by the goreleaser configuration
 	// to appropriate values for the compiled binary.
