@@ -204,7 +204,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Map the plan data to the Infisical CreateProjectTemplateRequest
-	var environments []infisical.Environment
+	environments := []infisical.Environment{}
 
 	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
 		environments, diags = r.unmarshalEnvironments(plan.Environments)
@@ -353,7 +353,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	var roles []infisical.Role
-	var environments []infisical.Environment
+	environments := []infisical.Environment{}
 
 	if !plan.Roles.IsNull() && !plan.Roles.IsUnknown() {
 		roles, diags = r.unmarshalRoles(plan.Roles)
