@@ -67,7 +67,7 @@ func (r *IntegrationAWSParameterStoreResource) Metadata(_ context.Context, req r
 // Schema defines the schema for the resource.
 func (r *IntegrationAWSParameterStoreResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create AWS Parameter Store integration & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "**Deprecated:** This resource is deprecated and will be removed in a future version. Use `infisical_secret_sync_aws_parameter_store` instead.\n\nCreate AWS Parameter Store integration & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",

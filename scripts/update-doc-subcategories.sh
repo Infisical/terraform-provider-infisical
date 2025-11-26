@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # This script updates subcategories in generated Terraform documentation
 # It runs after tfplugindocs to organize resources into logical groups
