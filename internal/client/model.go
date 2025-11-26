@@ -2515,11 +2515,11 @@ type Permission struct {
 }
 
 type CreateProjectTemplateRequest struct {
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Type         string        `json:"type"`
-	Roles        []Role        `json:"roles,omitempty"`
-	Environments []Environment `json:"environments"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Type         string         `json:"type"`
+	Roles        []Role         `json:"roles,omitempty"`
+	Environments *[]Environment `json:"environments,omitempty"`
 }
 
 type CreateProjectTemplateResponse struct {
@@ -2535,12 +2535,12 @@ type GetProjectTemplateByIdResponse struct {
 }
 
 type UpdateProjectTemplateRequest struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Type         string        `json:"type"`
-	Roles        []Role        `json:"roles,omitempty"`
-	Environments []Environment `json:"environments"`
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Type         string         `json:"type"`
+	Roles        []Role         `json:"roles,omitempty"`
+	Environments *[]Environment `json:"environments,omitempty"`
 }
 
 type UpdateProjectTemplateResponse struct {

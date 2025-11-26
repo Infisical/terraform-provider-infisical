@@ -204,13 +204,20 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Map the plan data to the Infisical CreateProjectTemplateRequest
-	environments := []infisical.Environment{}
+	var environmentsPtr *[]infisical.Environment
 
 	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
-		environments, diags = r.unmarshalEnvironments(plan.Environments)
+		environments, diags := r.unmarshalEnvironments(plan.Environments)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
+		}
+		environmentsPtr = &environments
+	} else {
+		// Only send empty array for secret-manager type, undefined for others
+		if plan.Type.ValueString() == "secret-manager" {
+			emptyEnvs := []infisical.Environment{}
+			environmentsPtr = &emptyEnvs
 		}
 	}
 
@@ -228,7 +235,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 		Name:         plan.Name.ValueString(),
 		Description:  plan.Description.ValueString(),
 		Type:         plan.Type.ValueString(),
-		Environments: environments,
+		Environments: environmentsPtr,
 		Roles:        roles,
 	})
 
@@ -353,7 +360,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	var roles []infisical.Role
-	environments := []infisical.Environment{}
+	var environmentsPtr *[]infisical.Environment
 
 	if !plan.Roles.IsNull() && !plan.Roles.IsUnknown() {
 		roles, diags = r.unmarshalRoles(plan.Roles)
@@ -365,8 +372,18 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
-		environments, diags = r.unmarshalEnvironments(plan.Environments)
+		environments, diags := r.unmarshalEnvironments(plan.Environments)
 		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		environmentsPtr = &environments
+	} else {
+		// Only send empty array for secret-manager type, undefined for others
+		if plan.Type.ValueString() == "secret-manager" {
+			emptyEnvs := []infisical.Environment{}
+			environmentsPtr = &emptyEnvs
+		}
 	}
 
 	if resp.Diagnostics.HasError() {
@@ -379,7 +396,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 		Description:  plan.Description.ValueString(),
 		Type:         plan.Type.ValueString(),
 		Roles:        roles,
-		Environments: environments,
+		Environments: environmentsPtr,
 	})
 
 	if err != nil {
