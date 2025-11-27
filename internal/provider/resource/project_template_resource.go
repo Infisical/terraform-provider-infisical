@@ -141,6 +141,7 @@ func (r *ProjectTemplateResource) Schema(_ context.Context, _ resource.SchemaReq
 			},
 			"environments": schema.ListNestedAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "The environments for the project template",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -203,19 +204,21 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Map the plan data to the Infisical CreateProjectTemplateRequest
-	environments := []infisical.Environment{}
+	var environments []infisical.Environment
 
-	if !plan.Environments.IsNull() || !plan.Environments.IsUnknown() {
+	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
 		environments, diags = r.unmarshalEnvironments(plan.Environments)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
+	} else if plan.Type.ValueString() == "secret-manager" {
+		environments = []infisical.Environment{}
 	}
 
-	roles := []infisical.Role{}
+	var roles []infisical.Role
 
-	if !plan.Roles.IsNull() || !plan.Roles.IsUnknown() {
+	if !plan.Roles.IsNull() && !plan.Roles.IsUnknown() {
 		roles, diags = r.unmarshalRoles(plan.Roles)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -366,6 +369,11 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
 		environments, diags = r.unmarshalEnvironments(plan.Environments)
 		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	} else if plan.Type.ValueString() == "secret-manager" {
+		environments = []infisical.Environment{}
 	}
 
 	if resp.Diagnostics.HasError() {
@@ -663,7 +671,7 @@ func (r ProjectTemplateResource) marshalEnvironments(envs []infisical.Environmen
 }
 
 func (r ProjectTemplateResource) unmarshalEnvironments(tfList types.List) ([]infisical.Environment, diag.Diagnostics) {
-	var envs []infisical.Environment
+	envs := []infisical.Environment{}
 	var diags diag.Diagnostics
 
 	// Make sure we only process if the list is known and not null
