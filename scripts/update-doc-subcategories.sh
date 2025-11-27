@@ -41,9 +41,9 @@ for file in "$DOCS_DIR/resources/"*.md; do
         dynamic_secret_*)
             update_subcategory "$file" "Dynamic Secrets";;
         
-        # Integrations (Deprecated)
+        # Native Integrations (Deprecated)
         integration_*)
-            update_subcategory "$file" "Integrations - DEPRECATED";;
+            update_subcategory "$file" "Native Integrations - DEPRECATED";;
         
         # App Connections
         app_connection_*)
