@@ -204,21 +204,16 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Map the plan data to the Infisical CreateProjectTemplateRequest
-	var environmentsPtr *[]infisical.Environment
+	var environments []infisical.Environment
 
 	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
-		environments, diags := r.unmarshalEnvironments(plan.Environments)
+		environments, diags = r.unmarshalEnvironments(plan.Environments)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		environmentsPtr = &environments
-	} else {
-		// Only send empty array for secret-manager type, undefined for others
-		if plan.Type.ValueString() == "secret-manager" {
-			emptyEnvs := []infisical.Environment{}
-			environmentsPtr = &emptyEnvs
-		}
+	} else if plan.Type.ValueString() == "secret-manager" {
+		environments = []infisical.Environment{}
 	}
 
 	var roles []infisical.Role
@@ -235,7 +230,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 		Name:         plan.Name.ValueString(),
 		Description:  plan.Description.ValueString(),
 		Type:         plan.Type.ValueString(),
-		Environments: environmentsPtr,
+		Environments: environments,
 		Roles:        roles,
 	})
 
@@ -360,7 +355,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	var roles []infisical.Role
-	var environmentsPtr *[]infisical.Environment
+	var environments []infisical.Environment
 
 	if !plan.Roles.IsNull() && !plan.Roles.IsUnknown() {
 		roles, diags = r.unmarshalRoles(plan.Roles)
@@ -372,18 +367,13 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	if !plan.Environments.IsNull() && !plan.Environments.IsUnknown() {
-		environments, diags := r.unmarshalEnvironments(plan.Environments)
+		environments, diags = r.unmarshalEnvironments(plan.Environments)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		environmentsPtr = &environments
-	} else {
-		// Only send empty array for secret-manager type, undefined for others
-		if plan.Type.ValueString() == "secret-manager" {
-			emptyEnvs := []infisical.Environment{}
-			environmentsPtr = &emptyEnvs
-		}
+	} else if plan.Type.ValueString() == "secret-manager" {
+		environments = []infisical.Environment{}
 	}
 
 	if resp.Diagnostics.HasError() {
@@ -396,7 +386,7 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 		Description:  plan.Description.ValueString(),
 		Type:         plan.Type.ValueString(),
 		Roles:        roles,
-		Environments: environmentsPtr,
+		Environments: environments,
 	})
 
 	if err != nil {
