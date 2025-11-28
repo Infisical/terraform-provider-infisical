@@ -178,8 +178,7 @@ func (r *IdentityTokenAuthTokenResource) Read(ctx context.Context, req resource.
 
 	// Get the latest data from the API
 	tokenData, err := r.client.GetIdentityTokenAuthToken(infisical.GetIdentityTokenAuthTokenRequest{
-		IdentityID: state.IdentityID.ValueString(),
-		TokenID:    state.ID.ValueString(),
+		TokenID: state.ID.ValueString(),
 	})
 
 	if err != nil {
@@ -300,6 +299,64 @@ func (r *IdentityTokenAuthTokenResource) Delete(ctx context.Context, req resourc
 			"Error deleting identity token auth token",
 			"Couldn't revoke identity token auth token in Infisical, unexpected error: "+err.Error(),
 		)
+		return
+	}
+}
+
+// ImportState imports an existing resource into Terraform.
+func (r *IdentityTokenAuthTokenResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity token auth token",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	tokenData, err := r.client.GetIdentityTokenAuthToken(infisical.GetIdentityTokenAuthTokenRequest{
+		TokenID: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Error importing identity token auth token",
+				fmt.Sprintf("No token found with token_id: %s", req.ID),
+			)
+			return
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity token auth token",
+				"Couldn't read identity token auth token from Infisical, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
+	if tokenData.IsAccessTokenRevoked {
+		resp.Diagnostics.AddError(
+			"Error importing identity token auth token",
+			fmt.Sprintf("The token with ID %s is revoked and cannot be imported", req.ID),
+		)
+		return
+	}
+
+	var state IdentityTokenAuthTokenResourceModel
+	state.ID = types.StringValue(tokenData.ID)
+	state.IdentityID = types.StringValue(tokenData.IdentityID)
+	state.Name = types.StringValue(tokenData.Name)
+	state.TTL = types.Int64Value(tokenData.AccessTokenTTL)
+	state.NumberOfUses = types.Int64Value(tokenData.AccessTokenNumUses)
+	state.NumberOfUsesLimit = types.Int64Value(tokenData.AccessTokenNumUsesLimit)
+	state.IsRevoked = types.BoolValue(tokenData.IsAccessTokenRevoked)
+	state.CreatedAt = types.StringValue(tokenData.CreatedAt.Format(time.RFC3339))
+
+	// Note: The token value itself is not returned in the read response for security reasons
+	state.Token = types.StringValue("")
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 }

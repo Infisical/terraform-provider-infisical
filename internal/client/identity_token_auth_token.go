@@ -20,7 +20,7 @@ func (client Client) GetIdentityTokenAuthToken(request GetIdentityTokenAuthToken
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT)
 
-	response, err := httpRequest.Get("api/v1/auth/token-auth/identities/" + request.IdentityID + "/tokens/" + request.TokenID)
+	response, err := httpRequest.Get("api/v1/auth/token-auth/tokens/" + request.TokenID)
 
 	if response.StatusCode() == http.StatusNotFound {
 		return IdentityTokenAuthToken{}, ErrNotFound

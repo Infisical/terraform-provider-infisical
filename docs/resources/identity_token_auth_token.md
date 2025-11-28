@@ -75,3 +75,13 @@ output "token-auth-token" {
 - `number_of_uses_limit` (Number) The maximum number of times that the token can be used; a value of 0 implies infinite number of uses. Default: 0
 - `token` (String, Sensitive) The token.
 - `ttl` (Number) The lifetime for the token in seconds. Default: 0 - not expiring
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the resource by its token ID
+# Note: The token value itself cannot be retrieved during import for security reasons
+terraform import infisical_identity_token_auth_token.example <token-id>
+```
