@@ -197,7 +197,7 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 }
 
 func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) (RawV3Secret, error) {
-	var secretsResponse RawV3Secret
+	var secretsResponse CreateRawSecretsV3Response
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
@@ -214,7 +214,7 @@ func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) (RawV3
 		return RawV3Secret{}, errors.NewAPIErrorWithResponse(operationCreateRawSecretsV3, response, &additionalContext)
 	}
 
-	return secretsResponse, nil
+	return secretsResponse.Secret, nil
 }
 
 func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {
