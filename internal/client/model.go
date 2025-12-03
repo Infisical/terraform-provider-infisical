@@ -553,6 +553,10 @@ type GetRawSecretsV3Request struct {
 	ExpandSecretReferences bool   `json:"expandSecretReferences"`
 }
 
+type CreateRawSecretsV3Response struct {
+	Secret RawV3Secret `json:"secret"`
+}
+
 type RawV3Secret struct {
 	ID            string `json:"id"`
 	Version       int    `json:"version"`
