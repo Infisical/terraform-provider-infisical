@@ -2195,7 +2195,7 @@ type DeleteAppConnectionResponse struct {
 	AppConnection AppConnection `json:"appConnection"`
 }
 
-// ExternalKms contains the external KMS provider-specific information
+// ExternalKms contains the external KMS provider-specific information.
 type ExternalKms struct {
 	ExternalKmsId   string                 `json:"id"`
 	Configuration   map[string]interface{} `json:"configuration"`
