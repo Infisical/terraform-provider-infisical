@@ -19,7 +19,6 @@ type ExternalKmsBaseResource struct {
 	ResourceTypeName                   string                        // terraform resource name suffix
 	ExternalKmsProviderName            string                        // complete descriptive name of the external KMS provider
 	client                             *infisical.Client
-	AllowedMethods                     []string
 	ConfigurationAttributes            map[string]schema.Attribute
 	ReadConfigurationForCreateFromPlan func(ctx context.Context, plan ExternalKmsBaseResourceModel) (map[string]any, diag.Diagnostics)
 	ReadConfigurationForUpdateFromPlan func(ctx context.Context, plan ExternalKmsBaseResourceModel, state ExternalKmsBaseResourceModel) (map[string]any, diag.Diagnostics)
