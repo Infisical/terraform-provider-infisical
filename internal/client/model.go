@@ -2195,6 +2195,45 @@ type DeleteAppConnectionResponse struct {
 	AppConnection AppConnection `json:"appConnection"`
 }
 
+// ExternalKms contains the external KMS provider-specific information
+type ExternalKms struct {
+	ExternalKmsId   string                 `json:"id"`
+	Configuration   map[string]interface{} `json:"configuration"`
+	CredentialsHash string                 `json:"credentialsHash"`
+}
+
+type ExternalKmsWithKey struct {
+	KmsId       string      `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	ExternalKms ExternalKms `json:"externalKms"`
+}
+
+type CreateExternalKmsRequest struct {
+	Provider      ExternalKmsProvider
+	Name          string                 `json:"name"`
+	Description   string                 `json:"description"`
+	Configuration map[string]interface{} `json:"configuration"`
+}
+
+type GetExternalKmsByIdRequest struct {
+	Provider ExternalKmsProvider
+	ID       string
+}
+
+type UpdateExternalKmsRequest struct {
+	Provider      ExternalKmsProvider
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	ID            string
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
+}
+
+type DeleteExternalKmsRequest struct {
+	Provider ExternalKmsProvider
+	ID       string
+}
+
 type SecretSyncConnection struct {
 	ConnectionID string `json:"id"`
 }
