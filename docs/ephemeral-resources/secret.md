@@ -77,4 +77,5 @@ provider "postgresql" {
 
 ### Read-Only
 
+- `metadata` (Map of String) Metadata associated with the secret as key-value pairs.
 - `value` (String, Sensitive) The value of the secret
