@@ -2662,3 +2662,349 @@ type GetKMSKeySigningAlgorithmsRequest struct {
 type GetKMSKeySigningAlgorithmsResponse struct {
 	SigningAlgorithms []string `json:"signingAlgorithms"`
 }
+
+type CertificateAuthorityConfiguration struct {
+	Type           string `json:"type,omitempty"`
+	FriendlyName   string `json:"friendlyName,omitempty"`
+	CommonName     string `json:"commonName,omitempty"`
+	Organization   string `json:"organization,omitempty"`
+	OU             string `json:"ou,omitempty"`
+	Country        string `json:"country,omitempty"`
+	Province       string `json:"province,omitempty"`
+	Locality       string `json:"locality,omitempty"`
+	KeyAlgorithm   string `json:"keyAlgorithm,omitempty"`
+	MaxPathLength  *int   `json:"maxPathLength,omitempty"`
+	ParentCaId     string `json:"parentCaId,omitempty"`
+	DN             string `json:"dn,omitempty"`
+	SerialNumber   string `json:"serialNumber,omitempty"`
+	ActiveCaCertId string `json:"activeCaCertId,omitempty"`
+
+	// ACME-specific fields
+	DNSAppConnectionId string                 `json:"dnsAppConnectionId,omitempty"`
+	DNSProviderConfig  map[string]interface{} `json:"dnsProviderConfig,omitempty"`
+	DirectoryUrl       string                 `json:"directoryUrl,omitempty"`
+	AccountEmail       string                 `json:"accountEmail,omitempty"`
+	EABKid             string                 `json:"eabKid,omitempty"`
+	EABHmacKey         string                 `json:"eabHmacKey,omitempty"`
+
+	// ADCS-specific fields
+	AzureAdcsConnectionId string `json:"azureAdcsConnectionId,omitempty"`
+}
+
+type CertificateAuthority struct {
+	ProjectId            string                            `json:"projectId"`
+	EnableDirectIssuance bool                              `json:"enableDirectIssuance"`
+	Name                 string                            `json:"name"`
+	Id                   string                            `json:"id"`
+	Status               string                            `json:"status"`
+	Type                 string                            `json:"type"`
+	Configuration        CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type CreateInternalCARequest struct {
+	ProjectId     string                            `json:"projectId"`
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type CreateInternalCAResponse struct {
+	CertificateAuthority
+}
+
+type GetCARequest struct {
+	ProjectId string
+	CAId      string
+}
+
+type GetCAResponse struct {
+	CertificateAuthority
+}
+
+
+type UpdateInternalCARequest struct {
+	ProjectId     string `json:"projectId"`
+	CAId          string
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type UpdateInternalCAResponse struct {
+	CertificateAuthority
+}
+
+type DeleteCARequest struct {
+	ProjectId string
+	CAId      string
+}
+
+type DeleteCAResponse struct {
+	CertificateAuthority
+}
+
+type CreateACMECARequest struct {
+	ProjectId     string                            `json:"projectId"`
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type CreateACMECAResponse struct {
+	CertificateAuthority
+}
+
+type UpdateACMECARequest struct {
+	ProjectId     string `json:"projectId"`
+	CAId          string
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type UpdateACMECAResponse struct {
+	CertificateAuthority
+}
+
+type CreateADCSCARequest struct {
+	ProjectId     string                            `json:"projectId"`
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type CreateADCSCAResponse struct {
+	CertificateAuthority
+}
+
+type UpdateADCSCARequest struct {
+	ProjectId     string `json:"projectId"`
+	CAId          string
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type UpdateADCSCAResponse struct {
+	CertificateAuthority
+}
+
+type CertificateTemplateSubject struct {
+	Type     string   `json:"type"`
+	Allowed  []string `json:"allowed,omitempty"`
+	Required []string `json:"required,omitempty"`
+	Denied   []string `json:"denied,omitempty"`
+}
+
+type CertificateTemplateSAN struct {
+	Type     string   `json:"type"`
+	Allowed  []string `json:"allowed,omitempty"`
+	Required []string `json:"required,omitempty"`
+	Denied   []string `json:"denied,omitempty"`
+}
+
+type CertificateTemplateKeyUsages struct {
+	Allowed  []string `json:"allowed,omitempty"`
+	Required []string `json:"required,omitempty"`
+	Denied   []string `json:"denied,omitempty"`
+}
+
+type CertificateTemplateExtendedKeyUsages struct {
+	Allowed  []string `json:"allowed,omitempty"`
+	Required []string `json:"required,omitempty"`
+	Denied   []string `json:"denied,omitempty"`
+}
+
+type CertificateTemplateAlgorithms struct {
+	Signature    []string `json:"signature,omitempty"`
+	KeyAlgorithm []string `json:"keyAlgorithm,omitempty"`
+}
+
+type CertificateTemplateValidity struct {
+	Max string `json:"max,omitempty"`
+}
+
+type CertificateTemplate struct {
+	Id                  string                               `json:"id"`
+	ProjectId           string                               `json:"projectId"`
+	Name                string                               `json:"name"`
+	Description         string                               `json:"description,omitempty"`
+	Subject             []CertificateTemplateSubject         `json:"subject,omitempty"`
+	Sans                []CertificateTemplateSAN             `json:"sans,omitempty"`
+	KeyUsages           *CertificateTemplateKeyUsages        `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages   *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
+	Algorithms          *CertificateTemplateAlgorithms       `json:"algorithms,omitempty"`
+	Validity            *CertificateTemplateValidity         `json:"validity,omitempty"`
+	CreatedAt           string                               `json:"createdAt"`
+	UpdatedAt           string                               `json:"updatedAt"`
+}
+
+type CreateCertificateTemplateRequest struct {
+	ProjectId         string                               `json:"projectId"`
+	Name              string                               `json:"name"`
+	Description       string                               `json:"description,omitempty"`
+	Subject           []CertificateTemplateSubject         `json:"subject,omitempty"`
+	Sans              []CertificateTemplateSAN             `json:"sans,omitempty"`
+	KeyUsages         *CertificateTemplateKeyUsages        `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
+	Algorithms        *CertificateTemplateAlgorithms       `json:"algorithms,omitempty"`
+	Validity          *CertificateTemplateValidity         `json:"validity,omitempty"`
+}
+
+type CreateCertificateTemplateResponse struct {
+	CertificateTemplate CertificateTemplate `json:"certificateTemplate"`
+}
+
+type GetCertificateTemplateRequest struct {
+	TemplateId string
+}
+
+type GetCertificateTemplateResponse struct {
+	CertificateTemplate CertificateTemplate `json:"certificateTemplate"`
+}
+
+
+type UpdateCertificateTemplateRequest struct {
+	TemplateId        string                               `json:"-"`
+	Name              string                               `json:"name,omitempty"`
+	Description       string                               `json:"description,omitempty"`
+	Subject           []CertificateTemplateSubject         `json:"subject,omitempty"`
+	Sans              []CertificateTemplateSAN             `json:"sans,omitempty"`
+	KeyUsages         *CertificateTemplateKeyUsages        `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
+	Algorithms        *CertificateTemplateAlgorithms       `json:"algorithms,omitempty"`
+	Validity          *CertificateTemplateValidity         `json:"validity,omitempty"`
+}
+
+type UpdateCertificateTemplateResponse struct {
+	CertificateTemplate CertificateTemplate `json:"certificateTemplate"`
+}
+
+type DeleteCertificateTemplateRequest struct {
+	TemplateId string
+}
+
+type DeleteCertificateTemplateResponse struct {
+	CertificateTemplate CertificateTemplate `json:"certificateTemplate"`
+}
+
+type CertificateProfileEstConfig struct {
+	Id                           string `json:"id"`
+	DisableBootstrapCaValidation bool   `json:"disableBootstrapCaValidation"`
+	Passphrase                   string `json:"passphrase"`
+	CaChain                      string `json:"caChain,omitempty"`
+}
+
+type CertificateProfileApiConfig struct {
+	Id               string `json:"id"`
+	AutoRenew        bool   `json:"autoRenew"`
+	RenewBeforeDays  int    `json:"renewBeforeDays,omitempty"`
+}
+
+type CertificateProfileAcmeConfig struct {
+	Id           string `json:"id"`
+	DirectoryUrl string `json:"directoryUrl"`
+}
+
+type CertificateProfileExternalConfigs struct {
+	Template string `json:"template,omitempty"`
+}
+
+type CertificateProfile struct {
+	Id                    string                              `json:"id"`
+	ProjectId             string                              `json:"projectId"`
+	CaId                  string                              `json:"caId,omitempty"`
+	CertificateTemplateId string                              `json:"certificateTemplateId"`
+	Slug                  string                              `json:"slug"`
+	Description           string                              `json:"description,omitempty"`
+	EnrollmentType        string                              `json:"enrollmentType"`
+	IssuerType            string                              `json:"issuerType"`
+	EstConfigId           string                              `json:"estConfigId,omitempty"`
+	ApiConfigId           string                              `json:"apiConfigId,omitempty"`
+	AcmeConfigId          string                              `json:"acmeConfigId,omitempty"`
+	ExternalConfigs       *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
+	CreatedAt             string                              `json:"createdAt"`
+	UpdatedAt             string                              `json:"updatedAt"`
+}
+
+type CreateCertificateProfileRequest struct {
+	ProjectId             string                              `json:"projectId"`
+	CaId                  string                              `json:"caId,omitempty"`
+	CertificateTemplateId string                              `json:"certificateTemplateId"`
+	Slug                  string                              `json:"slug"`
+	Description           string                              `json:"description,omitempty"`
+	EnrollmentType        string                              `json:"enrollmentType"`
+	IssuerType            string                              `json:"issuerType,omitempty"`
+	EstConfig             *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
+	ApiConfig             *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
+	AcmeConfig            map[string]interface{}              `json:"acmeConfig,omitempty"`
+	ExternalConfigs       *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
+}
+
+type CreateCertificateProfileResponse struct {
+	CertificateProfile CertificateProfile `json:"certificateProfile"`
+}
+
+type GetCertificateProfileRequest struct {
+	ProfileId string
+}
+
+type GetCertificateProfileResponse struct {
+	CertificateProfile CertificateProfile `json:"certificateProfile"`
+}
+
+
+type UpdateCertificateProfileRequest struct {
+	ProfileId       string                              `json:"-"`
+	Slug            string                              `json:"slug,omitempty"`
+	Description     string                              `json:"description,omitempty"`
+	EnrollmentType  string                              `json:"enrollmentType,omitempty"`
+	IssuerType      string                              `json:"issuerType,omitempty"`
+	EstConfig       *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
+	ApiConfig       *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
+	ExternalConfigs *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
+}
+
+type UpdateCertificateProfileResponse struct {
+	CertificateProfile CertificateProfile `json:"certificateProfile"`
+}
+
+type DeleteCertificateProfileRequest struct {
+	ProfileId string
+}
+
+type DeleteCertificateProfileResponse struct {
+	CertificateProfile CertificateProfile `json:"certificateProfile"`
+}
+
+type CACertificate struct {
+	Certificate      string `json:"certificate"`
+	CertificateChain string `json:"certificateChain"`
+	SerialNumber     string `json:"serialNumber"`
+	Version          int    `json:"version,omitempty"`
+}
+
+type GenerateCACertificateRequest struct {
+	CaId           string  `json:"-"`
+	NotBefore      string  `json:"notBefore"`
+	NotAfter       string  `json:"notAfter"`
+	MaxPathLength  *int    `json:"maxPathLength,omitempty"`
+	ParentCaId     string  `json:"parentCaId,omitempty"`
+}
+
+type GenerateCACertificateResponse struct {
+	Certificate      string `json:"certificate"`
+	CertificateChain string `json:"certificateChain"`
+	SerialNumber     string `json:"serialNumber"`
+}
+
+type GetCACertificateRequest struct {
+	CaId string
+}
+
+type GetCACertificateResponse struct {
+	Certificate      string `json:"certificate"`
+	CertificateChain string `json:"certificateChain"`
+	SerialNumber     string `json:"serialNumber"`
+}
+

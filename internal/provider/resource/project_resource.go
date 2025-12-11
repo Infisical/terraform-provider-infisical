@@ -21,8 +21,9 @@ import (
 
 var (
 	PROJECT_TYPE_SECRET_MANAGER = "secret-manager"
+	PROJECT_TYPE_CERT_MANAGER   = "cert-manager"
 	PROJECT_TYPE_KMS            = "kms"
-	SUPPORTED_PROJECT_TYPES     = []string{PROJECT_TYPE_SECRET_MANAGER, PROJECT_TYPE_KMS}
+	SUPPORTED_PROJECT_TYPES     = []string{PROJECT_TYPE_SECRET_MANAGER, PROJECT_TYPE_CERT_MANAGER, PROJECT_TYPE_KMS}
 )
 
 // Ensure the implementation satisfies the expected interfaces.
