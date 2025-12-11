@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	SUPPORTED_SUBJECT_TYPES        = []string{"common_name", "organization", "country"}
-	SUPPORTED_SAN_TYPES            = []string{"dns_name", "ip_address", "email", "uri"}
-	SUPPORTED_CERT_KEY_USAGES      = []string{
+	SUPPORTED_SUBJECT_TYPES   = []string{"common_name", "organization", "country"}
+	SUPPORTED_SAN_TYPES       = []string{"dns_name", "ip_address", "email", "uri"}
+	SUPPORTED_CERT_KEY_USAGES = []string{
 		"digital_signature", "key_encipherment", "non_repudiation",
 		"data_encipherment", "key_agreement", "key_cert_sign",
 		"crl_sign", "encipher_only", "decipher_only",
@@ -87,16 +87,16 @@ type certManagerCertificateTemplateValidityModel struct {
 }
 
 type certManagerCertificateTemplateResourceModel struct {
-	ProjectSlug       types.String                                              `tfsdk:"project_slug"`
-	Id                types.String                                              `tfsdk:"id"`
-	Name              types.String                                              `tfsdk:"name"`
-	Description       types.String                                              `tfsdk:"description"`
-	Subject           []certManagerCertificateTemplateSubjectModel              `tfsdk:"subject"`
-	Sans              []certManagerCertificateTemplateSanModel                  `tfsdk:"sans"`
-	KeyUsages         *certManagerCertificateTemplateKeyUsagesModel             `tfsdk:"key_usages"`
-	ExtendedKeyUsages *certManagerCertificateTemplateExtendedKeyUsagesModel     `tfsdk:"extended_key_usages"`
-	Algorithms        *certManagerCertificateTemplateAlgorithmsModel            `tfsdk:"algorithms"`
-	Validity          *certManagerCertificateTemplateValidityModel              `tfsdk:"validity"`
+	ProjectSlug       types.String                                          `tfsdk:"project_slug"`
+	Id                types.String                                          `tfsdk:"id"`
+	Name              types.String                                          `tfsdk:"name"`
+	Description       types.String                                          `tfsdk:"description"`
+	Subject           []certManagerCertificateTemplateSubjectModel          `tfsdk:"subject"`
+	Sans              []certManagerCertificateTemplateSanModel              `tfsdk:"sans"`
+	KeyUsages         *certManagerCertificateTemplateKeyUsagesModel         `tfsdk:"key_usages"`
+	ExtendedKeyUsages *certManagerCertificateTemplateExtendedKeyUsagesModel `tfsdk:"extended_key_usages"`
+	Algorithms        *certManagerCertificateTemplateAlgorithmsModel        `tfsdk:"algorithms"`
+	Validity          *certManagerCertificateTemplateValidityModel          `tfsdk:"validity"`
 }
 
 func (r *certManagerCertificateTemplateResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {

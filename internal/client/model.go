@@ -2721,7 +2721,6 @@ type GetCAResponse struct {
 	CertificateAuthority
 }
 
-
 type UpdateInternalCARequest struct {
 	ProjectId     string `json:"projectId"`
 	CAId          string
@@ -2825,30 +2824,30 @@ type CertificateTemplateValidity struct {
 }
 
 type CertificateTemplate struct {
-	Id                  string                               `json:"id"`
-	ProjectId           string                               `json:"projectId"`
-	Name                string                               `json:"name"`
-	Description         string                               `json:"description,omitempty"`
-	Subject             []CertificateTemplateSubject         `json:"subject,omitempty"`
-	Sans                []CertificateTemplateSAN             `json:"sans,omitempty"`
-	KeyUsages           *CertificateTemplateKeyUsages        `json:"keyUsages,omitempty"`
-	ExtendedKeyUsages   *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
-	Algorithms          *CertificateTemplateAlgorithms       `json:"algorithms,omitempty"`
-	Validity            *CertificateTemplateValidity         `json:"validity,omitempty"`
-	CreatedAt           string                               `json:"createdAt"`
-	UpdatedAt           string                               `json:"updatedAt"`
+	Id                string                                `json:"id"`
+	ProjectId         string                                `json:"projectId"`
+	Name              string                                `json:"name"`
+	Description       string                                `json:"description,omitempty"`
+	Subject           []CertificateTemplateSubject          `json:"subject,omitempty"`
+	Sans              []CertificateTemplateSAN              `json:"sans,omitempty"`
+	KeyUsages         *CertificateTemplateKeyUsages         `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
+	Algorithms        *CertificateTemplateAlgorithms        `json:"algorithms,omitempty"`
+	Validity          *CertificateTemplateValidity          `json:"validity,omitempty"`
+	CreatedAt         string                                `json:"createdAt"`
+	UpdatedAt         string                                `json:"updatedAt"`
 }
 
 type CreateCertificateTemplateRequest struct {
-	ProjectId         string                               `json:"projectId"`
-	Name              string                               `json:"name"`
-	Description       string                               `json:"description,omitempty"`
-	Subject           []CertificateTemplateSubject         `json:"subject,omitempty"`
-	Sans              []CertificateTemplateSAN             `json:"sans,omitempty"`
-	KeyUsages         *CertificateTemplateKeyUsages        `json:"keyUsages,omitempty"`
+	ProjectId         string                                `json:"projectId"`
+	Name              string                                `json:"name"`
+	Description       string                                `json:"description,omitempty"`
+	Subject           []CertificateTemplateSubject          `json:"subject,omitempty"`
+	Sans              []CertificateTemplateSAN              `json:"sans,omitempty"`
+	KeyUsages         *CertificateTemplateKeyUsages         `json:"keyUsages,omitempty"`
 	ExtendedKeyUsages *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
-	Algorithms        *CertificateTemplateAlgorithms       `json:"algorithms,omitempty"`
-	Validity          *CertificateTemplateValidity         `json:"validity,omitempty"`
+	Algorithms        *CertificateTemplateAlgorithms        `json:"algorithms,omitempty"`
+	Validity          *CertificateTemplateValidity          `json:"validity,omitempty"`
 }
 
 type CreateCertificateTemplateResponse struct {
@@ -2863,17 +2862,16 @@ type GetCertificateTemplateResponse struct {
 	CertificateTemplate CertificateTemplate `json:"certificateTemplate"`
 }
 
-
 type UpdateCertificateTemplateRequest struct {
-	TemplateId        string                               `json:"-"`
-	Name              string                               `json:"name,omitempty"`
-	Description       string                               `json:"description,omitempty"`
-	Subject           []CertificateTemplateSubject         `json:"subject,omitempty"`
-	Sans              []CertificateTemplateSAN             `json:"sans,omitempty"`
-	KeyUsages         *CertificateTemplateKeyUsages        `json:"keyUsages,omitempty"`
+	TemplateId        string                                `json:"-"`
+	Name              string                                `json:"name,omitempty"`
+	Description       string                                `json:"description,omitempty"`
+	Subject           []CertificateTemplateSubject          `json:"subject,omitempty"`
+	Sans              []CertificateTemplateSAN              `json:"sans,omitempty"`
+	KeyUsages         *CertificateTemplateKeyUsages         `json:"keyUsages,omitempty"`
 	ExtendedKeyUsages *CertificateTemplateExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
-	Algorithms        *CertificateTemplateAlgorithms       `json:"algorithms,omitempty"`
-	Validity          *CertificateTemplateValidity         `json:"validity,omitempty"`
+	Algorithms        *CertificateTemplateAlgorithms        `json:"algorithms,omitempty"`
+	Validity          *CertificateTemplateValidity          `json:"validity,omitempty"`
 }
 
 type UpdateCertificateTemplateResponse struct {
@@ -2896,9 +2894,9 @@ type CertificateProfileEstConfig struct {
 }
 
 type CertificateProfileApiConfig struct {
-	Id               string `json:"id"`
-	AutoRenew        bool   `json:"autoRenew"`
-	RenewBeforeDays  int    `json:"renewBeforeDays,omitempty"`
+	Id              string `json:"id"`
+	AutoRenew       bool   `json:"autoRenew"`
+	RenewBeforeDays int    `json:"renewBeforeDays,omitempty"`
 }
 
 type CertificateProfileAcmeConfig struct {
@@ -2911,33 +2909,33 @@ type CertificateProfileExternalConfigs struct {
 }
 
 type CertificateProfile struct {
-	Id                    string                              `json:"id"`
-	ProjectId             string                              `json:"projectId"`
-	CaId                  string                              `json:"caId,omitempty"`
-	CertificateTemplateId string                              `json:"certificateTemplateId"`
-	Slug                  string                              `json:"slug"`
-	Description           string                              `json:"description,omitempty"`
-	EnrollmentType        string                              `json:"enrollmentType"`
-	IssuerType            string                              `json:"issuerType"`
-	EstConfigId           string                              `json:"estConfigId,omitempty"`
-	ApiConfigId           string                              `json:"apiConfigId,omitempty"`
-	AcmeConfigId          string                              `json:"acmeConfigId,omitempty"`
+	Id                    string                             `json:"id"`
+	ProjectId             string                             `json:"projectId"`
+	CaId                  string                             `json:"caId,omitempty"`
+	CertificateTemplateId string                             `json:"certificateTemplateId"`
+	Slug                  string                             `json:"slug"`
+	Description           string                             `json:"description,omitempty"`
+	EnrollmentType        string                             `json:"enrollmentType"`
+	IssuerType            string                             `json:"issuerType"`
+	EstConfigId           string                             `json:"estConfigId,omitempty"`
+	ApiConfigId           string                             `json:"apiConfigId,omitempty"`
+	AcmeConfigId          string                             `json:"acmeConfigId,omitempty"`
 	ExternalConfigs       *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
-	CreatedAt             string                              `json:"createdAt"`
-	UpdatedAt             string                              `json:"updatedAt"`
+	CreatedAt             string                             `json:"createdAt"`
+	UpdatedAt             string                             `json:"updatedAt"`
 }
 
 type CreateCertificateProfileRequest struct {
-	ProjectId             string                              `json:"projectId"`
-	CaId                  string                              `json:"caId,omitempty"`
-	CertificateTemplateId string                              `json:"certificateTemplateId"`
-	Slug                  string                              `json:"slug"`
-	Description           string                              `json:"description,omitempty"`
-	EnrollmentType        string                              `json:"enrollmentType"`
-	IssuerType            string                              `json:"issuerType,omitempty"`
+	ProjectId             string                             `json:"projectId"`
+	CaId                  string                             `json:"caId,omitempty"`
+	CertificateTemplateId string                             `json:"certificateTemplateId"`
+	Slug                  string                             `json:"slug"`
+	Description           string                             `json:"description,omitempty"`
+	EnrollmentType        string                             `json:"enrollmentType"`
+	IssuerType            string                             `json:"issuerType,omitempty"`
 	EstConfig             *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
 	ApiConfig             *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
-	AcmeConfig            map[string]interface{}              `json:"acmeConfig,omitempty"`
+	AcmeConfig            map[string]interface{}             `json:"acmeConfig,omitempty"`
 	ExternalConfigs       *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
 }
 
@@ -2953,13 +2951,12 @@ type GetCertificateProfileResponse struct {
 	CertificateProfile CertificateProfile `json:"certificateProfile"`
 }
 
-
 type UpdateCertificateProfileRequest struct {
-	ProfileId       string                              `json:"-"`
-	Slug            string                              `json:"slug,omitempty"`
-	Description     string                              `json:"description,omitempty"`
-	EnrollmentType  string                              `json:"enrollmentType,omitempty"`
-	IssuerType      string                              `json:"issuerType,omitempty"`
+	ProfileId       string                             `json:"-"`
+	Slug            string                             `json:"slug,omitempty"`
+	Description     string                             `json:"description,omitempty"`
+	EnrollmentType  string                             `json:"enrollmentType,omitempty"`
+	IssuerType      string                             `json:"issuerType,omitempty"`
 	EstConfig       *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
 	ApiConfig       *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
 	ExternalConfigs *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
@@ -2985,11 +2982,11 @@ type CACertificate struct {
 }
 
 type GenerateCACertificateRequest struct {
-	CaId           string  `json:"-"`
-	NotBefore      string  `json:"notBefore"`
-	NotAfter       string  `json:"notAfter"`
-	MaxPathLength  *int    `json:"maxPathLength,omitempty"`
-	ParentCaId     string  `json:"parentCaId,omitempty"`
+	CaId          string `json:"-"`
+	NotBefore     string `json:"notBefore"`
+	NotAfter      string `json:"notAfter"`
+	MaxPathLength *int   `json:"maxPathLength,omitempty"`
+	ParentCaId    string `json:"parentCaId,omitempty"`
 }
 
 type GenerateCACertificateResponse struct {
@@ -3007,4 +3004,3 @@ type GetCACertificateResponse struct {
 	CertificateChain string `json:"certificateChain"`
 	SerialNumber     string `json:"serialNumber"`
 }
-

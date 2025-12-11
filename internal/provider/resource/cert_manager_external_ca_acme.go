@@ -290,7 +290,6 @@ func (r *certManagerExternalCAACMEResource) Read(ctx context.Context, req resour
 		state.EABKid = types.StringValue(ca.Configuration.EABKid)
 	}
 
-
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

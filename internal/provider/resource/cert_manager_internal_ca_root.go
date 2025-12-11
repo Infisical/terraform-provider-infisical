@@ -360,7 +360,6 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 		state.KeyAlgorithm = types.StringValue(ca.Configuration.KeyAlgorithm)
 	}
 
-
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

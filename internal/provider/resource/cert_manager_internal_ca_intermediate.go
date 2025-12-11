@@ -362,7 +362,6 @@ func (r *certManagerInternalCAIntermediateResource) Read(ctx context.Context, re
 		state.ParentCAId = types.StringValue(ca.Configuration.ParentCaId)
 	}
 
-
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

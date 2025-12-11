@@ -53,14 +53,14 @@ type certManagerCertificateProfileExternalConfigsModel struct {
 }
 
 type certManagerCertificateProfileResourceModel struct {
-	ProjectSlug           types.String                                        `tfsdk:"project_slug"`
-	Id                    types.String                                        `tfsdk:"id"`
-	CaId                  types.String                                        `tfsdk:"ca_id"`
-	CertificateTemplateId types.String                                        `tfsdk:"certificate_template_id"`
-	Slug                  types.String                                        `tfsdk:"slug"`
-	Description           types.String                                        `tfsdk:"description"`
-	EnrollmentType        types.String                                        `tfsdk:"enrollment_type"`
-	IssuerType            types.String                                        `tfsdk:"issuer_type"`
+	ProjectSlug           types.String                                       `tfsdk:"project_slug"`
+	Id                    types.String                                       `tfsdk:"id"`
+	CaId                  types.String                                       `tfsdk:"ca_id"`
+	CertificateTemplateId types.String                                       `tfsdk:"certificate_template_id"`
+	Slug                  types.String                                       `tfsdk:"slug"`
+	Description           types.String                                       `tfsdk:"description"`
+	EnrollmentType        types.String                                       `tfsdk:"enrollment_type"`
+	IssuerType            types.String                                       `tfsdk:"issuer_type"`
 	EstConfig             *certManagerCertificateProfileEstConfigModel       `tfsdk:"est_config"`
 	ApiConfig             *certManagerCertificateProfileApiConfigModel       `tfsdk:"api_config"`
 	ExternalConfigs       *certManagerCertificateProfileExternalConfigsModel `tfsdk:"external_configs"`

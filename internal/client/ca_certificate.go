@@ -48,4 +48,3 @@ func (client Client) GetCACertificate(request GetCACertificateRequest) (GetCACer
 
 	return certResponse, nil
 }
-
