@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -80,7 +79,7 @@ func NewSecretSyncAzureAppConfigurationResource() resource.Resource {
 			return syncOptionsMap, nil
 		},
 
-		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			initialSyncBehavior, ok := secretSync.SyncOptions["initialSyncBehavior"].(string)
 			if !ok {
 				initialSyncBehavior = ""
@@ -151,7 +150,7 @@ func NewSecretSyncAzureAppConfigurationResource() resource.Resource {
 
 			return destinationConfig, diags
 		},
-		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
 			urlVal, ok := secretSync.DestinationConfig["configurationUrl"].(string)

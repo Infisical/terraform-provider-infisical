@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -126,7 +125,7 @@ func (r *IdentityUniversalAuthResource) Configure(_ context.Context, req resourc
 	r.client = client
 }
 
-func updateUniversalAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityUniversalAuthResourceModel, newIdentityUniversalAuth *infisicalclient.IdentityUniversalAuth) {
+func updateUniversalAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityUniversalAuthResourceModel, newIdentityUniversalAuth *infisical.IdentityUniversalAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityUniversalAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityUniversalAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityUniversalAuth.AccessTokenNumUsesLimit)
@@ -274,7 +273,7 @@ func (r *IdentityUniversalAuthResource) Read(ctx context.Context, req resource.R
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {

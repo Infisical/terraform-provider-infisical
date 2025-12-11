@@ -56,7 +56,7 @@ func (r *IntegrationGCPSecretManagerResource) Metadata(_ context.Context, req re
 // Schema defines the schema for the resource.
 func (r *IntegrationGCPSecretManagerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create GCP Secret Manager integration & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "**Deprecated:** This resource is deprecated and will be removed in a future version. Use `infisical_secret_sync_gcp_secret_manager` instead.\n\nCreate GCP Secret Manager integration & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",

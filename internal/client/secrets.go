@@ -7,6 +7,21 @@ import (
 	"strconv"
 	"strings"
 	"terraform-provider-infisical/internal/crypto"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetSecretsV3               = "CallGetSecretsV3"
+	operationCreateSecretsV3            = "CallCreateSecretsV3"
+	operationDeleteSecretsV3            = "CallDeleteSecretsV3"
+	operationUpdateSecretsV3            = "CallUpdateSecretsV3"
+	operationGetSingleSecretByNameV3    = "CallGetSingleSecretByNameV3"
+	operationGetSingleSecretByIDV3      = "CallGetSingleSecretByIDV3"
+	operationGetSecretsRawV3            = "CallGetSecretsRawV3"
+	operationCreateRawSecretsV3         = "CallCreateRawSecretsV3"
+	operationDeleteRawSecretV3          = "CallDeleteRawSecretV3"
+	operationUpdateRawSecretV3          = "CallUpdateRawSecretV3"
+	operationGetSingleRawSecretByNameV3 = "CallGetSingleRawSecretByNameV3"
 )
 
 func (client Client) GetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncryptedSecretsV3Response, error) {
@@ -26,17 +41,18 @@ func (client Client) GetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncr
 	response, err := httpRequest.Get("api/v3/secrets")
 
 	if err != nil {
-		return GetEncryptedSecretsV3Response{}, fmt.Errorf("CallGetSecretsV3: Unable to complete api request [err=%s]", err)
+		return GetEncryptedSecretsV3Response{}, errors.NewGenericRequestError(operationGetSecretsV3, err)
 	}
 
 	if response.IsError() {
-		return GetEncryptedSecretsV3Response{}, fmt.Errorf("CallGetSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%v]", response.RawResponse)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return GetEncryptedSecretsV3Response{}, errors.NewAPIErrorWithResponse(operationGetSecretsV3, response, &additionalContext)
 	}
 
 	return secretsResponse, nil
 }
 
-func (client Client) CreateSecretsV3(request CreateSecretV3Request) error {
+func (client Client) CreateSecretsV3(request CreateSecretV3Request) (EncryptedSecretV3, error) {
 	var secretsResponse EncryptedSecretV3
 	response, err := client.Config.HttpClient.
 		R().
@@ -46,14 +62,15 @@ func (client Client) CreateSecretsV3(request CreateSecretV3Request) error {
 		Post(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
 	if err != nil {
-		return fmt.Errorf("CallCreateSecretsV3: Unable to complete api request [err=%s]", err)
+		return EncryptedSecretV3{}, errors.NewGenericRequestError(operationCreateSecretsV3, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallCreateSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return EncryptedSecretV3{}, errors.NewAPIErrorWithResponse(operationCreateSecretsV3, response, &additionalContext)
 	}
 
-	return nil
+	return secretsResponse, nil
 }
 
 func (client Client) DeleteSecretsV3(request DeleteSecretV3Request) error {
@@ -66,11 +83,12 @@ func (client Client) DeleteSecretsV3(request DeleteSecretV3Request) error {
 		Delete(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
 	if err != nil {
-		return fmt.Errorf("CallDeleteSecretsV3: Unable to complete api request [err=%s]", err)
+		return errors.NewGenericRequestError(operationDeleteSecretsV3, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallDeleteSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return errors.NewAPIErrorWithResponse(operationDeleteSecretsV3, response, &additionalContext)
 	}
 
 	return nil
@@ -87,11 +105,12 @@ func (client Client) UpdateSecretsV3(request UpdateSecretByNameV3Request) error 
 		Patch(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
 	if err != nil {
-		return fmt.Errorf("CallUpdateSecretsV3: Unable to complete api request [err=%s]", err)
+		return errors.NewGenericRequestError(operationUpdateSecretsV3, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallUpdateSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return errors.NewAPIErrorWithResponse(operationUpdateSecretsV3, response, &additionalContext)
 	}
 
 	return nil
@@ -111,11 +130,15 @@ func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Requ
 		Get(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
 	if err != nil {
-		return GetSingleSecretByNameSecretResponse{}, fmt.Errorf("CallGetSingleSecretByNameV3: Unable to complete api request [err=%s]", err)
+		return GetSingleSecretByNameSecretResponse{}, errors.NewGenericRequestError(operationGetSingleSecretByNameV3, err)
 	}
 
 	if response.IsError() {
-		return GetSingleSecretByNameSecretResponse{}, fmt.Errorf("CallGetSingleSecretByNameV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSingleSecretByNameSecretResponse{}, ErrNotFound
+		}
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return GetSingleSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleSecretByNameV3, response, &additionalContext)
 	}
 
 	return secretsResponse, nil
@@ -130,14 +153,14 @@ func (client Client) GetSingleSecretByIDV3(request GetSingleSecretByIDV3Request)
 		Get(fmt.Sprintf("api/v3/secrets/raw/id/%s", request.ID))
 
 	if err != nil {
-		return GetSingleSecretByIDV3Response{}, fmt.Errorf("CallGetSingleSecretByIDV3: Unable to complete api request [err=%s]", err)
+		return GetSingleSecretByIDV3Response{}, errors.NewGenericRequestError(operationGetSingleSecretByIDV3, err)
 	}
 
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
 			return GetSingleSecretByIDV3Response{}, ErrNotFound
 		}
-		return GetSingleSecretByIDV3Response{}, fmt.Errorf("CallGetSingleSecretByIDV3: Unsuccessful response. [response=%s]", response)
+		return GetSingleSecretByIDV3Response{}, errors.NewAPIErrorWithResponse(operationGetSingleSecretByIDV3, response, nil)
 	}
 
 	return secretsResponse, nil
@@ -163,18 +186,19 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 	response, err := httpRequest.Get("api/v3/secrets/raw")
 
 	if err != nil {
-		return GetRawSecretsV3Response{}, fmt.Errorf("CallGetSecretsRawV3: Unable to complete api request [err=%s]", err)
+		return GetRawSecretsV3Response{}, errors.NewGenericRequestError(operationGetSecretsRawV3, err)
 	}
 
 	if response.IsError() {
-		return GetRawSecretsV3Response{}, fmt.Errorf("CallGetSecretsRawV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%v]", response.RawResponse)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return GetRawSecretsV3Response{}, errors.NewAPIErrorWithResponse(operationGetSecretsRawV3, response, &additionalContext)
 	}
 
 	return secretsResponse, nil
 }
 
-func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) error {
-	var secretsResponse EncryptedSecretV3
+func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) (RawV3Secret, error) {
+	var secretsResponse CreateRawSecretsV3Response
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
@@ -183,14 +207,15 @@ func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) error 
 		Post(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretKey))
 
 	if err != nil {
-		return fmt.Errorf("CallCreateRawSecretsV3: Unable to complete api request [err=%s]", err)
+		return RawV3Secret{}, errors.NewGenericRequestError(operationCreateRawSecretsV3, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallCreateRawSecretsV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return RawV3Secret{}, errors.NewAPIErrorWithResponse(operationCreateRawSecretsV3, response, &additionalContext)
 	}
 
-	return nil
+	return secretsResponse.Secret, nil
 }
 
 func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {
@@ -203,11 +228,12 @@ func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {
 		Delete(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
 
 	if err != nil {
-		return fmt.Errorf("CallDeleteRawSecretV3: Unable to complete api request [err=%s]", err)
+		return errors.NewGenericRequestError(operationDeleteRawSecretV3, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallDeleteRawSecretV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return errors.NewAPIErrorWithResponse(operationDeleteRawSecretV3, response, &additionalContext)
 	}
 
 	return nil
@@ -223,11 +249,12 @@ func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) e
 		Patch(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
 
 	if err != nil {
-		return fmt.Errorf("CallUpdateRawSecretV3: Unable to complete api request [err=%s]", err)
+		return errors.NewGenericRequestError(operationUpdateRawSecretV3, err)
 	}
 
 	if response.IsError() {
-		return fmt.Errorf("CallUpdateRawSecretV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return errors.NewAPIErrorWithResponse(operationUpdateRawSecretV3, response, &additionalContext)
 	}
 
 	return nil
@@ -247,11 +274,17 @@ func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3R
 		Get(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
 
 	if err != nil {
-		return GetSingleRawSecretByNameSecretResponse{}, fmt.Errorf("CallGetSingleRawSecretByNameV3: Unable to complete api request [err=%s]", err)
+		return GetSingleRawSecretByNameSecretResponse{}, errors.NewGenericRequestError(operationGetSingleRawSecretByNameV3, err)
 	}
 
 	if response.IsError() {
-		return GetSingleRawSecretByNameSecretResponse{}, fmt.Errorf("CallGetSingleRawSecretByNameV3: Unsuccessful response. Please make sure your secret path, workspace and environment name are all correct [response=%s]", response)
+
+		if response.StatusCode() == http.StatusNotFound {
+			return GetSingleRawSecretByNameSecretResponse{}, ErrNotFound
+		}
+
+		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
+		return GetSingleRawSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleRawSecretByNameV3, response, &additionalContext)
 	}
 
 	return secretsResponse, nil

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -239,7 +238,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 			return
 		}
 
-		projectRolePermissions := make([]infisicalclient.ProjectRolePermissionRequest, 0, len(permissions))
+		projectRolePermissions := make([]infisical.ProjectRolePermissionRequest, 0, len(permissions))
 
 		for _, el := range permissions {
 			condition := make(map[string]any)
@@ -256,7 +255,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 				condition = nil
 			}
 
-			projectRolePermissions = append(projectRolePermissions, infisicalclient.ProjectRolePermissionRequest{
+			projectRolePermissions = append(projectRolePermissions, infisical.ProjectRolePermissionRequest{
 				Action:     el.Action.ValueString(),
 				Subject:    el.Subject.ValueString(),
 				Conditions: condition,
@@ -642,7 +641,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 			return
 		}
 
-		projectRolePermissions := make([]infisicalclient.ProjectRolePermissionRequest, 0, len(permissions))
+		projectRolePermissions := make([]infisical.ProjectRolePermissionRequest, 0, len(permissions))
 		for _, el := range permissions {
 			condition := make(map[string]any)
 			if el.Conditions != nil {
@@ -657,7 +656,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 			} else {
 				condition = nil
 			}
-			projectRolePermissions = append(projectRolePermissions, infisicalclient.ProjectRolePermissionRequest{
+			projectRolePermissions = append(projectRolePermissions, infisical.ProjectRolePermissionRequest{
 				Action:     el.Action.ValueString(),
 				Subject:    el.Subject.ValueString(),
 				Conditions: condition,

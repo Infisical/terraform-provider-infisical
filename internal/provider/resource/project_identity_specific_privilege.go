@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -27,7 +26,7 @@ import (
 var (
 	_                                      resource.Resource = &projectIdentitySpecificPrivilegeResourceResource{}
 	SPECIFIC_PRIVILEGE_PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS                   = []string{"secrets"}
+	SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-templates", "kms", "pki-alerts", "pki-collections"}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -142,10 +141,10 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 					"actions": schema.ListAttribute{
 						ElementType: types.StringType,
 						Required:    true,
-						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(PERMISSION_ACTIONS, ",")),
+						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(SPECIFIC_PRIVILEGE_PERMISSION_ACTIONS, ",")),
 					},
 					"subject": schema.StringAttribute{
-						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(PERMISSION_SUBJECTS, ",")),
+						Description: fmt.Sprintf("Describe what action an entity can take. Enum: %s", strings.Join(SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS, ",")),
 						Required:    true,
 					},
 					"conditions": schema.SingleNestedAttribute{
@@ -268,7 +267,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Co
 		for _, action := range planPermissionActions {
 			actions = append(actions, action.ValueString())
 		}
-		privilegePermission := infisicalclient.ProjectSpecificPrivilegePermissionRequest{
+		privilegePermission := infisical.ProjectSpecificPrivilegePermissionRequest{
 			Actions:    actions,
 			Subject:    plan.Permission.Subject.ValueString(),
 			Conditions: condition,
@@ -730,7 +729,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 		for _, action := range planPermissionActions {
 			actions = append(actions, action.ValueString())
 		}
-		privilegePermission := infisicalclient.ProjectSpecificPrivilegePermissionRequest{
+		privilegePermission := infisical.ProjectSpecificPrivilegePermissionRequest{
 			Actions:    actions,
 			Subject:    plan.Permission.Subject.ValueString(),
 			Conditions: condition,

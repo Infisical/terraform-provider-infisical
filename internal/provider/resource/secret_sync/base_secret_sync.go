@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,20 +16,20 @@ import (
 
 // SecretSyncBaseResource is the resource implementation.
 type SecretSyncBaseResource struct {
-	App                                    infisicalclient.SecretSyncApp // used for identifying secret sync route
-	ResourceTypeName                       string                        // terraform resource name suffix
-	SyncName                               string                        // complete descriptive name of the secret sync
-	AppConnection                          infisicalclient.AppConnectionApp
+	App                                    infisical.SecretSyncApp // used for identifying secret sync route
+	ResourceTypeName                       string                  // terraform resource name suffix
+	SyncName                               string                  // complete descriptive name of the secret sync
+	AppConnection                          infisical.AppConnectionApp
 	client                                 *infisical.Client
 	DestinationConfigAttributes            map[string]schema.Attribute
 	ReadDestinationConfigForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadDestinationConfigForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
+	ReadDestinationConfigFromApi           func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics)
 
 	SyncOptionsAttributes            map[string]schema.Attribute
 	ReadSyncOptionsForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadSyncOptionsForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadSyncOptionsFromApi           func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics)
+	ReadSyncOptionsFromApi           func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics)
 }
 
 type SecretSyncBaseResourceModel struct {
@@ -125,6 +124,67 @@ func (r *SecretSyncBaseResource) Configure(_ context.Context, req resource.Confi
 	r.client = client
 }
 
+func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || r.client == nil || !r.client.Config.IsMachineIdentityAuth {
+		return
+	}
+
+	var plan SecretSyncBaseResourceModel
+	if diags := req.Plan.Get(ctx, &plan); diags.HasError() {
+		return
+	}
+
+	if !req.State.Raw.IsNull() {
+		var state SecretSyncBaseResourceModel
+		if diags := req.State.Get(ctx, &state); !diags.HasError() {
+			if plan.DestinationConfig.Equal(state.DestinationConfig) {
+				return
+			}
+		}
+	}
+
+	var destinationConfigMap map[string]interface{}
+	var configDiags diag.Diagnostics
+	var excludeSyncId string
+
+	if req.State.Raw.IsNull() {
+		destinationConfigMap, configDiags = r.ReadDestinationConfigForCreateFromPlan(ctx, plan)
+	} else {
+		var state SecretSyncBaseResourceModel
+		if diags := req.State.Get(ctx, &state); diags.HasError() {
+			return
+		}
+		destinationConfigMap, configDiags = r.ReadDestinationConfigForUpdateFromPlan(ctx, plan, state)
+		if !state.ID.IsNull() && !state.ID.IsUnknown() {
+			excludeSyncId = state.ID.ValueString()
+		}
+	}
+
+	if configDiags.HasError() {
+		return
+	}
+
+	checkRequest := infisical.CheckDuplicateDestinationRequest{
+		App:               r.App,
+		DestinationConfig: destinationConfigMap,
+		ProjectID:         plan.ProjectID.ValueString(),
+		ExcludeSyncId:     excludeSyncId,
+	}
+
+	duplicateCheck, err := r.client.CheckDuplicateDestination(checkRequest)
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Unable to check for duplicate destinations",
+			"Warning: Could not verify if this destination already exists. This may result in conflicts. Error: "+err.Error(),
+		)
+	} else if duplicateCheck.HasDuplicate {
+		resp.Diagnostics.AddWarning(
+			"Duplicate destination configuration detected",
+			"A secret sync with the same destination configuration already exists in this project. Proceeding with this operation may result in conflicts or unexpected behavior.",
+		)
+	}
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
@@ -181,7 +241,7 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	secretSync, err := r.client.CreateSecretSync(infisicalclient.CreateSecretSyncRequest{
+	secretSync, err := r.client.CreateSecretSync(infisical.CreateSecretSyncRequest{
 		App:               r.App,
 		Name:              plan.Name.ValueString(),
 		Description:       plan.Description.ValueString(),
@@ -229,7 +289,7 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	secretSync, err := r.client.GetSecretSyncById(infisicalclient.GetSecretSyncByIdRequest{
+	secretSync, err := r.client.GetSecretSyncById(infisical.GetSecretSyncByIdRequest{
 		App: r.App,
 		ID:  state.ID.ValueString(),
 	})
@@ -336,7 +396,7 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	_, err := r.client.UpdateSecretSync(infisicalclient.UpdateSecretSyncRequest{
+	_, err := r.client.UpdateSecretSync(infisical.UpdateSecretSyncRequest{
 		App:               r.App,
 		ID:                state.ID.ValueString(),
 		Name:              plan.Name.ValueString(),

@@ -49,7 +49,7 @@ func (r *IntegrationDatabricksResource) Metadata(_ context.Context, req resource
 // Schema defines the schema for the resource.
 func (r *IntegrationDatabricksResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create Databricks integration & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "**Deprecated:** This resource is deprecated and will be removed in a future version. Use `infisical_secret_sync_databricks` instead.\n\nCreate Databricks integration & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"integration_auth_id": schema.StringAttribute{
 				Computed:      true,

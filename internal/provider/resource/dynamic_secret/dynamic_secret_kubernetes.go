@@ -2,7 +2,8 @@ package resource
 
 import (
 	"context"
-	infisicalclient "terraform-provider-infisical/internal/client"
+	"strconv"
+	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -46,7 +47,7 @@ type DynamicSecretKubernetesConfigurationModel struct {
 
 func NewDynamicSecretKubernetesResource() resource.Resource {
 	return &DynamicSecretBaseResource{
-		Provider:          infisicalclient.DynamicSecretProviderKubernetes,
+		Provider:          infisical.DynamicSecretProviderKubernetes,
 		ResourceTypeName:  "_dynamic_secret_kubernetes",
 		DynamicSecretName: "Kubernetes",
 		ConfigurationAttributes: map[string]schema.Attribute{
@@ -225,7 +226,7 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 			return configurationMap, diags
 		},
 
-		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
+		ReadConfigurationFromApi: func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
 			var currentState DynamicSecretKubernetesConfigurationModel
@@ -387,7 +388,7 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 					if !ok {
 						diags.AddError(
 							"Invalid audience element type",
-							"Expected audience at index "+string(rune(i))+" to be a string but got something else.",
+							"Expected audience at index "+strconv.Itoa(i)+" to be a string but got something else.",
 						)
 						return types.ObjectNull(map[string]attr.Type{}), diags
 					}

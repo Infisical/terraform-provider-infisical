@@ -45,8 +45,8 @@ func NewAppConnectionAwsResource() resource.Resource {
 				Sensitive:   true,
 			},
 		},
-		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentials AppConnectionAwsCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentials, basetypes.ObjectAsOptions{})
@@ -87,8 +87,8 @@ func NewAppConnectionAwsResource() resource.Resource {
 
 			return credentialsConfig, diags
 		},
-		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			credentialsConfig := make(map[string]interface{})
+		ReadCredentialsForUpdateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
+			credentialsConfig := make(map[string]any)
 
 			var credentialsFromPlan AppConnectionAwsCredentialsModel
 			diags := plan.Credentials.As(ctx, &credentialsFromPlan, basetypes.ObjectAsOptions{})
@@ -103,7 +103,12 @@ func NewAppConnectionAwsResource() resource.Resource {
 			}
 
 			if plan.Method.ValueString() == AwsAppConnectionAssumeRoleMethod {
-				if credentialsFromPlan.RoleARN.IsNull() || credentialsFromPlan.RoleARN.ValueString() == "" {
+				roleArn := credentialsFromPlan.RoleARN
+				if credentialsFromPlan.RoleARN.IsUnknown() {
+					roleArn = credentialsFromState.RoleARN
+				}
+
+				if roleArn.IsNull() || roleArn.ValueString() == "" {
 					diags.AddError(
 						"Unable to update AWS app connection",
 						"Role arn field must be defined in assume-role method",
@@ -111,11 +116,20 @@ func NewAppConnectionAwsResource() resource.Resource {
 					return nil, diags
 				}
 
-				if credentialsFromState.RoleARN.ValueString() != credentialsFromPlan.RoleARN.ValueString() {
-					credentialsConfig["roleArn"] = credentialsFromPlan.RoleARN.ValueString()
-				}
+				credentialsConfig["roleArn"] = roleArn.ValueString()
+
 			} else {
-				if credentialsFromPlan.AccessKeyId.IsNull() || credentialsFromPlan.AccessKeyId.ValueString() == "" {
+				accessKeyId := credentialsFromPlan.AccessKeyId
+				if credentialsFromPlan.AccessKeyId.IsUnknown() {
+					accessKeyId = credentialsFromState.AccessKeyId
+				}
+
+				secretAccessKey := credentialsFromPlan.SecretAccessKey
+				if credentialsFromPlan.SecretAccessKey.IsUnknown() {
+					secretAccessKey = credentialsFromState.SecretAccessKey
+				}
+
+				if accessKeyId.IsNull() || accessKeyId.ValueString() == "" {
 					diags.AddError(
 						"Unable to update AWS app connection",
 						"Access key id field must be defined in access-key method",
@@ -123,7 +137,7 @@ func NewAppConnectionAwsResource() resource.Resource {
 					return nil, diags
 				}
 
-				if credentialsFromPlan.SecretAccessKey.IsNull() || credentialsFromPlan.SecretAccessKey.ValueString() == "" {
+				if secretAccessKey.IsNull() || secretAccessKey.ValueString() == "" {
 					diags.AddError(
 						"Unable to update AWS app connection",
 						"Secret access key field must be defined in access-key method",
@@ -131,8 +145,9 @@ func NewAppConnectionAwsResource() resource.Resource {
 					return nil, diags
 				}
 
-				credentialsConfig["accessKeyId"] = credentialsFromPlan.AccessKeyId.ValueString()
-				credentialsConfig["secretAccessKey"] = credentialsFromPlan.SecretAccessKey.ValueString()
+				credentialsConfig["accessKeyId"] = accessKeyId.ValueString()
+				credentialsConfig["secretAccessKey"] = secretAccessKey.ValueString()
+
 			}
 
 			return credentialsConfig, diags

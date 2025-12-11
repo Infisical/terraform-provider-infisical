@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -21,13 +20,13 @@ type MetaEntry struct {
 
 // DynamicSecretBaseResource is the resource implementation.
 type DynamicSecretBaseResource struct {
-	Provider                  infisicalclient.DynamicSecretProvider
+	Provider                  infisical.DynamicSecretProvider
 	ResourceTypeName          string // terraform resource name suffix
 	DynamicSecretName         string // complete descriptive name of the dynamic secret
 	client                    *infisical.Client
 	ConfigurationAttributes   map[string]schema.Attribute
 	ReadConfigurationFromPlan func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
-	ReadConfigurationFromApi  func(ctx context.Context, dynamicSecret infisicalclient.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics)
+	ReadConfigurationFromApi  func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics)
 }
 
 type DynamicSecretBaseResourceModel struct {
@@ -81,7 +80,7 @@ func (r *DynamicSecretBaseResource) Schema(_ context.Context, _ resource.SchemaR
 				Required:    true,
 			},
 			"max_ttl": schema.StringAttribute{
-				Description: "The maximum limit a TTL can be leases or renewed.",
+				Description: "The maximum limit a TTL can be leased or renewed for.",
 				Optional:    true,
 			},
 			"configuration": schema.SingleNestedAttribute{
@@ -167,8 +166,8 @@ func (r *DynamicSecretBaseResource) Create(ctx context.Context, req resource.Cre
 		}
 	}
 
-	dynamicSecret, err := r.client.CreateDynamicSecret(infisicalclient.CreateDynamicSecretRequest{
-		Provider: infisicalclient.DynamicSecretProviderObject{
+	dynamicSecret, err := r.client.CreateDynamicSecret(infisical.CreateDynamicSecretRequest{
+		Provider: infisical.DynamicSecretProviderObject{
 			Provider: r.Provider,
 			Inputs:   configurationMap,
 		},
@@ -191,6 +190,12 @@ func (r *DynamicSecretBaseResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	plan.ID = types.StringValue(dynamicSecret.Id)
+
+	plan.Configuration, diags = r.ReadConfigurationFromApi(ctx, dynamicSecret, plan.Configuration)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -217,7 +222,7 @@ func (r *DynamicSecretBaseResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	dynamicSecret, err := r.client.GetDynamicSecretByName(infisicalclient.GetDynamicSecretByNameRequest{
+	dynamicSecret, err := r.client.GetDynamicSecretByName(infisical.GetDynamicSecretByNameRequest{
 		ProjectSlug:     state.ProjectSlug.ValueString(),
 		EnvironmentSlug: state.EnvironmentSlug.ValueString(),
 		Path:            state.Path.ValueString(),
@@ -322,12 +327,12 @@ func (r *DynamicSecretBaseResource) Update(ctx context.Context, req resource.Upd
 		newName = plan.Name.ValueString()
 	}
 
-	_, err := r.client.UpdateDynamicSecret(infisicalclient.UpdateDynamicSecretRequest{
+	dynamicSecret, err := r.client.UpdateDynamicSecret(infisical.UpdateDynamicSecretRequest{
 		Name:            state.Name.ValueString(),
 		ProjectSlug:     state.ProjectSlug.ValueString(),
 		EnvironmentSlug: state.EnvironmentSlug.ValueString(),
 		Path:            state.Path.ValueString(),
-		Data: infisicalclient.UpdateDynamicSecretData{
+		Data: infisical.UpdateDynamicSecretData{
 			Inputs:           configurationMap,
 			DefaultTTL:       plan.DefaultTTL.ValueString(),
 			MaxTTL:           plan.MaxTTL.ValueString(),
@@ -342,6 +347,12 @@ func (r *DynamicSecretBaseResource) Update(ctx context.Context, req resource.Upd
 			"Error updating dynamic secret",
 			"Couldn't update dynamic secret, unexpected error: "+err.Error(),
 		)
+		return
+	}
+
+	plan.Configuration, diags = r.ReadConfigurationFromApi(ctx, dynamicSecret, plan.Configuration)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 

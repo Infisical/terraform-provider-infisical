@@ -9,6 +9,7 @@ import (
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
 	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
+	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -57,6 +58,7 @@ type authModel struct {
 	Token      types.String         `tfsdk:"token"`
 	Universal  *universalAuthModel  `tfsdk:"universal"`
 	Kubernetes *kubernetesAuthModel `tfsdk:"kubernetes"`
+	AWS        *awsIamAuthModel     `tfsdk:"aws_iam"`
 }
 
 type oidcAuthModel struct {
@@ -67,6 +69,10 @@ type oidcAuthModel struct {
 type universalAuthModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
+}
+
+type awsIamAuthModel struct {
+	IdentityId types.String `tfsdk:"identity_id"`
 }
 
 type kubernetesAuthModel struct {
@@ -167,6 +173,17 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 							},
 						},
 					},
+					"aws_iam": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "The configuration values for AWS IAM Auth",
+						Attributes: map[string]schema.Attribute{
+							"identity_id": schema.StringAttribute{
+								Optional:    true,
+								Sensitive:   true,
+								Description: "Machine identity ID. This attribute can also be set using the `INFISICAL_MACHINE_IDENTITY_ID` environment variable",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -227,7 +244,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	var authStrategy infisical.AuthStrategyType
+	var authStrategy infisical.AuthStrategyType = ""
 
 	if config.Auth != nil {
 		if config.Auth.Oidc != nil {
@@ -260,10 +277,27 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 			if !config.Auth.Kubernetes.Token.IsNull() {
 				serviceAccountToken = config.Auth.Kubernetes.Token.ValueString()
 			}
+		} else if config.Auth.AWS != nil {
+			authStrategy = infisical.AuthStrategy.AWS_IAM_MACHINE_IDENTITY
+			if !config.Auth.AWS.IdentityId.IsNull() {
+				identityId = config.Auth.AWS.IdentityId.ValueString()
+			}
 		} else if config.Auth.Token.ValueString() != "" {
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = config.Auth.Token.ValueString()
 		}
+	}
+
+	// strict env vars check:
+	if authStrategy == "" {
+		// ? note(daniel): this fix only works for token auth.
+		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
+		// ? We should have a field for specifying the target auth strategy, like we do for the CLI (--method=aws-auth as an example)
+		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
+			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
+			token = envVarToken
+		}
+
 	}
 
 	client, err := infisical.NewClient(infisical.Config{
@@ -304,6 +338,8 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewSecretTagDataSource,
 		infisicalDatasource.NewSecretFolderDataSource,
 		infisicalDatasource.NewGroupsDataSource,
+		infisicalDatasource.NewIdentityDetailsDataSource,
+		infisicalDatasource.NewKMSKeyDataSource,
 	}
 }
 
@@ -328,6 +364,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityGcpAuthResource,
 		infisicalResource.NewIdentityAzureAuthResource,
 		infisicalResource.NewIdentityOidcAuthResource,
+		infisicalResource.NewIdentityTokenAuthResource,
+		infisicalResource.NewIdentityTokenAuthTokenResource,
 		infisicalResource.NewIntegrationGcpSecretManagerResource,
 		infisicalResource.NewIntegrationAwsParameterStoreResource,
 		infisicalResource.NewIntegrationAwsSecretsManagerResource,
@@ -339,15 +377,50 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewGroupResource,
 		appConnectionResource.NewAppConnectionGcpResource,
 		appConnectionResource.NewAppConnectionAwsResource,
+		appConnectionResource.NewAppConnectionAzureResource,
+		appConnectionResource.NewAppConnection1PasswordResource,
+		appConnectionResource.NewAppConnectionRenderResource,
+		appConnectionResource.NewAppConnectionMySqlResource,
+		appConnectionResource.NewAppConnectionMsSqlResource,
+		appConnectionResource.NewAppConnectionPostgresResource,
+		appConnectionResource.NewAppConnectionOracleDbResource,
+		appConnectionResource.NewAppConnectionBitbucketResource,
+		appConnectionResource.NewAppConnectionDatabricksResource,
+		appConnectionResource.NewAppConnectionCloudflareResource,
+		appConnectionResource.NewAppConnectionSupabaseResource,
+		appConnectionResource.NewAppConnectionFlyioResource,
+		appConnectionResource.NewAppConnectionLdapResource,
+		appConnectionResource.NewAppConnectionGitlabResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
 		secretSyncResource.NewSecretSyncAwsParameterStoreResource,
 		secretSyncResource.NewSecretSyncAwsSecretsManagerResource,
 		secretSyncResource.NewSecretSyncGithubResource,
+		secretSyncResource.NewSecretSync1PasswordResource,
+		secretSyncResource.NewSecretSyncAzureDevOpsResource,
+		secretSyncResource.NewSecretSyncRenderResource,
+		secretSyncResource.NewSecretSyncBitbucketResource,
+		secretSyncResource.NewSecretSyncDatabricksResource,
+		secretSyncResource.NewSecretSyncCloudflareWorkersResource,
+		secretSyncResource.NewSecretSyncCloudflarePagesResource,
+		secretSyncResource.NewSecretSyncSupabaseResource,
+		secretSyncResource.NewSecretSyncFlyioResource,
+		secretSyncResource.NewSecretSyncGitlabResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,
+		dynamicSecretResource.NewDynamicSecretMongoAtlasResource,
+		dynamicSecretResource.NewDynamicSecretMongoDbResource,
+		secretRotationResource.NewSecretRotationMySqlCredentialsResource,
+		secretRotationResource.NewSecretRotationMsSqlCredentialsResource,
+		secretRotationResource.NewSecretRotationPostgresCredentialsResource,
+		secretRotationResource.NewSecretRotationOracleDbCredentialsResource,
+		secretRotationResource.NewSecretRotationAzureClientSecretResource,
+		secretRotationResource.NewSecretRotationAwsIamUserSecretResource,
+		secretRotationResource.NewSecretRotationLdapPasswordResource,
+		infisicalResource.NewProjectTemplateResource,
+		infisicalResource.NewKMSKeyResource,
 	}
 }
 

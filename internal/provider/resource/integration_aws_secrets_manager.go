@@ -74,7 +74,7 @@ func (r *IntegrationAWSSecretsManagerResource) Metadata(_ context.Context, req r
 // Schema defines the schema for the resource.
 func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create AWS Secrets Manager integration & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "**Deprecated:** This resource is deprecated and will be removed in a future version. Use `infisical_secret_sync_aws_secrets_manager` instead.\n\nCreate AWS Secrets Manager integration & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",

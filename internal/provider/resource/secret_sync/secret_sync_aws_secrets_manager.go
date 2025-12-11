@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -141,7 +140,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			return syncOptionsMap, nil
 		},
 
-		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			syncOptionsMap := make(map[string]attr.Value)
 			var diags diag.Diagnostics
 
@@ -387,7 +386,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			destinationConfig["secretName"] = awsCfg.AwsSecretsManagerSecretName.ValueString()
 			return destinationConfig, diags
 		},
-		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisicalclient.SecretSync) (types.Object, diag.Diagnostics) {
+		ReadDestinationConfigFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
 			regionVal, ok := secretSync.DestinationConfig["region"].(string)

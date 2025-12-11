@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"terraform-provider-infisical/internal/pkg/terraform"
 
@@ -145,7 +144,7 @@ func (r *IdentityGcpAuthResource) Configure(_ context.Context, req resource.Conf
 	r.client = client
 }
 
-func updateGcpAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityGcpAuthResourceModel, newIdentityGcpAuth *infisicalclient.IdentityGcpAuth) {
+func updateGcpAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, plan *IdentityGcpAuthResourceModel, newIdentityGcpAuth *infisical.IdentityGcpAuth) {
 	plan.AccessTokenMaxTTL = types.Int64Value(newIdentityGcpAuth.AccessTokenMaxTTL)
 	plan.AccessTokenTTL = types.Int64Value(newIdentityGcpAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityGcpAuth.AccessTokenNumUsesLimit)
@@ -271,7 +270,7 @@ func (r *IdentityGcpAuthResource) Read(ctx context.Context, req resource.ReadReq
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {

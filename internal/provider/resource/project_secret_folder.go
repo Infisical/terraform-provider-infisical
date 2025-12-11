@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalclient "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -33,7 +33,9 @@ type projectSecretFolderResourceModel struct {
 	EnvironmentID   types.String `tfsdk:"environment_id"`
 	ProjectID       types.String `tfsdk:"project_id"`
 	EnvironmentSlug types.String `tfsdk:"environment_slug"`
-	SecretPath      types.String `tfsdk:"folder_path"`
+	FolderPath      types.String `tfsdk:"folder_path"`
+	Path            types.String `tfsdk:"path"`
+	ForceDelete     types.Bool   `tfsdk:"force_delete"`
 }
 
 // Metadata returns the resource type name.
@@ -73,6 +75,16 @@ func (r *projectSecretFolderResource) Schema(_ context.Context, _ resource.Schem
 			"environment_id": schema.StringAttribute{
 				Description: "The ID of the environment",
 				Computed:    true,
+			},
+			"path": schema.StringAttribute{
+				Description: "The full path of the folder, including its name.",
+				Computed:    true,
+			},
+			"force_delete": schema.BoolAttribute{
+				Description: "Whether to force delete the folder even if it contains resources.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
 			},
 		},
 	}
@@ -120,19 +132,20 @@ func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.C
 		Name:        plan.Name.ValueString(),
 		ProjectID:   plan.ProjectID.ValueString(),
 		Environment: plan.EnvironmentSlug.ValueString(),
-		SecretPath:  plan.SecretPath.ValueString(),
+		SecretPath:  plan.FolderPath.ValueString(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project secret folder",
-			"Couldn't save folder to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save folder to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
 
 	plan.ID = types.StringValue(newProjectSecretFolder.Folder.ID)
 	plan.EnvironmentID = types.StringValue(newProjectSecretFolder.Folder.EnvID)
+	plan.Path = types.StringValue(newProjectSecretFolder.Folder.Path)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -166,19 +179,20 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 	})
 
 	if err != nil {
-		if err == infisicalclient.ErrNotFound {
+		if err == infisical.ErrNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching folders from your project",
-				"Couldn't read project secret folder from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project secret folder from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
 	}
 
 	state.EnvironmentID = types.StringValue(secretFolder.Folder.EnvID)
+	state.Path = types.StringValue(secretFolder.Folder.Path)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -216,18 +230,19 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 		Name:        plan.Name.ValueString(),
 		ID:          plan.ID.ValueString(),
 		Environment: plan.EnvironmentSlug.ValueString(),
-		SecretPath:  plan.SecretPath.ValueString(),
+		SecretPath:  plan.FolderPath.ValueString(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating secret folder",
-			"Couldn't update secret folder from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update secret folder from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
 
 	plan.EnvironmentID = types.StringValue(updatedFolder.Folder.EnvID)
+	plan.Path = types.StringValue(updatedFolder.Folder.Path)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -258,13 +273,14 @@ func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.D
 		ID:          state.ID.ValueString(),
 		ProjectID:   state.ProjectID.ValueString(),
 		Environment: state.EnvironmentSlug.ValueString(),
-		SecretPath:  state.SecretPath.ValueString(),
+		SecretPath:  state.FolderPath.ValueString(),
+		ForceDelete: state.ForceDelete.ValueBool(),
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting secret folder",
-			"Couldn't delete secret folder from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete secret folder from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -288,7 +304,7 @@ func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resou
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching secrets folder",
-				"Couldn't fetch secrets folder from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't fetch secrets folder from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return
@@ -313,4 +329,5 @@ func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), folder.Folder.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_slug"), folder.Folder.Environment.EnvSlug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), folder.Folder.ProjectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("path"), folder.Folder.Path)...)
 }

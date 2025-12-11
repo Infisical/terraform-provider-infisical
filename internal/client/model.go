@@ -44,6 +44,7 @@ type Project struct {
 	Name               string    `json:"name"`
 	Description        string    `json:"description"`
 	Slug               string    `json:"slug"`
+	Type               string    `json:"type"`
 	AutoCapitalization bool      `json:"autoCapitalization"`
 	OrgID              string    `json:"orgId"`
 	CreatedAt          time.Time `json:"createdAt"`
@@ -203,6 +204,8 @@ type IdentityKubernetesAuth struct {
 	AllowedAudience            string                  `json:"allowedAudience"`
 	CACERT                     string                  `json:"caCert"`
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
+	TokenReviewerMode          string                  `json:"tokenReviewMode"`
+	GatewayID                  string                  `json:"gatewayId"`
 }
 
 type IdentityOidcAuth struct {
@@ -223,6 +226,17 @@ type IdentityOidcAuth struct {
 	CACERT                  string                  `json:"caCert"`
 }
 
+type IdentityTokenAuth struct {
+	ID                      string                  `json:"id"`
+	AccessTokenTTL          int64                   `json:"accessTokenTTL"`
+	AccessTokenMaxTTL       int64                   `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit int64                   `json:"accessTokenNumUsesLimit"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIp `json:"accessTokenTrustedIps"`
+	CreatedAt               string                  `json:"createdAt"`
+	UpdatedAt               string                  `json:"updatedAt"`
+	IdentityID              string                  `json:"identityId"`
+}
+
 type IdentityAuthTrustedIp struct {
 	Type      string `json:"type"`
 	Prefix    *int   `json:"prefix,omitempty"`
@@ -240,6 +254,23 @@ type IdentityUniversalAuthClientSecret struct {
 	ClientSecretTTL          int64  `json:"clientSecretTTL"`
 	IdentityUAID             string `json:"identityUAId"`
 	IsClientSecretRevoked    bool   `json:"isClientSecretRevoked"`
+}
+type IdentityTokenAuthToken struct {
+	ID                       string    `json:"id"`
+	AccessTokenTTL           int64     `json:"accessTokenTTL"`
+	AccessTokenMaxTTL        int64     `json:"accessTokenMaxTTL"`
+	AccessTokenNumUses       int64     `json:"accessTokenNumUses"`
+	AccessTokenNumUsesLimit  int64     `json:"accessTokenNumUsesLimit"`
+	AccessTokenLastUsedAt    time.Time `json:"accessTokenLastUsedAt"`
+	AccessTokenLastRenewedAt time.Time `json:"accessTokenLastRenewedAt"`
+	IsAccessTokenRevoked     bool      `json:"isAccessTokenRevoked"`
+	IdentityUAClientSecretId string    `json:"identityUAClientSecretId"`
+	IdentityID               string    `json:"identityId"`
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
+	Name                     string    `json:"name"`
+	AuthMethod               string    `json:"authMethod"`
+	AccessTokenPeriod        int64     `json:"accessTokenPeriod"`
 }
 
 type ProjectIdentitySpecificPrivilege struct {
@@ -270,6 +301,7 @@ type ProjectWithEnvironments struct {
 	Name                  string               `json:"name"`
 	Description           string               `json:"description"`
 	Slug                  string               `json:"slug"`
+	Type                  string               `json:"type"`
 	AutoCapitalization    bool                 `json:"autoCapitalization"`
 	OrgID                 string               `json:"orgId"`
 	CreatedAt             time.Time            `json:"createdAt"`
@@ -312,6 +344,7 @@ type SecretFolder struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	EnvID string `json:"envId"`
+	Path  string `json:"path"`
 }
 
 type SecretFolderByID struct {
@@ -438,6 +471,7 @@ type GetEncryptedWorkspaceKeyResponse struct {
 
 // encrypted secret.
 type EncryptedSecret struct {
+	ID                      string `json:"id"`
 	SecretName              string `json:"secretName"`
 	WorkspaceID             string `json:"workspaceId"`
 	Type                    string `json:"type"`
@@ -489,9 +523,9 @@ type UpdateSecretByNameV3Request struct {
 	Environment           string   `json:"environment"`
 	Type                  string   `json:"type"`
 	SecretPath            string   `json:"secretPath"`
-	SecretValueCiphertext string   `json:"secretValueCiphertext"`
-	SecretValueIV         string   `json:"secretValueIV"`
-	SecretValueTag        string   `json:"secretValueTag"`
+	SecretValueCiphertext *string  `json:"secretValueCiphertext,omitempty"`
+	SecretValueIV         *string  `json:"secretValueIV,omitempty"`
+	SecretValueTag        *string  `json:"secretValueTag,omitempty"`
 	TagIDs                []string `json:"tags,omitempty"`
 }
 
@@ -520,11 +554,17 @@ type GetRawSecretsV3Request struct {
 	ExpandSecretReferences bool   `json:"expandSecretReferences"`
 }
 
+type CreateRawSecretsV3Response struct {
+	Secret RawV3Secret `json:"secret"`
+}
+
 type RawV3Secret struct {
+	ID            string `json:"id"`
 	Version       int    `json:"version"`
 	Workspace     string `json:"workspace"`
 	Type          string `json:"type"`
 	Environment   string `json:"environment"`
+	SecretPath    string `json:"secretPath"`
 	SecretKey     string `json:"secretKey"`
 	SecretValue   string `json:"secretValue"`
 	SecretComment string `json:"secretComment"`
@@ -601,7 +641,7 @@ type UpdateRawSecretByNameV3Request struct {
 	SecretPath               string   `json:"secretPath"`
 	SecretReminderNote       string   `json:"secretReminderNote"`
 	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
-	SecretValue              string   `json:"secretValue"`
+	SecretValue              *string  `json:"secretValue,omitempty"`
 	TagIDs                   []string `json:"tagIds"`
 }
 
@@ -611,6 +651,7 @@ type CreateProjectRequest struct {
 	Slug                    string `json:"slug"`
 	OrganizationSlug        string `json:"organizationSlug"`
 	Template                string `json:"template,omitempty"`
+	Type                    string `json:"type,omitempty"`
 	KmsSecretManagerKeyId   string `json:"kmsKeyId,omitempty"`
 	ShouldCreateDefaultEnvs bool   `json:"shouldCreateDefaultEnvs"`
 	HasDeleteProtection     bool   `json:"hasDeleteProtection"`
@@ -629,7 +670,8 @@ type GetProjectByIdRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Slug                string `json:"slug"`
+	ProjectId           string `json:"projectId"`
+	ProjectSlug         string `json:"slug"`
 	ProjectName         string `json:"name"`
 	ProjectDescription  string `json:"description"`
 	HasDeleteProtection bool   `json:"hasDeleteProtection"`
@@ -1187,8 +1229,9 @@ type UpdateSecretFolderResponse struct {
 type DeleteSecretFolderRequest struct {
 	ID          string `json:"id"`
 	Environment string `json:"environment"`
-	ProjectID   string `json:"workspaceId"`
+	ProjectID   string `json:"projectId"`
 	SecretPath  string `json:"path"`
+	ForceDelete bool   `json:"forceDelete"`
 }
 
 type DeleteSecretFolderResponse struct {
@@ -1395,6 +1438,43 @@ type RevokeIdentityUniversalAuthClientSecretResponse struct {
 	ClientSecretData IdentityUniversalAuthClientSecret `json:"clientSecretData"`
 }
 
+type CreateIdentityTokenAuthTokenRequest struct {
+	IdentityID string `json:"identityId"`
+	Name       string `json:"name"`
+}
+
+type CreateIdentityTokenAuthTokenResponse struct {
+	AccessToken string                 `json:"accessToken"`
+	TokenData   IdentityTokenAuthToken `json:"tokenData"`
+}
+
+type UpdateIdentityTokenAuthTokenRequest struct {
+	TokenID string `json:"tokenId"`
+	Name    string `json:"name"`
+}
+
+type UpdateIdentityTokenAuthTokenResponse struct {
+	Token IdentityTokenAuthToken `json:"token"`
+}
+
+type GetIdentityTokenAuthTokenRequest struct {
+	IdentityID string `json:"identityId"`
+	TokenID    string `json:"tokenId"`
+}
+
+type GetIdentityTokenAuthTokenResponse struct {
+	Token IdentityTokenAuthToken `json:"token"`
+}
+
+type RevokeIdentityTokenAuthTokenRequest struct {
+	IdentityID string `json:"identityId"`
+	TokenID    string `json:"tokenId"`
+}
+
+type RevokeIdentityTokenAuthTokenResponse struct {
+	Token IdentityTokenAuthToken `json:"token"`
+}
+
 type CreateIdentityAwsAuthRequest struct {
 	IdentityID              string                         `json:"identityId"`
 	StsEndpoint             string                         `json:"stsEndpoint,omitempty"`
@@ -1537,9 +1617,9 @@ type RevokeIdentityGcpAuthResponse struct {
 
 type CreateIdentityKubernetesAuthRequest struct {
 	IdentityID              string                         `json:"identityId"`
-	KubernetesHost          string                         `json:"kubernetesHost"`
-	CACERT                  string                         `json:"caCert"`
-	TokenReviewerJwt        string                         `json:"tokenReviewerJwt"`
+	KubernetesHost          *string                        `json:"kubernetesHost"`
+	CACERT                  string                         `json:"caCert,omitempty"`
+	TokenReviewerJwt        string                         `json:"tokenReviewerJwt,omitempty"`
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
@@ -1547,6 +1627,8 @@ type CreateIdentityKubernetesAuthRequest struct {
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	TokenReviewerMode       string                         `json:"tokenReviewMode"`
+	GatewayID               *string                        `json:"gatewayId"`
 }
 
 type CreateIdentityKubernetesAuthResponse struct {
@@ -1555,9 +1637,9 @@ type CreateIdentityKubernetesAuthResponse struct {
 
 type UpdateIdentityKubernetesAuthRequest struct {
 	IdentityID              string                         `json:"identityId"`
-	KubernetesHost          string                         `json:"kubernetesHost"`
+	KubernetesHost          *string                        `json:"kubernetesHost"`
 	CACERT                  string                         `json:"caCert"`
-	TokenReviewerJwt        string                         `json:"tokenReviewerJwt"`
+	TokenReviewerJwt        *string                        `json:"tokenReviewerJwt"`
 	AllowedNamespaces       string                         `json:"allowedNamespaces"`
 	AllowedNames            string                         `json:"allowedNames"`
 	AllowedAudience         string                         `json:"allowedAudience"`
@@ -1565,6 +1647,8 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	TokenReviewerMode       string                         `json:"tokenReviewMode"`
+	GatewayID               *string                        `json:"gatewayId"`
 }
 
 type CreateIdentityOidcAuthResponse struct {
@@ -1623,6 +1707,46 @@ type UpdateIdentityOidcAuthRequest struct {
 
 type UpdateIdentityKubernetesAuthResponse struct {
 	IdentityKubernetesAuth IdentityKubernetesAuth `json:"identityKubernetesAuth"`
+}
+
+type CreateIdentityTokenAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type CreateIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
+}
+
+type UpdateIdentityTokenAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
+}
+
+type GetIdentityTokenAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type GetIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
+}
+
+type RevokeIdentityTokenAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityTokenAuthResponse struct {
+	IdentityTokenAuth IdentityTokenAuth `json:"identityTokenAuth"`
 }
 
 type GetIdentityKubernetesAuthRequest struct {
@@ -1796,15 +1920,16 @@ type SecretApprovalPolicyApprover struct {
 }
 
 type SecretApprovalPolicy struct {
-	ID                   string                          `json:"id"`
-	ProjectID            string                          `json:"projectId"`
-	Name                 string                          `json:"name"`
-	Environment          SecretApprovalPolicyEnvironment `json:"environment"`
-	SecretPath           string                          `json:"secretPath"`
-	Approvers            []SecretApprovalPolicyApprover  `json:"approvers"`
-	RequiredApprovals    int64                           `json:"approvals"`
-	EnforcementLevel     string                          `json:"enforcementLevel"`
-	AllowedSelfApprovals bool                            `json:"allowedSelfApprovals"`
+	ID                   string                            `json:"id"`
+	ProjectID            string                            `json:"projectId"`
+	Name                 string                            `json:"name"`
+	Environment          SecretApprovalPolicyEnvironment   `json:"environment"`
+	Environments         []SecretApprovalPolicyEnvironment `json:"environments"`
+	SecretPath           string                            `json:"secretPath"`
+	Approvers            []SecretApprovalPolicyApprover    `json:"approvers"`
+	RequiredApprovals    int64                             `json:"approvals"`
+	EnforcementLevel     string                            `json:"enforcementLevel"`
+	AllowedSelfApprovals bool                              `json:"allowedSelfApprovals"`
 }
 
 type CreateSecretApprovalPolicyApprover struct {
@@ -1816,6 +1941,7 @@ type CreateSecretApprovalPolicyApprover struct {
 type CreateSecretApprovalPolicyRequest struct {
 	ProjectID            string                               `json:"workspaceId"`
 	Name                 string                               `json:"name,omitempty"`
+	Environments         []string                             `json:"environments"`
 	Environment          string                               `json:"environment"`
 	SecretPath           string                               `json:"secretPath"`
 	Approvers            []CreateSecretApprovalPolicyApprover `json:"approvers"`
@@ -1837,9 +1963,10 @@ type GetSecretApprovalPolicyByIDResponse struct {
 }
 
 type UpdateSecretApprovalPolicyApprover struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
-	Name string `json:"username"`
+	Type         string   `json:"type"`
+	ID           string   `json:"id"`
+	Name         string   `json:"username"`
+	Environments []string `json:"environments"`
 }
 
 type UpdateSecretApprovalPolicyRequest struct {
@@ -1850,6 +1977,7 @@ type UpdateSecretApprovalPolicyRequest struct {
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
+	Environments         []string                             `json:"environments"`
 }
 
 type UpdateSecretApprovalPolicyResponse struct {
@@ -1875,14 +2003,15 @@ type AccessApprovalPolicyEnvironment struct {
 }
 
 type AccessApprovalPolicy struct {
-	ID                string                          `json:"id"`
-	ProjectID         string                          `json:"projectId"`
-	Name              string                          `json:"name"`
-	Environment       AccessApprovalPolicyEnvironment `json:"environment"`
-	SecretPath        string                          `json:"secretPath"`
-	Approvers         []AccessApprovalPolicyApprover  `json:"approvers"`
-	RequiredApprovals int64                           `json:"approvals"`
-	EnforcementLevel  string                          `json:"enforcementLevel"`
+	ID                string                            `json:"id"`
+	ProjectID         string                            `json:"projectId"`
+	Name              string                            `json:"name"`
+	Environments      []AccessApprovalPolicyEnvironment `json:"environments"`
+	Environment       AccessApprovalPolicyEnvironment   `json:"environment"`
+	SecretPath        string                            `json:"secretPath"`
+	Approvers         []AccessApprovalPolicyApprover    `json:"approvers"`
+	RequiredApprovals int64                             `json:"approvals"`
+	EnforcementLevel  string                            `json:"enforcementLevel"`
 }
 
 type CreateAccessApprovalPolicyApprover struct {
@@ -1894,6 +2023,7 @@ type CreateAccessApprovalPolicyApprover struct {
 type CreateAccessApprovalPolicyRequest struct {
 	ProjectSlug       string                               `json:"projectSlug"`
 	Name              string                               `json:"name,omitempty"`
+	Environments      []string                             `json:"environments"`
 	Environment       string                               `json:"environment"`
 	SecretPath        string                               `json:"secretPath"`
 	Approvers         []CreateAccessApprovalPolicyApprover `json:"approvers"`
@@ -1923,6 +2053,7 @@ type UpdateAccessApprovalPolicyRequest struct {
 	ID                string
 	Name              string                               `json:"name"`
 	SecretPath        string                               `json:"secretPath"`
+	Environments      []string                             `json:"environments"`
 	Approvers         []UpdateAccessApprovalPolicyApprover `json:"approvers"`
 	RequiredApprovals int64                                `json:"approvals"`
 	EnforcementLevel  string                               `json:"enforcementLevel"`
@@ -2145,6 +2276,17 @@ type DeleteSecretSyncResponse struct {
 	SecretSync SecretSync `json:"secretSync"`
 }
 
+type CheckDuplicateDestinationRequest struct {
+	App               SecretSyncApp
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	ExcludeSyncId     string                 `json:"excludeSyncId,omitempty"`
+	ProjectID         string                 `json:"projectId"`
+}
+
+type CheckDuplicateDestinationResponse struct {
+	HasDuplicate bool `json:"hasDuplicate"`
+}
+
 type DynamicSecret struct {
 	Id               string                 `json:"id"`
 	Name             string                 `json:"name"`
@@ -2239,4 +2381,285 @@ type UpdateGroupRequest struct {
 
 type DeleteGroupRequest struct {
 	ID string
+}
+
+type SecretRotationProviderObject struct {
+	Provider SecretRotationProvider `json:"type"`
+	Inputs   map[string]any         `json:"inputs"`
+}
+
+type SecretRotationConnection struct {
+	ConnectionID string `json:"id"`
+}
+
+type SecretRotationEnvironment struct {
+	Slug string `json:"slug"`
+}
+
+type SecretRotationFolder struct {
+	Path string `json:"path"`
+}
+
+type SecretRotationRotateAtUtc struct {
+	Hours   int64 `json:"hours"`
+	Minutes int64 `json:"minutes"`
+}
+
+type SecretRotation struct {
+	ID                  string                    `json:"id"`
+	Name                string                    `json:"name"`
+	Description         string                    `json:"description"`
+	AutoRotationEnabled bool                      `json:"isAutoRotationEnabled"`
+	ProjectID           string                    `json:"projectId"`
+	ConnectionID        string                    `json:"connectionId"`
+	Connection          SecretRotationConnection  `json:"connection"`
+	Environment         SecretRotationEnvironment `json:"environment"`
+	SecretFolder        SecretRotationFolder      `json:"folder"`
+
+	RotationInterval int32                      `json:"rotationInterval"`
+	RotateAtUtc      *SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+
+	Parameters          map[string]any `json:"parameters"`
+	SecretsMapping      map[string]any `json:"secretsMapping"`
+	TemporaryParameters map[string]any `json:"temporaryParameters"`
+}
+
+type CreateSecretRotationRequest struct {
+	Provider SecretRotationProvider
+
+	Name                string `json:"name"`
+	Description         string `json:"description"`
+	AutoRotationEnabled bool   `json:"isAutoRotationEnabled"`
+	ProjectID           string `json:"projectId"`
+	ConnectionID        string `json:"connectionId"`
+	Environment         string `json:"environment"`
+	SecretPath          string `json:"secretPath"`
+
+	RotationInterval int32                     `json:"rotationInterval"`
+	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+
+	Parameters          map[string]any `json:"parameters"`
+	SecretsMapping      map[string]any `json:"secretsMapping"`
+	TemporaryParameters map[string]any `json:"temporaryParameters,omitempty"`
+}
+
+type CreateSecretRotationResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type GetSecretRotationByIdRequest struct {
+	Provider SecretRotationProvider
+	ID       string
+}
+
+type GetSecretRotationByIdResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type UpdateSecretRotationRequest struct {
+	Provider SecretRotationProvider
+	ID       string
+
+	Name                string `json:"name,omitempty"`
+	Description         string `json:"description"`
+	AutoRotationEnabled bool   `json:"isAutoRotationEnabled,omitempty"`
+	ConnectionID        string `json:"connectionId,omitempty"`
+	Environment         string `json:"environment,omitempty"`
+	SecretPath          string `json:"secretPath,omitempty"`
+
+	RotationInterval int32                     `json:"rotationInterval,omitempty"`
+	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
+
+	Parameters          map[string]any `json:"parameters,omitempty"`
+	SecretsMapping      map[string]any `json:"secretsMapping,omitempty"`
+	TemporaryParameters map[string]any `json:"temporaryParameters,omitempty"`
+}
+
+type UpdateSecretRotationResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type DeleteSecretRotationRequest struct {
+	Provider SecretRotationProvider
+	ID       string
+}
+
+type DeleteSecretRotationResponse struct {
+	SecretRotation SecretRotation `json:"secretRotation"`
+}
+
+type ProjectTemplate struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Roles        []Role        `json:"roles"`
+	Environments []Environment `json:"environments"`
+	OrgID        string        `json:"orgId"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	UpdatedAt    time.Time     `json:"updatedAt"`
+	Type         string        `json:"type"`
+}
+
+type Environment struct {
+	Name     string `json:"name"`
+	Slug     string `json:"slug"`
+	Position int64  `json:"position"`
+}
+
+type Role struct {
+	Name        string       `json:"name"`
+	Slug        string       `json:"slug"`
+	Permissions []Permission `json:"permissions"`
+}
+
+type Permission struct {
+	Subject    string         `json:"subject"`
+	Action     []string       `json:"action"`
+	Conditions map[string]any `json:"conditions,omitempty"`
+	Inverted   bool           `json:"inverted"`
+}
+
+type CreateProjectTemplateRequest struct {
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Type         string        `json:"type"`
+	Roles        []Role        `json:"roles,omitempty"`
+	Environments []Environment `json:"environments"`
+}
+
+type CreateProjectTemplateResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+type GetProjectTemplateByIdRequest struct {
+	ID string `json:"id"`
+}
+
+type GetProjectTemplateByIdResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+type UpdateProjectTemplateRequest struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Type         string        `json:"type"`
+	Roles        []Role        `json:"roles,omitempty"`
+	Environments []Environment `json:"environments"`
+}
+
+type UpdateProjectTemplateResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+type DeleteProjectTemplateResponse struct {
+	ProjectTemplate ProjectTemplate `json:"projectTemplate"`
+}
+
+// IdentityDetails
+
+type IdentityOrganization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type IdentityDetails struct {
+	Organization IdentityOrganization `json:"organization"`
+}
+
+type GetIdentityDetailsResponse struct {
+	IdentityDetails IdentityDetails `json:"identityDetails"`
+}
+
+type KMSKey struct {
+	ID                  string    `json:"id"`
+	Description         string    `json:"description"`
+	IsDisabled          bool      `json:"isDisabled"`
+	OrgId               string    `json:"orgId"`
+	Name                string    `json:"name"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
+	ProjectId           string    `json:"projectId"`
+	KeyUsage            string    `json:"keyUsage"`
+	Version             int       `json:"version"`
+	EncryptionAlgorithm string    `json:"encryptionAlgorithm"`
+}
+
+type CreateKMSKeyRequest struct {
+	ProjectId           string `json:"projectId"`
+	Name                string `json:"name"`
+	Description         string `json:"description,omitempty"`
+	KeyUsage            string `json:"keyUsage,omitempty"`
+	EncryptionAlgorithm string `json:"encryptionAlgorithm,omitempty"`
+}
+
+type CreateKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type GetKMSKeyRequest struct {
+	KeyId string
+}
+
+type GetKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type GetKMSKeyByNameRequest struct {
+	KeyName   string
+	ProjectId string
+}
+
+type GetKMSKeyByNameResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type ListKMSKeysRequest struct {
+	ProjectId      string
+	Offset         *int
+	Limit          *int
+	OrderBy        *string
+	OrderDirection *string
+	Search         *string
+}
+
+type ListKMSKeysResponse struct {
+	Keys       []KMSKey `json:"keys"`
+	TotalCount int      `json:"totalCount"`
+}
+
+type UpdateKMSKeyRequest struct {
+	KeyId       string `json:"-"`
+	Name        string `json:"name,omitempty"`
+	IsDisabled  *bool  `json:"isDisabled,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+type UpdateKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type DeleteKMSKeyRequest struct {
+	KeyId string
+}
+
+type DeleteKMSKeyResponse struct {
+	Key KMSKey `json:"key"`
+}
+
+type GetKMSKeyPublicKeyRequest struct {
+	KeyId string
+}
+
+type GetKMSKeyPublicKeyResponse struct {
+	PublicKey string `json:"publicKey"`
+}
+
+type GetKMSKeySigningAlgorithmsRequest struct {
+	KeyId string
+}
+
+type GetKMSKeySigningAlgorithmsResponse struct {
+	SigningAlgorithms []string `json:"signingAlgorithms"`
 }

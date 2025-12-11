@@ -3,6 +3,14 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationCreateProjectEnvironment  = "CallCreateProjectEnvironment"
+	operationDeleteProjectEnvironment  = "CallDeleteProjectEnvironment"
+	operationGetProjectEnvironmentByID = "CallGetProjectEnvironmentByID"
+	operationUpdateProjectEnvironment  = "CallUpdateProjectEnvironment"
 )
 
 func (client Client) CreateProjectEnvironment(request CreateProjectEnvironmentRequest) (CreateProjectEnvironmentResponse, error) {
@@ -15,11 +23,11 @@ func (client Client) CreateProjectEnvironment(request CreateProjectEnvironmentRe
 		Post(fmt.Sprintf("api/v1/workspace/%s/environments", request.ProjectID))
 
 	if err != nil {
-		return CreateProjectEnvironmentResponse{}, fmt.Errorf("CallCreateProjectEnvironment: Unable to complete api request [err=%s]", err)
+		return CreateProjectEnvironmentResponse{}, errors.NewGenericRequestError(operationCreateProjectEnvironment, err)
 	}
 
 	if response.IsError() {
-		return CreateProjectEnvironmentResponse{}, fmt.Errorf("CallCreateProjectEnvironment: Unsuccessful response. [response=%s]", string(response.Body()))
+		return CreateProjectEnvironmentResponse{}, errors.NewAPIErrorWithResponse(operationCreateProjectEnvironment, response, nil)
 	}
 
 	return body, nil
@@ -35,11 +43,11 @@ func (client Client) DeleteProjectEnvironment(request DeleteProjectEnvironmentRe
 		Delete(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
 
 	if err != nil {
-		return DeleteProjectEnvironmentResponse{}, fmt.Errorf("CallDeleteProjectEnvironment: Unable to complete api request [err=%s]", err)
+		return DeleteProjectEnvironmentResponse{}, errors.NewGenericRequestError(operationDeleteProjectEnvironment, err)
 	}
 
 	if response.IsError() {
-		return DeleteProjectEnvironmentResponse{}, fmt.Errorf("CallDeleteProjectEnvironment Unsuccessful response. [response=%s]", string(response.Body()))
+		return DeleteProjectEnvironmentResponse{}, errors.NewAPIErrorWithResponse(operationDeleteProjectEnvironment, response, nil)
 	}
 
 	return body, nil
@@ -60,11 +68,11 @@ func (client Client) GetProjectEnvironmentByID(request GetProjectEnvironmentByID
 	}
 
 	if err != nil {
-		return GetProjectEnvironmentByIDResponse{}, fmt.Errorf("GetProjectEnvironmentByID: Unable to complete api request [err=%s]", err)
+		return GetProjectEnvironmentByIDResponse{}, errors.NewGenericRequestError(operationGetProjectEnvironmentByID, err)
 	}
 
 	if response.IsError() {
-		return GetProjectEnvironmentByIDResponse{}, fmt.Errorf("GetProjectEnvironmentByID: Unsuccessful response. [response=%v]", string(response.Body()))
+		return GetProjectEnvironmentByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectEnvironmentByID, response, nil)
 	}
 
 	return body, nil
@@ -80,11 +88,11 @@ func (client Client) UpdateProjectEnvironment(request UpdateProjectEnvironmentRe
 		Patch(fmt.Sprintf("api/v1/workspace/%s/environments/%s", request.ProjectID, request.ID))
 
 	if err != nil {
-		return UpdateProjectEnvironmentResponse{}, fmt.Errorf("CallUpdateProjectEnvironment: Unable to complete api request [err=%s]", err)
+		return UpdateProjectEnvironmentResponse{}, errors.NewGenericRequestError(operationUpdateProjectEnvironment, err)
 	}
 
 	if response.IsError() {
-		return UpdateProjectEnvironmentResponse{}, fmt.Errorf("CallUpdateProjectEnvironment: Unsuccessful response. [response=%s]", string(response.Body()))
+		return UpdateProjectEnvironmentResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectEnvironment, response, nil)
 	}
 
 	return body, nil

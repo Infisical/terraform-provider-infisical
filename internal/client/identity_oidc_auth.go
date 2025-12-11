@@ -1,8 +1,15 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
+	"terraform-provider-infisical/internal/errors"
+)
+
+const (
+	operationGetIdentityOidcAuth    = "CallGetIdentityOidcAuth"
+	operationCreateIdentityOidcAuth = "CallCreateIdentityOidcAuth"
+	operationUpdateIdentityOidcAuth = "CallUpdateIdentityOidcAuth"
+	operationRevokeIdentityOidcAuth = "CallRevokeIdentityOidcAuth"
 )
 
 func (client Client) CreateIdentityOidcAuth(request CreateIdentityOidcAuthRequest) (IdentityOidcAuth, error) {
@@ -15,11 +22,11 @@ func (client Client) CreateIdentityOidcAuth(request CreateIdentityOidcAuthReques
 		Post("api/v1/auth/oidc-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityOidcAuth{}, fmt.Errorf("CreateIdentityOidcAuth: Unable to complete api request [err=%s]", err)
+		return IdentityOidcAuth{}, errors.NewGenericRequestError(operationCreateIdentityOidcAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityOidcAuth{}, fmt.Errorf("CreateIdentityOidcAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityOidcAuth{}, errors.NewAPIErrorWithResponse(operationCreateIdentityOidcAuth, response, nil)
 	}
 
 	return body.IdentityOidcAuth, nil
@@ -40,11 +47,11 @@ func (client Client) GetIdentityOidcAuth(request GetIdentityOidcAuthRequest) (Id
 	}
 
 	if err != nil {
-		return IdentityOidcAuth{}, fmt.Errorf("GetIdentityOidcAuth: Unable to complete api request [err=%s]", err)
+		return IdentityOidcAuth{}, errors.NewGenericRequestError(operationGetIdentityOidcAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityOidcAuth{}, fmt.Errorf("GetIdentityOidcAuth: Unsuccessful response. [response=%v]", string(response.Body()))
+		return IdentityOidcAuth{}, errors.NewAPIErrorWithResponse(operationGetIdentityOidcAuth, response, nil)
 	}
 
 	return body.IdentityOidcAuth, nil
@@ -60,11 +67,11 @@ func (client Client) UpdateIdentityOidcAuth(request UpdateIdentityOidcAuthReques
 		Patch("api/v1/auth/oidc-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityOidcAuth{}, fmt.Errorf("UpdateIdentityOidcAuth: Unable to complete api request [err=%s]", err)
+		return IdentityOidcAuth{}, errors.NewGenericRequestError(operationUpdateIdentityOidcAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityOidcAuth{}, fmt.Errorf("UpdateIdentityOidcAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityOidcAuth{}, errors.NewAPIErrorWithResponse(operationUpdateIdentityOidcAuth, response, nil)
 	}
 
 	return body.IdentityOidcAuth, nil
@@ -80,11 +87,11 @@ func (client Client) RevokeIdentityOidcAuth(request RevokeIdentityOidcAuthReques
 		Delete("api/v1/auth/oidc-auth/identities/" + request.IdentityID)
 
 	if err != nil {
-		return IdentityOidcAuth{}, fmt.Errorf("RevokeIdentityOidcAuth: Unable to complete api request [err=%s]", err)
+		return IdentityOidcAuth{}, errors.NewGenericRequestError(operationRevokeIdentityOidcAuth, err)
 	}
 
 	if response.IsError() {
-		return IdentityOidcAuth{}, fmt.Errorf("RevokeIdentityOidcAuth: Unsuccessful response. [response=%s]", string(response.Body()))
+		return IdentityOidcAuth{}, errors.NewAPIErrorWithResponse(operationRevokeIdentityOidcAuth, response, nil)
 	}
 
 	return body.IdentityOidcAuth, nil

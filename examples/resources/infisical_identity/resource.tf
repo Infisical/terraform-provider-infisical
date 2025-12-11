@@ -101,3 +101,25 @@ resource "infisical_identity_kubernetes_auth" "k8-auth" {
   token_reviewer_jwt = "ey<example>"
   allowed_namespaces = ["namespace-a", "namespace-b"]
 }
+
+resource "infisical_identity" "token-auth" {
+  name   = "token-auth"
+  role   = "member"
+  org_id = "<org_id>"
+}
+
+resource "infisical_identity_token_auth" "token-auth" {
+  identity_id = infisical_identity.token-auth.id
+}
+
+resource "infisical_identity_token_auth_token" "token-auth-token" {
+  identity_id = infisical_identity.token-auth.id
+  name        = "token-auth-token"
+
+  depends_on = [infisical_identity_token_auth.token-auth]
+}
+
+output "token-auth-token" {
+  sensitive = true
+  value     = infisical_identity_token_auth_token.token-auth-token.token
+}
