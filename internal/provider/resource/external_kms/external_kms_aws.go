@@ -206,6 +206,17 @@ func NewExternalKmsAwsResource() resource.Resource {
 			return configurationMap, diags
 		},
 		OverwriteConfigurationFields: func(state *ExternalKmsBaseResourceModel) diag.Diagnostics {
+			var diags diag.Diagnostics
+
+			configAttrs := state.Configuration.Attributes()
+
+			credentialTypes := map[string]attr.Type{
+				"access_key_id":     types.StringType,
+				"secret_access_key": types.StringType,
+				"role_arn":          types.StringType,
+				"role_external_id":  types.StringType,
+			}
+
 			credentialConfig := map[string]attr.Value{
 				"access_key_id":     types.StringNull(),
 				"secret_access_key": types.StringNull(),
@@ -213,35 +224,21 @@ func NewExternalKmsAwsResource() resource.Resource {
 				"role_external_id":  types.StringNull(),
 			}
 
-			configurationConfig := map[string]attr.Value{
-				"aws_region":     types.StringNull(),
-				"aws_kms_key_id": types.StringNull(),
-				"type":           types.StringNull(),
-				"credential": types.ObjectValueMust(
-					map[string]attr.Type{
-						"access_key_id":     types.StringType,
-						"secret_access_key": types.StringType,
-						"role_arn":          types.StringType,
-						"role_external_id":  types.StringType,
-					},
-					credentialConfig,
-				),
-			}
+			configAttrs["credential"] = types.ObjectValueMust(
+				credentialTypes,
+				credentialConfig,
+			)
 
-			var diags diag.Diagnostics
-			state.Configuration, diags = types.ObjectValue(map[string]attr.Type{
+			configTypes := map[string]attr.Type{
 				"aws_region":     types.StringType,
 				"aws_kms_key_id": types.StringType,
 				"type":           types.StringType,
 				"credential": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"access_key_id":     types.StringType,
-						"secret_access_key": types.StringType,
-						"role_arn":          types.StringType,
-						"role_external_id":  types.StringType,
-					},
+					AttrTypes: credentialTypes,
 				},
-			}, configurationConfig)
+			}
+
+			state.Configuration, diags = types.ObjectValue(configTypes, configAttrs)
 
 			return diags
 		},
