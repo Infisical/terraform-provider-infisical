@@ -2921,6 +2921,9 @@ type CertificateProfile struct {
 	ApiConfigId           string                             `json:"apiConfigId,omitempty"`
 	AcmeConfigId          string                             `json:"acmeConfigId,omitempty"`
 	ExternalConfigs       *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
+	EstConfig             *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
+	ApiConfig             *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
+	AcmeConfig            *CertificateProfileAcmeConfig      `json:"acmeConfig,omitempty"`
 	CreatedAt             string                             `json:"createdAt"`
 	UpdatedAt             string                             `json:"updatedAt"`
 }
@@ -2944,7 +2947,8 @@ type CreateCertificateProfileResponse struct {
 }
 
 type GetCertificateProfileRequest struct {
-	ProfileId string
+	ProfileId      string
+	IncludeConfigs bool
 }
 
 type GetCertificateProfileResponse struct {

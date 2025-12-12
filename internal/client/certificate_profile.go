@@ -34,11 +34,16 @@ func (client Client) CreateCertificateProfile(request CreateCertificateProfileRe
 
 func (client Client) GetCertificateProfile(request GetCertificateProfileRequest) (GetCertificateProfileResponse, error) {
 	var profileResponse GetCertificateProfileResponse
-	response, err := client.Config.HttpClient.
+	req := client.Config.HttpClient.
 		R().
 		SetResult(&profileResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v1/cert-manager/certificate-profiles/%s", request.ProfileId))
+		SetHeader("User-Agent", USER_AGENT)
+
+	if request.IncludeConfigs {
+		req.SetQueryParam("includeConfigs", "true")
+	}
+
+	response, err := req.Get(fmt.Sprintf("api/v1/cert-manager/certificate-profiles/%s", request.ProfileId))
 
 	if err != nil {
 		return GetCertificateProfileResponse{}, errors.NewGenericRequestError(operationGetCertificateProfile, err)

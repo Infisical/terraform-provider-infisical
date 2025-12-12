@@ -334,9 +334,15 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	}
 
 	profile, err := r.client.GetCertificateProfile(infisical.GetCertificateProfileRequest{
-		ProfileId: state.Id.ValueString(),
+		ProfileId:      state.Id.ValueString(),
+		IncludeConfigs: true,
 	})
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
 		resp.Diagnostics.AddError("Error reading certificate profile", err.Error())
 		return
 	}
@@ -350,6 +356,37 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 
 	if profile.CertificateProfile.CaId != "" {
 		state.CaId = types.StringValue(profile.CertificateProfile.CaId)
+	}
+
+	if profile.CertificateProfile.EstConfig != nil {
+		state.EstConfig = &certManagerCertificateProfileEstConfigModel{
+			DisableBootstrapCaValidation: types.BoolValue(profile.CertificateProfile.EstConfig.DisableBootstrapCaValidation),
+			Passphrase:                   types.StringValue(profile.CertificateProfile.EstConfig.Passphrase),
+		}
+		if profile.CertificateProfile.EstConfig.CaChain != "" {
+			state.EstConfig.CaChain = types.StringValue(profile.CertificateProfile.EstConfig.CaChain)
+		} else {
+			state.EstConfig.CaChain = types.StringNull()
+		}
+	} else {
+		state.EstConfig = nil
+	}
+
+	if profile.CertificateProfile.ApiConfig != nil {
+		state.ApiConfig = &certManagerCertificateProfileApiConfigModel{
+			AutoRenew:       types.BoolValue(profile.CertificateProfile.ApiConfig.AutoRenew),
+			RenewBeforeDays: types.Int64Value(int64(profile.CertificateProfile.ApiConfig.RenewBeforeDays)),
+		}
+	} else {
+		state.ApiConfig = nil
+	}
+
+	if profile.CertificateProfile.ExternalConfigs != nil {
+		state.ExternalConfigs = &certManagerCertificateProfileExternalConfigsModel{
+			Template: types.StringValue(profile.CertificateProfile.ExternalConfigs.Template),
+		}
+	} else {
+		state.ExternalConfigs = nil
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -372,11 +409,9 @@ func (r *certManagerCertificateProfileResource) Update(ctx context.Context, req 
 	}
 
 	updateProfileRequest := infisical.UpdateCertificateProfileRequest{
-		ProfileId:      plan.Id.ValueString(),
-		Slug:           plan.Slug.ValueString(),
-		Description:    plan.Description.ValueString(),
-		EnrollmentType: plan.EnrollmentType.ValueString(),
-		IssuerType:     plan.IssuerType.ValueString(),
+		ProfileId:   plan.Id.ValueString(),
+		Slug:        plan.Slug.ValueString(),
+		Description: plan.Description.ValueString(),
 	}
 
 	if plan.EstConfig != nil {
