@@ -5,6 +5,7 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,6 +31,7 @@ type ephemeralSecretResourceModel struct {
 	Name        types.String `tfsdk:"name"`
 	Value       types.String `tfsdk:"value"`
 	WorkspaceId types.String `tfsdk:"workspace_id"`
+	Metadata    types.Map    `tfsdk:"metadata"`
 }
 
 // Metadata returns the resource type name.
@@ -66,6 +68,11 @@ func (r *ephemeralSecretResource) Schema(_ context.Context, _ ephemeral.SchemaRe
 				Description: "The value of the secret",
 				Computed:    true,
 				Sensitive:   true,
+			},
+			"metadata": schema.MapAttribute{
+				ElementType: types.StringType,
+				Description: "Metadata associated with the secret as key-value pairs.",
+				Computed:    true,
 			},
 		},
 	}
@@ -130,11 +137,28 @@ func (r *ephemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRe
 		return
 	}
 
+	var metadata types.Map
+	if len(res.Secret.SecretMetadata) > 0 {
+		metadataMap := make(map[string]types.String, len(res.Secret.SecretMetadata))
+		for _, item := range res.Secret.SecretMetadata {
+			metadataMap[item.Key] = types.StringValue(item.Value)
+		}
+		var diags diag.Diagnostics
+		metadata, diags = types.MapValueFrom(ctx, types.StringType, metadataMap)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	} else {
+		metadata = types.MapNull(types.StringType)
+	}
+
 	resp.Result.Set(ctx, ephemeralSecretResourceModel{
 		Value:       types.StringValue(res.Secret.SecretValue),
 		Name:        types.StringValue(res.Secret.SecretKey),
 		FolderPath:  config.FolderPath,
 		EnvSlug:     config.EnvSlug,
 		WorkspaceId: config.WorkspaceId,
+		Metadata:    metadata,
 	})
 }

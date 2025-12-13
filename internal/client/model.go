@@ -557,6 +557,11 @@ type CreateRawSecretsV3Response struct {
 	Secret RawV3Secret `json:"secret"`
 }
 
+type SecretMetadataItem struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type RawV3Secret struct {
 	ID            string `json:"id"`
 	Version       int    `json:"version"`
@@ -568,8 +573,9 @@ type RawV3Secret struct {
 	SecretValue   string `json:"secretValue"`
 	SecretComment string `json:"secretComment"`
 
-	SecretReminderNote       string `json:"secretReminderNote"`
-	SecretReminderRepeatDays int64  `json:"secretReminderRepeatDays"`
+	SecretReminderNote       string               `json:"secretReminderNote"`
+	SecretReminderRepeatDays int64                `json:"secretReminderRepeatDays"`
+	SecretMetadata           []SecretMetadataItem `json:"secretMetadata"`
 	Tags                     []struct {
 		ID    string `json:"id"`
 		Slug  string `json:"slug"`
@@ -598,8 +604,9 @@ type GetSingleSecretByIDV3Response = struct {
 		SecretComment string `json:"secretComment"`
 		SecretPath    string `json:"secretPath"`
 
-		SecretReminderNote       string `json:"secretReminderNote"`
-		SecretReminderRepeatDays int64  `json:"secretReminderRepeatDays"`
+		SecretReminderNote       string               `json:"secretReminderNote"`
+		SecretReminderRepeatDays int64                `json:"secretReminderRepeatDays"`
+		SecretMetadata           []SecretMetadataItem `json:"secretMetadata"`
 		Tags                     []struct {
 			ID    string `json:"id"`
 			Slug  string `json:"slug"`
@@ -611,16 +618,17 @@ type GetSingleSecretByIDV3Response = struct {
 
 // create secrets.
 type CreateRawSecretV3Request struct {
-	WorkspaceID              string   `json:"workspaceId"`
-	Type                     string   `json:"type"`
-	Environment              string   `json:"environment"`
-	SecretKey                string   `json:"secretKey"`
-	SecretValue              string   `json:"secretValue"`
-	SecretComment            string   `json:"secretComment"`
-	SecretPath               string   `json:"secretPath"`
-	SecretReminderNote       string   `json:"secretReminderNote"`
-	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
-	TagIDs                   []string `json:"tagIds"`
+	WorkspaceID              string               `json:"workspaceId"`
+	Type                     string               `json:"type"`
+	Environment              string               `json:"environment"`
+	SecretKey                string               `json:"secretKey"`
+	SecretValue              string               `json:"secretValue"`
+	SecretComment            string               `json:"secretComment"`
+	SecretPath               string               `json:"secretPath"`
+	SecretReminderNote       string               `json:"secretReminderNote"`
+	SecretReminderRepeatDays int64                `json:"secretReminderRepeatDays"`
+	SecretMetadata           []SecretMetadataItem `json:"secretMetadata,omitempty"`
+	TagIDs                   []string             `json:"tagIds"`
 }
 
 type DeleteRawSecretV3Request struct {
@@ -633,15 +641,16 @@ type DeleteRawSecretV3Request struct {
 
 // update secret by name api.
 type UpdateRawSecretByNameV3Request struct {
-	SecretName               string   `json:"secretName"`
-	WorkspaceID              string   `json:"workspaceId"`
-	Environment              string   `json:"environment"`
-	Type                     string   `json:"type"`
-	SecretPath               string   `json:"secretPath"`
-	SecretReminderNote       string   `json:"secretReminderNote"`
-	SecretReminderRepeatDays int64    `json:"secretReminderRepeatDays"`
-	SecretValue              *string  `json:"secretValue,omitempty"`
-	TagIDs                   []string `json:"tagIds"`
+	SecretName               string               `json:"secretName"`
+	WorkspaceID              string               `json:"workspaceId"`
+	Environment              string               `json:"environment"`
+	Type                     string               `json:"type"`
+	SecretPath               string               `json:"secretPath"`
+	SecretReminderNote       string               `json:"secretReminderNote"`
+	SecretReminderRepeatDays int64                `json:"secretReminderRepeatDays"`
+	SecretValue              *string              `json:"secretValue,omitempty"`
+	SecretMetadata           []SecretMetadataItem `json:"secretMetadata,omitempty"`
+	TagIDs                   []string             `json:"tagIds"`
 }
 
 type CreateProjectRequest struct {
