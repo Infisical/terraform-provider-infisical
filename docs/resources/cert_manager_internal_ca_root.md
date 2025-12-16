@@ -24,7 +24,6 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
   project_slug = infisical_project.pki.slug
 
   name          = "enterprise-root-ca"
-  friendly_name = "Enterprise Root CA"
   common_name   = "Enterprise Root Certificate Authority"
   organization  = "Acme Corp"
   ou            = "IT Security"
@@ -40,20 +39,18 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
 
 ### Required
 
-- `common_name` (String) The common name (CN) of the root CA certificate
-- `country` (String) The country (C) of the root CA certificate
-- `friendly_name` (String) The friendly display name of the root CA
-- `locality` (String) The locality (L) of the root CA certificate
 - `name` (String) The name of the root CA
-- `organization` (String) The organization (O) of the root CA certificate
-- `ou` (String) The organizational unit (OU) of the root CA certificate
 - `project_slug` (String) The slug of the cert-manager project
-- `province` (String) The state/province (ST) of the root CA certificate
 
 ### Optional
 
+- `common_name` (String) The common name (CN) of the root CA certificate
+- `country` (String) The country (C) of the root CA certificate
 - `key_algorithm` (String) The key algorithm for the root CA. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
-- `max_path_length` (Number) The maximum path length for certificate chains issued by this CA
+- `locality` (String) The locality (L) of the root CA certificate
+- `organization` (String) The organization (O) of the root CA certificate
+- `ou` (String) The organizational unit (OU) of the root CA certificate
+- `province` (String) The state/province (ST) of the root CA certificate
 - `status` (String) The status of the CA. Supported values: active, disabled, pending-certificate. Defaults to 'active'.
 
 ### Read-Only

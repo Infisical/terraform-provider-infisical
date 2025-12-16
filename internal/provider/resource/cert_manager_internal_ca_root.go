@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -40,19 +39,17 @@ type certManagerInternalCARootResource struct {
 }
 
 type certManagerInternalCARootResourceModel struct {
-	ProjectSlug   types.String `tfsdk:"project_slug"`
-	Id            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	FriendlyName  types.String `tfsdk:"friendly_name"`
-	CommonName    types.String `tfsdk:"common_name"`
-	Organization  types.String `tfsdk:"organization"`
-	OU            types.String `tfsdk:"ou"`
-	Country       types.String `tfsdk:"country"`
-	Province      types.String `tfsdk:"province"`
-	Locality      types.String `tfsdk:"locality"`
-	KeyAlgorithm  types.String `tfsdk:"key_algorithm"`
-	MaxPathLength types.Int64  `tfsdk:"max_path_length"`
-	Status        types.String `tfsdk:"status"`
+	ProjectSlug  types.String `tfsdk:"project_slug"`
+	Id           types.String `tfsdk:"id"`
+	Name         types.String `tfsdk:"name"`
+	CommonName   types.String `tfsdk:"common_name"`
+	Organization types.String `tfsdk:"organization"`
+	OU           types.String `tfsdk:"ou"`
+	Country      types.String `tfsdk:"country"`
+	Province     types.String `tfsdk:"province"`
+	Locality     types.String `tfsdk:"locality"`
+	KeyAlgorithm types.String `tfsdk:"key_algorithm"`
+	Status       types.String `tfsdk:"status"`
 }
 
 func (r *certManagerInternalCARootResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -77,37 +74,30 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"friendly_name": schema.StringAttribute{
-				Description: "The friendly display name of the root CA",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"common_name": schema.StringAttribute{
 				Description: "The common name (CN) of the root CA certificate",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"organization": schema.StringAttribute{
 				Description: "The organization (O) of the root CA certificate",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"ou": schema.StringAttribute{
 				Description: "The organizational unit (OU) of the root CA certificate",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"country": schema.StringAttribute{
 				Description: "The country (C) of the root CA certificate",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -117,14 +107,14 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 			},
 			"province": schema.StringAttribute{
 				Description: "The state/province (ST) of the root CA certificate",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"locality": schema.StringAttribute{
 				Description: "The locality (L) of the root CA certificate",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -139,15 +129,6 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 				},
 				Validators: []validator.String{
 					stringvalidator.OneOf(SUPPORTED_ROOT_CA_KEY_ALGORITHMS...),
-				},
-			},
-			"max_path_length": schema.Int64Attribute{
-				Description: "The maximum path length for certificate chains issued by this CA",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"status": schema.StringAttribute{
@@ -205,6 +186,26 @@ func (r *certManagerInternalCARootResource) Create(ctx context.Context, req reso
 		return
 	}
 
+	// Validate that at least one subject field is provided
+	subjectFields := []types.String{
+		plan.CommonName, plan.Organization, plan.OU,
+		plan.Country, plan.Province, plan.Locality,
+	}
+	hasSubjectField := false
+	for _, field := range subjectFields {
+		if !field.IsNull() && !field.IsUnknown() && field.ValueString() != "" {
+			hasSubjectField = true
+			break
+		}
+	}
+	if !hasSubjectField {
+		resp.Diagnostics.AddError(
+			"Missing subject fields",
+			"At least one of the fields common_name, organization, ou, country, province, or locality must be provided",
+		)
+		return
+	}
+
 	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: plan.ProjectSlug.ValueString(),
 	})
@@ -227,27 +228,19 @@ func (r *certManagerInternalCARootResource) Create(ctx context.Context, req reso
 		status = plan.Status.ValueString()
 	}
 
-	var maxPathLength *int
-	if !plan.MaxPathLength.IsNull() && !plan.MaxPathLength.IsUnknown() {
-		val := int(plan.MaxPathLength.ValueInt64())
-		maxPathLength = &val
-	}
-
 	newCA, err := r.client.CreateInternalCA(infisical.CreateInternalCARequest{
 		ProjectId: project.ID,
 		Name:      plan.Name.ValueString(),
 		Status:    status,
 		Configuration: infisical.CertificateAuthorityConfiguration{
-			Type:          "root",
-			FriendlyName:  plan.FriendlyName.ValueString(),
-			CommonName:    plan.CommonName.ValueString(),
-			Organization:  plan.Organization.ValueString(),
-			OU:            plan.OU.ValueString(),
-			Country:       plan.Country.ValueString(),
-			Province:      plan.Province.ValueString(),
-			Locality:      plan.Locality.ValueString(),
-			KeyAlgorithm:  keyAlgorithm,
-			MaxPathLength: maxPathLength,
+			Type:         "root",
+			CommonName:   plan.CommonName.ValueString(),
+			Organization: plan.Organization.ValueString(),
+			OU:           plan.OU.ValueString(),
+			Country:      plan.Country.ValueString(),
+			Province:     plan.Province.ValueString(),
+			Locality:     plan.Locality.ValueString(),
+			KeyAlgorithm: keyAlgorithm,
 		},
 	})
 
@@ -262,15 +255,7 @@ func (r *certManagerInternalCARootResource) Create(ctx context.Context, req reso
 	plan.Id = types.StringValue(newCA.Id)
 	plan.KeyAlgorithm = types.StringValue(keyAlgorithm)
 	plan.Status = types.StringValue(newCA.Status)
-	if maxPathLength != nil {
-		plan.MaxPathLength = types.Int64Value(int64(*maxPathLength))
-	} else {
-		plan.MaxPathLength = types.Int64Null()
-	}
 
-	if newCA.Configuration.FriendlyName != "" {
-		plan.FriendlyName = types.StringValue(newCA.Configuration.FriendlyName)
-	}
 	if newCA.Configuration.CommonName != "" {
 		plan.CommonName = types.StringValue(newCA.Configuration.CommonName)
 	}
@@ -310,7 +295,7 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 		return
 	}
 
-	ca, err := r.client.GetCA(infisical.GetCARequest{
+	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
 		ProjectId: project.ID,
 		CAId:      state.Id.ValueString(),
 	})
@@ -335,9 +320,6 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 	}
 	state.Status = types.StringValue(status)
 
-	if ca.Configuration.FriendlyName != "" {
-		state.FriendlyName = types.StringValue(ca.Configuration.FriendlyName)
-	}
 	if ca.Configuration.CommonName != "" {
 		state.CommonName = types.StringValue(ca.Configuration.CommonName)
 	}
@@ -390,6 +372,26 @@ func (r *certManagerInternalCARootResource) Update(ctx context.Context, req reso
 		return
 	}
 
+	// Validate that at least one subject field is provided
+	subjectFields := []types.String{
+		plan.CommonName, plan.Organization, plan.OU,
+		plan.Country, plan.Province, plan.Locality,
+	}
+	hasSubjectField := false
+	for _, field := range subjectFields {
+		if !field.IsNull() && !field.IsUnknown() && field.ValueString() != "" {
+			hasSubjectField = true
+			break
+		}
+	}
+	if !hasSubjectField {
+		resp.Diagnostics.AddError(
+			"Missing subject fields",
+			"At least one of the fields common_name, organization, ou, country, province, or locality must be provided",
+		)
+		return
+	}
+
 	project, err := r.client.GetProject(infisical.GetProjectRequest{
 		Slug: plan.ProjectSlug.ValueString(),
 	})
@@ -402,28 +404,20 @@ func (r *certManagerInternalCARootResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	var maxPathLength *int
-	if !plan.MaxPathLength.IsNull() && !plan.MaxPathLength.IsUnknown() {
-		val := int(plan.MaxPathLength.ValueInt64())
-		maxPathLength = &val
-	}
-
 	_, err = r.client.UpdateInternalCA(infisical.UpdateInternalCARequest{
 		ProjectId: project.ID,
 		CAId:      plan.Id.ValueString(),
 		Name:      plan.Name.ValueString(),
 		Status:    plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
-			Type:          "root",
-			FriendlyName:  plan.FriendlyName.ValueString(),
-			CommonName:    plan.CommonName.ValueString(),
-			Organization:  plan.Organization.ValueString(),
-			OU:            plan.OU.ValueString(),
-			Country:       plan.Country.ValueString(),
-			Province:      plan.Province.ValueString(),
-			Locality:      plan.Locality.ValueString(),
-			KeyAlgorithm:  plan.KeyAlgorithm.ValueString(),
-			MaxPathLength: maxPathLength,
+			Type:         "root",
+			CommonName:   plan.CommonName.ValueString(),
+			Organization: plan.Organization.ValueString(),
+			OU:           plan.OU.ValueString(),
+			Country:      plan.Country.ValueString(),
+			Province:     plan.Province.ValueString(),
+			Locality:     plan.Locality.ValueString(),
+			KeyAlgorithm: plan.KeyAlgorithm.ValueString(),
 		},
 	})
 

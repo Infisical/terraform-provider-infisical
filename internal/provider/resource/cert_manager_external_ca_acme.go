@@ -246,7 +246,7 @@ func (r *certManagerExternalCAACMEResource) Read(ctx context.Context, req resour
 		return
 	}
 
-	ca, err := r.client.GetCA(infisical.GetCARequest{
+	ca, err := r.client.GetACMECA(infisical.GetCARequest{
 		ProjectId: project.ID,
 		CAId:      state.Id.ValueString(),
 	})

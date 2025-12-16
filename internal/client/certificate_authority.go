@@ -8,6 +8,9 @@ import (
 const (
 	operationCreateInternalCA = "CallCreateInternalCA"
 	operationGetCA            = "CallGetCA"
+	operationGetInternalCA    = "CallGetInternalCA"
+	operationGetACMECA        = "CallGetACMECA"
+	operationGetADCSCA        = "CallGetADCSCA"
 	operationUpdateInternalCA = "CallUpdateInternalCA"
 	operationDeleteCA         = "CallDeleteCA"
 	operationCreateACMECA     = "CallCreateACMECA"
@@ -50,6 +53,66 @@ func (client Client) GetCA(request GetCARequest) (GetCAResponse, error) {
 
 	if response.IsError() {
 		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetCA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) GetInternalCA(request GetCARequest) (GetCAResponse, error) {
+	var caResponse GetCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("projectId", request.ProjectId).
+		Get(fmt.Sprintf("api/v1/cert-manager/ca/internal/%s", request.CAId))
+
+	if err != nil {
+		return GetCAResponse{}, errors.NewGenericRequestError(operationGetInternalCA, err)
+	}
+
+	if response.IsError() {
+		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetInternalCA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) GetACMECA(request GetCARequest) (GetCAResponse, error) {
+	var caResponse GetCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("projectId", request.ProjectId).
+		Get(fmt.Sprintf("api/v1/cert-manager/ca/acme/%s", request.CAId))
+
+	if err != nil {
+		return GetCAResponse{}, errors.NewGenericRequestError(operationGetACMECA, err)
+	}
+
+	if response.IsError() {
+		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetACMECA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) GetADCSCA(request GetCARequest) (GetCAResponse, error) {
+	var caResponse GetCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("projectId", request.ProjectId).
+		Get(fmt.Sprintf("api/v1/cert-manager/ca/azure-ad-cs/%s", request.CAId))
+
+	if err != nil {
+		return GetCAResponse{}, errors.NewGenericRequestError(operationGetADCSCA, err)
+	}
+
+	if response.IsError() {
+		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetADCSCA, response, nil)
 	}
 
 	return caResponse, nil

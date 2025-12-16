@@ -9,7 +9,6 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
   project_slug = infisical_project.pki.slug
 
   name          = "enterprise-root-ca"
-  friendly_name = "Enterprise Root CA"
   common_name   = "Enterprise Root Certificate Authority"
   organization  = "Acme Corp"
   ou            = "IT Security"

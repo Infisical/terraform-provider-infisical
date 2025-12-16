@@ -162,9 +162,9 @@ Required:
 
 Optional:
 
-- `allowed` (List of String) List of allowed extended key usages
-- `denied` (List of String) List of denied extended key usages
-- `required` (List of String) List of required extended key usages
+- `allowed` (List of String) List of allowed extended key usages. Possible values: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
+- `denied` (List of String) List of denied extended key usages. Possible values: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
+- `required` (List of String) List of required extended key usages. Possible values: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 
 
 <a id="nestedblock--key_usages"></a>
@@ -172,9 +172,9 @@ Optional:
 
 Optional:
 
-- `allowed` (List of String) List of allowed key usages
-- `denied` (List of String) List of denied key usages
-- `required` (List of String) List of required key usages
+- `allowed` (List of String) List of allowed key usages. Possible values: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
+- `denied` (List of String) List of denied key usages. Possible values: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
+- `required` (List of String) List of required key usages. Possible values: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
 
 
 <a id="nestedblock--sans"></a>
@@ -182,7 +182,7 @@ Optional:
 
 Required:
 
-- `type` (String) The SAN type
+- `type` (String) The SAN type. Possible values: dns_name, ip_address, email, uri
 
 Optional:
 
@@ -196,7 +196,7 @@ Optional:
 
 Required:
 
-- `type` (String) The subject attribute type
+- `type` (String) The subject attribute type. Possible values: common_name, organization, country
 
 Optional:
 

@@ -190,7 +190,7 @@ func (r *certManagerExternalCAADCSResource) Read(ctx context.Context, req resour
 		return
 	}
 
-	ca, err := r.client.GetCA(infisical.GetCARequest{
+	ca, err := r.client.GetADCSCA(infisical.GetCARequest{
 		ProjectId: project.ID,
 		CAId:      state.Id.ValueString(),
 	})

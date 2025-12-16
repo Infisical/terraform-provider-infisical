@@ -32,12 +32,12 @@ type certManagerCACertificateResource struct {
 }
 
 type certManagerCACertificateResourceModel struct {
+	ProjectSlug      types.String `tfsdk:"project_slug"`
 	CaId             types.String `tfsdk:"ca_id"`
 	Id               types.String `tfsdk:"id"`
 	NotBefore        types.String `tfsdk:"not_before"`
 	NotAfter         types.String `tfsdk:"not_after"`
 	MaxPathLength    types.Int64  `tfsdk:"max_path_length"`
-	ParentCaId       types.String `tfsdk:"parent_ca_id"`
 	Certificate      types.String `tfsdk:"certificate"`
 	CertificateChain types.String `tfsdk:"certificate_chain"`
 	SerialNumber     types.String `tfsdk:"serial_number"`
@@ -51,6 +51,13 @@ func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.
 	resp.Schema = schema.Schema{
 		Description: "Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
+			"project_slug": schema.StringAttribute{
+				Description: "The slug of the cert-manager project",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 			"ca_id": schema.StringAttribute{
 				Description: "The ID of the certificate authority to generate a certificate for",
 				Required:    true,
@@ -59,7 +66,7 @@ func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.
 				},
 			},
 			"id": schema.StringAttribute{
-				Description: "The unique identifier for this CA certificate resource (composed of ca_id:serial_number)",
+				Description: "The unique identifier for this CA certificate resource",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -89,13 +96,6 @@ func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.
 				},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
-				},
-			},
-			"parent_ca_id": schema.StringAttribute{
-				Description: "Parent CA ID for intermediate certificate generation (required for intermediate CAs)",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"certificate": schema.StringAttribute{
@@ -177,8 +177,25 @@ func (r *certManagerCACertificateResource) Create(ctx context.Context, req resou
 		generateRequest.MaxPathLength = &maxPathLength
 	}
 
-	if !plan.ParentCaId.IsNull() {
-		generateRequest.ParentCaId = plan.ParentCaId.ValueString()
+	project, err := r.client.GetProject(infisical.GetProjectRequest{
+		Slug: plan.ProjectSlug.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading project", err.Error())
+		return
+	}
+
+	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
+		ProjectId: project.ID,
+		CAId:      plan.CaId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading CA", "CA certificate generation is only supported for internal CAs. Error: "+err.Error())
+		return
+	}
+
+	if ca.Configuration.Type == "intermediate" && ca.Configuration.ParentCaId != "" {
+		generateRequest.ParentCaId = ca.Configuration.ParentCaId
 	}
 
 	certificate, err := r.client.GenerateCACertificate(generateRequest)
@@ -282,7 +299,7 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Unknown())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), types.StringUnknown())...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), types.StringUnknown())...)
 
 	} else if len(parts) == 2 {
 		caId := parts[0]
@@ -313,7 +330,7 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Unknown())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), types.StringUnknown())...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), types.StringUnknown())...)
 
 	} else {
 		resp.Diagnostics.AddError(

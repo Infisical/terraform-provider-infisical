@@ -2665,7 +2665,6 @@ type GetKMSKeySigningAlgorithmsResponse struct {
 
 type CertificateAuthorityConfiguration struct {
 	Type           string `json:"type,omitempty"`
-	FriendlyName   string `json:"friendlyName,omitempty"`
 	CommonName     string `json:"commonName,omitempty"`
 	Organization   string `json:"organization,omitempty"`
 	OU             string `json:"ou,omitempty"`

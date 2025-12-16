@@ -136,7 +136,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
-							Description: "The subject attribute type",
+							Description: "The subject attribute type. Possible values: " + strings.Join(SUPPORTED_SUBJECT_TYPES, ", "),
 							Required:    true,
 							Validators: []validator.String{
 								stringvalidator.OneOf(SUPPORTED_SUBJECT_TYPES...),
@@ -165,7 +165,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
-							Description: "The SAN type",
+							Description: "The SAN type. Possible values: " + strings.Join(SUPPORTED_SAN_TYPES, ", "),
 							Required:    true,
 							Validators: []validator.String{
 								stringvalidator.OneOf(SUPPORTED_SAN_TYPES...),
@@ -193,7 +193,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				Description: "Key usage policies for the certificate template",
 				Attributes: map[string]schema.Attribute{
 					"allowed": schema.ListAttribute{
-						Description: "List of allowed key usages",
+						Description: "List of allowed key usages. Possible values: " + strings.Join(SUPPORTED_CERT_KEY_USAGES, ", "),
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -201,7 +201,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 						},
 					},
 					"required": schema.ListAttribute{
-						Description: "List of required key usages",
+						Description: "List of required key usages. Possible values: " + strings.Join(SUPPORTED_CERT_KEY_USAGES, ", "),
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -209,7 +209,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 						},
 					},
 					"denied": schema.ListAttribute{
-						Description: "List of denied key usages",
+						Description: "List of denied key usages. Possible values: " + strings.Join(SUPPORTED_CERT_KEY_USAGES, ", "),
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -222,7 +222,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				Description: "Extended key usage policies for the certificate template",
 				Attributes: map[string]schema.Attribute{
 					"allowed": schema.ListAttribute{
-						Description: "List of allowed extended key usages",
+						Description: "List of allowed extended key usages. Possible values: " + strings.Join(SUPPORTED_CERT_EXT_KEY_USAGES, ", "),
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -230,7 +230,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 						},
 					},
 					"required": schema.ListAttribute{
-						Description: "List of required extended key usages",
+						Description: "List of required extended key usages. Possible values: " + strings.Join(SUPPORTED_CERT_EXT_KEY_USAGES, ", "),
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -238,7 +238,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 						},
 					},
 					"denied": schema.ListAttribute{
-						Description: "List of denied extended key usages",
+						Description: "List of denied extended key usages. Possible values: " + strings.Join(SUPPORTED_CERT_EXT_KEY_USAGES, ", "),
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
