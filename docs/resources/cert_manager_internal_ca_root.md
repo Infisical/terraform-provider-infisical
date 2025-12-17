@@ -51,7 +51,7 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
 - `organization` (String) The organization (O) of the root CA certificate
 - `ou` (String) The organizational unit (OU) of the root CA certificate
 - `province` (String) The state/province (ST) of the root CA certificate
-- `status` (String) The status of the CA. Supported values: active, disabled, pending-certificate. Defaults to 'active'.
+- `status` (String) The status of the CA. Supported values: active, disabled. Defaults to 'active'.
 
 ### Read-Only
 

@@ -30,7 +30,7 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
   status = "active"
 
   dns_app_connection_id = "your-route53-connection-id"
-  dns_provider          = "route53"
+  dns_provider          = "route53" # Supported values: route53, cloudflare, dns-made-easy
   dns_hosted_zone_id    = "Z123456789ABCDEFGH"
 
   directory_url = "https://acme-v02.api.letsencrypt.org/directory"
@@ -50,7 +50,7 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 - `account_email` (String) The email address for ACME account registration
 - `directory_url` (String) The ACME directory URL
 - `dns_app_connection_id` (String) The ID of the DNS app connection for ACME challenge validation
-- `dns_provider` (String) The DNS provider (e.g., 'route53', 'cloudflare')
+- `dns_provider` (String) The DNS provider for ACME challenge validation. Supported values: route53, cloudflare, dns-made-easy
 - `name` (String) The name of the ACME CA
 - `project_slug` (String) The slug of the cert-manager project
 
@@ -59,7 +59,7 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 - `dns_hosted_zone_id` (String) The hosted zone ID for DNS-01 challenge validation
 - `eab_hmac_key` (String, Sensitive) External Account Binding (EAB) HMAC key (optional)
 - `eab_kid` (String) External Account Binding (EAB) Key ID (optional)
-- `status` (String) The status of the CA. Supported values: active, disabled, pending-certificate. Defaults to 'active'.
+- `status` (String) The status of the CA. Supported values: active, disabled. Defaults to 'active'.
 
 ### Read-Only
 

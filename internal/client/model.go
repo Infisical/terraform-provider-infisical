@@ -2712,8 +2712,7 @@ type CreateInternalCAResponse struct {
 }
 
 type GetCARequest struct {
-	ProjectId string
-	CAId      string
+	CAId string
 }
 
 type GetCAResponse struct {
@@ -2733,8 +2732,7 @@ type UpdateInternalCAResponse struct {
 }
 
 type DeleteCARequest struct {
-	ProjectId string
-	CAId      string
+	CAId string
 }
 
 type DeleteCAResponse struct {

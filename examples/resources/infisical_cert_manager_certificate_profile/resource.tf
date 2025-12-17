@@ -135,7 +135,7 @@ resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
 # ACME profile
 resource "infisical_cert_manager_certificate_profile" "acme_profile" {
   project_slug            = infisical_project.pki.slug
-  ca_id                   = var.acme_ca_id # Reference to existing ACME CA
+  ca_id                   = var.acme_ca_id
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
   slug            = "acme-letsencrypt"

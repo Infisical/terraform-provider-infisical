@@ -17,6 +17,10 @@ import (
 )
 
 var (
+	SUPPORTED_DNS_PROVIDERS = []string{"route53", "cloudflare", "dns-made-easy"}
+)
+
+var (
 	_ resource.Resource = &certManagerExternalCAACMEResource{}
 )
 
@@ -77,8 +81,11 @@ func (r *certManagerExternalCAACMEResource) Schema(_ context.Context, _ resource
 				Required:    true,
 			},
 			"dns_provider": schema.StringAttribute{
-				Description: "The DNS provider (e.g., 'route53', 'cloudflare')",
+				Description: "The DNS provider for ACME challenge validation. Supported values: " + strings.Join(SUPPORTED_DNS_PROVIDERS, ", "),
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(SUPPORTED_DNS_PROVIDERS...),
+				},
 			},
 			"dns_hosted_zone_id": schema.StringAttribute{
 				Description: "The hosted zone ID for DNS-01 challenge validation",
@@ -234,21 +241,9 @@ func (r *certManagerExternalCAACMEResource) Read(ctx context.Context, req resour
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
 
 	ca, err := r.client.GetACMECA(infisical.GetCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {
@@ -392,21 +387,9 @@ func (r *certManagerExternalCAACMEResource) Delete(ctx context.Context, req reso
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteACMECA(infisical.DeleteCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+	_, err := r.client.DeleteACMECA(infisical.DeleteCARequest{
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {

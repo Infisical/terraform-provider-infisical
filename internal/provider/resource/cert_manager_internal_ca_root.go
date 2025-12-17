@@ -23,7 +23,7 @@ const (
 
 var (
 	SUPPORTED_ROOT_CA_KEY_ALGORITHMS = []string{"RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"}
-	SUPPORTED_CA_STATUSES            = []string{"active", "disabled", "pending-certificate"}
+	SUPPORTED_CA_STATUSES            = []string{"active", "disabled"}
 )
 
 var (
@@ -283,21 +283,9 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
 
 	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {
@@ -452,21 +440,9 @@ func (r *certManagerInternalCARootResource) Delete(ctx context.Context, req reso
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteInternalCA(infisical.DeleteCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+	_, err := r.client.DeleteInternalCA(infisical.DeleteCARequest{
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {

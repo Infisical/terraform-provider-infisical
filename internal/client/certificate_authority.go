@@ -7,7 +7,6 @@ import (
 
 const (
 	operationCreateInternalCA = "CallCreateInternalCA"
-	operationGetCA            = "CallGetCA"
 	operationGetInternalCA    = "CallGetInternalCA"
 	operationGetACMECA        = "CallGetACMECA"
 	operationGetADCSCA        = "CallGetADCSCA"
@@ -39,32 +38,12 @@ func (client Client) CreateInternalCA(request CreateInternalCARequest) (CreateIn
 	return caResponse, nil
 }
 
-func (client Client) GetCA(request GetCARequest) (GetCAResponse, error) {
-	var caResponse GetCAResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&caResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v1/cert-manager/ca/%s", request.CAId))
-
-	if err != nil {
-		return GetCAResponse{}, errors.NewGenericRequestError(operationGetCA, err)
-	}
-
-	if response.IsError() {
-		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetCA, response, nil)
-	}
-
-	return caResponse, nil
-}
-
 func (client Client) GetInternalCA(request GetCARequest) (GetCAResponse, error) {
 	var caResponse GetCAResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&caResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("projectId", request.ProjectId).
 		Get(fmt.Sprintf("api/v1/cert-manager/ca/internal/%s", request.CAId))
 
 	if err != nil {
@@ -84,7 +63,6 @@ func (client Client) GetACMECA(request GetCARequest) (GetCAResponse, error) {
 		R().
 		SetResult(&caResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("projectId", request.ProjectId).
 		Get(fmt.Sprintf("api/v1/cert-manager/ca/acme/%s", request.CAId))
 
 	if err != nil {
@@ -104,7 +82,6 @@ func (client Client) GetADCSCA(request GetCARequest) (GetCAResponse, error) {
 		R().
 		SetResult(&caResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("projectId", request.ProjectId).
 		Get(fmt.Sprintf("api/v1/cert-manager/ca/azure-ad-cs/%s", request.CAId))
 
 	if err != nil {
@@ -144,7 +121,6 @@ func (client Client) DeleteInternalCA(request DeleteCARequest) (DeleteCAResponse
 		R().
 		SetResult(&caResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("projectId", request.ProjectId).
 		Delete(fmt.Sprintf("api/v1/cert-manager/ca/internal/%s", request.CAId))
 
 	if err != nil {
@@ -164,7 +140,6 @@ func (client Client) DeleteACMECA(request DeleteCARequest) (DeleteCAResponse, er
 		R().
 		SetResult(&caResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("projectId", request.ProjectId).
 		Delete(fmt.Sprintf("api/v1/cert-manager/ca/acme/%s", request.CAId))
 
 	if err != nil {
@@ -184,7 +159,6 @@ func (client Client) DeleteADCSCA(request DeleteCARequest) (DeleteCAResponse, er
 		R().
 		SetResult(&caResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("projectId", request.ProjectId).
 		Delete(fmt.Sprintf("api/v1/cert-manager/ca/azure-ad-cs/%s", request.CAId))
 
 	if err != nil {

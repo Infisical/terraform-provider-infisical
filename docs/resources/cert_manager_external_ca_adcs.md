@@ -41,7 +41,7 @@ resource "infisical_cert_manager_external_ca_adcs" "adcs" {
 
 ### Optional
 
-- `status` (String) The status of the CA. Supported values: active, disabled, pending-certificate. Defaults to 'active'.
+- `status` (String) The status of the CA. Supported values: active, disabled. Defaults to 'active'.
 
 ### Read-Only
 

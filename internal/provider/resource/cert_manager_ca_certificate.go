@@ -32,7 +32,6 @@ type certManagerCACertificateResource struct {
 }
 
 type certManagerCACertificateResourceModel struct {
-	ProjectSlug      types.String `tfsdk:"project_slug"`
 	CaId             types.String `tfsdk:"ca_id"`
 	Id               types.String `tfsdk:"id"`
 	NotBefore        types.String `tfsdk:"not_before"`
@@ -51,13 +50,6 @@ func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.
 	resp.Schema = schema.Schema{
 		Description: "Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
-			"project_slug": schema.StringAttribute{
-				Description: "The slug of the cert-manager project",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"ca_id": schema.StringAttribute{
 				Description: "The ID of the certificate authority to generate a certificate for",
 				Required:    true,
@@ -177,27 +169,6 @@ func (r *certManagerCACertificateResource) Create(ctx context.Context, req resou
 		generateRequest.MaxPathLength = &maxPathLength
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading project", err.Error())
-		return
-	}
-
-	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
-		ProjectId: project.ID,
-		CAId:      plan.CaId.ValueString(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading CA", "CA certificate generation is only supported for internal CAs. Error: "+err.Error())
-		return
-	}
-
-	if ca.Configuration.Type == "intermediate" && ca.Configuration.ParentCaId != "" {
-		generateRequest.ParentCaId = ca.Configuration.ParentCaId
-	}
-
 	certificate, err := r.client.GenerateCACertificate(generateRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Error generating CA certificate", err.Error())
@@ -299,7 +270,6 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Unknown())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), types.StringUnknown())...)
 
 	} else if len(parts) == 2 {
 		caId := parts[0]
@@ -330,7 +300,6 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Unknown())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), types.StringUnknown())...)
 
 	} else {
 		resp.Diagnostics.AddError(

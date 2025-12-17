@@ -178,21 +178,9 @@ func (r *certManagerExternalCAADCSResource) Read(ctx context.Context, req resour
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
 
 	ca, err := r.client.GetADCSCA(infisical.GetCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {
@@ -298,21 +286,9 @@ func (r *certManagerExternalCAADCSResource) Delete(ctx context.Context, req reso
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteADCSCA(infisical.DeleteCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+	_, err := r.client.DeleteADCSCA(infisical.DeleteCARequest{
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {

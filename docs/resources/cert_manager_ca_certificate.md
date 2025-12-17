@@ -117,7 +117,6 @@ output "issuing_ca_chain" {
 - `ca_id` (String) The ID of the certificate authority to generate a certificate for
 - `not_after` (String) The date and time when the CA expires in RFC3339 format (e.g., '2034-01-01T00:00:00Z')
 - `not_before` (String) The date and time when the CA becomes valid in RFC3339 format (e.g., '2024-01-01T00:00:00Z')
-- `project_slug` (String) The slug of the cert-manager project
 
 ### Optional
 

@@ -150,7 +150,7 @@ resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
 # ACME profile
 resource "infisical_cert_manager_certificate_profile" "acme_profile" {
   project_slug            = infisical_project.pki.slug
-  ca_id                   = var.acme_ca_id # Reference to existing ACME CA
+  ca_id                   = var.acme_ca_id
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
   slug            = "acme-letsencrypt"
@@ -214,8 +214,8 @@ variable "adcs_ca_id" {
 
 - `certificate_template_id` (String) The ID of the certificate template to use
 - `enrollment_type` (String) The enrollment type for the profile. Supported values: api, est, acme
+- `name` (String) The unique name of the certificate profile
 - `project_slug` (String) The slug of the cert-manager project
-- `slug` (String) The unique slug of the certificate profile
 
 ### Optional
 

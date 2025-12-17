@@ -57,7 +57,7 @@ type certManagerCertificateProfileResourceModel struct {
 	Id                    types.String                                       `tfsdk:"id"`
 	CaId                  types.String                                       `tfsdk:"ca_id"`
 	CertificateTemplateId types.String                                       `tfsdk:"certificate_template_id"`
-	Slug                  types.String                                       `tfsdk:"slug"`
+	Name                  types.String                                       `tfsdk:"name" json:"slug"`
 	Description           types.String                                       `tfsdk:"description"`
 	EnrollmentType        types.String                                       `tfsdk:"enrollment_type"`
 	IssuerType            types.String                                       `tfsdk:"issuer_type"`
@@ -102,8 +102,8 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"slug": schema.StringAttribute{
-				Description: "The unique slug of the certificate profile",
+			"name": schema.StringAttribute{
+				Description: "The unique name of the certificate profile",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -268,7 +268,7 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 	createProfileRequest := infisical.CreateCertificateProfileRequest{
 		ProjectId:             project.ID,
 		CertificateTemplateId: plan.CertificateTemplateId.ValueString(),
-		Slug:                  plan.Slug.ValueString(),
+		Slug:                  plan.Name.ValueString(),
 		EnrollmentType:        plan.EnrollmentType.ValueString(),
 		Description:           plan.Description.ValueString(),
 	}
@@ -348,7 +348,7 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	}
 
 	state.Id = types.StringValue(profile.CertificateProfile.Id)
-	state.Slug = types.StringValue(profile.CertificateProfile.Slug)
+	state.Name = types.StringValue(profile.CertificateProfile.Slug)
 	state.Description = types.StringValue(profile.CertificateProfile.Description)
 	state.EnrollmentType = types.StringValue(profile.CertificateProfile.EnrollmentType)
 	state.IssuerType = types.StringValue(profile.CertificateProfile.IssuerType)
@@ -410,7 +410,7 @@ func (r *certManagerCertificateProfileResource) Update(ctx context.Context, req 
 
 	updateProfileRequest := infisical.UpdateCertificateProfileRequest{
 		ProfileId:   plan.Id.ValueString(),
-		Slug:        plan.Slug.ValueString(),
+		Slug:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	}
 

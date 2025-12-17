@@ -52,6 +52,7 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
 
 ### Required
 
+- `key_algorithm` (String) The key algorithm for the intermediate CA. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `name` (String) The name of the intermediate CA
 - `parent_ca_id` (String) The ID of the parent CA (root or intermediate CA)
 - `project_slug` (String) The slug of the cert-manager project
@@ -60,12 +61,11 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
 
 - `common_name` (String) The common name (CN) of the intermediate CA certificate
 - `country` (String) The country (C) of the intermediate CA certificate
-- `key_algorithm` (String) The key algorithm for the intermediate CA. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `locality` (String) The locality (L) of the intermediate CA certificate
 - `organization` (String) The organization (O) of the intermediate CA certificate
 - `ou` (String) The organizational unit (OU) of the intermediate CA certificate
 - `province` (String) The state/province (ST) of the intermediate CA certificate
-- `status` (String) The status of the CA. Supported values: active, disabled, pending-certificate. Defaults to 'active'.
+- `status` (String) The status of the CA. Supported values: active, disabled. Defaults to 'active'.
 
 ### Read-Only
 

@@ -119,10 +119,8 @@ func (r *certManagerInternalCAIntermediateResource) Schema(_ context.Context, _ 
 			},
 			"key_algorithm": schema.StringAttribute{
 				Description: "The key algorithm for the intermediate CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", "),
-				Optional:    true,
-				Computed:    true,
+				Required:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
@@ -216,10 +214,7 @@ func (r *certManagerInternalCAIntermediateResource) Create(ctx context.Context, 
 		return
 	}
 
-	keyAlgorithm := "RSA_2048"
-	if !plan.KeyAlgorithm.IsNull() && !plan.KeyAlgorithm.IsUnknown() {
-		keyAlgorithm = plan.KeyAlgorithm.ValueString()
-	}
+	keyAlgorithm := plan.KeyAlgorithm.ValueString()
 
 	status := "active"
 	if !plan.Status.IsNull() && !plan.Status.IsUnknown() {
@@ -282,21 +277,9 @@ func (r *certManagerInternalCAIntermediateResource) Read(ctx context.Context, re
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
 
 	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {
@@ -394,21 +377,8 @@ func (r *certManagerInternalCAIntermediateResource) Update(ctx context.Context, 
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.UpdateInternalCA(infisical.UpdateInternalCARequest{
-		ProjectId: project.ID,
-		CAId:      plan.Id.ValueString(),
+	_, err := r.client.UpdateInternalCA(infisical.UpdateInternalCARequest{
+		CAId: plan.Id.ValueString(),
 		Name:      plan.Name.ValueString(),
 		Status:    plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
@@ -455,21 +425,9 @@ func (r *certManagerInternalCAIntermediateResource) Delete(ctx context.Context, 
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: state.ProjectSlug.ValueString(),
-	})
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.DeleteInternalCA(infisical.DeleteCARequest{
-		ProjectId: project.ID,
-		CAId:      state.Id.ValueString(),
+	_, err := r.client.DeleteInternalCA(infisical.DeleteCARequest{
+		CAId: state.Id.ValueString(),
 	})
 
 	if err != nil {
