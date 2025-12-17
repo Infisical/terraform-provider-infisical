@@ -57,6 +57,7 @@ type secretResourceModel struct {
 	WorkspaceId    types.String    `tfsdk:"workspace_id"`
 	LastUpdated    types.String    `tfsdk:"last_updated"`
 	Tags           types.List      `tfsdk:"tag_ids"`
+	Metadata       types.Map       `tfsdk:"metadata"`
 	ID             types.String    `tfsdk:"id"`
 }
 
@@ -193,6 +194,11 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:    true,
 				Description: "Tag ids to be attached for the secrets.",
 			},
+			"metadata": schema.MapAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Description: "Metadata associated with the secret as key-value pairs.",
+			},
 			"secret_reminder": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"note": schema.StringAttribute{
@@ -273,6 +279,23 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	secretTagIds := make([]string, 0, len(planSecretTagIds))
 	for _, slug := range planSecretTagIds {
 		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
+	}
+
+	planMetadata := make(map[string]types.String, 0)
+	if !plan.Metadata.IsNull() && !plan.Metadata.IsUnknown() {
+		diags = plan.Metadata.ElementsAs(ctx, &planMetadata, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	secretMetadata := make([]infisical.SecretMetadataItem, 0, len(planMetadata))
+	for key, value := range planMetadata {
+		secretMetadata = append(secretMetadata, infisical.SecretMetadataItem{
+			Key:   key,
+			Value: value.ValueString(),
+		})
 	}
 
 	if r.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
@@ -383,6 +406,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			SecretKey:                plan.Name.ValueString(),
 			SecretValue:              secretData.Value,
 			TagIDs:                   secretTagIds,
+			SecretMetadata:           secretMetadata,
 		})
 
 		if err != nil {
@@ -394,6 +418,20 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 
 		plan.ID = types.StringValue(secret.ID)
+
+		if len(secret.SecretMetadata) > 0 {
+			metadataMap := make(map[string]types.String, len(secret.SecretMetadata))
+			for _, item := range secret.SecretMetadata {
+				metadataMap[item.Key] = types.StringValue(item.Value)
+			}
+			plan.Metadata, diags = types.MapValueFrom(ctx, types.StringType, metadataMap)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		} else if plan.Metadata.IsNull() || plan.Metadata.IsUnknown() {
+			plan.Metadata = types.MapNull(types.StringType)
+		}
 
 		// No need to set workspace ID as it is already set in the plan
 		//plan.WorkspaceId = plan.WorkspaceId
@@ -594,6 +632,20 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 			state.Value = types.StringValue(response.Secret.SecretValue)
 		}
 
+		if len(response.Secret.SecretMetadata) > 0 {
+			metadataMap := make(map[string]types.String, len(response.Secret.SecretMetadata))
+			for _, item := range response.Secret.SecretMetadata {
+				metadataMap[item.Key] = types.StringValue(item.Value)
+			}
+			state.Metadata, diags = types.MapValueFrom(ctx, types.StringType, metadataMap)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		} else {
+			state.Metadata = types.MapNull(types.StringType)
+		}
+
 	} else {
 		resp.Diagnostics.AddError(
 			"Error Reading Infisical secret",
@@ -655,6 +707,23 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 	secretTagIds := make([]string, 0, len(planSecretTagIds))
 	for _, slug := range planSecretTagIds {
 		secretTagIds = append(secretTagIds, strings.ToLower(slug.ValueString()))
+	}
+
+	planMetadata := make(map[string]types.String, 0)
+	if !plan.Metadata.IsNull() && !plan.Metadata.IsUnknown() {
+		diags = plan.Metadata.ElementsAs(ctx, &planMetadata, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	secretMetadata := make([]infisical.SecretMetadataItem, 0, len(planMetadata))
+	for key, value := range planMetadata {
+		secretMetadata = append(secretMetadata, infisical.SecretMetadataItem{
+			Key:   key,
+			Value: value.ValueString(),
+		})
 	}
 
 	// null check secret reminder
@@ -754,6 +823,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			SecretName:               plan.Name.ValueString(),
 			SecretReminderNote:       secretReminderNote,
 			SecretReminderRepeatDays: secretReminderRepeatDays,
+			SecretMetadata:           secretMetadata,
 		}
 
 		if secretData.ShouldUpdateValue {
@@ -768,6 +838,20 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 				"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
 			)
 			return
+		}
+
+		if len(secretMetadata) > 0 {
+			metadataMap := make(map[string]types.String, len(secretMetadata))
+			for _, item := range secretMetadata {
+				metadataMap[item.Key] = types.StringValue(item.Value)
+			}
+			plan.Metadata, diags = types.MapValueFrom(ctx, types.StringType, metadataMap)
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		} else if plan.Metadata.IsNull() || plan.Metadata.IsUnknown() {
+			plan.Metadata = types.MapNull(types.StringType)
 		}
 
 		// No need to set workspace ID as it is already set in the plan
@@ -846,6 +930,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 	var workspace, environment, secretPath, secretName, secretValue, secretId string
 	var tags []string
 	var secretReminder SecretReminder
+	var secretMetadata []infisical.SecretMetadataItem
 
 	if _, err := uuid.ParseUUID(req.ID); err == nil {
 		secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
@@ -880,6 +965,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretName = secret.Secret.SecretKey
 		secretValue = secret.Secret.SecretValue
 		secretId = secret.Secret.ID
+		secretMetadata = secret.Secret.SecretMetadata
 	} else {
 		parts := strings.SplitN(req.ID, ":", 4)
 
@@ -928,6 +1014,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretName = secret.Secret.SecretKey
 		secretValue = secret.Secret.SecretValue
 		secretId = secret.Secret.ID
+		secretMetadata = secret.Secret.SecretMetadata
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), workspace)...)
@@ -938,4 +1025,18 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tags)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("secret_reminder"), secretReminder)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretId)...)
+
+	if len(secretMetadata) > 0 {
+		metadataMap := make(map[string]types.String, len(secretMetadata))
+		for _, item := range secretMetadata {
+			metadataMap[item.Key] = types.StringValue(item.Value)
+		}
+		metadataValue, diags := types.MapValueFrom(ctx, types.StringType, metadataMap)
+		resp.Diagnostics.Append(diags...)
+		if !resp.Diagnostics.HasError() {
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata"), metadataValue)...)
+		}
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("metadata"), types.MapNull(types.StringType))...)
+	}
 }
