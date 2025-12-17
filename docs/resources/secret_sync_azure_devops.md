@@ -53,7 +53,7 @@ resource "infisical_secret_sync_azure_devops" "app-configuration-demo" {
 
 ### Required
 
-- `connection_id` (String) The ID of the azure Connection to use for syncing.
+- `connection_id` (String) The ID of the azure-devops Connection to use for syncing.
 - `destination_config` (Attributes) The destination configuration for the secret sync. (see [below for nested schema](#nestedatt--destination_config))
 - `environment` (String) The slug of the project environment to sync secrets from.
 - `name` (String) The name of the Azure DevOps sync to create. Must be slug-friendly.
