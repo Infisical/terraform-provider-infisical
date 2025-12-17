@@ -72,6 +72,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Secrets
         secret|secret_folder|secret_tag|secret_import)
             update_subcategory "$file" "Secrets";;
+
+        # External KMS
+        external_kms_*)
+            update_subcategory "$file" "External KMS";;
     esac
 done
 
