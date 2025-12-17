@@ -379,6 +379,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionGcpResource,
 		appConnectionResource.NewAppConnectionAwsResource,
 		appConnectionResource.NewAppConnectionAzureResource,
+		appConnectionResource.NewAppConnectionAzureKeyVaultResource,
 		appConnectionResource.NewAppConnection1PasswordResource,
 		appConnectionResource.NewAppConnectionRenderResource,
 		appConnectionResource.NewAppConnectionMySqlResource,
