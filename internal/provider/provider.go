@@ -9,6 +9,7 @@ import (
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
 	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
+	externalKmsResource "terraform-provider-infisical/internal/provider/resource/external_kms"
 	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
 
@@ -428,6 +429,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerCertificateTemplateResource,
 		infisicalResource.NewCertManagerCertificateProfileResource,
 		infisicalResource.NewCertManagerCACertificateResource,
+		externalKmsResource.NewExternalKmsAwsResource,
 	}
 }
 
