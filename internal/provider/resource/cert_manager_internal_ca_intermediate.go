@@ -277,7 +277,6 @@ func (r *certManagerInternalCAIntermediateResource) Read(ctx context.Context, re
 		return
 	}
 
-
 	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
 		CAId: state.Id.ValueString(),
 	})
@@ -378,9 +377,9 @@ func (r *certManagerInternalCAIntermediateResource) Update(ctx context.Context, 
 	}
 
 	_, err := r.client.UpdateInternalCA(infisical.UpdateInternalCARequest{
-		CAId: plan.Id.ValueString(),
-		Name:      plan.Name.ValueString(),
-		Status:    plan.Status.ValueString(),
+		CAId:   plan.Id.ValueString(),
+		Name:   plan.Name.ValueString(),
+		Status: plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
 			Type:         "intermediate",
 			CommonName:   plan.CommonName.ValueString(),
@@ -424,7 +423,6 @@ func (r *certManagerInternalCAIntermediateResource) Delete(ctx context.Context, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 
 	_, err := r.client.DeleteInternalCA(infisical.DeleteCARequest{
 		CAId: state.Id.ValueString(),

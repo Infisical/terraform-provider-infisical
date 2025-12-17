@@ -241,7 +241,6 @@ func (r *certManagerExternalCAACMEResource) Read(ctx context.Context, req resour
 		return
 	}
 
-
 	ca, err := r.client.GetACMECA(infisical.GetCARequest{
 		CAId: state.Id.ValueString(),
 	})
@@ -386,7 +385,6 @@ func (r *certManagerExternalCAACMEResource) Delete(ctx context.Context, req reso
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 
 	_, err := r.client.DeleteACMECA(infisical.DeleteCARequest{
 		CAId: state.Id.ValueString(),

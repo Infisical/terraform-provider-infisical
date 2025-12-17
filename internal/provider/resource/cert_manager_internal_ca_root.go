@@ -283,7 +283,6 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 		return
 	}
 
-
 	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
 		CAId: state.Id.ValueString(),
 	})
@@ -439,7 +438,6 @@ func (r *certManagerInternalCARootResource) Delete(ctx context.Context, req reso
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 
 	_, err := r.client.DeleteInternalCA(infisical.DeleteCARequest{
 		CAId: state.Id.ValueString(),

@@ -178,7 +178,6 @@ func (r *certManagerExternalCAADCSResource) Read(ctx context.Context, req resour
 		return
 	}
 
-
 	ca, err := r.client.GetADCSCA(infisical.GetCARequest{
 		CAId: state.Id.ValueString(),
 	})
@@ -285,7 +284,6 @@ func (r *certManagerExternalCAADCSResource) Delete(ctx context.Context, req reso
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 
 	_, err := r.client.DeleteADCSCA(infisical.DeleteCARequest{
 		CAId: state.Id.ValueString(),
