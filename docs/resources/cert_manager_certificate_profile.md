@@ -36,13 +36,14 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
   project_slug = infisical_project.pki.slug
   parent_ca_id = infisical_cert_manager_internal_ca_root.root.id
 
-  name         = "enterprise-issuing-ca"
-  common_name  = "Enterprise Issuing Certificate Authority"
-  organization = "Example Corp"
-  ou           = "IT Security"
-  country      = "US"
-  locality     = "San Francisco"
-  province     = "California"
+  name          = "enterprise-issuing-ca"
+  common_name   = "Enterprise Issuing Certificate Authority"
+  organization  = "Example Corp"
+  ou            = "IT Security"
+  country       = "US"
+  locality      = "San Francisco"
+  province      = "California"
+  key_algorithm = "RSA_2048"
 }
 
 resource "infisical_cert_manager_certificate_template" "web_server" {
@@ -102,7 +103,7 @@ resource "infisical_cert_manager_certificate_profile" "web_server_api" {
   ca_id                   = infisical_cert_manager_internal_ca_intermediate.issuing.id
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
-  slug            = "web-server-api"
+  name            = "web-server-api"
   description     = "API enrollment for web server certificates"
   enrollment_type = "api"
   issuer_type     = "ca"
@@ -119,7 +120,7 @@ resource "infisical_cert_manager_certificate_profile" "web_server_est" {
   ca_id                   = infisical_cert_manager_internal_ca_intermediate.issuing.id
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
-  slug            = "web-server-est"
+  name            = "web-server-est"
   description     = "EST enrollment for web server certificates"
   enrollment_type = "est"
   issuer_type     = "ca"
@@ -136,7 +137,7 @@ resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
   project_slug            = infisical_project.pki.slug
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
-  slug            = "self-signed-dev"
+  name            = "self-signed-dev"
   description     = "Self-signed certificates for development"
   enrollment_type = "api"
   issuer_type     = "self-signed"
@@ -153,7 +154,7 @@ resource "infisical_cert_manager_certificate_profile" "acme_profile" {
   ca_id                   = var.acme_ca_id
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
-  slug            = "acme-letsencrypt"
+  name            = "acme-letsencrypt"
   description     = "Let's Encrypt ACME certificates"
   enrollment_type = "acme"
   issuer_type     = "ca"
@@ -165,7 +166,7 @@ resource "infisical_cert_manager_certificate_profile" "adcs_profile" {
   ca_id                   = var.adcs_ca_id # Reference to existing ADCS CA
   certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
 
-  slug            = "adcs-corporate"
+  name            = "adcs-corporate"
   description     = "Corporate ADCS certificates"
   enrollment_type = "api"
   issuer_type     = "ca"

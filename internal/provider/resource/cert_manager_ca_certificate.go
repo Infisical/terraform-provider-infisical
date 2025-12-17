@@ -240,11 +240,18 @@ func (r *certManagerCACertificateResource) Delete(ctx context.Context, req resou
 		return
 	}
 
-	resp.Diagnostics.AddWarning(
-		"CA certificate not deleted from Infisical",
-		"CA certificates cannot be deleted programmatically from Infisical. The certificate still exists in Infisical and must be manually deleted if desired. The resource has been removed from Terraform state only.",
-	)
+	_, err := r.client.GetCACertificate(infisical.GetCACertificateRequest{
+		CaId: state.CaId.ValueString(),
+	})
 
+	if err != nil {
+		return
+	}
+
+	resp.Diagnostics.AddError(
+		"Cannot delete CA certificate",
+		"CA certificates cannot be directly deleted. If you need to remove the certificate, you must first delete the certificate authority",
+	)
 }
 
 func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

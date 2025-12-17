@@ -21,19 +21,19 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
   project_slug = infisical_project.pki.slug
   parent_ca_id = infisical_cert_manager_internal_ca_root.root.id
 
-  name         = "enterprise-issuing-ca"
-  common_name  = "Enterprise Issuing Certificate Authority"
-  organization = "Example Corp"
-  ou           = "IT Security"
-  country      = "US"
-  locality     = "San Francisco"
-  province     = "California"
+  name          = "enterprise-issuing-ca"
+  common_name   = "Enterprise Issuing Certificate Authority"
+  organization  = "Example Corp"
+  ou            = "IT Security"
+  country       = "US"
+  locality      = "San Francisco"
+  province      = "California"
+  key_algorithm = "RSA_2048"
 }
 
 # Generate certificate for the root CA
 resource "infisical_cert_manager_ca_certificate" "root_cert" {
-  project_slug = infisical_project.pki.slug
-  ca_id        = infisical_cert_manager_internal_ca_root.root.id
+  ca_id = infisical_cert_manager_internal_ca_root.root.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2034-01-01T00:00:00Z"
@@ -44,8 +44,7 @@ resource "infisical_cert_manager_ca_certificate" "root_cert" {
 
 # Generate certificate for the intermediate CA
 resource "infisical_cert_manager_ca_certificate" "issuing_cert" {
-  project_slug = infisical_project.pki.slug
-  ca_id        = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  ca_id = infisical_cert_manager_internal_ca_intermediate.issuing.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2029-01-01T00:00:00Z"
@@ -59,8 +58,7 @@ resource "infisical_cert_manager_ca_certificate" "issuing_cert" {
 
 # Example with shorter validity period for testing/development
 resource "infisical_cert_manager_ca_certificate" "dev_cert" {
-  project_slug = infisical_project.pki.slug
-  ca_id        = infisical_cert_manager_internal_ca_root.root.id
+  ca_id = infisical_cert_manager_internal_ca_root.root.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2025-01-01T00:00:00Z" # 1 year validity
