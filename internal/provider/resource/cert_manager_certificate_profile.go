@@ -159,7 +159,7 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 				},
 			},
 			"api_config": schema.SingleNestedBlock{
-				Description: "API configuration (optional for enrollment_type 'api')",
+				Description: "API configuration (required when enrollment_type is 'api')",
 				Attributes: map[string]schema.Attribute{
 					"auto_renew": schema.BoolAttribute{
 						Description: "Whether to automatically renew certificates",
@@ -237,6 +237,10 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 			return
 		}
 	case "api":
+		if plan.ApiConfig == nil {
+			resp.Diagnostics.AddError("Missing API configuration", "api_config block is required when enrollment_type is 'api'")
+			return
+		}
 	case "acme":
 		if plan.IssuerType.ValueString() == "self-signed" {
 			resp.Diagnostics.AddError("Invalid issuer type for ACME", "ACME enrollment_type cannot be used with self-signed issuer_type")
@@ -326,15 +330,16 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 		return
 	}
 
-	var state certManagerCertificateProfileResourceModel
-
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	var currentState certManagerCertificateProfileResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	var state certManagerCertificateProfileResourceModel
+
 	profile, err := r.client.GetCertificateProfile(infisical.GetCertificateProfileRequest{
-		ProfileId:      state.Id.ValueString(),
+		ProfileId:      currentState.Id.ValueString(),
 		IncludeConfigs: true,
 	})
 	if err != nil {
@@ -361,8 +366,14 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	if profile.CertificateProfile.EstConfig != nil {
 		state.EstConfig = &certManagerCertificateProfileEstConfigModel{
 			DisableBootstrapCaValidation: types.BoolValue(profile.CertificateProfile.EstConfig.DisableBootstrapCaValidation),
-			Passphrase:                   types.StringValue(profile.CertificateProfile.EstConfig.Passphrase),
 		}
+
+		if currentState.EstConfig != nil && !currentState.EstConfig.Passphrase.IsNull() {
+			state.EstConfig.Passphrase = currentState.EstConfig.Passphrase
+		} else {
+			state.EstConfig.Passphrase = types.StringNull()
+		}
+
 		if profile.CertificateProfile.EstConfig.CaChain != "" {
 			state.EstConfig.CaChain = types.StringValue(profile.CertificateProfile.EstConfig.CaChain)
 		} else {
@@ -372,13 +383,18 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 		state.EstConfig = nil
 	}
 
-	if profile.CertificateProfile.ApiConfig != nil {
-		state.ApiConfig = &certManagerCertificateProfileApiConfigModel{
-			AutoRenew:       types.BoolValue(profile.CertificateProfile.ApiConfig.AutoRenew),
-			RenewBeforeDays: types.Int64Value(int64(profile.CertificateProfile.ApiConfig.RenewBeforeDays)),
+	if currentState.ApiConfig != nil {
+		if profile.CertificateProfile.ApiConfig != nil {
+			state.ApiConfig = &certManagerCertificateProfileApiConfigModel{
+				AutoRenew:       types.BoolValue(profile.CertificateProfile.ApiConfig.AutoRenew),
+				RenewBeforeDays: types.Int64Value(int64(profile.CertificateProfile.ApiConfig.RenewBeforeDays)),
+			}
+		} else {
+			state.ApiConfig = &certManagerCertificateProfileApiConfigModel{
+				AutoRenew:       types.BoolNull(),
+				RenewBeforeDays: types.Int64Null(),
+			}
 		}
-	} else {
-		state.ApiConfig = nil
 	}
 
 	if profile.CertificateProfile.ExternalConfigs != nil {

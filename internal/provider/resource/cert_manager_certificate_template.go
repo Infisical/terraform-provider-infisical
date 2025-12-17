@@ -474,15 +474,16 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 		return
 	}
 
-	var state certManagerCertificateTemplateResourceModel
-
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	var currentState certManagerCertificateTemplateResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	var state certManagerCertificateTemplateResourceModel
+
 	template, err := r.client.GetCertificateTemplate(infisical.GetCertificateTemplateRequest{
-		TemplateId: state.Id.ValueString(),
+		TemplateId: currentState.Id.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading certificate template", err.Error())
@@ -563,58 +564,70 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 		}
 	}
 
-	if template.CertificateTemplate.KeyUsages != nil {
+	if currentState.KeyUsages != nil {
 		state.KeyUsages = &certManagerCertificateTemplateKeyUsagesModel{}
 
-		if len(template.CertificateTemplate.KeyUsages.Allowed) > 0 {
-			allowedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Allowed)
-			resp.Diagnostics.Append(diags...)
-			state.KeyUsages.Allowed = allowedList
+		if template.CertificateTemplate.KeyUsages != nil {
+			if len(template.CertificateTemplate.KeyUsages.Allowed) > 0 {
+				allowedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Allowed)
+				resp.Diagnostics.Append(diags...)
+				state.KeyUsages.Allowed = allowedList
+			} else {
+				state.KeyUsages.Allowed = types.ListNull(types.StringType)
+			}
+
+			if len(template.CertificateTemplate.KeyUsages.Required) > 0 {
+				requiredList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Required)
+				resp.Diagnostics.Append(diags...)
+				state.KeyUsages.Required = requiredList
+			} else {
+				state.KeyUsages.Required = types.ListNull(types.StringType)
+			}
+
+			if len(template.CertificateTemplate.KeyUsages.Denied) > 0 {
+				deniedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Denied)
+				resp.Diagnostics.Append(diags...)
+				state.KeyUsages.Denied = deniedList
+			} else {
+				state.KeyUsages.Denied = types.ListNull(types.StringType)
+			}
 		} else {
 			state.KeyUsages.Allowed = types.ListNull(types.StringType)
-		}
-
-		if len(template.CertificateTemplate.KeyUsages.Required) > 0 {
-			requiredList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Required)
-			resp.Diagnostics.Append(diags...)
-			state.KeyUsages.Required = requiredList
-		} else {
 			state.KeyUsages.Required = types.ListNull(types.StringType)
-		}
-
-		if len(template.CertificateTemplate.KeyUsages.Denied) > 0 {
-			deniedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Denied)
-			resp.Diagnostics.Append(diags...)
-			state.KeyUsages.Denied = deniedList
-		} else {
 			state.KeyUsages.Denied = types.ListNull(types.StringType)
 		}
 	}
 
-	if template.CertificateTemplate.ExtendedKeyUsages != nil {
+	if currentState.ExtendedKeyUsages != nil {
 		state.ExtendedKeyUsages = &certManagerCertificateTemplateExtendedKeyUsagesModel{}
 
-		if len(template.CertificateTemplate.ExtendedKeyUsages.Allowed) > 0 {
-			allowedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Allowed)
-			resp.Diagnostics.Append(diags...)
-			state.ExtendedKeyUsages.Allowed = allowedList
+		if template.CertificateTemplate.ExtendedKeyUsages != nil {
+			if len(template.CertificateTemplate.ExtendedKeyUsages.Allowed) > 0 {
+				allowedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Allowed)
+				resp.Diagnostics.Append(diags...)
+				state.ExtendedKeyUsages.Allowed = allowedList
+			} else {
+				state.ExtendedKeyUsages.Allowed = types.ListNull(types.StringType)
+			}
+
+			if len(template.CertificateTemplate.ExtendedKeyUsages.Required) > 0 {
+				requiredList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Required)
+				resp.Diagnostics.Append(diags...)
+				state.ExtendedKeyUsages.Required = requiredList
+			} else {
+				state.ExtendedKeyUsages.Required = types.ListNull(types.StringType)
+			}
+
+			if len(template.CertificateTemplate.ExtendedKeyUsages.Denied) > 0 {
+				deniedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Denied)
+				resp.Diagnostics.Append(diags...)
+				state.ExtendedKeyUsages.Denied = deniedList
+			} else {
+				state.ExtendedKeyUsages.Denied = types.ListNull(types.StringType)
+			}
 		} else {
 			state.ExtendedKeyUsages.Allowed = types.ListNull(types.StringType)
-		}
-
-		if len(template.CertificateTemplate.ExtendedKeyUsages.Required) > 0 {
-			requiredList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Required)
-			resp.Diagnostics.Append(diags...)
-			state.ExtendedKeyUsages.Required = requiredList
-		} else {
 			state.ExtendedKeyUsages.Required = types.ListNull(types.StringType)
-		}
-
-		if len(template.CertificateTemplate.ExtendedKeyUsages.Denied) > 0 {
-			deniedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Denied)
-			resp.Diagnostics.Append(diags...)
-			state.ExtendedKeyUsages.Denied = deniedList
-		} else {
 			state.ExtendedKeyUsages.Denied = types.ListNull(types.StringType)
 		}
 	}

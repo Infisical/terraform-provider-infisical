@@ -23,13 +23,14 @@ resource "infisical_project" "pki" {
 resource "infisical_cert_manager_internal_ca_root" "root" {
   project_slug = infisical_project.pki.slug
 
-  name         = "enterprise-root-ca"
-  common_name  = "Enterprise Root Certificate Authority"
-  organization = "Acme Corp"
-  ou           = "IT Security"
-  country      = "US"
-  province     = "California"
-  locality     = "San Francisco"
+  name          = "enterprise-root-ca"
+  common_name   = "Enterprise Root Certificate Authority"
+  organization  = "Acme Corp"
+  ou            = "IT Security"
+  country       = "US"
+  province      = "California"
+  locality      = "San Francisco"
+  key_algorithm = "RSA_2048"
 }
 
 resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
@@ -54,7 +55,6 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
 
 - `key_algorithm` (String) The key algorithm for the intermediate CA. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `name` (String) The name of the intermediate CA
-- `parent_ca_id` (String) The ID of the parent CA (root or intermediate CA)
 - `project_slug` (String) The slug of the cert-manager project
 
 ### Optional

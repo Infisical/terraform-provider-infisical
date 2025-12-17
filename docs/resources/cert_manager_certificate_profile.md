@@ -23,13 +23,14 @@ resource "infisical_project" "pki" {
 resource "infisical_cert_manager_internal_ca_root" "root" {
   project_slug = infisical_project.pki.slug
 
-  name         = "enterprise-root-ca"
-  common_name  = "Enterprise Root Certificate Authority"
-  organization = "Example Corp"
-  ou           = "IT Security"
-  country      = "US"
-  locality     = "San Francisco"
-  province     = "California"
+  name          = "enterprise-root-ca"
+  common_name   = "Enterprise Root Certificate Authority"
+  organization  = "Example Corp"
+  ou            = "IT Security"
+  country       = "US"
+  locality      = "San Francisco"
+  province      = "California"
+  key_algorithm = "RSA_2048"
 }
 
 resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
@@ -49,7 +50,7 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
 resource "infisical_cert_manager_certificate_template" "web_server" {
   project_slug = infisical_project.pki.slug
 
-  name        = "Web Server Template"
+  name        = "web-server-template"
   description = "Template for web server certificates"
 
   subject {
@@ -220,7 +221,7 @@ variable "adcs_ca_id" {
 
 ### Optional
 
-- `api_config` (Block, Optional) API configuration (optional for enrollment_type 'api') (see [below for nested schema](#nestedblock--api_config))
+- `api_config` (Block, Optional) API configuration (required when enrollment_type is 'api') (see [below for nested schema](#nestedblock--api_config))
 - `ca_id` (String) The ID of the certificate authority to use (required unless issuer_type is 'self-signed')
 - `description` (String) The description of the certificate profile
 - `est_config` (Block, Optional) EST configuration (required when enrollment_type is 'est') (see [below for nested schema](#nestedblock--est_config))

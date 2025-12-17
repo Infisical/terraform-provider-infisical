@@ -23,13 +23,14 @@ resource "infisical_project" "pki" {
 resource "infisical_cert_manager_internal_ca_root" "root" {
   project_slug = infisical_project.pki.slug
 
-  name         = "enterprise-root-ca"
-  common_name  = "Enterprise Root Certificate Authority"
-  organization = "Example Corp"
-  ou           = "IT Security"
-  country      = "US"
-  locality     = "San Francisco"
-  province     = "California"
+  name          = "enterprise-root-ca"
+  common_name   = "Enterprise Root Certificate Authority"
+  organization  = "Example Corp"
+  ou            = "IT Security"
+  country       = "US"
+  locality      = "San Francisco"
+  province      = "California"
+  key_algorithm = "RSA_2048"
 }
 
 resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
@@ -119,6 +120,7 @@ output "issuing_ca_chain" {
 ### Optional
 
 - `max_path_length` (Number) The maximum number of intermediate CAs that may follow this CA in the certificate chain. Use -1 for no path limit
+- `parent_ca_id` (String) The ID of the parent CA (required for intermediate CAs)
 
 ### Read-Only
 

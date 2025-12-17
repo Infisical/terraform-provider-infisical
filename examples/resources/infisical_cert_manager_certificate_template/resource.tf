@@ -8,7 +8,7 @@ resource "infisical_project" "pki" {
 resource "infisical_cert_manager_certificate_template" "web_server" {
   project_slug = infisical_project.pki.slug
 
-  name        = "Web Server Template"
+  name        = "web-server-template"
   description = "Template for web server certificates"
 
   # Subject Attribute Policies
@@ -69,7 +69,7 @@ resource "infisical_cert_manager_certificate_template" "web_server" {
 resource "infisical_cert_manager_certificate_template" "code_signing" {
   project_slug = infisical_project.pki.slug
 
-  name        = "Code Signing Template"
+  name        = "code-signing-template"
   description = "Template for code signing certificates"
 
   # Subject Attribute Policies

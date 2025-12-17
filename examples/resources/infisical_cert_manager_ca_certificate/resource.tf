@@ -8,13 +8,14 @@ resource "infisical_project" "pki" {
 resource "infisical_cert_manager_internal_ca_root" "root" {
   project_slug = infisical_project.pki.slug
 
-  name         = "enterprise-root-ca"
-  common_name  = "Enterprise Root Certificate Authority"
-  organization = "Example Corp"
-  ou           = "IT Security"
-  country      = "US"
-  locality     = "San Francisco"
-  province     = "California"
+  name          = "enterprise-root-ca"
+  common_name   = "Enterprise Root Certificate Authority"
+  organization  = "Example Corp"
+  ou            = "IT Security"
+  country       = "US"
+  locality      = "San Francisco"
+  province      = "California"
+  key_algorithm = "RSA_2048"
 }
 
 resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {

@@ -34,6 +34,7 @@ type certManagerCACertificateResource struct {
 type certManagerCACertificateResourceModel struct {
 	CaId             types.String `tfsdk:"ca_id"`
 	Id               types.String `tfsdk:"id"`
+	ParentCaId       types.String `tfsdk:"parent_ca_id"`
 	NotBefore        types.String `tfsdk:"not_before"`
 	NotAfter         types.String `tfsdk:"not_after"`
 	MaxPathLength    types.Int64  `tfsdk:"max_path_length"`
@@ -62,6 +63,13 @@ func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"parent_ca_id": schema.StringAttribute{
+				Description: "The ID of the parent CA (required for intermediate CAs)",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"not_before": schema.StringAttribute{
@@ -169,6 +177,10 @@ func (r *certManagerCACertificateResource) Create(ctx context.Context, req resou
 		generateRequest.MaxPathLength = &maxPathLength
 	}
 
+	if !plan.ParentCaId.IsNull() && plan.ParentCaId.ValueString() != "" {
+		generateRequest.ParentCaId = plan.ParentCaId.ValueString()
+	}
+
 	certificate, err := r.client.GenerateCACertificate(generateRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Error generating CA certificate", err.Error())
@@ -221,7 +233,6 @@ func (r *certManagerCACertificateResource) Read(ctx context.Context, req resourc
 	state.Certificate = types.StringValue(certificate.Certificate)
 	state.CertificateChain = types.StringValue(certificate.CertificateChain)
 	state.SerialNumber = types.StringValue(certificate.SerialNumber)
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 

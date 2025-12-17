@@ -32,7 +32,6 @@ type certManagerInternalCAIntermediateResourceModel struct {
 	ProjectSlug  types.String `tfsdk:"project_slug"`
 	Id           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
-	ParentCAId   types.String `tfsdk:"parent_ca_id"`
 	CommonName   types.String `tfsdk:"common_name"`
 	Organization types.String `tfsdk:"organization"`
 	OU           types.String `tfsdk:"ou"`
@@ -60,13 +59,6 @@ func (r *certManagerInternalCAIntermediateResource) Schema(_ context.Context, _ 
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the intermediate CA",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"parent_ca_id": schema.StringAttribute{
-				Description: "The ID of the parent CA (root or intermediate CA)",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -234,7 +226,6 @@ func (r *certManagerInternalCAIntermediateResource) Create(ctx context.Context, 
 			Province:     plan.Province.ValueString(),
 			Locality:     plan.Locality.ValueString(),
 			KeyAlgorithm: keyAlgorithm,
-			ParentCaId:   plan.ParentCAId.ValueString(),
 		},
 	})
 
@@ -322,9 +313,6 @@ func (r *certManagerInternalCAIntermediateResource) Read(ctx context.Context, re
 	if ca.Configuration.KeyAlgorithm != "" {
 		state.KeyAlgorithm = types.StringValue(ca.Configuration.KeyAlgorithm)
 	}
-	if ca.Configuration.ParentCaId != "" {
-		state.ParentCAId = types.StringValue(ca.Configuration.ParentCaId)
-	}
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -389,7 +377,6 @@ func (r *certManagerInternalCAIntermediateResource) Update(ctx context.Context, 
 			Province:     plan.Province.ValueString(),
 			Locality:     plan.Locality.ValueString(),
 			KeyAlgorithm: plan.KeyAlgorithm.ValueString(),
-			ParentCaId:   plan.ParentCAId.ValueString(),
 		},
 	})
 
