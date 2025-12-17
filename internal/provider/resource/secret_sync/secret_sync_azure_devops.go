@@ -28,7 +28,7 @@ func NewSecretSyncAzureDevOpsResource() resource.Resource {
 		App:              infisical.SecretSyncAppAzureDevOps,
 		SyncName:         "Azure DevOps",
 		ResourceTypeName: "_secret_sync_azure_devops",
-		AppConnection:    infisical.AppConnectionAppAzure,
+		AppConnection:    infisical.AppConnectionAppAzureDevOps,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"devops_project_id": schema.StringAttribute{
 				Required:    true,
