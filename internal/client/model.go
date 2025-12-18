@@ -3053,3 +3053,14 @@ type GetCACertificateResponse struct {
 	CertificateChain string `json:"certificateChain"`
 	SerialNumber     string `json:"serialNumber"`
 }
+
+type GetSpecificCACertificateRequest struct {
+	CaId   string
+	CertId string
+}
+
+type GetSpecificCACertificateResponse struct {
+	Certificate      string `json:"certificate"`
+	CertificateChain string `json:"certificateChain"`
+	SerialNumber     string `json:"serialNumber"`
+}

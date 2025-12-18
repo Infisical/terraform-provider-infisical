@@ -486,6 +486,11 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 		TemplateId: currentState.Id.ValueString(),
 	})
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
 		resp.Diagnostics.AddError("Error reading certificate template", err.Error())
 		return
 	}

@@ -48,3 +48,22 @@ func (client Client) GetCACertificate(request GetCACertificateRequest) (GetCACer
 
 	return certResponse, nil
 }
+
+func (client Client) GetSpecificCACertificate(request GetSpecificCACertificateRequest) (GetSpecificCACertificateResponse, error) {
+	var certResponse GetSpecificCACertificateResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&certResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/cert-manager/ca/internal/%s/certificate/%s", request.CaId, request.CertId))
+
+	if err != nil {
+		return GetSpecificCACertificateResponse{}, errors.NewGenericRequestError(operationGetCACertificate, err)
+	}
+
+	if response.IsError() {
+		return GetSpecificCACertificateResponse{}, errors.NewAPIErrorWithResponse(operationGetCACertificate, response, nil)
+	}
+
+	return certResponse, nil
+}
