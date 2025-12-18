@@ -254,7 +254,7 @@ func (r *certManagerCACertificateResource) Read(ctx context.Context, req resourc
 		resp.Diagnostics.AddWarning(
 			"CA certificate removed from Terraform state only",
 			"The CA certificate resource has been removed from Terraform state, but the actual certificate still exists in the CA. "+
-				"The certificate will be automatically deleted when the certificate authority is deleted. "
+				"The certificate will be automatically deleted when the certificate authority is deleted.",
 		)
 		resp.State.RemoveResource(ctx)
 		return
@@ -318,8 +318,13 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError(
 			"Invalid import ID format",
-			"CA certificate import ID must be in format 'ca_id:cert_id'. "+
-				"To find the certificate ID, check the Infisical dashboard or use the API to list certificates for the CA.",
+			fmt.Sprintf("Expected format: 'ca_id:serial_number', but got: '%s'\n\n"+
+				"To import a CA certificate:\n"+
+				"1. Find your CA ID in the Infisical dashboard (Certificate Manager → CAs)\n"+
+				"2. Find the certificate serial number in the CA's certificates list\n"+
+				"3. Use: terraform import infisical_cert_manager_ca_certificate.name \"ca_id:serial_number\"\n\n"+
+				"Example: terraform import infisical_cert_manager_ca_certificate.my_cert \"87501291-4677-4328-92dd-f229aa0e21df:e3b6427a6bf043fcbdac\"",
+				req.ID),
 		)
 		return
 	}
