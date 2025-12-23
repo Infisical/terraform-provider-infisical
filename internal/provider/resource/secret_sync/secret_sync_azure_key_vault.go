@@ -30,6 +30,7 @@ func NewSecretSyncAzureKeyVaultResource() resource.Resource {
 		SyncName:         "Azure Key Vault",
 		ResourceTypeName: "_secret_sync_azure_key_vault",
 		AppConnection:    infisical.AppConnectionAppAzure,
+		CanImportSecrets: true,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vault_base_url": schema.StringAttribute{
 				Required:    true,
