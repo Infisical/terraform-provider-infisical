@@ -39,6 +39,7 @@ func NewSecretSyncAwsParameterStoreResource() resource.Resource {
 		SyncName:         "AWS Parameter Store",
 		ResourceTypeName: "_secret_sync_aws_parameter_store",
 		AppConnection:    infisical.AppConnectionAppAWS,
+		CanImportSecrets: true,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,

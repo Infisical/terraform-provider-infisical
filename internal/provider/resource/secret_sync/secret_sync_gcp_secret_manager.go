@@ -34,6 +34,7 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 		SyncName:         "GCP Secret Manager",
 		ResourceTypeName: "_secret_sync_gcp_secret_manager",
 		AppConnection:    "GCP",
+		CanImportSecrets: true,
 		SyncOptionsAttributes: map[string]schema.Attribute{
 			"initial_sync_behavior": schema.StringAttribute{
 				Required:    true,

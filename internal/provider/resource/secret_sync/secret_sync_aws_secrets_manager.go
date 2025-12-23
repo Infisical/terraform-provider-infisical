@@ -41,6 +41,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 		SyncName:         "AWS Secrets Manager",
 		ResourceTypeName: "_secret_sync_aws_secrets_manager",
 		AppConnection:    infisical.AppConnectionAppAWS,
+		CanImportSecrets: true,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,

@@ -135,6 +135,7 @@ func NewSecretSyncRenderResource() resource.Resource {
 		App:              infisical.SecretSyncAppRender,
 		SyncName:         "Render",
 		ResourceTypeName: "_secret_sync_render",
+		CanImportSecrets: true,
 		AppConnection:    infisical.AppConnectionAppRender,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"scope": schema.StringAttribute{

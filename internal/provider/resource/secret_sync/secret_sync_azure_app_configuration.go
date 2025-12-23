@@ -32,6 +32,7 @@ func NewSecretSyncAzureAppConfigurationResource() resource.Resource {
 		SyncName:         "Azure App Configuration",
 		ResourceTypeName: "_secret_sync_azure_app_configuration",
 		AppConnection:    infisical.AppConnectionAppAzure,
+		CanImportSecrets: true,
 		SyncOptionsAttributes: map[string]schema.Attribute{
 			"initial_sync_behavior": schema.StringAttribute{
 				Required:    true,
