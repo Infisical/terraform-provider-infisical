@@ -122,11 +122,12 @@ func (r *ephemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRe
 	}
 
 	res, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
-		SecretName:  config.Name.ValueString(),
-		Type:        "shared",
-		WorkspaceId: config.WorkspaceId.ValueString(),
-		Environment: config.EnvSlug.ValueString(),
-		SecretPath:  config.FolderPath.ValueString(),
+		SecretName:             config.Name.ValueString(),
+		Type:                   "shared",
+		WorkspaceId:            config.WorkspaceId.ValueString(),
+		Environment:            config.EnvSlug.ValueString(),
+		SecretPath:             config.FolderPath.ValueString(),
+		ExpandSecretReferences: true,
 	})
 
 	if err != nil {

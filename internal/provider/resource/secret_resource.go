@@ -606,11 +606,12 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	} else if r.client.Config.IsMachineIdentityAuth {
 		// Get refreshed order value from HashiCups
 		response, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
-			SecretName:  state.Name.ValueString(),
-			Type:        "shared",
-			WorkspaceId: state.WorkspaceId.ValueString(),
-			Environment: state.EnvSlug.ValueString(),
-			SecretPath:  state.FolderPath.ValueString(),
+			SecretName:             state.Name.ValueString(),
+			Type:                   "shared",
+			WorkspaceId:            state.WorkspaceId.ValueString(),
+			Environment:            state.EnvSlug.ValueString(),
+			SecretPath:             state.FolderPath.ValueString(),
+			ExpandSecretReferences: false,
 		})
 
 		if err != nil {
