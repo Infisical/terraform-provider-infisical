@@ -37,3 +37,10 @@ resource "infisical_project" "kms-project" {
   description = "This is a KMS project for key management"
   type        = "kms"
 }
+
+resource "infisical_project" "certificate-project" {
+  name        = "Certificates Project"
+  slug        = "certificate-project"
+  description = "This is a certificates project for certificate management"
+  type        = "cert-manager"
+}
