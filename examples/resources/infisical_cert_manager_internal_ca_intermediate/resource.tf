@@ -20,7 +20,6 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
 
 resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
   project_slug = infisical_project.pki.slug
-  parent_ca_id = infisical_cert_manager_internal_ca_root.root.id
 
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"

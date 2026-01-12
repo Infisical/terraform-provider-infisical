@@ -496,6 +496,7 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 	}
 
 	state.Id = types.StringValue(template.CertificateTemplate.Id)
+	state.ProjectSlug = currentState.ProjectSlug
 	state.Name = types.StringValue(template.CertificateTemplate.Name)
 	if template.CertificateTemplate.Description != "" {
 		state.Description = types.StringValue(template.CertificateTemplate.Description)
@@ -523,7 +524,11 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 				resp.Diagnostics.Append(diags...)
 				state.Subject[i].Required = requiredList
 			} else {
-				state.Subject[i].Required = types.ListNull(types.StringType)
+				if len(currentState.Subject) > i && !currentState.Subject[i].Required.IsNull() {
+					state.Subject[i].Required = currentState.Subject[i].Required
+				} else {
+					state.Subject[i].Required = types.ListNull(types.StringType)
+				}
 			}
 
 			if len(subj.Denied) > 0 {

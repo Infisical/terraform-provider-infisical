@@ -149,6 +149,7 @@ func (r *certManagerExternalCAADCSResource) Create(ctx context.Context, req reso
 	}
 
 	plan.Id = types.StringValue(newCA.Id)
+	plan.Name = types.StringValue(newCA.Name)
 	plan.Status = types.StringValue(newCA.Status)
 
 	if newCA.Configuration.AzureAdcsConnectionId != "" {
@@ -244,7 +245,7 @@ func (r *certManagerExternalCAADCSResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	_, err = r.client.UpdateADCSCA(infisical.UpdateADCSCARequest{
+	updatedCA, err := r.client.UpdateADCSCA(infisical.UpdateADCSCARequest{
 		ProjectId: project.ID,
 		CAId:      plan.Id.ValueString(),
 		Name:      plan.Name.ValueString(),
@@ -260,6 +261,14 @@ func (r *certManagerExternalCAADCSResource) Update(ctx context.Context, req reso
 			"Couldn't update ADCS CA in Infisical, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	plan.Id = types.StringValue(updatedCA.Id)
+	plan.Name = types.StringValue(updatedCA.Name)
+	plan.Status = types.StringValue(updatedCA.Status)
+
+	if updatedCA.Configuration.AzureAdcsConnectionId != "" {
+		plan.AzureAdcsConnectionId = types.StringValue(updatedCA.Configuration.AzureAdcsConnectionId)
 	}
 
 	diags = resp.State.Set(ctx, plan)

@@ -353,6 +353,7 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	}
 
 	state.Id = types.StringValue(profile.CertificateProfile.Id)
+	state.ProjectSlug = currentState.ProjectSlug
 	state.Name = types.StringValue(profile.CertificateProfile.Slug)
 	state.Description = types.StringValue(profile.CertificateProfile.Description)
 	state.EnrollmentType = types.StringValue(profile.CertificateProfile.EnrollmentType)

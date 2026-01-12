@@ -3039,6 +3039,7 @@ type GenerateCACertificateRequest struct {
 }
 
 type GenerateCACertificateResponse struct {
+	CertId           string `json:"certId"`
 	Certificate      string `json:"certificate"`
 	CertificateChain string `json:"certificateChain"`
 	SerialNumber     string `json:"serialNumber"`
@@ -3049,6 +3050,7 @@ type GetCACertificateRequest struct {
 }
 
 type GetCACertificateResponse struct {
+	CertId           string `json:"certId"`
 	Certificate      string `json:"certificate"`
 	CertificateChain string `json:"certificateChain"`
 	SerialNumber     string `json:"serialNumber"`
@@ -3060,6 +3062,7 @@ type GetSpecificCACertificateRequest struct {
 }
 
 type GetSpecificCACertificateResponse struct {
+	CertId           string `json:"certId"`
 	Certificate      string `json:"certificate"`
 	CertificateChain string `json:"certificateChain"`
 	SerialNumber     string `json:"serialNumber"`

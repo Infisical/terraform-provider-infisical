@@ -51,6 +51,9 @@ func (client Client) GetInternalCA(request GetCARequest) (GetCAResponse, error) 
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetCAResponse{}, ErrNotFound
+		}
 		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetInternalCA, response, nil)
 	}
 
@@ -70,6 +73,9 @@ func (client Client) GetACMECA(request GetCARequest) (GetCAResponse, error) {
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetCAResponse{}, ErrNotFound
+		}
 		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetACMECA, response, nil)
 	}
 
@@ -89,6 +95,9 @@ func (client Client) GetADCSCA(request GetCARequest) (GetCAResponse, error) {
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetCAResponse{}, ErrNotFound
+		}
 		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetADCSCA, response, nil)
 	}
 

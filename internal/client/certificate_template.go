@@ -45,6 +45,9 @@ func (client Client) GetCertificateTemplate(request GetCertificateTemplateReques
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetCertificateTemplateResponse{}, ErrNotFound
+		}
 		return GetCertificateTemplateResponse{}, errors.NewAPIErrorWithResponse(operationGetCertificateTemplate, response, nil)
 	}
 

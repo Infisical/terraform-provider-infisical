@@ -210,7 +210,7 @@ func (r *certManagerCACertificateResource) Create(ctx context.Context, req resou
 		return
 	}
 
-	plan.Id = types.StringValue(fmt.Sprintf("%s:%s", plan.CaId.ValueString(), certificate.SerialNumber))
+	plan.Id = types.StringValue(certificate.CertId)
 	plan.Certificate = types.StringValue(certificate.Certificate)
 	plan.CertificateChain = types.StringValue(certificate.CertificateChain)
 	plan.SerialNumber = types.StringValue(certificate.SerialNumber)
@@ -234,29 +234,16 @@ func (r *certManagerCACertificateResource) Read(ctx context.Context, req resourc
 		return
 	}
 
-	parts := strings.Split(state.Id.ValueString(), ":")
-	if len(parts) != 2 {
-		resp.Diagnostics.AddError(
-			"Invalid certificate ID format",
-			"Certificate ID must be in format 'ca_id:cert_id', got: "+state.Id.ValueString(),
-		)
-		return
-	}
-
-	caId := parts[0]
-	certId := parts[1]
-
 	certificate, err := r.client.GetSpecificCACertificate(infisical.GetSpecificCACertificateRequest{
-		CaId:   caId,
-		CertId: certId,
+		CaId:   state.CaId.ValueString(),
+		CertId: state.Id.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddWarning(
-			"CA certificate removed from Terraform state only",
-			"The CA certificate resource has been removed from Terraform state, but the actual certificate still exists in the CA. "+
-				"The certificate will be automatically deleted when the certificate authority is deleted.",
-		)
-		resp.State.RemoveResource(ctx)
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Error reading CA certificate", err.Error())
 		return
 	}
 
@@ -288,27 +275,23 @@ func (r *certManagerCACertificateResource) Delete(ctx context.Context, req resou
 		return
 	}
 
-	parts := strings.Split(state.Id.ValueString(), ":")
-	if len(parts) != 2 {
-		resp.Diagnostics.AddError(
-			"Invalid certificate ID format",
-			"Certificate ID must be in format 'ca_id:cert_id', got: "+state.Id.ValueString(),
-		)
-		return
-	}
-
 	_, err := r.client.GetSpecificCACertificate(infisical.GetSpecificCACertificateRequest{
-		CaId:   parts[0],
-		CertId: parts[1],
+		CaId:   state.CaId.ValueString(),
+		CertId: state.Id.ValueString(),
 	})
 
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			return
+		}
+		resp.Diagnostics.AddError("Error checking CA certificate", err.Error())
 		return
 	}
 
-	resp.Diagnostics.AddError(
-		"Cannot delete CA certificate",
-		"CA certificates cannot be directly deleted. If you need to remove the certificate, you must first delete the certificate authority",
+	resp.Diagnostics.AddWarning(
+		"CA certificate removed from Terraform state only",
+		"The CA certificate resource has been removed from Terraform state, but the actual certificate still exists in the CA. "+
+			"The certificate will be automatically deleted when the certificate authority is deleted.",
 	)
 }
 
@@ -318,39 +301,41 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError(
 			"Invalid import ID format",
-			fmt.Sprintf("Expected format: 'ca_id:serial_number', but got: '%s'\n\n"+
+			fmt.Sprintf("Expected format: 'ca_id:certificate_id', but got: '%s'\n\n"+
 				"To import a CA certificate:\n"+
 				"1. Find your CA ID in the Infisical dashboard (Certificate Manager → CAs)\n"+
-				"2. Find the certificate serial number in the CA's certificates list\n"+
-				"3. Use: terraform import infisical_cert_manager_ca_certificate.name \"ca_id:serial_number\"\n\n"+
-				"Example: terraform import infisical_cert_manager_ca_certificate.my_cert \"87501291-4677-4328-92dd-f229aa0e21df:e3b6427a6bf043fcbdac\"",
+				"2. Find the certificate ID in the CA's certificates list\n"+
+				"3. Use: terraform import infisical_cert_manager_ca_certificate.name \"ca_id:certificate_id\"\n\n"+
+				"Example: terraform import infisical_cert_manager_ca_certificate.my_cert \"87501291-4677-4328-92dd-f229aa0e21df:e3b6427a-6bf0-43fc-bdac-7022e996842c\"",
 				req.ID),
 		)
 		return
 	}
 
-	if len(parts) == 2 {
-		caId := parts[0]
-		certId := parts[1]
+	caId := parts[0]
+	certId := parts[1]
 
-		certificate, err := r.client.GetSpecificCACertificate(infisical.GetSpecificCACertificateRequest{
-			CaId:   caId,
-			CertId: certId,
-		})
-		if err != nil {
-			resp.Diagnostics.AddError("Error importing CA certificate", err.Error())
+	certificate, err := r.client.GetSpecificCACertificate(infisical.GetSpecificCACertificateRequest{
+		CaId:   caId,
+		CertId: certId,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError("CA certificate not found", "The CA certificate does not exist or has been deleted")
 			return
 		}
-
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("ca_id"), caId)...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("certificate"), certificate.Certificate)...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("certificate_chain"), certificate.CertificateChain)...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("serial_number"), certificate.SerialNumber)...)
-
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringNull())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringNull())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Null())...)
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), types.StringNull())...)
+		resp.Diagnostics.AddError("Error importing CA certificate", err.Error())
+		return
 	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("ca_id"), caId)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), certId)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("certificate"), certificate.Certificate)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("certificate_chain"), certificate.CertificateChain)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("serial_number"), certificate.SerialNumber)...)
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringNull())...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringNull())...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Null())...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), types.StringNull())...)
 }

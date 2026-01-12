@@ -62,6 +62,9 @@ func (client Client) GetSpecificCACertificate(request GetSpecificCACertificateRe
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetSpecificCACertificateResponse{}, ErrNotFound
+		}
 		return GetSpecificCACertificateResponse{}, errors.NewAPIErrorWithResponse(operationGetCACertificate, response, nil)
 	}
 

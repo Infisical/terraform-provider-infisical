@@ -50,6 +50,9 @@ func (client Client) GetCertificateProfile(request GetCertificateProfileRequest)
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetCertificateProfileResponse{}, ErrNotFound
+		}
 		return GetCertificateProfileResponse{}, errors.NewAPIErrorWithResponse(operationGetCertificateProfile, response, nil)
 	}
 

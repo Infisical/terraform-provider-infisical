@@ -35,7 +35,6 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
 
 resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
   project_slug = infisical_project.pki.slug
-  parent_ca_id = infisical_cert_manager_internal_ca_root.root.id
 
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"
@@ -60,7 +59,8 @@ resource "infisical_cert_manager_ca_certificate" "root_cert" {
 
 # Generate certificate for the intermediate CA
 resource "infisical_cert_manager_ca_certificate" "issuing_cert" {
-  ca_id = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  ca_id        = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  parent_ca_id = infisical_cert_manager_internal_ca_root.root.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2029-01-01T00:00:00Z"
