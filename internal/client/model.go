@@ -2151,14 +2151,15 @@ type ListSecretImportResponse struct {
 }
 
 type AppConnection struct {
-	Id              string `json:"id"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
-	Version         int    `json:"version"`
-	OrgId           string `json:"orgId"`
-	App             string `json:"app"`
-	Method          string `json:"method"`
-	CredentialsHash string `json:"credentialsHash"`
+	Id              string  `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	Version         int     `json:"version"`
+	OrgId           string  `json:"orgId"`
+	ProjectId       *string `json:"projectId"`
+	App             string  `json:"app"`
+	Method          string  `json:"method"`
+	CredentialsHash string  `json:"credentialsHash"`
 }
 
 type CreateAppConnectionRequest struct {
@@ -2167,6 +2168,7 @@ type CreateAppConnectionRequest struct {
 	Method      string                 `json:"method"`
 	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials"`
+	ProjectId   string                 `json:"projectId,omitempty"`
 }
 
 type CreateAppConnectionResponse struct {
@@ -2189,6 +2191,7 @@ type UpdateAppConnectionRequest struct {
 	Method      string                 `json:"method"`
 	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials,omitempty"`
+	ProjectId   string                 `json:"projectId,omitempty"`
 }
 
 type UpdateAppConnectionResponse struct {

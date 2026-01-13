@@ -32,6 +32,7 @@ type AppConnectionBaseResourceModel struct {
 	Name            types.String `tfsdk:"name"`
 	Method          types.String `tfsdk:"method"`
 	Description     types.String `tfsdk:"description"`
+	ProjectId       types.String `tfsdk:"project_id"`
 	Credentials     types.Object `tfsdk:"credentials"`
 	CredentialsHash types.String `tfsdk:"credentials_hash"`
 }
@@ -61,6 +62,11 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 			"description": schema.StringAttribute{
 				Optional:    true,
 				Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
+			},
+			"project_id": schema.StringAttribute{
+				Optional:      true,
+				Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"credentials": schema.SingleNestedAttribute{
 				Required:    true,
@@ -141,6 +147,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 		Description: plan.Description.ValueString(),
 		Method:      plan.Method.ValueString(),
 		Credentials: credentialsMap,
+		ProjectId:   plan.ProjectId.ValueString(),
 	})
 
 	if err != nil {
@@ -219,6 +226,12 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		state.Description = types.StringValue(appConnection.Description)
 	}
 
+	if appConnection.ProjectId != nil {
+		state.ProjectId = types.StringValue(*appConnection.ProjectId)
+	} else {
+		state.ProjectId = types.StringNull()
+	}
+
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
@@ -279,6 +292,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		Description: plan.Description.ValueString(),
 		Method:      plan.Method.ValueString(),
 		Credentials: credentialsMap,
+		ProjectId:   plan.ProjectId.ValueString(),
 	})
 
 	if err != nil {

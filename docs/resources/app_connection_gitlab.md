@@ -57,6 +57,7 @@ resource "infisical_app_connection_gitlab" "gitlab_connection" {
 ### Optional
 
 - `description` (String) An optional description for the GitLab App Connection.
+- `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
 
