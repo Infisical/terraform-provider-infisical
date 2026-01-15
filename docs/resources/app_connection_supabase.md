@@ -56,6 +56,7 @@ resource "infisical_app_connection_supabase" "example" {
 ### Optional
 
 - `description` (String) An optional description for the Supabase App Connection.
+- `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
 

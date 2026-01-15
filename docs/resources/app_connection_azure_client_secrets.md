@@ -56,6 +56,7 @@ resource "infisical_app_connection_azure_client_secrets" "app_connection_azure_c
 ### Optional
 
 - `description` (String) An optional description for the Azure Client Secrets App Connection.
+- `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
 

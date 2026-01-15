@@ -56,6 +56,7 @@ resource "infisical_app_connection_azure_app_configuration" "app_connection_azur
 ### Optional
 
 - `description` (String) An optional description for the Azure App Configuration App Connection.
+- `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
 

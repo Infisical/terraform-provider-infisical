@@ -56,6 +56,7 @@ resource "infisical_app_connection_azure_key_vault" "app_connection_azure_key_va
 ### Optional
 
 - `description` (String) An optional description for the Azure Key Vault App Connection.
+- `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
 
