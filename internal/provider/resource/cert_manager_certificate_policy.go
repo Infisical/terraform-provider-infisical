@@ -40,72 +40,72 @@ var (
 )
 
 var (
-	_ resource.Resource = &certManagerCertificateTemplateResource{}
+	_ resource.Resource = &certManagerCertificatePolicyResource{}
 )
 
-func NewCertManagerCertificateTemplateResource() resource.Resource {
-	return &certManagerCertificateTemplateResource{}
+func NewCertManagerCertificatePolicyResource() resource.Resource {
+	return &certManagerCertificatePolicyResource{}
 }
 
-type certManagerCertificateTemplateResource struct {
+type certManagerCertificatePolicyResource struct {
 	client *infisical.Client
 }
 
-type certManagerCertificateTemplateSubjectModel struct {
+type certManagerCertificatePolicySubjectModel struct {
 	Type     types.String `tfsdk:"type"`
 	Allowed  types.List   `tfsdk:"allowed"`
 	Required types.List   `tfsdk:"required"`
 	Denied   types.List   `tfsdk:"denied"`
 }
 
-type certManagerCertificateTemplateSanModel struct {
+type certManagerCertificatePolicySanModel struct {
 	Type     types.String `tfsdk:"type"`
 	Allowed  types.List   `tfsdk:"allowed"`
 	Required types.List   `tfsdk:"required"`
 	Denied   types.List   `tfsdk:"denied"`
 }
 
-type certManagerCertificateTemplateKeyUsagesModel struct {
+type certManagerCertificatePolicyKeyUsagesModel struct {
 	Allowed  types.List `tfsdk:"allowed"`
 	Required types.List `tfsdk:"required"`
 	Denied   types.List `tfsdk:"denied"`
 }
 
-type certManagerCertificateTemplateExtendedKeyUsagesModel struct {
+type certManagerCertificatePolicyExtendedKeyUsagesModel struct {
 	Allowed  types.List `tfsdk:"allowed"`
 	Required types.List `tfsdk:"required"`
 	Denied   types.List `tfsdk:"denied"`
 }
 
-type certManagerCertificateTemplateAlgorithmsModel struct {
+type certManagerCertificatePolicyAlgorithmsModel struct {
 	Signature    types.List `tfsdk:"signature"`
 	KeyAlgorithm types.List `tfsdk:"key_algorithm"`
 }
 
-type certManagerCertificateTemplateValidityModel struct {
+type certManagerCertificatePolicyValidityModel struct {
 	Max types.String `tfsdk:"max"`
 }
 
-type certManagerCertificateTemplateResourceModel struct {
-	ProjectSlug       types.String                                          `tfsdk:"project_slug"`
-	Id                types.String                                          `tfsdk:"id"`
-	Name              types.String                                          `tfsdk:"name"`
-	Description       types.String                                          `tfsdk:"description"`
-	Subject           []certManagerCertificateTemplateSubjectModel          `tfsdk:"subject"`
-	Sans              []certManagerCertificateTemplateSanModel              `tfsdk:"sans"`
-	KeyUsages         *certManagerCertificateTemplateKeyUsagesModel         `tfsdk:"key_usages"`
-	ExtendedKeyUsages *certManagerCertificateTemplateExtendedKeyUsagesModel `tfsdk:"extended_key_usages"`
-	Algorithms        *certManagerCertificateTemplateAlgorithmsModel        `tfsdk:"algorithms"`
-	Validity          *certManagerCertificateTemplateValidityModel          `tfsdk:"validity"`
+type certManagerCertificatePolicyResourceModel struct {
+	ProjectSlug       types.String                                         `tfsdk:"project_slug"`
+	Id                types.String                                         `tfsdk:"id"`
+	Name              types.String                                         `tfsdk:"name"`
+	Description       types.String                                         `tfsdk:"description"`
+	Subject           []certManagerCertificatePolicySubjectModel           `tfsdk:"subject"`
+	Sans              []certManagerCertificatePolicySanModel               `tfsdk:"sans"`
+	KeyUsages         *certManagerCertificatePolicyKeyUsagesModel          `tfsdk:"key_usages"`
+	ExtendedKeyUsages *certManagerCertificatePolicyExtendedKeyUsagesModel `tfsdk:"extended_key_usages"`
+	Algorithms        *certManagerCertificatePolicyAlgorithmsModel         `tfsdk:"algorithms"`
+	Validity          *certManagerCertificatePolicyValidityModel           `tfsdk:"validity"`
 }
 
-func (r *certManagerCertificateTemplateResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_cert_manager_certificate_template"
+func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cert_manager_certificate_policy"
 }
 
-func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage certificate templates in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage certificate policies in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"project_slug": schema.StringAttribute{
 				Description: "The slug of the cert-manager project",
@@ -115,24 +115,24 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"id": schema.StringAttribute{
-				Description: "The ID of the certificate template",
+				Description: "The ID of the certificate policy",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the certificate template",
+				Description: "The name of the certificate policy",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "The description of the certificate template",
+				Description: "The description of the certificate policy",
 				Optional:    true,
 			},
 		},
 		Blocks: map[string]schema.Block{
 			"subject": schema.ListNestedBlock{
-				Description: "Subject attribute policies for the certificate template",
+				Description: "Subject attribute policies for the certificate policy",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -161,7 +161,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"sans": schema.ListNestedBlock{
-				Description: "Subject alternative name (SAN) policies for the certificate template",
+				Description: "Subject alternative name (SAN) policies for the certificate policy",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -190,7 +190,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"key_usages": schema.SingleNestedBlock{
-				Description: "Key usage policies for the certificate template",
+				Description: "Key usage policies for the certificate policy",
 				Attributes: map[string]schema.Attribute{
 					"allowed": schema.ListAttribute{
 						Description: "List of allowed key usages. Possible values: " + strings.Join(SUPPORTED_CERT_KEY_USAGES, ", "),
@@ -219,7 +219,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"extended_key_usages": schema.SingleNestedBlock{
-				Description: "Extended key usage policies for the certificate template",
+				Description: "Extended key usage policies for the certificate policy",
 				Attributes: map[string]schema.Attribute{
 					"allowed": schema.ListAttribute{
 						Description: "List of allowed extended key usages. Possible values: " + strings.Join(SUPPORTED_CERT_EXT_KEY_USAGES, ", "),
@@ -248,7 +248,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"algorithms": schema.SingleNestedBlock{
-				Description: "Algorithm constraints for the certificate template. At least one signature algorithm and one key algorithm must be specified.",
+				Description: "Algorithm constraints for the certificate policy. At least one signature algorithm and one key algorithm must be specified.",
 				Attributes: map[string]schema.Attribute{
 					"signature": schema.ListAttribute{
 						Description: "List of allowed signature algorithms (at least one required). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", "),
@@ -271,7 +271,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"validity": schema.SingleNestedBlock{
-				Description: "Validity constraints for the certificate template",
+				Description: "Validity constraints for the certificate policy",
 				Attributes: map[string]schema.Attribute{
 					"max": schema.StringAttribute{
 						Description: "Maximum validity period (e.g., '90d', '2y', '6m')",
@@ -283,7 +283,7 @@ func (r *certManagerCertificateTemplateResource) Schema(_ context.Context, _ res
 	}
 }
 
-func (r *certManagerCertificateTemplateResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *certManagerCertificatePolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -300,16 +300,16 @@ func (r *certManagerCertificateTemplateResource) Configure(_ context.Context, re
 	r.client = client
 }
 
-func (r *certManagerCertificateTemplateResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create certificate template",
+			"Unable to create certificate policy",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var plan certManagerCertificateTemplateResourceModel
+	var plan certManagerCertificatePolicyResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -324,128 +324,128 @@ func (r *certManagerCertificateTemplateResource) Create(ctx context.Context, req
 		return
 	}
 
-	createTemplateRequest := infisical.CreateCertificateTemplateRequest{
+	createPolicyRequest := infisical.CreateCertificatePolicyRequest{
 		ProjectId:   project.ID,
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	}
 
 	if len(plan.Subject) > 0 {
-		createTemplateRequest.Subject = make([]infisical.CertificateTemplateSubject, len(plan.Subject))
+		createPolicyRequest.Subject = make([]infisical.CertificatePolicySubject, len(plan.Subject))
 		for i, subj := range plan.Subject {
-			createTemplateRequest.Subject[i] = infisical.CertificateTemplateSubject{
+			createPolicyRequest.Subject[i] = infisical.CertificatePolicySubject{
 				Type: subj.Type.ValueString(),
 			}
 
 			if !subj.Allowed.IsNull() {
 				allowed := make([]string, 0, len(subj.Allowed.Elements()))
 				resp.Diagnostics.Append(subj.Allowed.ElementsAs(ctx, &allowed, false)...)
-				createTemplateRequest.Subject[i].Allowed = allowed
+				createPolicyRequest.Subject[i].Allowed = allowed
 			}
 
 			if !subj.Required.IsNull() {
 				required := make([]string, 0, len(subj.Required.Elements()))
 				resp.Diagnostics.Append(subj.Required.ElementsAs(ctx, &required, false)...)
-				createTemplateRequest.Subject[i].Required = required
+				createPolicyRequest.Subject[i].Required = required
 			}
 
 			if !subj.Denied.IsNull() {
 				denied := make([]string, 0, len(subj.Denied.Elements()))
 				resp.Diagnostics.Append(subj.Denied.ElementsAs(ctx, &denied, false)...)
-				createTemplateRequest.Subject[i].Denied = denied
+				createPolicyRequest.Subject[i].Denied = denied
 			}
 		}
 	}
 
 	if len(plan.Sans) > 0 {
-		createTemplateRequest.Sans = make([]infisical.CertificateTemplateSAN, len(plan.Sans))
+		createPolicyRequest.Sans = make([]infisical.CertificatePolicySAN, len(plan.Sans))
 		for i, san := range plan.Sans {
-			createTemplateRequest.Sans[i] = infisical.CertificateTemplateSAN{
+			createPolicyRequest.Sans[i] = infisical.CertificatePolicySAN{
 				Type: san.Type.ValueString(),
 			}
 
 			if !san.Allowed.IsNull() {
 				allowed := make([]string, 0, len(san.Allowed.Elements()))
 				resp.Diagnostics.Append(san.Allowed.ElementsAs(ctx, &allowed, false)...)
-				createTemplateRequest.Sans[i].Allowed = allowed
+				createPolicyRequest.Sans[i].Allowed = allowed
 			}
 
 			if !san.Required.IsNull() {
 				required := make([]string, 0, len(san.Required.Elements()))
 				resp.Diagnostics.Append(san.Required.ElementsAs(ctx, &required, false)...)
-				createTemplateRequest.Sans[i].Required = required
+				createPolicyRequest.Sans[i].Required = required
 			}
 
 			if !san.Denied.IsNull() {
 				denied := make([]string, 0, len(san.Denied.Elements()))
 				resp.Diagnostics.Append(san.Denied.ElementsAs(ctx, &denied, false)...)
-				createTemplateRequest.Sans[i].Denied = denied
+				createPolicyRequest.Sans[i].Denied = denied
 			}
 		}
 	}
 
 	if plan.KeyUsages != nil {
-		createTemplateRequest.KeyUsages = &infisical.CertificateTemplateKeyUsages{}
+		createPolicyRequest.KeyUsages = &infisical.CertificatePolicyKeyUsages{}
 
 		if !plan.KeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.KeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			createTemplateRequest.KeyUsages.Allowed = allowed
+			createPolicyRequest.KeyUsages.Allowed = allowed
 		}
 
 		if !plan.KeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.KeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			createTemplateRequest.KeyUsages.Required = required
+			createPolicyRequest.KeyUsages.Required = required
 		}
 
 		if !plan.KeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.KeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			createTemplateRequest.KeyUsages.Denied = denied
+			createPolicyRequest.KeyUsages.Denied = denied
 		}
 	}
 
 	if plan.ExtendedKeyUsages != nil {
-		createTemplateRequest.ExtendedKeyUsages = &infisical.CertificateTemplateExtendedKeyUsages{}
+		createPolicyRequest.ExtendedKeyUsages = &infisical.CertificatePolicyExtendedKeyUsages{}
 
 		if !plan.ExtendedKeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.ExtendedKeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			createTemplateRequest.ExtendedKeyUsages.Allowed = allowed
+			createPolicyRequest.ExtendedKeyUsages.Allowed = allowed
 		}
 
 		if !plan.ExtendedKeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.ExtendedKeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			createTemplateRequest.ExtendedKeyUsages.Required = required
+			createPolicyRequest.ExtendedKeyUsages.Required = required
 		}
 
 		if !plan.ExtendedKeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.ExtendedKeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			createTemplateRequest.ExtendedKeyUsages.Denied = denied
+			createPolicyRequest.ExtendedKeyUsages.Denied = denied
 		}
 	}
 
 	if plan.Algorithms != nil {
-		createTemplateRequest.Algorithms = &infisical.CertificateTemplateAlgorithms{}
+		createPolicyRequest.Algorithms = &infisical.CertificatePolicyAlgorithms{}
 
 		if !plan.Algorithms.Signature.IsNull() {
 			signature := make([]string, 0, len(plan.Algorithms.Signature.Elements()))
 			resp.Diagnostics.Append(plan.Algorithms.Signature.ElementsAs(ctx, &signature, false)...)
-			createTemplateRequest.Algorithms.Signature = signature
+			createPolicyRequest.Algorithms.Signature = signature
 		}
 
 		if !plan.Algorithms.KeyAlgorithm.IsNull() {
 			keyAlgorithm := make([]string, 0, len(plan.Algorithms.KeyAlgorithm.Elements()))
 			resp.Diagnostics.Append(plan.Algorithms.KeyAlgorithm.ElementsAs(ctx, &keyAlgorithm, false)...)
-			createTemplateRequest.Algorithms.KeyAlgorithm = keyAlgorithm
+			createPolicyRequest.Algorithms.KeyAlgorithm = keyAlgorithm
 		}
 	}
 
 	if plan.Validity != nil && !plan.Validity.Max.IsNull() {
-		createTemplateRequest.Validity = &infisical.CertificateTemplateValidity{
+		createPolicyRequest.Validity = &infisical.CertificatePolicyValidity{
 			Max: plan.Validity.Max.ValueString(),
 		}
 	}
@@ -454,36 +454,36 @@ func (r *certManagerCertificateTemplateResource) Create(ctx context.Context, req
 		return
 	}
 
-	template, err := r.client.CreateCertificateTemplate(createTemplateRequest)
+	policy, err := r.client.CreateCertificatePolicy(createPolicyRequest)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating certificate template", err.Error())
+		resp.Diagnostics.AddError("Error creating certificate policy", err.Error())
 		return
 	}
 
-	plan.Id = types.StringValue(template.CertificateTemplate.Id)
+	plan.Id = types.StringValue(policy.CertificatePolicy.Id)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
-func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read certificate template",
+			"Unable to read certificate policy",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var currentState certManagerCertificateTemplateResourceModel
+	var currentState certManagerCertificatePolicyResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state certManagerCertificateTemplateResourceModel
+	var state certManagerCertificatePolicyResourceModel
 
-	template, err := r.client.GetCertificateTemplate(infisical.GetCertificateTemplateRequest{
-		TemplateId: currentState.Id.ValueString(),
+	policy, err := r.client.GetCertificatePolicy(infisical.GetCertificatePolicyRequest{
+		PolicyId: currentState.Id.ValueString(),
 	})
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -491,23 +491,23 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 			return
 		}
 
-		resp.Diagnostics.AddError("Error reading certificate template", err.Error())
+		resp.Diagnostics.AddError("Error reading certificate policy", err.Error())
 		return
 	}
 
-	state.Id = types.StringValue(template.CertificateTemplate.Id)
+	state.Id = types.StringValue(policy.CertificatePolicy.Id)
 	state.ProjectSlug = currentState.ProjectSlug
-	state.Name = types.StringValue(template.CertificateTemplate.Name)
-	if template.CertificateTemplate.Description != "" {
-		state.Description = types.StringValue(template.CertificateTemplate.Description)
+	state.Name = types.StringValue(policy.CertificatePolicy.Name)
+	if policy.CertificatePolicy.Description != "" {
+		state.Description = types.StringValue(policy.CertificatePolicy.Description)
 	} else {
 		state.Description = types.StringNull()
 	}
 
-	if len(template.CertificateTemplate.Subject) > 0 {
-		state.Subject = make([]certManagerCertificateTemplateSubjectModel, len(template.CertificateTemplate.Subject))
-		for i, subj := range template.CertificateTemplate.Subject {
-			state.Subject[i] = certManagerCertificateTemplateSubjectModel{
+	if len(policy.CertificatePolicy.Subject) > 0 {
+		state.Subject = make([]certManagerCertificatePolicySubjectModel, len(policy.CertificatePolicy.Subject))
+		for i, subj := range policy.CertificatePolicy.Subject {
+			state.Subject[i] = certManagerCertificatePolicySubjectModel{
 				Type: types.StringValue(subj.Type),
 			}
 
@@ -541,10 +541,10 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 		}
 	}
 
-	if len(template.CertificateTemplate.Sans) > 0 {
-		state.Sans = make([]certManagerCertificateTemplateSanModel, len(template.CertificateTemplate.Sans))
-		for i, san := range template.CertificateTemplate.Sans {
-			state.Sans[i] = certManagerCertificateTemplateSanModel{
+	if len(policy.CertificatePolicy.Sans) > 0 {
+		state.Sans = make([]certManagerCertificatePolicySanModel, len(policy.CertificatePolicy.Sans))
+		for i, san := range policy.CertificatePolicy.Sans {
+			state.Sans[i] = certManagerCertificatePolicySanModel{
 				Type: types.StringValue(san.Type),
 			}
 
@@ -575,27 +575,27 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 	}
 
 	if currentState.KeyUsages != nil {
-		state.KeyUsages = &certManagerCertificateTemplateKeyUsagesModel{}
+		state.KeyUsages = &certManagerCertificatePolicyKeyUsagesModel{}
 
-		if template.CertificateTemplate.KeyUsages != nil {
-			if len(template.CertificateTemplate.KeyUsages.Allowed) > 0 {
-				allowedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Allowed)
+		if policy.CertificatePolicy.KeyUsages != nil {
+			if len(policy.CertificatePolicy.KeyUsages.Allowed) > 0 {
+				allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Allowed)
 				resp.Diagnostics.Append(diags...)
 				state.KeyUsages.Allowed = allowedList
 			} else {
 				state.KeyUsages.Allowed = types.ListNull(types.StringType)
 			}
 
-			if len(template.CertificateTemplate.KeyUsages.Required) > 0 {
-				requiredList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Required)
+			if len(policy.CertificatePolicy.KeyUsages.Required) > 0 {
+				requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Required)
 				resp.Diagnostics.Append(diags...)
 				state.KeyUsages.Required = requiredList
 			} else {
 				state.KeyUsages.Required = types.ListNull(types.StringType)
 			}
 
-			if len(template.CertificateTemplate.KeyUsages.Denied) > 0 {
-				deniedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.KeyUsages.Denied)
+			if len(policy.CertificatePolicy.KeyUsages.Denied) > 0 {
+				deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Denied)
 				resp.Diagnostics.Append(diags...)
 				state.KeyUsages.Denied = deniedList
 			} else {
@@ -609,27 +609,27 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 	}
 
 	if currentState.ExtendedKeyUsages != nil {
-		state.ExtendedKeyUsages = &certManagerCertificateTemplateExtendedKeyUsagesModel{}
+		state.ExtendedKeyUsages = &certManagerCertificatePolicyExtendedKeyUsagesModel{}
 
-		if template.CertificateTemplate.ExtendedKeyUsages != nil {
-			if len(template.CertificateTemplate.ExtendedKeyUsages.Allowed) > 0 {
-				allowedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Allowed)
+		if policy.CertificatePolicy.ExtendedKeyUsages != nil {
+			if len(policy.CertificatePolicy.ExtendedKeyUsages.Allowed) > 0 {
+				allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Allowed)
 				resp.Diagnostics.Append(diags...)
 				state.ExtendedKeyUsages.Allowed = allowedList
 			} else {
 				state.ExtendedKeyUsages.Allowed = types.ListNull(types.StringType)
 			}
 
-			if len(template.CertificateTemplate.ExtendedKeyUsages.Required) > 0 {
-				requiredList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Required)
+			if len(policy.CertificatePolicy.ExtendedKeyUsages.Required) > 0 {
+				requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Required)
 				resp.Diagnostics.Append(diags...)
 				state.ExtendedKeyUsages.Required = requiredList
 			} else {
 				state.ExtendedKeyUsages.Required = types.ListNull(types.StringType)
 			}
 
-			if len(template.CertificateTemplate.ExtendedKeyUsages.Denied) > 0 {
-				deniedList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.ExtendedKeyUsages.Denied)
+			if len(policy.CertificatePolicy.ExtendedKeyUsages.Denied) > 0 {
+				deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Denied)
 				resp.Diagnostics.Append(diags...)
 				state.ExtendedKeyUsages.Denied = deniedList
 			} else {
@@ -642,19 +642,19 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 		}
 	}
 
-	if template.CertificateTemplate.Algorithms != nil {
-		state.Algorithms = &certManagerCertificateTemplateAlgorithmsModel{}
+	if policy.CertificatePolicy.Algorithms != nil {
+		state.Algorithms = &certManagerCertificatePolicyAlgorithmsModel{}
 
-		if len(template.CertificateTemplate.Algorithms.Signature) > 0 {
-			signatureList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.Algorithms.Signature)
+		if len(policy.CertificatePolicy.Algorithms.Signature) > 0 {
+			signatureList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.Algorithms.Signature)
 			resp.Diagnostics.Append(diags...)
 			state.Algorithms.Signature = signatureList
 		} else {
 			state.Algorithms.Signature = types.ListNull(types.StringType)
 		}
 
-		if len(template.CertificateTemplate.Algorithms.KeyAlgorithm) > 0 {
-			keyAlgorithmList, diags := types.ListValueFrom(ctx, types.StringType, template.CertificateTemplate.Algorithms.KeyAlgorithm)
+		if len(policy.CertificatePolicy.Algorithms.KeyAlgorithm) > 0 {
+			keyAlgorithmList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.Algorithms.KeyAlgorithm)
 			resp.Diagnostics.Append(diags...)
 			state.Algorithms.KeyAlgorithm = keyAlgorithmList
 		} else {
@@ -662,153 +662,153 @@ func (r *certManagerCertificateTemplateResource) Read(ctx context.Context, req r
 		}
 	}
 
-	if template.CertificateTemplate.Validity != nil && template.CertificateTemplate.Validity.Max != "" {
-		state.Validity = &certManagerCertificateTemplateValidityModel{
-			Max: types.StringValue(template.CertificateTemplate.Validity.Max),
+	if policy.CertificatePolicy.Validity != nil && policy.CertificatePolicy.Validity.Max != "" {
+		state.Validity = &certManagerCertificatePolicyValidityModel{
+			Max: types.StringValue(policy.CertificatePolicy.Validity.Max),
 		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
-func (r *certManagerCertificateTemplateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update certificate template",
+			"Unable to update certificate policy",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var plan certManagerCertificateTemplateResourceModel
+	var plan certManagerCertificatePolicyResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	updateTemplateRequest := infisical.UpdateCertificateTemplateRequest{
-		TemplateId:  plan.Id.ValueString(),
+	updatePolicyRequest := infisical.UpdateCertificatePolicyRequest{
+		PolicyId:    plan.Id.ValueString(),
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	}
 
 	if len(plan.Subject) > 0 {
-		updateTemplateRequest.Subject = make([]infisical.CertificateTemplateSubject, len(plan.Subject))
+		updatePolicyRequest.Subject = make([]infisical.CertificatePolicySubject, len(plan.Subject))
 		for i, subj := range plan.Subject {
-			updateTemplateRequest.Subject[i] = infisical.CertificateTemplateSubject{
+			updatePolicyRequest.Subject[i] = infisical.CertificatePolicySubject{
 				Type: subj.Type.ValueString(),
 			}
 
 			if !subj.Allowed.IsNull() {
 				allowed := make([]string, 0, len(subj.Allowed.Elements()))
 				resp.Diagnostics.Append(subj.Allowed.ElementsAs(ctx, &allowed, false)...)
-				updateTemplateRequest.Subject[i].Allowed = allowed
+				updatePolicyRequest.Subject[i].Allowed = allowed
 			}
 
 			if !subj.Required.IsNull() {
 				required := make([]string, 0, len(subj.Required.Elements()))
 				resp.Diagnostics.Append(subj.Required.ElementsAs(ctx, &required, false)...)
-				updateTemplateRequest.Subject[i].Required = required
+				updatePolicyRequest.Subject[i].Required = required
 			}
 
 			if !subj.Denied.IsNull() {
 				denied := make([]string, 0, len(subj.Denied.Elements()))
 				resp.Diagnostics.Append(subj.Denied.ElementsAs(ctx, &denied, false)...)
-				updateTemplateRequest.Subject[i].Denied = denied
+				updatePolicyRequest.Subject[i].Denied = denied
 			}
 		}
 	}
 
 	if len(plan.Sans) > 0 {
-		updateTemplateRequest.Sans = make([]infisical.CertificateTemplateSAN, len(plan.Sans))
+		updatePolicyRequest.Sans = make([]infisical.CertificatePolicySAN, len(plan.Sans))
 		for i, san := range plan.Sans {
-			updateTemplateRequest.Sans[i] = infisical.CertificateTemplateSAN{
+			updatePolicyRequest.Sans[i] = infisical.CertificatePolicySAN{
 				Type: san.Type.ValueString(),
 			}
 
 			if !san.Allowed.IsNull() {
 				allowed := make([]string, 0, len(san.Allowed.Elements()))
 				resp.Diagnostics.Append(san.Allowed.ElementsAs(ctx, &allowed, false)...)
-				updateTemplateRequest.Sans[i].Allowed = allowed
+				updatePolicyRequest.Sans[i].Allowed = allowed
 			}
 
 			if !san.Required.IsNull() {
 				required := make([]string, 0, len(san.Required.Elements()))
 				resp.Diagnostics.Append(san.Required.ElementsAs(ctx, &required, false)...)
-				updateTemplateRequest.Sans[i].Required = required
+				updatePolicyRequest.Sans[i].Required = required
 			}
 
 			if !san.Denied.IsNull() {
 				denied := make([]string, 0, len(san.Denied.Elements()))
 				resp.Diagnostics.Append(san.Denied.ElementsAs(ctx, &denied, false)...)
-				updateTemplateRequest.Sans[i].Denied = denied
+				updatePolicyRequest.Sans[i].Denied = denied
 			}
 		}
 	}
 
 	if plan.KeyUsages != nil {
-		updateTemplateRequest.KeyUsages = &infisical.CertificateTemplateKeyUsages{}
+		updatePolicyRequest.KeyUsages = &infisical.CertificatePolicyKeyUsages{}
 
 		if !plan.KeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.KeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			updateTemplateRequest.KeyUsages.Allowed = allowed
+			updatePolicyRequest.KeyUsages.Allowed = allowed
 		}
 
 		if !plan.KeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.KeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			updateTemplateRequest.KeyUsages.Required = required
+			updatePolicyRequest.KeyUsages.Required = required
 		}
 
 		if !plan.KeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.KeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			updateTemplateRequest.KeyUsages.Denied = denied
+			updatePolicyRequest.KeyUsages.Denied = denied
 		}
 	}
 
 	if plan.ExtendedKeyUsages != nil {
-		updateTemplateRequest.ExtendedKeyUsages = &infisical.CertificateTemplateExtendedKeyUsages{}
+		updatePolicyRequest.ExtendedKeyUsages = &infisical.CertificatePolicyExtendedKeyUsages{}
 
 		if !plan.ExtendedKeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.ExtendedKeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			updateTemplateRequest.ExtendedKeyUsages.Allowed = allowed
+			updatePolicyRequest.ExtendedKeyUsages.Allowed = allowed
 		}
 
 		if !plan.ExtendedKeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.ExtendedKeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			updateTemplateRequest.ExtendedKeyUsages.Required = required
+			updatePolicyRequest.ExtendedKeyUsages.Required = required
 		}
 
 		if !plan.ExtendedKeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.ExtendedKeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			updateTemplateRequest.ExtendedKeyUsages.Denied = denied
+			updatePolicyRequest.ExtendedKeyUsages.Denied = denied
 		}
 	}
 
 	if plan.Algorithms != nil {
-		updateTemplateRequest.Algorithms = &infisical.CertificateTemplateAlgorithms{}
+		updatePolicyRequest.Algorithms = &infisical.CertificatePolicyAlgorithms{}
 
 		if !plan.Algorithms.Signature.IsNull() {
 			signature := make([]string, 0, len(plan.Algorithms.Signature.Elements()))
 			resp.Diagnostics.Append(plan.Algorithms.Signature.ElementsAs(ctx, &signature, false)...)
-			updateTemplateRequest.Algorithms.Signature = signature
+			updatePolicyRequest.Algorithms.Signature = signature
 		}
 
 		if !plan.Algorithms.KeyAlgorithm.IsNull() {
 			keyAlgorithm := make([]string, 0, len(plan.Algorithms.KeyAlgorithm.Elements()))
 			resp.Diagnostics.Append(plan.Algorithms.KeyAlgorithm.ElementsAs(ctx, &keyAlgorithm, false)...)
-			updateTemplateRequest.Algorithms.KeyAlgorithm = keyAlgorithm
+			updatePolicyRequest.Algorithms.KeyAlgorithm = keyAlgorithm
 		}
 	}
 
 	if plan.Validity != nil && !plan.Validity.Max.IsNull() {
-		updateTemplateRequest.Validity = &infisical.CertificateTemplateValidity{
+		updatePolicyRequest.Validity = &infisical.CertificatePolicyValidity{
 			Max: plan.Validity.Max.ValueString(),
 		}
 	}
@@ -817,40 +817,40 @@ func (r *certManagerCertificateTemplateResource) Update(ctx context.Context, req
 		return
 	}
 
-	_, err := r.client.UpdateCertificateTemplate(updateTemplateRequest)
+	_, err := r.client.UpdateCertificatePolicy(updatePolicyRequest)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating certificate template", err.Error())
+		resp.Diagnostics.AddError("Error updating certificate policy", err.Error())
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
-func (r *certManagerCertificateTemplateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *certManagerCertificatePolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete certificate template",
+			"Unable to delete certificate policy",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var state certManagerCertificateTemplateResourceModel
+	var state certManagerCertificatePolicyResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err := r.client.DeleteCertificateTemplate(infisical.DeleteCertificateTemplateRequest{
-		TemplateId: state.Id.ValueString(),
+	_, err := r.client.DeleteCertificatePolicy(infisical.DeleteCertificatePolicyRequest{
+		PolicyId: state.Id.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting certificate template", err.Error())
+		resp.Diagnostics.AddError("Error deleting certificate policy", err.Error())
 		return
 	}
 }
 
-func (r *certManagerCertificateTemplateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *certManagerCertificatePolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

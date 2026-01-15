@@ -89,7 +89,7 @@ resource "infisical_project_role" "biller" {
 Required:
 
 - `action` (String) Describe what action an entity can take. Enum: create,edit,delete,read
-- `subject` (String) Describe what action an entity can take. Enum: role,member,groups,settings,integrations,webhooks,service-tokens,environments,tags,audit-logs,ip-allowlist,workspace,secrets,secret-rollback,secret-approval,secret-rotation,identity,certificate-authorities,certificates,certificate-templates,kms,pki-alerts,pki-collections
+- `subject` (String) Describe what action an entity can take. Enum: role,member,groups,settings,integrations,webhooks,service-tokens,environments,tags,audit-logs,ip-allowlist,workspace,secrets,secret-rollback,secret-approval,secret-rotation,identity,certificate-authorities,certificates,certificate-policies,kms,pki-alerts,pki-collections
 
 Optional:
 

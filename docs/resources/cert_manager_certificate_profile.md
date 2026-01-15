@@ -46,11 +46,11 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
   key_algorithm = "RSA_2048"
 }
 
-resource "infisical_cert_manager_certificate_template" "web_server" {
+resource "infisical_cert_manager_certificate_policy" "web_server" {
   project_slug = infisical_project.pki.slug
 
   name        = "web-server-template"
-  description = "Template for web server certificates"
+  description = "Policy for web server certificates"
 
   subject {
     type     = "common_name"
@@ -99,9 +99,9 @@ resource "infisical_cert_manager_certificate_template" "web_server" {
 
 # API enrollment profile for web server certificates
 resource "infisical_cert_manager_certificate_profile" "web_server_api" {
-  project_slug            = infisical_project.pki.slug
-  ca_id                   = infisical_cert_manager_internal_ca_intermediate.issuing.id
-  certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
+  project_slug          = infisical_project.pki.slug
+  ca_id                 = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "web-server-api"
   description     = "API enrollment for web server certificates"
@@ -116,9 +116,9 @@ resource "infisical_cert_manager_certificate_profile" "web_server_api" {
 
 # EST enrollment profile for web server certificates
 resource "infisical_cert_manager_certificate_profile" "web_server_est" {
-  project_slug            = infisical_project.pki.slug
-  ca_id                   = infisical_cert_manager_internal_ca_intermediate.issuing.id
-  certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
+  project_slug          = infisical_project.pki.slug
+  ca_id                 = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "web-server-est"
   description     = "EST enrollment for web server certificates"
@@ -134,8 +134,8 @@ resource "infisical_cert_manager_certificate_profile" "web_server_est" {
 
 # Self-signed profile for development
 resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
-  project_slug            = infisical_project.pki.slug
-  certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
+  project_slug          = infisical_project.pki.slug
+  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "self-signed-dev"
   description     = "Self-signed certificates for development"
@@ -150,9 +150,9 @@ resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
 
 # ACME profile
 resource "infisical_cert_manager_certificate_profile" "acme_profile" {
-  project_slug            = infisical_project.pki.slug
-  ca_id                   = var.acme_ca_id
-  certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
+  project_slug          = infisical_project.pki.slug
+  ca_id                 = var.acme_ca_id
+  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "acme-letsencrypt"
   description     = "Let's Encrypt ACME certificates"
@@ -162,9 +162,9 @@ resource "infisical_cert_manager_certificate_profile" "acme_profile" {
 
 # ADCS profile (requires external ADCS CA to be configured)
 resource "infisical_cert_manager_certificate_profile" "adcs_profile" {
-  project_slug            = infisical_project.pki.slug
-  ca_id                   = var.adcs_ca_id # Reference to existing ADCS CA
-  certificate_template_id = infisical_cert_manager_certificate_template.web_server.id
+  project_slug          = infisical_project.pki.slug
+  ca_id                 = var.adcs_ca_id # Reference to existing ADCS CA
+  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "adcs-corporate"
   description     = "Corporate ADCS certificates"
@@ -213,7 +213,7 @@ variable "adcs_ca_id" {
 
 ### Required
 
-- `certificate_template_id` (String) The ID of the certificate template to use
+- `certificate_policy_id` (String) The ID of the certificate policy to use
 - `enrollment_type` (String) The enrollment type for the profile. Supported values: api, est, acme
 - `name` (String) The unique name of the certificate profile
 - `project_slug` (String) The slug of the cert-manager project

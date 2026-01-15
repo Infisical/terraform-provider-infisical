@@ -56,7 +56,7 @@ type certManagerCertificateProfileResourceModel struct {
 	ProjectSlug           types.String                                       `tfsdk:"project_slug"`
 	Id                    types.String                                       `tfsdk:"id"`
 	CaId                  types.String                                       `tfsdk:"ca_id"`
-	CertificateTemplateId types.String                                       `tfsdk:"certificate_template_id"`
+	CertificatePolicyId types.String                                       `tfsdk:"certificate_policy_id"`
 	Name                  types.String                                       `tfsdk:"name" json:"slug"`
 	Description           types.String                                       `tfsdk:"description"`
 	EnrollmentType        types.String                                       `tfsdk:"enrollment_type"`
@@ -95,8 +95,8 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"certificate_template_id": schema.StringAttribute{
-				Description: "The ID of the certificate template to use",
+			"certificate_policy_id": schema.StringAttribute{
+				Description: "The ID of the certificate policy to use",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -271,7 +271,7 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 
 	createProfileRequest := infisical.CreateCertificateProfileRequest{
 		ProjectId:             project.ID,
-		CertificateTemplateId: plan.CertificateTemplateId.ValueString(),
+		CertificatePolicyId: plan.CertificatePolicyId.ValueString(),
 		Slug:                  plan.Name.ValueString(),
 		EnrollmentType:        plan.EnrollmentType.ValueString(),
 		Description:           plan.Description.ValueString(),
@@ -358,7 +358,7 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	state.Description = types.StringValue(profile.CertificateProfile.Description)
 	state.EnrollmentType = types.StringValue(profile.CertificateProfile.EnrollmentType)
 	state.IssuerType = types.StringValue(profile.CertificateProfile.IssuerType)
-	state.CertificateTemplateId = types.StringValue(profile.CertificateProfile.CertificateTemplateId)
+	state.CertificatePolicyId = types.StringValue(profile.CertificateProfile.CertificatePolicyId)
 
 	if profile.CertificateProfile.CaId != "" {
 		state.CaId = types.StringValue(profile.CertificateProfile.CaId)
