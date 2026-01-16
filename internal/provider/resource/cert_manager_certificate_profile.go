@@ -53,17 +53,17 @@ type certManagerCertificateProfileExternalConfigsModel struct {
 }
 
 type certManagerCertificateProfileResourceModel struct {
-	ProjectSlug           types.String                                       `tfsdk:"project_slug"`
-	Id                    types.String                                       `tfsdk:"id"`
-	CaId                  types.String                                       `tfsdk:"ca_id"`
+	ProjectSlug         types.String                                       `tfsdk:"project_slug"`
+	Id                  types.String                                       `tfsdk:"id"`
+	CaId                types.String                                       `tfsdk:"ca_id"`
 	CertificatePolicyId types.String                                       `tfsdk:"certificate_policy_id"`
-	Name                  types.String                                       `tfsdk:"name" json:"slug"`
-	Description           types.String                                       `tfsdk:"description"`
-	EnrollmentType        types.String                                       `tfsdk:"enrollment_type"`
-	IssuerType            types.String                                       `tfsdk:"issuer_type"`
-	EstConfig             *certManagerCertificateProfileEstConfigModel       `tfsdk:"est_config"`
-	ApiConfig             *certManagerCertificateProfileApiConfigModel       `tfsdk:"api_config"`
-	ExternalConfigs       *certManagerCertificateProfileExternalConfigsModel `tfsdk:"external_configs"`
+	Name                types.String                                       `tfsdk:"name" json:"slug"`
+	Description         types.String                                       `tfsdk:"description"`
+	EnrollmentType      types.String                                       `tfsdk:"enrollment_type"`
+	IssuerType          types.String                                       `tfsdk:"issuer_type"`
+	EstConfig           *certManagerCertificateProfileEstConfigModel       `tfsdk:"est_config"`
+	ApiConfig           *certManagerCertificateProfileApiConfigModel       `tfsdk:"api_config"`
+	ExternalConfigs     *certManagerCertificateProfileExternalConfigsModel `tfsdk:"external_configs"`
 }
 
 func (r *certManagerCertificateProfileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -270,11 +270,11 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 	}
 
 	createProfileRequest := infisical.CreateCertificateProfileRequest{
-		ProjectId:             project.ID,
+		ProjectId:           project.ID,
 		CertificatePolicyId: plan.CertificatePolicyId.ValueString(),
-		Slug:                  plan.Name.ValueString(),
-		EnrollmentType:        plan.EnrollmentType.ValueString(),
-		Description:           plan.Description.ValueString(),
+		Slug:                plan.Name.ValueString(),
+		EnrollmentType:      plan.EnrollmentType.ValueString(),
+		Description:         plan.Description.ValueString(),
 	}
 
 	if !plan.CaId.IsNull() {

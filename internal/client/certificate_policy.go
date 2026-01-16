@@ -92,5 +92,3 @@ func (client Client) DeleteCertificatePolicy(request DeleteCertificatePolicyRequ
 
 	return policyResponse, nil
 }
-
-
