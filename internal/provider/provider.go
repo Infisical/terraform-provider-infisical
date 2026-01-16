@@ -428,6 +428,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerExternalCAADCSResource,
 		infisicalResource.NewCertManagerCertificatePolicyResource,
 		infisicalResource.NewCertManagerCertificateProfileResource,
+		infisicalResource.NewCertManagerCertificateResource,
 		infisicalResource.NewCertManagerCACertificateResource,
 		externalKmsResource.NewExternalKmsAwsResource,
 	}

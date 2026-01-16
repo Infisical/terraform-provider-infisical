@@ -87,16 +87,16 @@ type certManagerCertificatePolicyValidityModel struct {
 }
 
 type certManagerCertificatePolicyResourceModel struct {
-	ProjectSlug       types.String                                         `tfsdk:"project_slug"`
-	Id                types.String                                         `tfsdk:"id"`
-	Name              types.String                                         `tfsdk:"name"`
-	Description       types.String                                         `tfsdk:"description"`
-	Subject           []certManagerCertificatePolicySubjectModel           `tfsdk:"subject"`
-	Sans              []certManagerCertificatePolicySanModel               `tfsdk:"sans"`
-	KeyUsages         *certManagerCertificatePolicyKeyUsagesModel          `tfsdk:"key_usages"`
+	ProjectSlug       types.String                                        `tfsdk:"project_slug"`
+	Id                types.String                                        `tfsdk:"id"`
+	Name              types.String                                        `tfsdk:"name"`
+	Description       types.String                                        `tfsdk:"description"`
+	Subject           []certManagerCertificatePolicySubjectModel          `tfsdk:"subject"`
+	Sans              []certManagerCertificatePolicySanModel              `tfsdk:"sans"`
+	KeyUsages         *certManagerCertificatePolicyKeyUsagesModel         `tfsdk:"key_usages"`
 	ExtendedKeyUsages *certManagerCertificatePolicyExtendedKeyUsagesModel `tfsdk:"extended_key_usages"`
-	Algorithms        *certManagerCertificatePolicyAlgorithmsModel         `tfsdk:"algorithms"`
-	Validity          *certManagerCertificatePolicyValidityModel           `tfsdk:"validity"`
+	Algorithms        *certManagerCertificatePolicyAlgorithmsModel        `tfsdk:"algorithms"`
+	Validity          *certManagerCertificatePolicyValidityModel          `tfsdk:"validity"`
 }
 
 func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
