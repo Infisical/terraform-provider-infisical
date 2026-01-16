@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
@@ -136,6 +138,9 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 			"country": schema.StringAttribute{
 				Description: "The country (C) for the certificate (2-letter code)",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(2, 2),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -475,6 +480,10 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 		CertificateId: certificateId,
 	})
 	if err != nil {
+		tflog.Warn(ctx, "Failed to fetch certificate details", map[string]interface{}{
+			"certificate_id": certificateId,
+			"error":          err.Error(),
+		})
 		plan.NotBefore = types.StringValue("")
 		plan.NotAfter = types.StringValue("")
 		return
@@ -532,6 +541,9 @@ func (r *certManagerCertificateResource) parseAltNames(ctx context.Context, altN
 
 	altNamesList, diags := types.ListValueFrom(ctx, types.StringType, altNamesStrings)
 	if diags.HasError() {
+		tflog.Warn(ctx, "Failed to parse alt names list", map[string]interface{}{
+			"error": diags.Errors(),
+		})
 		return types.ListNull(types.StringType)
 	}
 	return altNamesList
@@ -539,8 +551,12 @@ func (r *certManagerCertificateResource) parseAltNames(ctx context.Context, altN
 
 func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Context, plan *certManagerCertificateResourceModel, certificateRequestId string, timeoutSeconds int64, resp *resource.CreateResponse) {
 	timeout := time.Duration(timeoutSeconds) * time.Second
-	pollInterval := 5 * time.Second
 	startTime := time.Now()
+
+	// Exponential backoff: start at 2s, max 30s
+	minInterval := 2 * time.Second
+	maxInterval := 30 * time.Second
+	currentInterval := minInterval
 
 	for {
 		if ctx.Err() != nil {
@@ -565,7 +581,8 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 				case <-ctx.Done():
 					resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 					return
-				case <-time.After(pollInterval):
+				case <-time.After(currentInterval):
+					currentInterval = r.nextBackoffInterval(currentInterval, maxInterval)
 					continue
 				}
 			}
@@ -599,7 +616,8 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 			case <-ctx.Done():
 				resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 				return
-			case <-time.After(pollInterval):
+			case <-time.After(currentInterval):
+				currentInterval = r.nextBackoffInterval(currentInterval, maxInterval)
 				continue
 			}
 
@@ -613,11 +631,20 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 			case <-ctx.Done():
 				resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 				return
-			case <-time.After(pollInterval):
+			case <-time.After(currentInterval):
+				currentInterval = r.nextBackoffInterval(currentInterval, maxInterval)
 				continue
 			}
 		}
 	}
+}
+
+func (r *certManagerCertificateResource) nextBackoffInterval(current, maxInterval time.Duration) time.Duration {
+	next := time.Duration(float64(current) * 1.5)
+	if next > maxInterval {
+		return maxInterval
+	}
+	return next
 }
 
 func (r *certManagerCertificateResource) handleIssuedCertificate(ctx context.Context, plan *certManagerCertificateResourceModel, statusResponse *infisical.GetCertificateRequestStatusResponse) {
@@ -719,5 +746,24 @@ func (r *certManagerCertificateResource) ImportState(ctx context.Context, req re
 }
 
 func readFileContent(filePath string) ([]byte, error) {
-	return os.ReadFile(filePath)
+	cleanPath := filepath.Clean(filePath)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Convert to absolute path to check if it's within working directory
+	absPath := cleanPath
+	if !filepath.IsAbs(cleanPath) {
+		absPath = filepath.Join(cwd, cleanPath)
+	}
+	absPath = filepath.Clean(absPath)
+
+	cwdClean := filepath.Clean(cwd)
+	if !strings.HasPrefix(absPath, cwdClean+string(filepath.Separator)) && absPath != cwdClean {
+		return nil, fmt.Errorf("file path must be within the working directory")
+	}
+
+	return os.ReadFile(absPath)
 }
