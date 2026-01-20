@@ -1234,6 +1234,12 @@ type UpdateSecretFolderResponse struct {
 	Folder SecretFolder `json:"folder"`
 }
 
+type MoveSecretFolderRequest struct {
+	ID        string
+	ProjectID string `json:"projectId"`
+	NewPath   string `json:"newPath"`
+}
+
 type DeleteSecretFolderRequest struct {
 	ID          string `json:"id"`
 	Environment string `json:"environment"`

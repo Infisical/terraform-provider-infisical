@@ -53,9 +53,8 @@ func (r *projectSecretFolderResource) Schema(_ context.Context, _ resource.Schem
 				Required:    true,
 			},
 			"folder_path": schema.StringAttribute{
-				Description:   "The path where the folder should be created/updated",
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Description: "The path where the folder should be created/updated",
+				Required:    true,
 			},
 			"environment_slug": schema.StringAttribute{
 				Description:   "The environment slug of the folder to modify/create",
@@ -73,8 +72,9 @@ func (r *projectSecretFolderResource) Schema(_ context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"environment_id": schema.StringAttribute{
-				Description: "The ID of the environment",
-				Computed:    true,
+				Description:   "The ID of the environment",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"path": schema.StringAttribute{
 				Description: "The full path of the folder, including its name.",
@@ -223,6 +223,22 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if state.SecretPath.ValueString() != plan.SecretPath.ValueString() {
+		_, err := r.client.MoveSecretFolder(infisical.MoveSecretFolderRequest{
+			ID:        state.ID.ValueString(),
+			ProjectID: state.ProjectID.ValueString(),
+			NewPath:   plan.SecretPath.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error moving secret folder",
+				"Couldn't move secret folder from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	updatedFolder, err := r.client.UpdateSecretFolder(infisical.UpdateSecretFolderRequest{
