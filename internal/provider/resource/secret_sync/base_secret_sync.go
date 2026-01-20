@@ -204,7 +204,7 @@ func (r *SecretSyncBaseResource) addOverwriteDestinationWarnings(ctx context.Con
 
 	if !r.CanImportSecrets {
 		resp.Diagnostics.AddWarning(
-			fmt.Sprintf("%s only supports overwriting destination secrets", r.SyncName),
+			fmt.Sprintf("Existing secrets from %s may be removed", r.SyncName),
 			fmt.Sprintf("Secrets not present in Infisical will be removed from the destination. Consider adding a key_schema or setting disable_secret_deletion to true if you do not want existing secrets to be removed from %s.", r.SyncName),
 		)
 	} else if initialSyncBehavior == string(infisical.SecretSyncBehaviorOverwriteDestination) {
