@@ -3070,3 +3070,59 @@ type GetSpecificCACertificateResponse struct {
 	CertificateChain string `json:"certificateChain"`
 	SerialNumber     string `json:"serialNumber"`
 }
+
+type OrgRole struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Slug        string `json:"slug"`
+	// Permissions can have multiple structures
+	Permissions []map[string]any `json:"permissions"`
+}
+
+type CreateOrgRoleRequest struct {
+	Slug        string           `json:"slug"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Permissions []map[string]any `json:"permissions"`
+}
+
+type CreateOrgRoleResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type UpdateOrgRoleRequest struct {
+	RoleId      string
+	Slug        string           `json:"slug,omitempty"`
+	Name        string           `json:"name,omitempty"`
+	Description string           `json:"description,omitempty"`
+	Permissions []map[string]any `json:"permissions,omitempty"`
+}
+
+type UpdateOrgRoleResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type DeleteOrgRoleRequest struct {
+	RoleId string
+}
+
+type DeleteOrgRoleResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type GetOrgRoleBySlugRequest struct {
+	RoleSlug string
+}
+
+type GetOrgRoleBySlugResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type GetOrgRoleByIdRequest struct {
+	RoleId string
+}
+
+type GetOrgRoleByIdResponse struct {
+	Role OrgRole `json:"role"`
+}
