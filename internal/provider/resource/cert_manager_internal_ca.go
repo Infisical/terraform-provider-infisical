@@ -11,36 +11,42 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 const (
+	CA_TYPE_ROOT         = "root"
+	CA_TYPE_INTERMEDIATE = "intermediate"
+
 	DEFAULT_CA_KEY_ALGORITHM = "RSA_2048"
 	DEFAULT_CA_STATUS        = "active"
 )
 
 var (
+	SUPPORTED_CA_TYPES               = []string{CA_TYPE_ROOT, CA_TYPE_INTERMEDIATE}
 	SUPPORTED_ROOT_CA_KEY_ALGORITHMS = []string{"RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"}
 	SUPPORTED_CA_STATUSES            = []string{"active", "disabled"}
 )
 
 var (
-	_ resource.Resource = &certManagerInternalCARootResource{}
+	_ resource.Resource = &certManagerInternalCAResource{}
 )
 
-func NewCertManagerInternalCARootResource() resource.Resource {
-	return &certManagerInternalCARootResource{}
+func NewCertManagerInternalCAResource() resource.Resource {
+	return &certManagerInternalCAResource{}
 }
 
-type certManagerInternalCARootResource struct {
+type certManagerInternalCAResource struct {
 	client *infisical.Client
 }
 
-type certManagerInternalCARootResourceModel struct {
+type certManagerInternalCAResourceModel struct {
 	ProjectSlug  types.String `tfsdk:"project_slug"`
 	Id           types.String `tfsdk:"id"`
+	Type         types.String `tfsdk:"type"`
 	Name         types.String `tfsdk:"name"`
 	CommonName   types.String `tfsdk:"common_name"`
 	Organization types.String `tfsdk:"organization"`
@@ -52,13 +58,13 @@ type certManagerInternalCARootResourceModel struct {
 	Status       types.String `tfsdk:"status"`
 }
 
-func (r *certManagerInternalCARootResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_cert_manager_internal_ca_root"
+func (r *certManagerInternalCAResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cert_manager_internal_ca"
 }
 
-func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage internal root certificate authorities in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage internal certificate authorities (root or intermediate) in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"project_slug": schema.StringAttribute{
 				Description: "The slug of the cert-manager project",
@@ -67,36 +73,46 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"type": schema.StringAttribute{
+				Description: "The type of the CA. Supported values: " + strings.Join(SUPPORTED_CA_TYPES, ", "),
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.OneOf(SUPPORTED_CA_TYPES...),
+				},
+			},
 			"name": schema.StringAttribute{
-				Description: "The name of the root CA",
+				Description: "The name of the CA",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"common_name": schema.StringAttribute{
-				Description: "The common name (CN) of the root CA certificate",
+				Description: "The common name (CN) of the CA certificate",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"organization": schema.StringAttribute{
-				Description: "The organization (O) of the root CA certificate",
+				Description: "The organization (O) of the CA certificate",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"ou": schema.StringAttribute{
-				Description: "The organizational unit (OU) of the root CA certificate",
+				Description: "The organizational unit (OU) of the CA certificate",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"country": schema.StringAttribute{
-				Description: "The country (C) of the root CA certificate",
+				Description: "The country (C) of the CA certificate",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -106,25 +122,25 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 				},
 			},
 			"province": schema.StringAttribute{
-				Description: "The state/province (ST) of the root CA certificate",
+				Description: "The state/province (ST) of the CA certificate",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"locality": schema.StringAttribute{
-				Description: "The locality (L) of the root CA certificate",
+				Description: "The locality (L) of the CA certificate",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
-				Description: "The key algorithm for the root CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", "),
+				Description: "The key algorithm for the CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", ") + ". Defaults to '" + DEFAULT_CA_KEY_ALGORITHM + "'.",
 				Optional:    true,
 				Computed:    true,
+				Default:     stringdefault.StaticString(DEFAULT_CA_KEY_ALGORITHM),
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
@@ -132,18 +148,16 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 				},
 			},
 			"status": schema.StringAttribute{
-				Description: "The status of the CA. Supported values: " + strings.Join(SUPPORTED_CA_STATUSES, ", ") + ". Defaults to 'active'.",
+				Description: "The status of the CA. Supported values: " + strings.Join(SUPPORTED_CA_STATUSES, ", ") + ". Defaults to '" + DEFAULT_CA_STATUS + "'.",
 				Optional:    true,
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Default:     stringdefault.StaticString(DEFAULT_CA_STATUS),
 				Validators: []validator.String{
 					stringvalidator.OneOf(SUPPORTED_CA_STATUSES...),
 				},
 			},
 			"id": schema.StringAttribute{
-				Description:   "The ID of the root CA",
+				Description:   "The ID of the CA",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -151,7 +165,7 @@ func (r *certManagerInternalCARootResource) Schema(_ context.Context, _ resource
 	}
 }
 
-func (r *certManagerInternalCARootResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *certManagerInternalCAResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -170,16 +184,16 @@ func (r *certManagerInternalCARootResource) Configure(_ context.Context, req res
 	r.client = client
 }
 
-func (r *certManagerInternalCARootResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *certManagerInternalCAResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create root CA",
+			"Unable to create CA",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var plan certManagerInternalCARootResourceModel
+	var plan certManagerInternalCAResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -218,42 +232,31 @@ func (r *certManagerInternalCARootResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	keyAlgorithm := DEFAULT_CA_KEY_ALGORITHM
-	if !plan.KeyAlgorithm.IsNull() && !plan.KeyAlgorithm.IsUnknown() {
-		keyAlgorithm = plan.KeyAlgorithm.ValueString()
-	}
-
-	status := DEFAULT_CA_STATUS
-	if !plan.Status.IsNull() && !plan.Status.IsUnknown() {
-		status = plan.Status.ValueString()
-	}
-
 	newCA, err := r.client.CreateInternalCA(infisical.CreateInternalCARequest{
 		ProjectId: project.ID,
 		Name:      plan.Name.ValueString(),
-		Status:    status,
+		Status:    plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
-			Type:         "root",
+			Type:         plan.Type.ValueString(),
 			CommonName:   plan.CommonName.ValueString(),
 			Organization: plan.Organization.ValueString(),
 			OU:           plan.OU.ValueString(),
 			Country:      plan.Country.ValueString(),
 			Province:     plan.Province.ValueString(),
 			Locality:     plan.Locality.ValueString(),
-			KeyAlgorithm: keyAlgorithm,
+			KeyAlgorithm: plan.KeyAlgorithm.ValueString(),
 		},
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating root CA",
-			"Couldn't create root CA in Infisical, unexpected error: "+err.Error(),
+			"Error creating CA",
+			"Couldn't create CA in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
 
 	plan.Id = types.StringValue(newCA.Id)
-	plan.KeyAlgorithm = types.StringValue(keyAlgorithm)
 	plan.Status = types.StringValue(newCA.Status)
 
 	if newCA.Configuration.CommonName != "" {
@@ -267,16 +270,16 @@ func (r *certManagerInternalCARootResource) Create(ctx context.Context, req reso
 	}
 }
 
-func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *certManagerInternalCAResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read root CA",
+			"Unable to read CA",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var state certManagerInternalCARootResourceModel
+	var state certManagerInternalCAResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -294,8 +297,8 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 		}
 
 		resp.Diagnostics.AddError(
-			"Error reading root CA",
-			"Couldn't read root CA from Infisical, unexpected error: "+err.Error(),
+			"Error reading CA",
+			"Couldn't read CA from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -307,6 +310,9 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 	}
 	state.Status = types.StringValue(status)
 
+	if ca.Configuration.Type != "" {
+		state.Type = types.StringValue(ca.Configuration.Type)
+	}
 	if ca.Configuration.CommonName != "" {
 		state.CommonName = types.StringValue(ca.Configuration.CommonName)
 	}
@@ -336,23 +342,23 @@ func (r *certManagerInternalCARootResource) Read(ctx context.Context, req resour
 	}
 }
 
-func (r *certManagerInternalCARootResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *certManagerInternalCAResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update root CA",
+			"Unable to update CA",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var plan certManagerInternalCARootResourceModel
+	var plan certManagerInternalCAResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state certManagerInternalCARootResourceModel
+	var state certManagerInternalCAResourceModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -397,7 +403,7 @@ func (r *certManagerInternalCARootResource) Update(ctx context.Context, req reso
 		Name:      plan.Name.ValueString(),
 		Status:    plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
-			Type:         "root",
+			Type:         plan.Type.ValueString(),
 			CommonName:   plan.CommonName.ValueString(),
 			Organization: plan.Organization.ValueString(),
 			OU:           plan.OU.ValueString(),
@@ -410,8 +416,8 @@ func (r *certManagerInternalCARootResource) Update(ctx context.Context, req reso
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating root CA",
-			"Couldn't update root CA in Infisical, unexpected error: "+err.Error(),
+			"Error updating CA",
+			"Couldn't update CA in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -423,16 +429,16 @@ func (r *certManagerInternalCARootResource) Update(ctx context.Context, req reso
 	}
 }
 
-func (r *certManagerInternalCARootResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *certManagerInternalCAResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete root CA",
+			"Unable to delete CA",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	var state certManagerInternalCARootResourceModel
+	var state certManagerInternalCAResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -445,14 +451,14 @@ func (r *certManagerInternalCARootResource) Delete(ctx context.Context, req reso
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting root CA",
-			"Couldn't delete root CA from Infisical, unexpected error: "+err.Error(),
+			"Error deleting CA",
+			"Couldn't delete CA from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
 }
 
-func (r *certManagerInternalCARootResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *certManagerInternalCAResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, ":")
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError(

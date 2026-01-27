@@ -23,7 +23,7 @@ resource "infisical_project" "pki" {
 resource "infisical_cert_manager_certificate_policy" "web_server" {
   project_slug = infisical_project.pki.slug
 
-  name        = "web-server-template"
+  name        = "web-server-policy"
   description = "Policy for web server certificates"
 
   # Subject Attribute Policies
@@ -84,7 +84,7 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
 resource "infisical_cert_manager_certificate_policy" "code_signing" {
   project_slug = infisical_project.pki.slug
 
-  name        = "code-signing-template"
+  name        = "code-signing-policy"
   description = "Policy for code signing certificates"
 
   # Subject Attribute Policies
