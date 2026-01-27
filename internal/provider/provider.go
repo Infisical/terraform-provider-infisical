@@ -425,6 +425,12 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationLdapPasswordResource,
 		infisicalResource.NewProjectTemplateResource,
 		infisicalResource.NewKMSKeyResource,
+		infisicalResource.NewCertManagerInternalCAResource,
+		infisicalResource.NewCertManagerExternalCAACMEResource,
+		infisicalResource.NewCertManagerExternalCAADCSResource,
+		infisicalResource.NewCertManagerCertificatePolicyResource,
+		infisicalResource.NewCertManagerCertificateProfileResource,
+		infisicalResource.NewCertManagerCACertificateResource,
 		externalKmsResource.NewExternalKmsAwsResource,
 	}
 }
