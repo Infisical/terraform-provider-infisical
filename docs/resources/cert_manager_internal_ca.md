@@ -80,6 +80,6 @@ resource "infisical_cert_manager_internal_ca" "issuing" {
 Import is supported using the following syntax:
 
 ```shell
-# This will import the internal CA by project slug and CA ID
-terraform import infisical_cert_manager_internal_ca.example <project_slug>:<ca_id>
+# This will import the internal CA by its ID
+terraform import infisical_cert_manager_internal_ca.example <ca_id>
 ```

@@ -459,15 +459,45 @@ func (r *certManagerInternalCAResource) Delete(ctx context.Context, req resource
 }
 
 func (r *certManagerInternalCAResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := strings.Split(req.ID, ":")
-	if len(parts) != 2 {
+	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Invalid import ID",
-			"Import ID must be in the format 'project_slug:ca_id'",
+			"Unable to import CA",
+			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
+	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
+		CAId: req.ID,
+	})
+
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Error importing CA",
+				fmt.Sprintf("CA with ID %s not found", req.ID),
+			)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error importing CA",
+			"Couldn't read CA from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
+		ID: ca.ProjectId,
+	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing CA",
+			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), project.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
