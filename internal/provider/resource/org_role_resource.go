@@ -84,7 +84,7 @@ func (r *orgRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"permissions": schema.ListNestedAttribute{
 				Required:    true,
-				Description: "The permissions assigned to the organization role.",
+				Description: "The permissions assigned to the organization role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.SetAttribute{
@@ -104,7 +104,7 @@ func (r *orgRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						},
 						"conditions": schema.StringAttribute{
 							Optional:    true,
-							Description: "When specified, only matching conditions will be allowed to access given resource.",
+							Description: "When specified, only matching conditions will be allowed to access given resource. Refer to the documentation in https://infisical.com/docs/internals/permissions#conditions for the complete list of supported properties and operators.",
 							PlanModifiers: []planmodifier.String{
 								pkg.JsonEquivalentModifier{},
 							},
@@ -519,5 +519,5 @@ func (r *orgRoleResource) ImportState(ctx context.Context, req resource.ImportSt
 		permissions[i] = entry
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("permission"), permissions)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("permissions"), permissions)...)
 }
