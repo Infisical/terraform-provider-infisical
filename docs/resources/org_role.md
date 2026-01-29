@@ -60,7 +60,7 @@ resource "infisical_org_role" "tester" {
 ### Required
 
 - `name` (String) The name for the new role
-- `permissions` (Attributes List) The permissions assigned to the organization role. (see [below for nested schema](#nestedatt--permissions))
+- `permissions` (Attributes List) The permissions assigned to the organization role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions))
 - `slug` (String) The slug for the new role
 
 ### Optional
@@ -81,5 +81,5 @@ Required:
 
 Optional:
 
-- `conditions` (String) When specified, only matching conditions will be allowed to access given resource.
+- `conditions` (String) When specified, only matching conditions will be allowed to access given resource. Refer to the documentation in https://infisical.com/docs/internals/permissions#conditions for the complete list of supported properties and operators.
 - `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.
