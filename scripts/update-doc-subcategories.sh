@@ -52,6 +52,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Identities
         identity|identity_*)
             update_subcategory "$file" "Identities";;
+						
+        # Organization
+        org|org_*)
+            update_subcategory "$file" "Organization";;
         
         # Projects
         project|project_*)
