@@ -80,6 +80,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # External KMS
         external_kms_*)
             update_subcategory "$file" "External KMS";;
+
+        # Certificate Management
+        cert_manager_*)
+            update_subcategory "$file" "Certificate Management";;
     esac
 done
 
