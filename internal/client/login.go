@@ -24,10 +24,14 @@ func (client Client) UniversalMachineIdentityAuth() (string, error) {
 
 	var loginResponse MachineIdentityAuthResponse
 
-	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(map[string]string{
+	reqBody := map[string]string{
 		"clientId":     client.Config.ClientId,
 		"clientSecret": client.Config.ClientSecret,
-	}).Post("api/v1/auth/universal-auth/login")
+	}
+	if client.Config.OrganizationSlug != "" {
+		reqBody["organizationSlug"] = client.Config.OrganizationSlug
+	}
+	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(reqBody).Post("api/v1/auth/universal-auth/login")
 
 	if err != nil {
 		return "", errors.NewGenericRequestError(operationUniversalMachineIdentityAuth, err)
@@ -77,10 +81,16 @@ func (client Client) OidcMachineIdentityAuth() (string, error) {
 
 	var loginResponse MachineIdentityAuthResponse
 
-	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(map[string]string{
+	reqBody := map[string]string{
 		"identityId": client.Config.IdentityId,
 		"jwt":        authJwt,
-	}).Post("api/v1/auth/oidc-auth/login")
+	}
+
+	if client.Config.OrganizationSlug != "" {
+		reqBody["organizationSlug"] = client.Config.OrganizationSlug
+	}
+
+	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(reqBody).Post("api/v1/auth/oidc-auth/login")
 
 	if err != nil {
 		return "", errors.NewGenericRequestError(operationOidcMachineIdentityAuth, err)
@@ -117,10 +127,14 @@ func (client Client) KubernetesMachineIdentityAuth() (string, error) {
 
 	var loginResponse MachineIdentityAuthResponse
 
-	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(map[string]string{
+	reqBody := map[string]string{
 		"identityId": client.Config.IdentityId,
 		"jwt":        token,
-	}).Post("api/v1/auth/kubernetes-auth/login")
+	}
+	if client.Config.OrganizationSlug != "" {
+		reqBody["organizationSlug"] = client.Config.OrganizationSlug
+	}
+	res, err := client.Config.HttpClient.R().SetResult(&loginResponse).SetHeader("User-Agent", USER_AGENT).SetBody(reqBody).Post("api/v1/auth/kubernetes-auth/login")
 
 	if err != nil {
 		return "", errors.NewGenericRequestError(operationKubernetesMachineIdentityAuth, err)
@@ -154,7 +168,7 @@ func (client Client) AwsIamMachineIdentityAuth() (string, error) {
 		AutoTokenRefresh: false,
 	})
 
-	credential, err := infisicalClient.Auth().AwsIamAuthLogin(client.Config.IdentityId)
+	credential, err := infisicalClient.Auth().WithOrganizationSlug(client.Config.OrganizationSlug).AwsIamAuthLogin(client.Config.IdentityId)
 
 	if err != nil {
 		return "", fmt.Errorf("AwsIamMachineIdentityAuth: Unable to get machine identity token [err=%s]", err)

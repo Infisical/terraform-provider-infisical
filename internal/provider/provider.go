@@ -55,11 +55,12 @@ type infisicalProviderModel struct {
 }
 
 type authModel struct {
-	Oidc       *oidcAuthModel       `tfsdk:"oidc"`
-	Token      types.String         `tfsdk:"token"`
-	Universal  *universalAuthModel  `tfsdk:"universal"`
-	Kubernetes *kubernetesAuthModel `tfsdk:"kubernetes"`
-	AWS        *awsIamAuthModel     `tfsdk:"aws_iam"`
+	OrganizationSlug types.String         `tfsdk:"organization_slug"`
+	Oidc             *oidcAuthModel       `tfsdk:"oidc"`
+	Token            types.String         `tfsdk:"token"`
+	Universal        *universalAuthModel  `tfsdk:"universal"`
+	Kubernetes       *kubernetesAuthModel `tfsdk:"kubernetes"`
+	AWS              *awsIamAuthModel     `tfsdk:"aws_iam"`
 }
 
 type oidcAuthModel struct {
@@ -116,6 +117,10 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 				Optional:    true,
 				Description: "The configuration values for authentication",
 				Attributes: map[string]schema.Attribute{
+					"organization_slug": schema.StringAttribute{
+						Optional:    true,
+						Description: "When set, this will scope the login session to the specified organization the machine identity has access to. If left empty, the session defaults to the organization where the machine identity was created in.",
+					},
 					"token": schema.StringAttribute{
 						Optional:    true,
 						Sensitive:   true,
@@ -219,6 +224,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	token := os.Getenv(infisical.INFISICAL_TOKEN_NAME)
 	serviceAccountToken := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_NAME)
 	serviceAccountTokenPath := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH_NAME)
+	organizationSlug := os.Getenv(infisical.INFISICAL_AUTH_ORGANIZATION_SLUG_ENV_NAME)
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -248,6 +254,10 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	var authStrategy infisical.AuthStrategyType = ""
 
 	if config.Auth != nil {
+		if !config.Auth.OrganizationSlug.IsNull() {
+			organizationSlug = config.Auth.OrganizationSlug.ValueString()
+		}
+
 		if config.Auth.Oidc != nil {
 			authStrategy = infisical.AuthStrategy.OIDC_MACHINE_IDENTITY
 			if !config.Auth.Oidc.IdentityId.IsNull() {
@@ -312,6 +322,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		Token:                   token,
 		ServiceAccountToken:     serviceAccountToken,
 		ServiceAccountTokenPath: serviceAccountTokenPath,
+		OrganizationSlug:        organizationSlug,
 	})
 
 	if err != nil {

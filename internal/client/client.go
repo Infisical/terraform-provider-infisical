@@ -32,6 +32,7 @@ type Config struct {
 	HostURL string
 
 	AuthStrategy          AuthStrategyType
+	OrganizationSlug      string
 	IsMachineIdentityAuth bool
 
 	// Service Token Auth
