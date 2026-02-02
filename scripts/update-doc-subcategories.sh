@@ -52,6 +52,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Identities
         identity|identity_*)
             update_subcategory "$file" "Identities";;
+						
+        # Organization
+        org|org_*)
+            update_subcategory "$file" "Organization";;
         
         # Projects
         project|project_*)
@@ -72,6 +76,14 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Secrets
         secret|secret_folder|secret_tag|secret_import)
             update_subcategory "$file" "Secrets";;
+
+        # External KMS
+        external_kms_*)
+            update_subcategory "$file" "External KMS";;
+
+        # Certificate Management
+        cert_manager_*)
+            update_subcategory "$file" "Certificate Management";;
     esac
 done
 

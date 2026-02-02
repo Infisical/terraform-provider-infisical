@@ -31,6 +31,7 @@ func NewSecretSync1PasswordResource() resource.Resource {
 		SyncName:         "1Password",
 		ResourceTypeName: "_secret_sync_1password",
 		AppConnection:    infisical.AppConnectionApp1Password,
+		CanImportSecrets: true,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vault_id": schema.StringAttribute{
 				Required:    true,

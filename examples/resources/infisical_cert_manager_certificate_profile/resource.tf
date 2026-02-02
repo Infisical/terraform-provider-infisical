@@ -5,9 +5,10 @@ resource "infisical_project" "pki" {
   type        = "cert-manager"
 }
 
-resource "infisical_cert_manager_internal_ca_root" "root" {
+resource "infisical_cert_manager_internal_ca" "root" {
   project_slug = infisical_project.pki.slug
 
+  type          = "root"
   name          = "enterprise-root-ca"
   common_name   = "Enterprise Root Certificate Authority"
   organization  = "Example Corp"
@@ -18,9 +19,10 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
   key_algorithm = "RSA_2048"
 }
 
-resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
+resource "infisical_cert_manager_internal_ca" "issuing" {
   project_slug = infisical_project.pki.slug
 
+  type          = "intermediate"
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"
   organization  = "Example Corp"
@@ -34,7 +36,7 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
 resource "infisical_cert_manager_certificate_policy" "web_server" {
   project_slug = infisical_project.pki.slug
 
-  name        = "web-server-template"
+  name        = "web-server-policy"
   description = "Policy for web server certificates"
 
   subject {
@@ -85,7 +87,7 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
 # API enrollment profile for web server certificates
 resource "infisical_cert_manager_certificate_profile" "web_server_api" {
   project_slug          = infisical_project.pki.slug
-  ca_id                 = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  ca_id                 = infisical_cert_manager_internal_ca.issuing.id
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "web-server-api"
@@ -102,7 +104,7 @@ resource "infisical_cert_manager_certificate_profile" "web_server_api" {
 # EST enrollment profile for web server certificates
 resource "infisical_cert_manager_certificate_profile" "web_server_est" {
   project_slug          = infisical_project.pki.slug
-  ca_id                 = infisical_cert_manager_internal_ca_intermediate.issuing.id
+  ca_id                 = infisical_cert_manager_internal_ca.issuing.id
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "web-server-est"

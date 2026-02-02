@@ -5,9 +5,10 @@ resource "infisical_project" "pki" {
   type        = "cert-manager"
 }
 
-resource "infisical_cert_manager_internal_ca_root" "root" {
+resource "infisical_cert_manager_internal_ca" "root" {
   project_slug = infisical_project.pki.slug
 
+  type          = "root"
   name          = "enterprise-root-ca"
   common_name   = "Enterprise Root Certificate Authority"
   organization  = "Example Corp"
@@ -18,9 +19,10 @@ resource "infisical_cert_manager_internal_ca_root" "root" {
   key_algorithm = "RSA_2048"
 }
 
-resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
+resource "infisical_cert_manager_internal_ca" "issuing" {
   project_slug = infisical_project.pki.slug
 
+  type          = "intermediate"
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"
   organization  = "Example Corp"
@@ -33,7 +35,7 @@ resource "infisical_cert_manager_internal_ca_intermediate" "issuing" {
 
 # Generate certificate for the root CA
 resource "infisical_cert_manager_ca_certificate" "root_cert" {
-  ca_id = infisical_cert_manager_internal_ca_root.root.id
+  ca_id = infisical_cert_manager_internal_ca.root.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2034-01-01T00:00:00Z"
@@ -44,8 +46,8 @@ resource "infisical_cert_manager_ca_certificate" "root_cert" {
 
 # Generate certificate for the intermediate CA
 resource "infisical_cert_manager_ca_certificate" "issuing_cert" {
-  ca_id        = infisical_cert_manager_internal_ca_intermediate.issuing.id
-  parent_ca_id = infisical_cert_manager_internal_ca_root.root.id
+  ca_id        = infisical_cert_manager_internal_ca.issuing.id
+  parent_ca_id = infisical_cert_manager_internal_ca.root.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2029-01-01T00:00:00Z"
@@ -59,7 +61,7 @@ resource "infisical_cert_manager_ca_certificate" "issuing_cert" {
 
 # Example with shorter validity period for testing/development
 resource "infisical_cert_manager_ca_certificate" "dev_cert" {
-  ca_id = infisical_cert_manager_internal_ca_root.root.id
+  ca_id = infisical_cert_manager_internal_ca.root.id
 
   not_before = "2024-01-01T00:00:00Z"
   not_after  = "2025-01-01T00:00:00Z" # 1 year validity

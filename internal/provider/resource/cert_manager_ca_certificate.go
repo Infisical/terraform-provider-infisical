@@ -263,7 +263,7 @@ func (r *certManagerCACertificateResource) Read(ctx context.Context, req resourc
 func (r *certManagerCACertificateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	resp.Diagnostics.AddError(
 		"Update not supported",
-		"CA certificates cannot be updated. To change certificate properties, you must replace the resource (which will regenerate the certificate).",
+		"CA certificates cannot be updated. To change certificate properties, you must replace the resource (which will generate a new certificate).",
 	)
 }
 

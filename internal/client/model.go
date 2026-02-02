@@ -2151,14 +2151,15 @@ type ListSecretImportResponse struct {
 }
 
 type AppConnection struct {
-	Id              string `json:"id"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
-	Version         int    `json:"version"`
-	OrgId           string `json:"orgId"`
-	App             string `json:"app"`
-	Method          string `json:"method"`
-	CredentialsHash string `json:"credentialsHash"`
+	Id              string  `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	Version         int     `json:"version"`
+	OrgId           string  `json:"orgId"`
+	ProjectId       *string `json:"projectId"`
+	App             string  `json:"app"`
+	Method          string  `json:"method"`
+	CredentialsHash string  `json:"credentialsHash"`
 }
 
 type CreateAppConnectionRequest struct {
@@ -2167,6 +2168,7 @@ type CreateAppConnectionRequest struct {
 	Method      string                 `json:"method"`
 	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials"`
+	ProjectId   string                 `json:"projectId,omitempty"`
 }
 
 type CreateAppConnectionResponse struct {
@@ -2189,6 +2191,7 @@ type UpdateAppConnectionRequest struct {
 	Method      string                 `json:"method"`
 	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials,omitempty"`
+	ProjectId   string                 `json:"projectId,omitempty"`
 }
 
 type UpdateAppConnectionResponse struct {
@@ -3152,4 +3155,60 @@ type GetCertificateRequestStatusResponse struct {
 	ErrorMessage     *string `json:"errorMessage,omitempty"`
 	CreatedAt        string  `json:"createdAt"`
 	UpdatedAt        string  `json:"updatedAt"`
+}
+
+type OrgRole struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Slug        string `json:"slug"`
+	// Permissions can have multiple structures
+	Permissions []map[string]any `json:"permissions"`
+}
+
+type CreateOrgRoleRequest struct {
+	Slug        string           `json:"slug"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Permissions []map[string]any `json:"permissions"`
+}
+
+type CreateOrgRoleResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type UpdateOrgRoleRequest struct {
+	RoleId      string
+	Slug        string           `json:"slug,omitempty"`
+	Name        string           `json:"name,omitempty"`
+	Description string           `json:"description,omitempty"`
+	Permissions []map[string]any `json:"permissions,omitempty"`
+}
+
+type UpdateOrgRoleResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type DeleteOrgRoleRequest struct {
+	RoleId string
+}
+
+type DeleteOrgRoleResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type GetOrgRoleBySlugRequest struct {
+	RoleSlug string
+}
+
+type GetOrgRoleBySlugResponse struct {
+	Role OrgRole `json:"role"`
+}
+
+type GetOrgRoleByIdRequest struct {
+	RoleId string
+}
+
+type GetOrgRoleByIdResponse struct {
+	Role OrgRole `json:"role"`
 }
