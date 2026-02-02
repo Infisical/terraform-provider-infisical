@@ -3,8 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
@@ -57,7 +55,7 @@ type certManagerCertificateResource struct {
 
 type certManagerCertificateResourceModel struct {
 	ProfileId            types.String `tfsdk:"profile_id"`
-	CSRPath              types.String `tfsdk:"csr_path"`
+	CSR                  types.String `tfsdk:"csr"`
 	CommonName           types.String `tfsdk:"common_name"`
 	AltNames             types.List   `tfsdk:"alt_names"`
 	Organization         types.String `tfsdk:"organization"`
@@ -97,8 +95,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"csr_path": schema.StringAttribute{
-				Description: "Path to a Certificate Signing Request (CSR) file in PEM format. If provided, the certificate will be issued based on the CSR",
+			"csr": schema.StringAttribute{
+				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\"))",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -249,7 +247,6 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 			"certificate": schema.StringAttribute{
 				Description: "The issued certificate in PEM format",
 				Computed:    true,
-				Sensitive:   true,
 			},
 			"private_key": schema.StringAttribute{
 				Description: "The private key in PEM format (only available for direct field requests, not CSR-based)",
@@ -259,7 +256,6 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 			"certificate_chain": schema.StringAttribute{
 				Description: "The certificate chain in PEM format",
 				Computed:    true,
-				Sensitive:   true,
 			},
 		},
 	}
@@ -298,13 +294,13 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 		return
 	}
 
-	hasCSR := !plan.CSRPath.IsNull() && !plan.CSRPath.IsUnknown() && plan.CSRPath.ValueString() != ""
+	hasCSR := !plan.CSR.IsNull() && !plan.CSR.IsUnknown() && plan.CSR.ValueString() != ""
 	hasCommonName := !plan.CommonName.IsNull() && !plan.CommonName.IsUnknown() && plan.CommonName.ValueString() != ""
 
 	if !hasCSR && !hasCommonName {
 		resp.Diagnostics.AddError(
 			"Missing certificate request data",
-			"Either 'csr_path' or 'common_name' must be provided",
+			"Either 'csr' or 'common_name' must be provided",
 		)
 		return
 	}
@@ -319,15 +315,9 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 	}
 
 	if hasCSR {
-		csrBytes, err := readFileContent(plan.CSRPath.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error reading CSR file",
-				fmt.Sprintf("Failed to read CSR file at %s: %v", plan.CSRPath.ValueString(), err),
-			)
-			return
-		}
-		certRequest.CSR = string(csrBytes)
+		csrContent := strings.ReplaceAll(plan.CSR.ValueString(), "\r\n", "\n")
+		csrContent = strings.TrimSpace(csrContent)
+		certRequest.CSR = csrContent
 	}
 
 	hasAttributes := false
@@ -743,27 +733,4 @@ func (r *certManagerCertificateResource) Delete(ctx context.Context, req resourc
 
 func (r *certManagerCertificateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
-}
-
-func readFileContent(filePath string) ([]byte, error) {
-	cleanPath := filepath.Clean(filePath)
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %w", err)
-	}
-
-	// Convert to absolute path to check if it's within working directory
-	absPath := cleanPath
-	if !filepath.IsAbs(cleanPath) {
-		absPath = filepath.Join(cwd, cleanPath)
-	}
-	absPath = filepath.Clean(absPath)
-
-	cwdClean := filepath.Clean(cwd)
-	if !strings.HasPrefix(absPath, cwdClean+string(filepath.Separator)) && absPath != cwdClean {
-		return nil, fmt.Errorf("file path must be within the working directory")
-	}
-
-	return os.ReadFile(absPath)
 }
