@@ -25,6 +25,7 @@ terraform {
 provider "infisical" {
   host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
+    # organization_slug = "<organization slug to scope the session to sub-org>"
     universal = {
       client_id     = "<machine-identity-client-id>"
       client_secret = "<machine-identity-client-secret>"
@@ -52,6 +53,7 @@ Optional:
 - `aws_iam` (Attributes) The configuration values for AWS IAM Auth (see [below for nested schema](#nestedatt--auth--aws_iam))
 - `kubernetes` (Attributes) The configuration values for Kubernetes Auth (see [below for nested schema](#nestedatt--auth--kubernetes))
 - `oidc` (Attributes) The configuration values for OIDC Auth (see [below for nested schema](#nestedatt--auth--oidc))
+- `organization_slug` (String) When set, this will scope the login session to the specified organization the machine identity has access to. If left empty, the session defaults to the organization where the machine identity was created in.
 - `token` (String, Sensitive) The authentication token for Machine Identity Token Auth. This attribute can also be set using the `INFISICAL_TOKEN` environment variable
 - `universal` (Attributes) The configuration values for Universal Auth (see [below for nested schema](#nestedatt--auth--universal))
 
