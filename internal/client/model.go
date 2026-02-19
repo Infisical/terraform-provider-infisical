@@ -642,6 +642,7 @@ type DeleteRawSecretV3Request struct {
 // update secret by name api.
 type UpdateRawSecretByNameV3Request struct {
 	SecretName               string               `json:"secretName"`
+	NewSecretName            string               `json:"newSecretName,omitempty"`
 	WorkspaceID              string               `json:"workspaceId"`
 	Environment              string               `json:"environment"`
 	Type                     string               `json:"type"`

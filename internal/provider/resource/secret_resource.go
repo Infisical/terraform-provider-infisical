@@ -462,14 +462,6 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	if state.Name != plan.Name {
-		resp.Diagnostics.AddError(
-			"Unable to update secret",
-			"Secret keys cannot be updated via Terraform at this time",
-		)
-		return
-	}
-
 	planSecretTagIds := make([]types.String, 0, len(plan.Tags.Elements()))
 	diags = plan.Tags.ElementsAs(ctx, &planSecretTagIds, false)
 	resp.Diagnostics.Append(diags...)
@@ -538,7 +530,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		Type:                     "shared",
 		TagIDs:                   secretTagIds,
 		SecretPath:               plan.FolderPath.ValueString(),
-		SecretName:               plan.Name.ValueString(),
+		SecretName:               state.Name.ValueString(),
 		SecretReminderNote:       secretReminderNote,
 		SecretReminderRepeatDays: secretReminderRepeatDays,
 		SecretMetadata:           secretMetadata,
@@ -546,6 +538,10 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	if secretData.ShouldUpdateValue {
 		updateRequest.SecretValue = pkg.StringToPtr(secretData.Value)
+	}
+
+	if plan.Name.ValueString() != state.Name.ValueString() {
+		updateRequest.NewSecretName = plan.Name.ValueString()
 	}
 
 	err = r.client.UpdateRawSecretV3(updateRequest)
