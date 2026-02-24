@@ -45,7 +45,7 @@ func mustGithubCredentialsObjectWithNulls(t *testing.T, token string, instanceTy
 func TestBuildGithubCredentialsForCreate_ValidCloud(t *testing.T) {
 	ctx := context.Background()
 	plan := AppConnectionBaseResourceModel{
-		Method: types.StringValue(AppConnectionGithubAuthMethodPat),
+		Method:      types.StringValue(AppConnectionGithubAuthMethodPat),
 		Credentials: mustGithubCredentialsObject(t, "ghp_secret", "", ""),
 	}
 

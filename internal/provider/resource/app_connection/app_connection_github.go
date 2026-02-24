@@ -175,8 +175,8 @@ func NewAppConnectionGithubResource() resource.Resource {
 			var diags diag.Diagnostics
 			state.Credentials, diags = types.ObjectValue(map[string]attr.Type{
 				"personal_access_token": types.StringType,
-				"instance_type":          types.StringType,
-				"host":                   types.StringType,
+				"instance_type":         types.StringType,
+				"host":                  types.StringType,
 			}, credentialsConfig)
 
 			return diags
