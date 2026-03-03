@@ -22,7 +22,6 @@ type AppConnectionGithubCredentialsModel struct {
 const AppConnectionGithubAuthMethodPat = "pat"
 
 // buildGithubCredentialsForCreate validates plan credentials and returns the API payload for create.
-// Extracted for unit testing.
 func buildGithubCredentialsForCreate(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
 	credentialsConfig := make(map[string]any)
 
@@ -52,16 +51,14 @@ func buildGithubCredentialsForCreate(ctx context.Context, plan AppConnectionBase
 		}
 	}
 
-	if instanceType == "server" {
-		if credentials.Host.IsNull() || credentials.Host.ValueString() == "" {
-			diags.AddError(
-				"Unable to create GitHub app connection",
-				"host is required when instance_type is 'server' (GitHub Enterprise).",
-			)
-			return nil, diags
-		}
-		credentialsConfig["host"] = credentials.Host.ValueString()
-	} else if !credentials.Host.IsNull() && credentials.Host.ValueString() != "" {
+	if instanceType == "server" && (credentials.Host.IsNull() || credentials.Host.ValueString() == "") {
+		diags.AddError(
+			"Unable to create GitHub app connection",
+			"host is required when instance_type is 'server' (GitHub Enterprise).",
+		)
+		return nil, diags
+	}
+	if !credentials.Host.IsNull() && credentials.Host.ValueString() != "" {
 		credentialsConfig["host"] = credentials.Host.ValueString()
 	}
 
@@ -72,7 +69,6 @@ func buildGithubCredentialsForCreate(ctx context.Context, plan AppConnectionBase
 }
 
 // buildGithubCredentialsForUpdate validates plan/state credentials and returns the API payload for update.
-// Extracted for unit testing.
 func buildGithubCredentialsForUpdate(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
 	credentialsConfig := make(map[string]any)
 
@@ -116,16 +112,14 @@ func buildGithubCredentialsForUpdate(ctx context.Context, plan AppConnectionBase
 	if credentialsFromPlan.Host.IsUnknown() {
 		host = credentialsFromState.Host
 	}
-	if instanceTypeStr == "server" {
-		if host.IsNull() || host.ValueString() == "" {
-			diags.AddError(
-				"Unable to update GitHub app connection",
-				"host is required when instance_type is 'server' (GitHub Enterprise).",
-			)
-			return nil, diags
-		}
-		credentialsConfig["host"] = host.ValueString()
-	} else if !host.IsNull() && host.ValueString() != "" {
+	if instanceTypeStr == "server" && (host.IsNull() || host.ValueString() == "") {
+		diags.AddError(
+			"Unable to update GitHub app connection",
+			"host is required when instance_type is 'server' (GitHub Enterprise).",
+		)
+		return nil, diags
+	}
+	if !host.IsNull() && host.ValueString() != "" {
 		credentialsConfig["host"] = host.ValueString()
 	}
 
