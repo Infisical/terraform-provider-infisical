@@ -2161,6 +2161,7 @@ type AppConnection struct {
 	App             string  `json:"app"`
 	Method          string  `json:"method"`
 	CredentialsHash string  `json:"credentialsHash"`
+	GatewayId       *string `json:"gatewayId"`
 }
 
 type CreateAppConnectionRequest struct {
@@ -2170,6 +2171,7 @@ type CreateAppConnectionRequest struct {
 	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials"`
 	ProjectId   string                 `json:"projectId,omitempty"`
+	GatewayId   string                 `json:"gatewayId,omitempty"`
 }
 
 type CreateAppConnectionResponse struct {
@@ -2193,6 +2195,7 @@ type UpdateAppConnectionRequest struct {
 	Name        string                 `json:"name"`
 	Credentials map[string]interface{} `json:"credentials,omitempty"`
 	ProjectId   string                 `json:"projectId,omitempty"`
+	GatewayId   string                 `json:"gatewayId,omitempty"`
 }
 
 type UpdateAppConnectionResponse struct {
