@@ -137,6 +137,69 @@ func (r *SecretSyncBaseResource) Configure(_ context.Context, req resource.Confi
 	r.client = client
 }
 
+func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || r.client == nil || !r.client.Config.IsMachineIdentityAuth {
+		return
+	}
+
+	var plan SecretSyncBaseResourceModel
+	if diags := req.Plan.Get(ctx, &plan); diags.HasError() {
+		return
+	}
+
+	r.addOverwriteDestinationWarnings(ctx, plan, resp)
+
+	if !req.State.Raw.IsNull() {
+		var state SecretSyncBaseResourceModel
+		if diags := req.State.Get(ctx, &state); !diags.HasError() {
+			if plan.DestinationConfig.Equal(state.DestinationConfig) {
+				return
+			}
+		}
+	}
+
+	var destinationConfigMap map[string]interface{}
+	var configDiags diag.Diagnostics
+	var excludeSyncId string
+
+	if req.State.Raw.IsNull() {
+		destinationConfigMap, configDiags = r.ReadDestinationConfigForCreateFromPlan(ctx, plan)
+	} else {
+		var state SecretSyncBaseResourceModel
+		if diags := req.State.Get(ctx, &state); diags.HasError() {
+			return
+		}
+		destinationConfigMap, configDiags = r.ReadDestinationConfigForUpdateFromPlan(ctx, plan, state)
+		if !state.ID.IsNull() && !state.ID.IsUnknown() {
+			excludeSyncId = state.ID.ValueString()
+		}
+	}
+
+	if configDiags.HasError() {
+		return
+	}
+
+	checkRequest := infisical.CheckDuplicateDestinationRequest{
+		App:               r.App,
+		DestinationConfig: destinationConfigMap,
+		ProjectID:         plan.ProjectID.ValueString(),
+		ExcludeSyncId:     excludeSyncId,
+	}
+
+	duplicateCheck, err := r.client.CheckDuplicateDestination(checkRequest)
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Unable to check for duplicate destinations",
+			"Warning: Could not verify if this destination already exists. This may result in conflicts. Error: "+err.Error(),
+		)
+	} else if duplicateCheck.HasDuplicate {
+		resp.Diagnostics.AddWarning(
+			"Duplicate destination configuration detected",
+			"A secret sync with the same destination configuration already exists in this project. Proceeding with this operation may result in conflicts or unexpected behavior.",
+		)
+	}
+}
+
 // addOverwriteDestinationWarnings adds warnings when using overwrite destination initial sync behavior.
 func (r *SecretSyncBaseResource) addOverwriteDestinationWarnings(ctx context.Context, plan SecretSyncBaseResourceModel, resp *resource.ModifyPlanResponse) {
 	syncOptions, diags := r.ReadSyncOptionsForCreateFromPlan(ctx, plan)
