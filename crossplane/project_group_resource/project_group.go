@@ -207,14 +207,24 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	if state.ProjectID.ValueString() == "" || state.GroupID.ValueString() == "" {
+	if state.ProjectID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	// Prefer group_id for lookup, fall back to group_name
+	identifier := state.GroupID.ValueString()
+	if identifier == "" {
+		identifier = state.GroupName.ValueString()
+	}
+	if identifier == "" {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
 		ProjectId: state.ProjectID.ValueString(),
-		GroupId:   state.GroupID.ValueString(),
+		GroupId:   identifier,
 	})
 
 	if err != nil {
@@ -250,6 +260,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 
 	state.Roles = types.StringValue(string(rolesJSON))
 	state.MembershipID = types.StringValue(projectGroupMembership.Membership.ID)
+	state.GroupID = types.StringValue(projectGroupMembership.Membership.GroupID)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -362,9 +373,21 @@ func (r *ProjectGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
+	identifier := state.GroupID.ValueString()
+	if identifier == "" {
+		identifier = state.GroupName.ValueString()
+	}
+	if identifier == "" {
+		resp.Diagnostics.AddError(
+			"Error deleting project group",
+			"Cannot delete project group: neither group_id nor group_name is available in state",
+		)
+		return
+	}
+
 	_, err := r.client.DeleteProjectGroup(infisical.DeleteProjectGroupRequest{
 		ProjectId: state.ProjectID.ValueString(),
-		GroupId:   state.GroupID.ValueString(),
+		GroupId:   identifier,
 	})
 
 	if err != nil {
