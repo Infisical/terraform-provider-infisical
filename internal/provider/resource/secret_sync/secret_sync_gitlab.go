@@ -434,7 +434,7 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			if shouldMaskVal, ok := secretSync.DestinationConfig["shouldMaskSecrets"].(bool); ok {
 				destinationConfig["should_mask_secrets"] = types.BoolValue(shouldMaskVal)
 			} else {
-				destinationConfig["should_mask_secrets"] = types.BoolValue(true)
+				destinationConfig["should_mask_secrets"] = types.BoolValue(false)
 			}
 
 			if shouldHideVal, ok := secretSync.DestinationConfig["shouldHideSecrets"].(bool); ok {
