@@ -307,7 +307,7 @@ func (r *ProjectTemplateResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	// filter out default roles (admin, member, etc)
-	var customRoles []infisical.Role
+	customRoles := make([]infisical.Role, 0)
 	for _, role := range template.Roles {
 		if !isDefaultRole(role.Slug) {
 			customRoles = append(customRoles, role)
