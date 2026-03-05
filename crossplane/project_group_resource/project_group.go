@@ -207,24 +207,21 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	if state.ProjectID.ValueString() == "" {
+	if state.ProjectID.ValueString() == "" || (state.GroupID.ValueString() == "" && state.GroupName.ValueString() == "") {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	// Prefer group_id for lookup, fall back to group_name
-	identifier := state.GroupID.ValueString()
-	if identifier == "" {
-		identifier = state.GroupName.ValueString()
-	}
-	if identifier == "" {
-		resp.State.RemoveResource(ctx)
+	// Resolve group_id from group_name if not present (endpoint only accepts UUID)
+	groupID, errMsg := r.resolveGroupID(state.GroupID.ValueString(), state.GroupName.ValueString())
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Error resolving group by name", errMsg)
 		return
 	}
 
 	projectGroupMembership, err := r.client.GetProjectGroupMembership(infisical.GetProjectGroupMembershipRequest{
 		ProjectId: state.ProjectID.ValueString(),
-		GroupId:   identifier,
+		GroupId:   groupID,
 	})
 
 	if err != nil {
@@ -373,27 +370,39 @@ func (r *ProjectGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	identifier := state.GroupID.ValueString()
-	if identifier == "" {
-		identifier = state.GroupName.ValueString()
-	}
-	if identifier == "" {
-		resp.Diagnostics.AddError(
-			"Error deleting project group",
-			"Cannot delete project group: neither group_id nor group_name is available in state",
-		)
+	groupID, errMsg := r.resolveGroupID(state.GroupID.ValueString(), state.GroupName.ValueString())
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Error resolving group by name", errMsg)
 		return
 	}
 
 	_, err := r.client.DeleteProjectGroup(infisical.DeleteProjectGroupRequest{
 		ProjectId: state.ProjectID.ValueString(),
-		GroupId:   identifier,
+		GroupId:   groupID,
 	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project group",
-			"Couldn't delete project group from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project group from Infisical, unexpected error: "+err.Error(),
 		)
 	}
+}
+
+// resolveGroupID returns the group UUID for the given state, looking up by name if group_id is not set.
+// Returns ("", error message) if the group cannot be resolved.
+func (r *ProjectGroupResource) resolveGroupID(groupID, groupName string) (string, string) {
+	if groupID != "" {
+		return groupID, ""
+	}
+	groups, err := r.client.GetGroups()
+	if err != nil {
+		return "", "Couldn't list groups to resolve group_name to group_id: " + err.Error()
+	}
+	for _, g := range groups {
+		if g.Name == groupName {
+			return g.ID, ""
+		}
+	}
+	return "", "Could not find a group with name: " + groupName
 }
