@@ -155,8 +155,8 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			"should_mask_secrets": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether variables should be masked in logs",
-				Default:     booldefault.StaticBool(true),
+				Description: "Whether variables should be masked in logs. Note: GitLab restricts masked variable values to only contain alphanumeric characters and + / = @ : . ~ - (space), and requires a minimum length of 8 characters. Values like URLs containing ? or & will fail if masking is enabled.",
+				Default:     booldefault.StaticBool(false),
 			},
 			"should_hide_secrets": schema.BoolAttribute{
 				Optional:    true,
@@ -434,7 +434,7 @@ func NewSecretSyncGitlabResource() resource.Resource {
 			if shouldMaskVal, ok := secretSync.DestinationConfig["shouldMaskSecrets"].(bool); ok {
 				destinationConfig["should_mask_secrets"] = types.BoolValue(shouldMaskVal)
 			} else {
-				destinationConfig["should_mask_secrets"] = types.BoolValue(true)
+				destinationConfig["should_mask_secrets"] = types.BoolValue(false)
 			}
 
 			if shouldHideVal, ok := secretSync.DestinationConfig["shouldHideSecrets"].(bool); ok {

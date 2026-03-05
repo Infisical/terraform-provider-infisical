@@ -122,7 +122,7 @@ Optional:
 - `project_id` (String) The GitLab Project ID to sync secrets to. Required when scope is 'project'.
 - `project_name` (String) The GitLab Project Name to sync secrets to. Optional when scope is 'project'.
 - `should_hide_secrets` (Boolean) Whether variables should be hidden
-- `should_mask_secrets` (Boolean) Whether variables should be masked in logs
+- `should_mask_secrets` (Boolean) Whether variables should be masked in logs. Note: GitLab restricts masked variable values to only contain alphanumeric characters and + / = @ : . ~ - (space), and requires a minimum length of 8 characters. Values like URLs containing ? or & will fail if masking is enabled.
 - `should_protect_secrets` (Boolean) Whether variables should be protected
 
 
