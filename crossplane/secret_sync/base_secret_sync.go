@@ -26,6 +26,7 @@ type SecretSyncBaseResource struct {
 	ResourceTypeName                       string                  // terraform resource name suffix
 	SyncName                               string                  // complete descriptive name of the secret sync
 	AppConnection                          infisical.AppConnectionApp
+	CanImportSecrets                       bool // whether this sync destination supports importing secrets from the destination
 	client                                 *infisical.Client
 	DestinationConfigAttributes            map[string]schema.Attribute
 	ReadDestinationConfigForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
@@ -134,6 +135,97 @@ func (r *SecretSyncBaseResource) Configure(_ context.Context, req resource.Confi
 	}
 
 	r.client = client
+}
+
+func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || r.client == nil || !r.client.Config.IsMachineIdentityAuth {
+		return
+	}
+
+	var plan SecretSyncBaseResourceModel
+	if diags := req.Plan.Get(ctx, &plan); diags.HasError() {
+		return
+	}
+
+	r.addOverwriteDestinationWarnings(ctx, plan, resp)
+
+	if !req.State.Raw.IsNull() {
+		var state SecretSyncBaseResourceModel
+		if diags := req.State.Get(ctx, &state); !diags.HasError() {
+			if plan.DestinationConfig.Equal(state.DestinationConfig) {
+				return
+			}
+		}
+	}
+
+	var destinationConfigMap map[string]interface{}
+	var configDiags diag.Diagnostics
+	var excludeSyncId string
+
+	if req.State.Raw.IsNull() {
+		destinationConfigMap, configDiags = r.ReadDestinationConfigForCreateFromPlan(ctx, plan)
+	} else {
+		var state SecretSyncBaseResourceModel
+		if diags := req.State.Get(ctx, &state); diags.HasError() {
+			return
+		}
+		destinationConfigMap, configDiags = r.ReadDestinationConfigForUpdateFromPlan(ctx, plan, state)
+		if !state.ID.IsNull() && !state.ID.IsUnknown() {
+			excludeSyncId = state.ID.ValueString()
+		}
+	}
+
+	if configDiags.HasError() {
+		return
+	}
+
+	checkRequest := infisical.CheckDuplicateDestinationRequest{
+		App:               r.App,
+		DestinationConfig: destinationConfigMap,
+		ProjectID:         plan.ProjectID.ValueString(),
+		ExcludeSyncId:     excludeSyncId,
+	}
+
+	duplicateCheck, err := r.client.CheckDuplicateDestination(checkRequest)
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Unable to check for duplicate destinations",
+			"Warning: Could not verify if this destination already exists. This may result in conflicts. Error: "+err.Error(),
+		)
+	} else if duplicateCheck.HasDuplicate {
+		resp.Diagnostics.AddWarning(
+			"Duplicate destination configuration detected",
+			"A secret sync with the same destination configuration already exists in this project. Proceeding with this operation may result in conflicts or unexpected behavior.",
+		)
+	}
+}
+
+// addOverwriteDestinationWarnings adds warnings when using overwrite destination initial sync behavior.
+func (r *SecretSyncBaseResource) addOverwriteDestinationWarnings(ctx context.Context, plan SecretSyncBaseResourceModel, resp *resource.ModifyPlanResponse) {
+	syncOptions, diags := r.ReadSyncOptionsForCreateFromPlan(ctx, plan)
+	if diags.HasError() {
+		return
+	}
+
+	initialSyncBehavior, _ := syncOptions["initialSyncBehavior"].(string)
+	disableSecretDeletion, _ := syncOptions["disableSecretDeletion"].(bool)
+
+	if disableSecretDeletion {
+		return
+	}
+
+	if !r.CanImportSecrets {
+		resp.Diagnostics.AddWarning(
+			fmt.Sprintf("Existing secrets from %s may be removed", r.SyncName),
+			fmt.Sprintf("Secrets not present in Infisical will be removed from the destination. Consider adding a key_schema or setting disable_secret_deletion to true if you do not want existing secrets to be removed from %s.", r.SyncName),
+		)
+	} else if initialSyncBehavior == string(infisical.SecretSyncBehaviorOverwriteDestination) {
+		// Destination supports import but user chose overwrite - warn about secret deletion with import suggestion
+		resp.Diagnostics.AddWarning(
+			"Overwrite destination will remove secrets not present in Infisical",
+			fmt.Sprintf("Secrets not present in Infisical will be removed from the destination. If you have secrets in %s that you do not want deleted, consider setting initial_sync_behavior to import-prioritize-source or import-prioritize-destination. Alternatively, configure a key_schema or set disable_secret_deletion to true to have Infisical ignore these secrets.", r.SyncName),
+		)
+	}
 }
 
 // Create creates the resource and sets the initial Terraform state.
