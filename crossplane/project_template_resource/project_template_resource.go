@@ -234,7 +234,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 	plan.Description = types.StringValue(res.Description)
 	plan.Type = types.StringValue(res.Type)
 
-	if plan.Roles.IsNull() {
+	if plan.Roles.IsNull() || plan.Roles.IsUnknown() {
 		plan.Roles, diags = marshalRolesToJSON(res.Roles)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -242,7 +242,7 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 		}
 	}
 
-	if plan.Environments.IsNull() {
+	if plan.Environments.IsNull() || plan.Environments.IsUnknown() {
 		plan.Environments, diags = marshalEnvironmentsToJSON(res.Environments)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -473,11 +473,7 @@ func isDefaultRole(slug string) bool {
 func marshalRolesToJSON(roles []infisical.Role) (types.String, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	if len(roles) == 0 {
-		return types.StringNull(), diags
-	}
-
-	var rolesJSON []RoleJSON
+	rolesJSON := make([]RoleJSON, 0)
 	for _, role := range roles {
 		if isDefaultRole(role.Slug) {
 			continue
@@ -522,11 +518,7 @@ func marshalRolesToJSON(roles []infisical.Role) (types.String, diag.Diagnostics)
 func marshalEnvironmentsToJSON(environments []infisical.Environment) (types.String, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	if len(environments) == 0 {
-		return types.StringNull(), diags
-	}
-
-	var envJSON []EnvironmentJSON
+	envJSON := make([]EnvironmentJSON, 0)
 	for _, env := range environments {
 		envJSON = append(envJSON, EnvironmentJSON{
 			Name:     env.Name,
