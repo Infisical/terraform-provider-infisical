@@ -2434,6 +2434,34 @@ type DeleteGroupRequest struct {
 	ID string
 }
 
+type GroupMachineIdentity struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	IsPartOfGroup bool   `json:"isPartOfGroup"`
+}
+
+type AddGroupMachineIdentityRequest struct {
+	GroupID    string
+	IdentityID string
+}
+
+type AddGroupMachineIdentityResponse struct{}
+
+type ListGroupMachineIdentitiesRequest struct {
+	GroupID string
+}
+
+type ListGroupMachineIdentitiesResponse struct {
+	MachineIdentities []GroupMachineIdentity `json:"machineIdentities"`
+}
+
+type RemoveGroupMachineIdentityRequest struct {
+	GroupID    string
+	IdentityID string
+}
+
+type RemoveGroupMachineIdentityResponse struct{}
+
 type SecretRotationProviderObject struct {
 	Provider SecretRotationProvider `json:"type"`
 	Inputs   map[string]any         `json:"inputs"`
