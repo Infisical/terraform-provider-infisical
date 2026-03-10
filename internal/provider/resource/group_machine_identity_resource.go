@@ -93,8 +93,8 @@ func (r *GroupMachineIdentityResource) Create(ctx context.Context, req resource.
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error adding machine identity to group",
-			"Couldn't add machine identity to group, unexpected error: "+err.Error(),
+			"Error creating machine identity group membership",
+			"Couldn't create machine identity group membership, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -133,8 +133,8 @@ func (r *GroupMachineIdentityResource) Read(ctx context.Context, req resource.Re
 			return
 		}
 		resp.Diagnostics.AddError(
-			"Error reading group machine identity",
-			"Couldn't read group machine identity from Infisical, unexpected error: "+err.Error(),
+			"Error reading machine identity group membership",
+			"Couldn't read machine identity group membership from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -181,7 +181,7 @@ func (r *GroupMachineIdentityResource) Delete(ctx context.Context, req resource.
 			return
 		}
 		resp.Diagnostics.AddError(
-			"Error removing machine identity from group",
+			"Error deleting machine identity group membership",
 			"Couldn't list group machine identities, unexpected error: "+err.Error(),
 		)
 		return
@@ -205,8 +205,8 @@ func (r *GroupMachineIdentityResource) Delete(ctx context.Context, req resource.
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error removing machine identity from group",
-			"Couldn't remove machine identity from group, unexpected error: "+err.Error(),
+			"Error deleting machine identity group membership",
+			"Couldn't delete machine identity group membership, unexpected error: "+err.Error(),
 		)
 	}
 }
