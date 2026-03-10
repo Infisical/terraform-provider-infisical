@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -228,6 +229,60 @@ func (r *projectSecretTagResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
+}
+
+// ImportState imports an existing secret tag into Terraform state.
+// The import ID format is: <project_id>,<tag_id>
+func (r *projectSecretTagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import secret tag",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Import ID must be in the format <project_id>,<tag_id>",
+		)
+		return
+	}
+
+	projectID := strings.TrimSpace(parts[0])
+	tagID := strings.TrimSpace(parts[1])
+
+	secretTag, err := r.client.GetProjectTagByID(infisical.GetProjectTagByIDRequest{
+		ProjectID: projectID,
+		TagID:     tagID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Secret tag not found",
+				fmt.Sprintf("No secret tag with ID %q was found in project %q", tagID, projectID),
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing secret tag",
+				"Couldn't read secret tag from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	state := projectSecretTagResourceModel{
+		ID:        types.StringValue(secretTag.Tag.ID),
+		ProjectID: types.StringValue(projectID),
+		Name:      types.StringValue(secretTag.Tag.Name),
+		Slug:      types.StringValue(secretTag.Tag.Slug),
+		Color:     types.StringValue(secretTag.Tag.Color),
+	}
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
