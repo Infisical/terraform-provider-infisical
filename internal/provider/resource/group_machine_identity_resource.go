@@ -170,14 +170,40 @@ func (r *GroupMachineIdentityResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	_, err := r.client.RemoveGroupMachineIdentity(infisical.RemoveGroupMachineIdentityRequest{
+	// Check membership before attempting removal so that a 403 from the delete
+	// endpoint unambiguously signals a permission error rather than "not a member".
+	listResp, err := r.client.ListGroupMachineIdentities(infisical.ListGroupMachineIdentitiesRequest{
+		GroupID: state.GroupID.ValueString(),
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			// Group no longer exists; desired state already achieved.
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error removing machine identity from group",
+			"Couldn't list group machine identities, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	isMember := false
+	for _, identity := range listResp.MachineIdentities {
+		if identity.ID == state.IdentityID.ValueString() && identity.IsPartOfGroup {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		// Identity is already not a member; nothing to do.
+		return
+	}
+
+	_, err = r.client.RemoveGroupMachineIdentity(infisical.RemoveGroupMachineIdentityRequest{
 		GroupID:    state.GroupID.ValueString(),
 		IdentityID: state.IdentityID.ValueString(),
 	})
 	if err != nil {
-		if err == infisical.ErrNotFound {
-			return
-		}
 		resp.Diagnostics.AddError(
 			"Error removing machine identity from group",
 			"Couldn't remove machine identity from group, unexpected error: "+err.Error(),
