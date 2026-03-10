@@ -39,12 +39,12 @@ func (client Client) ListGroupMachineIdentities(request ListGroupMachineIdentiti
 		SetHeader("User-Agent", USER_AGENT).
 		Get(fmt.Sprintf("api/v1/groups/%s/machine-identities", request.GroupID))
 
-	if err != nil {
-		return ListGroupMachineIdentitiesResponse{}, errors.NewGenericRequestError(operationListGroupMachineIdentities, err)
-	}
-
 	if response.StatusCode() == http.StatusNotFound {
 		return ListGroupMachineIdentitiesResponse{}, ErrNotFound
+	}
+
+	if err != nil {
+		return ListGroupMachineIdentitiesResponse{}, errors.NewGenericRequestError(operationListGroupMachineIdentities, err)
 	}
 
 	if response.IsError() {
