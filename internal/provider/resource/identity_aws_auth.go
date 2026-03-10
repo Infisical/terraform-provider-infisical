@@ -414,10 +414,17 @@ func (r *IdentityAwsAuthResource) ImportState(ctx context.Context, req resource.
 		IdentityID: req.ID,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error importing identity aws auth",
-			"Couldn't read identity aws auth from Infisical, unexpected error: "+err.Error(),
-		)
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity aws auth not found",
+				"The identity with the given ID does not have aws auth configured",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity aws auth",
+				"Couldn't read identity aws auth from Infisical, unexpected error: "+err.Error(),
+			)
+		}
 		return
 	}
 
