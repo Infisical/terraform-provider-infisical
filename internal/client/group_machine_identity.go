@@ -62,6 +62,13 @@ func (client Client) RemoveGroupMachineIdentity(request RemoveGroupMachineIdenti
 		SetHeader("User-Agent", USER_AGENT).
 		Delete(fmt.Sprintf("api/v1/groups/%s/machine-identities/%s", request.GroupID, request.IdentityID))
 
+	// The API returns 404 if the group does not exist, and 403 if the identity
+	// is not currently a member of the group. Both cases mean the desired end
+	// state (identity not in group) is already achieved.
+	if response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusForbidden {
+		return RemoveGroupMachineIdentityResponse{}, ErrNotFound
+	}
+
 	if err != nil {
 		return RemoveGroupMachineIdentityResponse{}, errors.NewGenericRequestError(operationRemoveGroupMachineIdentity, err)
 	}

@@ -175,6 +175,9 @@ func (r *GroupMachineIdentityResource) Delete(ctx context.Context, req resource.
 		IdentityID: state.IdentityID.ValueString(),
 	})
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error removing machine identity from group",
 			"Couldn't remove machine identity from group, unexpected error: "+err.Error(),
