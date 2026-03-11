@@ -32,8 +32,13 @@ provider "infisical" {
   }
 }
 
+resource "infisical_project" "example" {
+  name = "example"
+  slug = "example"
+}
+
 resource "infisical_secret_tag" "example" {
-  project_id = "<project-id>"
+  project_id = infisical_project.example.id
   name       = "my-tag"
   slug       = "my-tag"
   color      = "#FF0000"
@@ -52,7 +57,7 @@ resource "infisical_secret_tag" "example" {
 
 ### Read-Only
 
-- `id` (String) The ID of the role
+- `id` (String) The ID of the tag
 
 ## Import
 

@@ -17,8 +17,13 @@ provider "infisical" {
   }
 }
 
+resource "infisical_project" "example" {
+  name = "example"
+  slug = "example"
+}
+
 resource "infisical_secret_tag" "example" {
-  project_id = "<project-id>"
+  project_id = infisical_project.example.id
   name       = "my-tag"
   slug       = "my-tag"
   color      = "#FF0000"
