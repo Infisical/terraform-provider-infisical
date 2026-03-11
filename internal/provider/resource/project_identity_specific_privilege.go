@@ -611,10 +611,53 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 
 		state.Slug = types.StringValue(projectIdentitySpecificPrivilegeResource.Privilege.Slug)
 
-		permissions, parseDiags := parsePermissionsV2(ctx, projectIdentitySpecificPrivilegeResource.Privilege.Permissions)
-		resp.Diagnostics.Append(parseDiags...)
-		if resp.Diagnostics.HasError() {
-			return
+		permissions := make([]IdentityPermissionV2Entry, len(projectIdentitySpecificPrivilegeResource.Privilege.Permissions))
+		for i, permMap := range projectIdentitySpecificPrivilegeResource.Privilege.Permissions {
+			entry := IdentityPermissionV2Entry{}
+
+			if actionRaw, ok := permMap["action"].([]interface{}); ok {
+				actions := make([]string, len(actionRaw))
+				for i, v := range actionRaw {
+					if strValue, ok := v.(string); ok {
+						actions[i] = strValue
+					} else {
+						resp.Diagnostics.AddError(
+							"Invalid Action Type",
+							fmt.Sprintf("Expected string type for action at index %d, got %T", i, v),
+						)
+						return
+					}
+				}
+
+				entry.Action, diags = types.SetValueFrom(ctx, types.StringType, actions)
+				resp.Diagnostics.Append(diags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+			}
+
+			if subject, ok := permMap["subject"].(string); ok {
+				entry.Subject = types.StringValue(subject)
+			}
+
+			if inverted, ok := permMap["inverted"].(bool); ok {
+				entry.Inverted = types.BoolValue(inverted)
+			}
+
+			if conditions, ok := permMap["conditions"].(map[string]any); ok {
+				conditionsBytes, err := json.Marshal(conditions)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error reading identity specific privilege",
+						"Couldn't parse conditions property, unexpected error: "+err.Error(),
+					)
+					return
+				}
+
+				entry.Conditions = types.StringValue(string(conditionsBytes))
+			}
+
+			permissions[i] = entry
 		}
 
 		state.PermissionsV2 = permissions
