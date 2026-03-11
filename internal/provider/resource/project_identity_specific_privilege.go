@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -610,53 +611,10 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 
 		state.Slug = types.StringValue(projectIdentitySpecificPrivilegeResource.Privilege.Slug)
 
-		permissions := make([]IdentityPermissionV2Entry, len(projectIdentitySpecificPrivilegeResource.Privilege.Permissions))
-		for i, permMap := range projectIdentitySpecificPrivilegeResource.Privilege.Permissions {
-			entry := IdentityPermissionV2Entry{}
-
-			if actionRaw, ok := permMap["action"].([]interface{}); ok {
-				actions := make([]string, len(actionRaw))
-				for i, v := range actionRaw {
-					if strValue, ok := v.(string); ok {
-						actions[i] = strValue
-					} else {
-						resp.Diagnostics.AddError(
-							"Invalid Action Type",
-							fmt.Sprintf("Expected string type for action at index %d, got %T", i, v),
-						)
-						return
-					}
-				}
-
-				entry.Action, diags = types.SetValueFrom(ctx, types.StringType, actions)
-				resp.Diagnostics.Append(diags...)
-				if resp.Diagnostics.HasError() {
-					return
-				}
-			}
-
-			if subject, ok := permMap["subject"].(string); ok {
-				entry.Subject = types.StringValue(subject)
-			}
-
-			if inverted, ok := permMap["inverted"].(bool); ok {
-				entry.Inverted = types.BoolValue(inverted)
-			}
-
-			if conditions, ok := permMap["conditions"].(map[string]any); ok {
-				conditionsBytes, err := json.Marshal(conditions)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error reading identity specific privilege",
-						"Couldn't parse conditions property, unexpected error: "+err.Error(),
-					)
-					return
-				}
-
-				entry.Conditions = types.StringValue(string(conditionsBytes))
-			}
-
-			permissions[i] = entry
+		permissions, parseDiags := parsePermissionsV2(ctx, projectIdentitySpecificPrivilegeResource.Privilege.Permissions)
+		resp.Diagnostics.Append(parseDiags...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
 
 		state.PermissionsV2 = permissions
@@ -893,6 +851,69 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 	}
 }
 
+// parsePermissionsV2 converts raw API permission maps into typed IdentityPermissionV2Entry values.
+// Missing fields are defaulted: action → empty set, subject → "", inverted → false.
+func parsePermissionsV2(ctx context.Context, rawPerms []map[string]any) ([]IdentityPermissionV2Entry, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	permissions := make([]IdentityPermissionV2Entry, len(rawPerms))
+
+	for i, permMap := range rawPerms {
+		entry := IdentityPermissionV2Entry{
+			Subject:  types.StringValue(""),
+			Inverted: types.BoolValue(false),
+			Action:   types.SetValueMust(types.StringType, []attr.Value{}),
+		}
+
+		if actionRaw, ok := permMap["action"].([]interface{}); ok {
+			actions := make([]string, len(actionRaw))
+			for j, v := range actionRaw {
+				if strValue, ok := v.(string); ok {
+					actions[j] = strValue
+				} else {
+					diags.AddError(
+						"Invalid action type",
+						fmt.Sprintf("Expected string type for action at index %d, got %T.", j, v),
+					)
+					return nil, diags
+				}
+			}
+
+			actionSet, setDiags := types.SetValueFrom(ctx, types.StringType, actions)
+			diags.Append(setDiags...)
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			entry.Action = actionSet
+		}
+
+		if subject, ok := permMap["subject"].(string); ok {
+			entry.Subject = types.StringValue(subject)
+		}
+
+		if inverted, ok := permMap["inverted"].(bool); ok {
+			entry.Inverted = types.BoolValue(inverted)
+		}
+
+		if conditions, ok := permMap["conditions"].(map[string]any); ok {
+			conditionsBytes, err := json.Marshal(conditions)
+			if err != nil {
+				diags.AddError(
+					"Error parsing permissions",
+					"Couldn't parse conditions property, unexpected error: "+err.Error(),
+				)
+				return nil, diags
+			}
+
+			entry.Conditions = types.StringValue(string(conditionsBytes))
+		}
+
+		permissions[i] = entry
+	}
+
+	return permissions, diags
+}
+
 // ImportState imports an existing project identity specific privilege into Terraform state.
 // The import ID format is: <project_slug>,<identity_id>,<privilege_id>.
 func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -948,55 +969,10 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx conte
 		state.TemporaryAccessEndTime = types.StringValue("")
 	}
 
-	permissions := make([]IdentityPermissionV2Entry, len(privilege.Privilege.Permissions))
-	for i, permMap := range privilege.Privilege.Permissions {
-		entry := IdentityPermissionV2Entry{}
-
-		if actionRaw, ok := permMap["action"].([]interface{}); ok {
-			actions := make([]string, len(actionRaw))
-			for j, v := range actionRaw {
-				if strValue, ok := v.(string); ok {
-					actions[j] = strValue
-				} else {
-					resp.Diagnostics.AddError(
-						"Invalid action type",
-						fmt.Sprintf("Expected string type for action at index %d, got %T.", j, v),
-					)
-					return
-				}
-			}
-
-			actionSet, actionDiags := types.SetValueFrom(ctx, types.StringType, actions)
-			resp.Diagnostics.Append(actionDiags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-
-			entry.Action = actionSet
-		}
-
-		if subject, ok := permMap["subject"].(string); ok {
-			entry.Subject = types.StringValue(subject)
-		}
-
-		if inverted, ok := permMap["inverted"].(bool); ok {
-			entry.Inverted = types.BoolValue(inverted)
-		}
-
-		if conditions, ok := permMap["conditions"].(map[string]any); ok {
-			conditionsBytes, err := json.Marshal(conditions)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error importing project identity specific privilege",
-					"Couldn't parse conditions property, unexpected error: "+err.Error(),
-				)
-				return
-			}
-
-			entry.Conditions = types.StringValue(string(conditionsBytes))
-		}
-
-		permissions[i] = entry
+	permissions, parseDiags := parsePermissionsV2(ctx, privilege.Privilege.Permissions)
+	resp.Diagnostics.Append(parseDiags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	state.PermissionsV2 = permissions
