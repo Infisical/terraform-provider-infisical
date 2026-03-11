@@ -3,9 +3,11 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -63,7 +65,7 @@ func (r *projectSecretTagResource) Schema(_ context.Context, _ resource.SchemaRe
 				Required:    true,
 			},
 			"id": schema.StringAttribute{
-				Description:   "The ID of the role",
+				Description:   "The ID of the tag",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -228,6 +230,55 @@ func (r *projectSecretTagResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
+}
+
+// ImportState imports an existing secret tag into Terraform state.
+// The import ID format is: <project_id>,<tag_id>.
+func (r *projectSecretTagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import secret tag",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Import ID must be in the format <project_id>,<tag_id>",
+		)
+		return
+	}
+
+	projectID := strings.TrimSpace(parts[0])
+	tagID := strings.TrimSpace(parts[1])
+
+	secretTag, err := r.client.GetProjectTagByID(infisical.GetProjectTagByIDRequest{
+		ProjectID: projectID,
+		TagID:     tagID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Secret tag not found",
+				fmt.Sprintf("No secret tag with ID %q was found in project %q", tagID, projectID),
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching secret tag",
+				"Couldn't fetch secret tag from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretTag.Tag.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), secretTag.Tag.ProjectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), secretTag.Tag.Name)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), secretTag.Tag.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("color"), secretTag.Tag.Color)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
