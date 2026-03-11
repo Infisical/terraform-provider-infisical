@@ -958,7 +958,7 @@ func parsePermissionsV2(ctx context.Context, rawPerms []map[string]any) ([]Ident
 }
 
 // ImportState imports an existing project identity specific privilege into Terraform state.
-// The import ID format is: <project_slug>,<identity_id>,<privilege_id>.
+// The import ID format is: <project_id>,<identity_id>,<privilege_id>.
 func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -972,14 +972,23 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx conte
 	if len(parts) != 3 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" || strings.TrimSpace(parts[2]) == "" {
 		resp.Diagnostics.AddError(
 			"Invalid import ID",
-			"Import ID must be in the format <project_slug>,<identity_id>,<privilege_id>.",
+			"Import ID must be in the format <project_id>,<identity_id>,<privilege_id>.",
 		)
 		return
 	}
 
-	projectSlug := strings.TrimSpace(parts[0])
+	projectID := strings.TrimSpace(parts[0])
 	identityID := strings.TrimSpace(parts[1])
 	privilegeID := strings.TrimSpace(parts[2])
+
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{ID: projectID})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching project",
+			"Couldn't fetch project from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
 
 	privilege, err := r.client.GetProjectIdentitySpecificPrivilegeV2(infisical.GetProjectIdentitySpecificPrivilegeV2Request{
 		ID: privilegeID,
@@ -994,7 +1003,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx conte
 
 	state := projectIdentitySpecificPrivilegeResourceResourceModel{
 		ID:          types.StringValue(privilege.Privilege.ID),
-		ProjectSlug: types.StringValue(projectSlug),
+		ProjectSlug: types.StringValue(project.Slug),
 		IdentityID:  types.StringValue(identityID),
 		Slug:        types.StringValue(privilege.Privilege.Slug),
 		IsTemporary: types.BoolValue(privilege.Privilege.IsTemporary),
