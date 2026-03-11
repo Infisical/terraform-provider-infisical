@@ -892,6 +892,118 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 	}
 }
 
+// ImportState imports an existing project identity specific privilege into Terraform state.
+// The import ID format is: <project_slug>,<identity_id>,<privilege_id>.
+func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project identity specific privilege",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 3)
+	if len(parts) != 3 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" || strings.TrimSpace(parts[2]) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Import ID must be in the format <project_slug>,<identity_id>,<privilege_id>.",
+		)
+		return
+	}
+
+	projectSlug := strings.TrimSpace(parts[0])
+	identityID := strings.TrimSpace(parts[1])
+	privilegeID := strings.TrimSpace(parts[2])
+
+	privilege, err := r.client.GetProjectIdentitySpecificPrivilegeV2(infisical.GetProjectIdentitySpecificPrivilegeV2Request{
+		ID: privilegeID,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching project identity specific privilege",
+			"Couldn't fetch project identity specific privilege from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	state := projectIdentitySpecificPrivilegeResourceResourceModel{
+		ID:          types.StringValue(privilege.Privilege.ID),
+		ProjectSlug: types.StringValue(projectSlug),
+		IdentityID:  types.StringValue(identityID),
+		Slug:        types.StringValue(privilege.Privilege.Slug),
+		IsTemporary: types.BoolValue(privilege.Privilege.IsTemporary),
+	}
+
+	if privilege.Privilege.IsTemporary {
+		state.TemporaryMode = types.StringValue(privilege.Privilege.TemporaryMode)
+		state.TemporaryRange = types.StringValue(privilege.Privilege.TemporaryRange)
+		state.TemporaryAccesStartTime = types.StringValue(privilege.Privilege.TemporaryAccessStartTime.Format(time.RFC3339))
+		state.TemporaryAccessEndTime = types.StringValue(privilege.Privilege.TemporaryAccessEndTime.Format(time.RFC3339))
+	} else {
+		state.TemporaryMode = types.StringValue("")
+		state.TemporaryRange = types.StringValue("")
+		state.TemporaryAccesStartTime = types.StringValue("")
+		state.TemporaryAccessEndTime = types.StringValue("")
+	}
+
+	permissions := make([]IdentityPermissionV2Entry, len(privilege.Privilege.Permissions))
+	for i, permMap := range privilege.Privilege.Permissions {
+		entry := IdentityPermissionV2Entry{}
+
+		if actionRaw, ok := permMap["action"].([]interface{}); ok {
+			actions := make([]string, len(actionRaw))
+			for j, v := range actionRaw {
+				if strValue, ok := v.(string); ok {
+					actions[j] = strValue
+				} else {
+					resp.Diagnostics.AddError(
+						"Invalid action type",
+						fmt.Sprintf("Expected string type for action at index %d, got %T.", j, v),
+					)
+					return
+				}
+			}
+
+			actionSet, actionDiags := types.SetValueFrom(ctx, types.StringType, actions)
+			resp.Diagnostics.Append(actionDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			entry.Action = actionSet
+		}
+
+		if subject, ok := permMap["subject"].(string); ok {
+			entry.Subject = types.StringValue(subject)
+		}
+
+		if inverted, ok := permMap["inverted"].(bool); ok {
+			entry.Inverted = types.BoolValue(inverted)
+		}
+
+		if conditions, ok := permMap["conditions"].(map[string]any); ok {
+			conditionsBytes, err := json.Marshal(conditions)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error importing project identity specific privilege",
+					"Couldn't parse conditions property, unexpected error: "+err.Error(),
+				)
+				return
+			}
+
+			entry.Conditions = types.StringValue(string(conditionsBytes))
+		}
+
+		permissions[i] = entry
+	}
+
+	state.PermissionsV2 = permissions
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+}
+
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *projectIdentitySpecificPrivilegeResourceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
