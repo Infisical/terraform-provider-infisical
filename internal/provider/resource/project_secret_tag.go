@@ -233,7 +233,7 @@ func (r *projectSecretTagResource) Update(ctx context.Context, req resource.Upda
 }
 
 // ImportState imports an existing secret tag into Terraform state.
-// The import ID format is: <project_id>,<tag_id>
+// The import ID format is: <project_id>,<tag_id>.
 func (r *projectSecretTagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
