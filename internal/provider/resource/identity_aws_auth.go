@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
@@ -158,11 +159,6 @@ func updateAwsAuthTerraformStateFromApi(ctx context.Context, diagnose diag.Diagn
 			"ip_address": types.StringType,
 		},
 	}, planAccessTokenTrustedIps)
-	diagnose.Append(diags...)
-	if diagnose.HasError() {
-		return
-	}
-
 	diagnose.Append(diags...)
 	if diagnose.HasError() {
 		return
@@ -367,4 +363,80 @@ func (r *IdentityAwsAuthResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
+}
+
+// ImportState imports an existing identity AWS auth into Terraform state.
+// The import ID is the identity ID (same identity that has AWS auth configured).
+func (r *IdentityAwsAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity aws auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	identity, err := r.client.GetIdentity(infisical.GetIdentityRequest{
+		IdentityID: req.ID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity not found",
+				"The identity with the given ID was not found",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity aws auth",
+				"Couldn't read identity from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	if len(identity.Identity.AuthMethods) == 0 {
+		resp.Diagnostics.AddError(
+			"Identity aws auth not found",
+			"The identity with the given ID has no configured auth methods",
+		)
+		return
+	}
+
+	if !slices.Contains(identity.Identity.AuthMethods, "aws-auth") {
+		resp.Diagnostics.AddError(
+			"Identity aws auth not found",
+			"The identity with the given ID does not have aws auth configured",
+		)
+		return
+	}
+
+	identityAwsAuth, err := r.client.GetIdentityAwsAuth(infisical.GetIdentityAwsAuthRequest{
+		IdentityID: req.ID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity aws auth not found",
+				"The identity with the given ID does not have aws auth configured",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity aws auth",
+				"Couldn't read identity aws auth from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	var state IdentityAwsAuthResourceModel
+
+	state.ID = types.StringValue(identityAwsAuth.ID)
+	state.IdentityID = types.StringValue(identityAwsAuth.IdentityID)
+	updateAwsAuthTerraformStateFromApi(ctx, resp.Diagnostics, &state, &identityAwsAuth)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
 }
