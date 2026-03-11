@@ -55,10 +55,11 @@ type Project struct {
 }
 
 type ProjectTag struct {
-	ID    string `json:"id"`
-	Slug  string `json:"slug"`
-	Name  string `json:"name"`
-	Color string `json:"color,omitempty"`
+	ID        string `json:"id"`
+	Slug      string `json:"slug"`
+	Name      string `json:"name"`
+	Color     string `json:"color,omitempty"`
+	ProjectID string `json:"projectId"`
 }
 
 type ProjectUser struct {
