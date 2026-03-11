@@ -130,3 +130,12 @@ Optional:
 
 - `conditions` (String) When specified, only matching conditions will be allowed to access given resource. Refer to the documentation in https://infisical.com/docs/internals/permissions#conditions for the complete list of supported properties and operators.
 - `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import a project identity specific privilege using its project slug, identity ID and privilege ID
+terraform import infisical_project_identity_specific_privilege.example <project_slug>,<identity_id>,<privilege_id>
+```
