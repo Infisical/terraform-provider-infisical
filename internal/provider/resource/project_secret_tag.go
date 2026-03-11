@@ -7,6 +7,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -64,7 +65,7 @@ func (r *projectSecretTagResource) Schema(_ context.Context, _ resource.SchemaRe
 				Required:    true,
 			},
 			"id": schema.StringAttribute{
-				Description:   "The ID of the role",
+				Description:   "The ID of the tag",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -266,23 +267,18 @@ func (r *projectSecretTagResource) ImportState(ctx context.Context, req resource
 			)
 		} else {
 			resp.Diagnostics.AddError(
-				"Error importing secret tag",
-				"Couldn't read secret tag from Infisical, unexpected error: "+err.Error(),
+				"Error fetching secret tag",
+				"Couldn't fetch secret tag from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return
 	}
 
-	state := projectSecretTagResourceModel{
-		ID:        types.StringValue(secretTag.Tag.ID),
-		ProjectID: types.StringValue(projectID),
-		Name:      types.StringValue(secretTag.Tag.Name),
-		Slug:      types.StringValue(secretTag.Tag.Slug),
-		Color:     types.StringValue(secretTag.Tag.Color),
-	}
-
-	diags := resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretTag.Tag.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), secretTag.Tag.ProjectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), secretTag.Tag.Name)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), secretTag.Tag.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("color"), secretTag.Tag.Color)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
