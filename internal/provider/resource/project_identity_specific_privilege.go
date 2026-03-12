@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -894,69 +893,6 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 	}
 }
 
-// parsePermissionsV2 converts raw API permission maps into typed IdentityPermissionV2Entry values.
-// Missing fields are defaulted: action → empty set, subject → "", inverted → false.
-func parsePermissionsV2(ctx context.Context, rawPerms []map[string]any) ([]IdentityPermissionV2Entry, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	permissions := make([]IdentityPermissionV2Entry, len(rawPerms))
-
-	for i, permMap := range rawPerms {
-		entry := IdentityPermissionV2Entry{
-			Subject:  types.StringValue(""),
-			Inverted: types.BoolValue(false),
-			Action:   types.SetValueMust(types.StringType, []attr.Value{}),
-		}
-
-		if actionRaw, ok := permMap["action"].([]interface{}); ok {
-			actions := make([]string, len(actionRaw))
-			for j, v := range actionRaw {
-				if strValue, ok := v.(string); ok {
-					actions[j] = strValue
-				} else {
-					diags.AddError(
-						"Invalid action type",
-						fmt.Sprintf("Expected string type for action at index %d, got %T.", j, v),
-					)
-					return nil, diags
-				}
-			}
-
-			actionSet, setDiags := types.SetValueFrom(ctx, types.StringType, actions)
-			diags.Append(setDiags...)
-			if diags.HasError() {
-				return nil, diags
-			}
-
-			entry.Action = actionSet
-		}
-
-		if subject, ok := permMap["subject"].(string); ok {
-			entry.Subject = types.StringValue(subject)
-		}
-
-		if inverted, ok := permMap["inverted"].(bool); ok {
-			entry.Inverted = types.BoolValue(inverted)
-		}
-
-		if conditions, ok := permMap["conditions"].(map[string]any); ok {
-			conditionsBytes, err := json.Marshal(conditions)
-			if err != nil {
-				diags.AddError(
-					"Error parsing permissions",
-					"Couldn't parse conditions property, unexpected error: "+err.Error(),
-				)
-				return nil, diags
-			}
-
-			entry.Conditions = types.StringValue(string(conditionsBytes))
-		}
-
-		permissions[i] = entry
-	}
-
-	return permissions, diags
-}
-
 // ImportState imports an existing project identity specific privilege into Terraform state.
 // The import ID format is: <project_id>,<identity_id>,<privilege_id>.
 func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -1001,33 +937,15 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx conte
 		return
 	}
 
+	// Bootstrap the minimal state that Read cannot derive on its own.
+	// Terraform calls Read automatically after this to populate the full state.
 	state := projectIdentitySpecificPrivilegeResourceResourceModel{
-		ID:          types.StringValue(privilege.Privilege.ID),
+		ID:          types.StringValue(privilegeID),
 		ProjectSlug: types.StringValue(project.Slug),
 		IdentityID:  types.StringValue(identityID),
 		Slug:        types.StringValue(privilege.Privilege.Slug),
 		IsTemporary: types.BoolValue(privilege.Privilege.IsTemporary),
 	}
-
-	if privilege.Privilege.IsTemporary {
-		state.TemporaryMode = types.StringValue(privilege.Privilege.TemporaryMode)
-		state.TemporaryRange = types.StringValue(privilege.Privilege.TemporaryRange)
-		state.TemporaryAccesStartTime = types.StringValue(privilege.Privilege.TemporaryAccessStartTime.Format(time.RFC3339))
-		state.TemporaryAccessEndTime = types.StringValue(privilege.Privilege.TemporaryAccessEndTime.Format(time.RFC3339))
-	} else {
-		state.TemporaryMode = types.StringValue("")
-		state.TemporaryRange = types.StringValue("")
-		state.TemporaryAccesStartTime = types.StringValue("")
-		state.TemporaryAccessEndTime = types.StringValue("")
-	}
-
-	permissions, parseDiags := parsePermissionsV2(ctx, privilege.Privilege.Permissions)
-	resp.Diagnostics.Append(parseDiags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	state.PermissionsV2 = permissions
 
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
