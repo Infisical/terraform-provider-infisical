@@ -24,9 +24,10 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_                                      resource.Resource = &projectIdentitySpecificPrivilegeResourceResource{}
-	SPECIFIC_PRIVILEGE_PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
+	_                                      resource.Resource                = &projectIdentitySpecificPrivilegeResourceResource{}
+	_                                      resource.ResourceWithImportState = &projectIdentitySpecificPrivilegeResourceResource{}
+	SPECIFIC_PRIVILEGE_PERMISSION_ACTIONS                                   = []string{"create", "edit", "delete", "read"}
+	SPECIFIC_PRIVILEGE_PERMISSION_SUBJECTS                                  = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -310,7 +311,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Co
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating project identity specific privilege",
-					"Couldn't save project identity specific privilege to Infiscial, unexpected error: "+err.Error(),
+					"Couldn't save project identity specific privilege to Infisical, unexpected error: "+err.Error(),
 				)
 				return
 			}
@@ -331,7 +332,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Co
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating project identity specific privilege",
-					"Couldn't save project identity specific privilege to Infiscial, unexpected error: "+err.Error(),
+					"Couldn't save project identity specific privilege to Infisical, unexpected error: "+err.Error(),
 				)
 				return
 			}
@@ -431,7 +432,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Create(ctx context.Co
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project identity specific privilege",
-				"Couldn't save project identity specific privilege to Infiscial, unexpected error: "+err.Error(),
+				"Couldn't save project identity specific privilege to Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -488,7 +489,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project identity specific privilege",
-				"Couldn't read project identity specific privilege from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project identity specific privilege from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -515,7 +516,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project identity specific privilege",
-						"Couldn't read project identity specific privilege from Infiscial, invalid action field in permission",
+						"Couldn't read project identity specific privilege from Infisical, invalid action field in permission",
 					)
 					return
 				}
@@ -527,7 +528,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project identity specific privilege",
-						"Couldn't read project identity specific privilege from Infiscial, invalid subject field in permission",
+						"Couldn't read project identity specific privilege from Infisical, invalid subject field in permission",
 					)
 					return
 				}
@@ -537,7 +538,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 			if !isValid {
 				resp.Diagnostics.AddError(
 					"Error reading project identity specific privilege",
-					"Couldn't read project identity specific privilege from Infiscial, invalid conditions field in permission",
+					"Couldn't read project identity specific privilege from Infisical, invalid conditions field in permission",
 				)
 				return
 			}
@@ -547,7 +548,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 			if !isValid {
 				resp.Diagnostics.AddError(
 					"Error reading project identity specific privilege",
-					"Couldn't read project identity specific privilege from Infiscial, invalid environment field in permission",
+					"Couldn't read project identity specific privilege from Infisical, invalid environment field in permission",
 				)
 				return
 			}
@@ -559,7 +560,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project identity specific privilege",
-						"Couldn't read project identity specific privilege from Infiscial, invalid secret path field in permission",
+						"Couldn't read project identity specific privilege from Infisical, invalid secret path field in permission",
 					)
 					return
 				}
@@ -590,11 +591,12 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project identity specific privilege",
-				"Couldn't read project identity specific privilege from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project identity specific privilege from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
 
+		state.IsTemporary = types.BoolValue(projectIdentitySpecificPrivilegeResource.Privilege.IsTemporary)
 		if projectIdentitySpecificPrivilegeResource.Privilege.IsTemporary {
 			state.TemporaryAccessEndTime = types.StringValue(projectIdentitySpecificPrivilegeResource.Privilege.TemporaryAccessEndTime.Format(time.RFC3339))
 			state.TemporaryAccesStartTime = types.StringValue(projectIdentitySpecificPrivilegeResource.Privilege.TemporaryAccessStartTime.Format(time.RFC3339))
@@ -776,7 +778,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project identity specific privilege",
-				"Couldn't update project identity specific privilege from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project identity specific privilege from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -866,7 +868,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project identity specific privilege",
-				"Couldn't update project identity specific privilege from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project identity specific privilege from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -890,6 +892,51 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Update(ctx context.Co
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// ImportState imports an existing project identity specific privilege into Terraform state.
+// The import ID format is: <project_id>,<identity_id>,<privilege_id>.
+func (r *projectIdentitySpecificPrivilegeResourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project identity specific privilege",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 3)
+	if len(parts) != 3 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" || strings.TrimSpace(parts[2]) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Import ID must be in the format <project_id>,<identity_id>,<privilege_id>.",
+		)
+		return
+	}
+
+	projectID := strings.TrimSpace(parts[0])
+	identityID := strings.TrimSpace(parts[1])
+	privilegeID := strings.TrimSpace(parts[2])
+
+	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{ID: projectID})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching project",
+			"Couldn't fetch project from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Bootstrap the minimal state that Read cannot derive on its own.
+	// Terraform calls Read automatically after this to populate the full state.
+	state := projectIdentitySpecificPrivilegeResourceResourceModel{
+		ID:          types.StringValue(privilegeID),
+		ProjectSlug: types.StringValue(project.Slug),
+		IdentityID:  types.StringValue(identityID),
+	}
+
+	diags := resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -919,7 +966,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Delete(ctx context.Co
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project identity specific privilege",
-			"Couldn't delete project identity specific privilege from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project identity specific privilege from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
