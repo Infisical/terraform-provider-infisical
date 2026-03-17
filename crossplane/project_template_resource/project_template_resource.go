@@ -430,6 +430,22 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	plan.Description = types.StringValue(apiResp.Description)
 	plan.Type = types.StringValue(apiResp.Type)
 
+	if plan.Environments.IsNull() || plan.Environments.IsUnknown() {
+		plan.Environments, diags = marshalEnvironmentsToJSON(apiResp.Environments)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if plan.Roles.IsNull() || plan.Roles.IsUnknown() {
+		plan.Roles, diags = marshalRolesToJSON(apiResp.Roles)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 }
