@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"sort"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
@@ -151,6 +152,42 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 	}
 }
 
+// orderAPIIdentityRolesByPlan reorders API-returned roles to match the ordering specified in the Terraform plan.
+// The API may return roles in a non-deterministic order, but Terraform requires list elements to maintain
+// the same positional order as the plan to avoid "inconsistent result after apply" errors.
+func orderAPIIdentityRolesByPlan(planRoles []ProjectIdentityRole, apiRoles []ProjectIdentityRole) []ProjectIdentityRole {
+	apiRoleMap := make(map[string]ProjectIdentityRole, len(apiRoles))
+	for _, role := range apiRoles {
+		apiRoleMap[role.RoleSlug.ValueString()] = role
+	}
+
+	ordered := make([]ProjectIdentityRole, 0, len(apiRoles))
+	matched := make(map[string]bool)
+
+	// First, add roles in the order they appear in the plan (deduplicating by slug)
+	for _, planRole := range planRoles {
+		slug := planRole.RoleSlug.ValueString()
+		if apiRole, ok := apiRoleMap[slug]; ok && !matched[slug] {
+			ordered = append(ordered, apiRole)
+			matched[slug] = true
+		}
+	}
+
+	// Then, append any remaining API roles not present in the plan (sorted for determinism)
+	var remaining []ProjectIdentityRole
+	for _, apiRole := range apiRoles {
+		if !matched[apiRole.RoleSlug.ValueString()] {
+			remaining = append(remaining, apiRole)
+		}
+	}
+	sort.Slice(remaining, func(i, j int) bool {
+		return remaining[i].RoleSlug.ValueString() < remaining[j].RoleSlug.ValueString()
+	})
+	ordered = append(ordered, remaining...)
+
+	return ordered
+}
+
 // Configure adds the provider configured client to the resource.
 func (r *ProjectIdentityResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -259,7 +296,7 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	apiRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
 	for _, el := range projectIdentityDetails.Membership.Roles {
 		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
@@ -281,9 +318,9 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 			val.TemporaryAccesStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
-		planRoles = append(planRoles, val)
+		apiRoles = append(apiRoles, val)
 	}
-	plan.Roles = planRoles
+	plan.Roles = orderAPIIdentityRolesByPlan(plan.Roles, apiRoles)
 	plan.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -351,7 +388,7 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	apiRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
 	for _, el := range projectIdentityDetails.Membership.Roles {
 		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
@@ -372,10 +409,10 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 			val.TemporaryAccesStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
-		planRoles = append(planRoles, val)
+		apiRoles = append(apiRoles, val)
 	}
 
-	state.Roles = planRoles
+	state.Roles = orderAPIIdentityRolesByPlan(state.Roles, apiRoles)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -505,7 +542,7 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
+	apiRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
 	for _, el := range projectIdentityDetails.Membership.Roles {
 		val := ProjectIdentityRole{
 			ID:                      types.StringValue(el.ID),
@@ -528,9 +565,9 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 			val.TemporaryAccesStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
-		planRoles = append(planRoles, val)
+		apiRoles = append(apiRoles, val)
 	}
-	plan.Roles = planRoles
+	plan.Roles = orderAPIIdentityRolesByPlan(plan.Roles, apiRoles)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -630,6 +667,11 @@ func (r *ProjectIdentityResource) ImportState(ctx context.Context, req resource.
 		}
 		planRoles = append(planRoles, val)
 	}
+
+	// Sort roles alphabetically by slug for deterministic state after import
+	sort.Slice(planRoles, func(i, j int) bool {
+		return planRoles[i].RoleSlug.ValueString() < planRoles[j].RoleSlug.ValueString()
+	})
 
 	// Create the identity object value
 	identityObj, diags := types.ObjectValue(map[string]attr.Type{
