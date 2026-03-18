@@ -164,10 +164,10 @@ func orderAPIIdentityRolesByPlan(planRoles []ProjectIdentityRole, apiRoles []Pro
 	ordered := make([]ProjectIdentityRole, 0, len(apiRoles))
 	matched := make(map[string]bool)
 
-	// First, add roles in the order they appear in the plan
+	// First, add roles in the order they appear in the plan (deduplicating by slug)
 	for _, planRole := range planRoles {
 		slug := planRole.RoleSlug.ValueString()
-		if apiRole, ok := apiRoleMap[slug]; ok {
+		if apiRole, ok := apiRoleMap[slug]; ok && !matched[slug] {
 			ordered = append(ordered, apiRole)
 			matched[slug] = true
 		}
@@ -667,6 +667,11 @@ func (r *ProjectIdentityResource) ImportState(ctx context.Context, req resource.
 		}
 		planRoles = append(planRoles, val)
 	}
+
+	// Sort roles alphabetically by slug for deterministic state after import
+	sort.Slice(planRoles, func(i, j int) bool {
+		return planRoles[i].RoleSlug.ValueString() < planRoles[j].RoleSlug.ValueString()
+	})
 
 	// Create the identity object value
 	identityObj, diags := types.ObjectValue(map[string]attr.Type{

@@ -170,10 +170,10 @@ func orderAPIRolesByPlan(planRoles []ProjectUserRole, apiRoles []ProjectUserRole
 	ordered := make([]ProjectUserRole, 0, len(apiRoles))
 	matched := make(map[string]bool)
 
-	// First, add roles in the order they appear in the plan
+	// First, add roles in the order they appear in the plan (deduplicating by slug)
 	for _, planRole := range planRoles {
 		slug := planRole.RoleSlug.ValueString()
-		if apiRole, ok := apiRoleMap[slug]; ok {
+		if apiRole, ok := apiRoleMap[slug]; ok && !matched[slug] {
 			ordered = append(ordered, apiRole)
 			matched[slug] = true
 		}
