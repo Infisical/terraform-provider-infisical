@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"sort"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
@@ -157,6 +158,42 @@ func (r *ProjectUserResource) Schema(_ context.Context, _ resource.SchemaRequest
 	}
 }
 
+// orderAPIRolesByPlan reorders API-returned roles to match the ordering specified in the Terraform plan.
+// The API may return roles in a non-deterministic order, but Terraform requires list elements to maintain
+// the same positional order as the plan to avoid "inconsistent result after apply" errors.
+func orderAPIRolesByPlan(planRoles []ProjectUserRole, apiRoles []ProjectUserRole) []ProjectUserRole {
+	apiRoleMap := make(map[string]ProjectUserRole, len(apiRoles))
+	for _, role := range apiRoles {
+		apiRoleMap[role.RoleSlug.ValueString()] = role
+	}
+
+	ordered := make([]ProjectUserRole, 0, len(apiRoles))
+	matched := make(map[string]bool)
+
+	// First, add roles in the order they appear in the plan
+	for _, planRole := range planRoles {
+		slug := planRole.RoleSlug.ValueString()
+		if apiRole, ok := apiRoleMap[slug]; ok {
+			ordered = append(ordered, apiRole)
+			matched[slug] = true
+		}
+	}
+
+	// Then, append any remaining API roles not present in the plan (sorted for determinism)
+	var remaining []ProjectUserRole
+	for _, apiRole := range apiRoles {
+		if !matched[apiRole.RoleSlug.ValueString()] {
+			remaining = append(remaining, apiRole)
+		}
+	}
+	sort.Slice(remaining, func(i, j int) bool {
+		return remaining[i].RoleSlug.ValueString() < remaining[j].RoleSlug.ValueString()
+	})
+	ordered = append(ordered, remaining...)
+
+	return ordered
+}
+
 // Configure adds the provider configured client to the resource.
 func (r *ProjectUserResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -297,7 +334,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	planRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
+	apiRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
 	for _, el := range projectUserDetails.Membership.Roles {
 		val := ProjectUserRole{
 			ID:                      types.StringValue(el.ID),
@@ -320,9 +357,9 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 			val.TemporaryAccesStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
-		planRoles = append(planRoles, val)
+		apiRoles = append(apiRoles, val)
 	}
-	plan.Roles = planRoles
+	plan.Roles = orderAPIRolesByPlan(plan.Roles, apiRoles)
 	plan.MembershipId = types.StringValue(projectUserDetails.Membership.ID)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -386,7 +423,7 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	planRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
+	apiRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
 	for _, el := range projectUserDetails.Membership.Roles {
 		val := ProjectUserRole{
 			ID:                      types.StringValue(el.ID),
@@ -407,10 +444,10 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 			val.TemporaryAccesStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
-		planRoles = append(planRoles, val)
+		apiRoles = append(apiRoles, val)
 	}
 
-	state.Roles = planRoles
+	state.Roles = orderAPIRolesByPlan(state.Roles, apiRoles)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -535,7 +572,7 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	planRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
+	apiRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
 	for _, el := range projectUserDetails.Membership.Roles {
 		val := ProjectUserRole{
 			ID:                      types.StringValue(el.ID),
@@ -556,9 +593,9 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 			val.TemporaryAccesStartTime = types.StringNull()
 			val.TemporaryAccessEndTime = types.StringNull()
 		}
-		planRoles = append(planRoles, val)
+		apiRoles = append(apiRoles, val)
 	}
-	plan.Roles = planRoles
+	plan.Roles = orderAPIRolesByPlan(plan.Roles, apiRoles)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
