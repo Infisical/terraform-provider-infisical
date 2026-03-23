@@ -9,7 +9,9 @@ import (
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -111,10 +113,21 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"project_slug": schema.StringAttribute{
 				Description: "The slug of the project to create role. Must provide either project_slug or project_id, but not both.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRoot("project_id"),
+					}...),
+				},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The ID of the project to create role. Must provide either project_id or project_slug, but not both.",
-				Optional:    true,
+				Description:   "The ID of the project to create role. Must provide either project_id or project_slug, but not both.",
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRoot("project_slug"),
+					}...),
+				},
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the role",
@@ -208,19 +221,6 @@ func (r *projectRoleResource) Configure(_ context.Context, req resource.Configur
 	r.client = client
 }
 
-func (r *projectRoleResource) validateProjectIdentifier(plan projectRoleResourceModel) error {
-	hasId := !plan.ProjectID.IsNull() && !plan.ProjectID.IsUnknown()
-	hasSlug := !plan.ProjectSlug.IsNull() && !plan.ProjectSlug.IsUnknown()
-
-	if !hasId && !hasSlug {
-		return fmt.Errorf("Must provide either project_id or project_slug")
-	}
-	if hasId && hasSlug {
-		return fmt.Errorf("Must provide either project_id or project_slug, not both")
-	}
-	return nil
-}
-
 func (r *projectRoleResource) getProject(plan projectRoleResourceModel) (infisical.ProjectWithEnvironments, error) {
 	if !plan.ProjectSlug.IsNull() && !plan.ProjectSlug.IsUnknown() {
 		return r.client.GetProject(infisical.GetProjectRequest{
@@ -248,11 +248,6 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if validationErr := r.validateProjectIdentifier(plan); validationErr != nil {
-		resp.Diagnostics.AddError("Error creating project role", validationErr.Error())
 		return
 	}
 
@@ -301,7 +296,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project role",
-				"Couldn't resolve project slug, unexpected error: "+err.Error(),
+				"Couldn't resolve project, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -663,11 +658,6 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	if validationErr := r.validateProjectIdentifier(plan); validationErr != nil {
-		resp.Diagnostics.AddError("Error updating project role", validationErr.Error())
-		return
-	}
-
 	if !state.ProjectSlug.IsNull() && !plan.ProjectSlug.IsNull() && state.ProjectSlug.ValueString() != plan.ProjectSlug.ValueString() {
 		resp.Diagnostics.AddError(
 			"Unable to update project role",
@@ -737,7 +727,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project role",
-				"Couldn't resolve project slug, unexpected error: "+err.Error(),
+				"Couldn't resolve project, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -861,7 +851,7 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting project role",
-				"Couldn't resolve project slug, unexpected error: "+err.Error(),
+				"Couldn't resolve project, unexpected error: "+err.Error(),
 			)
 			return
 		}
