@@ -9,7 +9,9 @@ import (
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -51,6 +53,7 @@ type projectRoleResourceModel struct {
 	Description   types.String                   `tfsdk:"description"`
 	Slug          types.String                   `tfsdk:"slug"`
 	ProjectSlug   types.String                   `tfsdk:"project_slug"`
+	ProjectID     types.String                   `tfsdk:"project_id"`
 	ID            types.String                   `tfsdk:"id"`
 	Permissions   types.List                     `tfsdk:"permissions"`
 	PermissionsV2 []ProjectRolePermissionV2Entry `tfsdk:"permissions_v2"`
@@ -108,8 +111,24 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Default:     stringdefault.StaticString(""),
 			},
 			"project_slug": schema.StringAttribute{
-				Description: "The slug of the project to create role",
-				Required:    true,
+				Description: "The slug of the project to create role. Must provide either project_slug or project_id, but not both.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRoot("project_id"),
+					}...),
+				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"project_id": schema.StringAttribute{
+				Description:   "The ID of the project to create role. Must provide either project_id or project_slug, but not both.",
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRoot("project_slug"),
+					}...),
+				},
 			},
 			"id": schema.StringAttribute{
 				Description:   "The ID of the role",
@@ -203,6 +222,18 @@ func (r *projectRoleResource) Configure(_ context.Context, req resource.Configur
 	r.client = client
 }
 
+func (r *projectRoleResource) getProject(plan projectRoleResourceModel) (infisical.ProjectWithEnvironments, error) {
+	if !plan.ProjectSlug.IsNull() && !plan.ProjectSlug.IsUnknown() {
+		return r.client.GetProject(infisical.GetProjectRequest{
+			Slug: plan.ProjectSlug.ValueString(),
+		})
+	}
+
+	return r.client.GetProjectById(infisical.GetProjectByIdRequest{
+		ID: plan.ProjectID.ValueString(),
+	})
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
@@ -262,8 +293,17 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 			})
 		}
 
+		project, err := r.getProject(plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating project role",
+				"Couldn't resolve project, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
 		newProjectRole, err := r.client.CreateProjectRole(infisical.CreateProjectRoleRequest{
-			ProjectSlug: plan.ProjectSlug.ValueString(),
+			ProjectSlug: project.Slug,
 			Slug:        plan.Slug.ValueString(),
 			Name:        plan.Name.ValueString(),
 			Description: plan.Description.ValueString(),
@@ -280,14 +320,11 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 
 		plan.ID = types.StringValue(newProjectRole.Role.ID)
 	} else {
-		project, err := r.client.GetProject(infisical.GetProjectRequest{
-			Slug: plan.ProjectSlug.ValueString(),
-		})
-
+		project, err := r.getProject(plan)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project role",
-				"Unexpected error: "+err.Error(),
+				"Couldn't resolve project ID, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -371,10 +408,19 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 
 	// Permissions V1
 	if !state.Permissions.IsNull() {
+		project, err := r.getProject(state)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading project role",
+				"Couldn't resolve project slug, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
 		// Get the latest data from the API
 		projectRole, err := r.client.GetProjectRoleBySlug(infisical.GetProjectRoleBySlugRequest{
 			RoleSlug:    state.Slug.ValueString(),
-			ProjectSlug: state.ProjectSlug.ValueString(),
+			ProjectSlug: project.Slug,
 		})
 
 		if err != nil {
@@ -502,14 +548,11 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 
 		state.Permissions = permissionListValue
 	} else {
-		project, err := r.client.GetProject(infisical.GetProjectRequest{
-			Slug: state.ProjectSlug.ValueString(),
-		})
-
+		project, err := r.getProject(state)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project role",
-				"Unexpected error: "+err.Error(),
+				"Couldn't resolve project ID, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -616,10 +659,28 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	if state.ProjectSlug != plan.ProjectSlug {
+	if !state.ProjectSlug.IsNull() && !plan.ProjectSlug.IsNull() && state.ProjectSlug.ValueString() != plan.ProjectSlug.ValueString() {
 		resp.Diagnostics.AddError(
 			"Unable to update project role",
 			"Project slug cannot be updated",
+		)
+		return
+	}
+
+	if !state.ProjectID.IsNull() && !plan.ProjectID.IsNull() && state.ProjectID.ValueString() != plan.ProjectID.ValueString() {
+		resp.Diagnostics.AddError(
+			"Unable to update project role",
+			"Project ID cannot be updated",
+		)
+		return
+	}
+
+	stateUsesSlug := !state.ProjectSlug.IsNull()
+	planUsesSlug := !plan.ProjectSlug.IsNull()
+	if stateUsesSlug != planUsesSlug {
+		resp.Diagnostics.AddError(
+			"Unable to update project role",
+			"Cannot switch between project_slug and project_id. Please continue using the same project identifier type.",
 		)
 		return
 	}
@@ -663,8 +724,17 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 			})
 		}
 
-		_, err := r.client.UpdateProjectRole(infisical.UpdateProjectRoleRequest{
-			ProjectSlug: plan.ProjectSlug.ValueString(),
+		project, err := r.getProject(plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating project role",
+				"Couldn't resolve project, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		_, err = r.client.UpdateProjectRole(infisical.UpdateProjectRoleRequest{
+			ProjectSlug: project.Slug,
 			RoleId:      plan.ID.ValueString(),
 			Slug:        plan.Slug.ValueString(),
 			Name:        plan.Name.ValueString(),
@@ -680,14 +750,11 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 			return
 		}
 	} else {
-		project, err := r.client.GetProject(infisical.GetProjectRequest{
-			Slug: plan.ProjectSlug.ValueString(),
-		})
-
+		project, err := r.getProject(plan)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project role",
-				"Unexpected error: "+err.Error(),
+				"Couldn't resolve project ID, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -767,17 +834,41 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	_, err := r.client.DeleteProjectRole(infisical.DeleteProjectRoleRequest{
-		ProjectSlug: state.ProjectSlug.ValueString(),
-		RoleId:      state.ID.ValueString(),
-	})
+	if !state.ProjectID.IsNull() && !state.ProjectID.IsUnknown() {
+		_, err := r.client.DeleteProjectRoleV2(infisical.DeleteProjectRoleV2Request{
+			ProjectId: state.ProjectID.ValueString(),
+			RoleId:    state.ID.ValueString(),
+		})
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting project role",
-			"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
-		)
-		return
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting project role",
+				"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	} else {
+		project, err := r.getProject(state)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting project role",
+				"Couldn't resolve project, unexpected error: "+err.Error(),
+			)
+			return
+		}
+
+		_, err = r.client.DeleteProjectRole(infisical.DeleteProjectRoleRequest{
+			ProjectSlug: project.Slug,
+			RoleId:      state.ID.ValueString(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting project role",
+				"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 }

@@ -908,6 +908,15 @@ type DeleteProjectRoleResponse struct {
 	Role ProjectRole `json:"role"`
 }
 
+type DeleteProjectRoleV2Request struct {
+	ProjectId string
+	RoleId    string
+}
+
+type DeleteProjectRoleV2Response struct {
+	Role ProjectRole `json:"role"`
+}
+
 type GetProjectRoleBySlugRequest struct {
 	ProjectSlug string `json:"projectSlug"`
 	RoleSlug    string `json:"roleSlug"`

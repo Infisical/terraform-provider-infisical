@@ -13,6 +13,7 @@ const (
 	operationGetProjectRoleBySlug   = "CallGetProjectRoleBySlug"
 	operationCreateProjectRoleV2    = "CallCreateProjectRoleV2"
 	operationUpdateProjectRoleV2    = "CallUpdateProjectRoleV2"
+	operationDeleteProjectRoleV2    = "CallDeleteProjectRoleV2"
 	operationGetProjectRoleBySlugV2 = "CallGetProjectRoleBySlugV2"
 )
 
@@ -91,6 +92,25 @@ func (client Client) UpdateProjectRole(request UpdateProjectRoleRequest) (Update
 
 	if response.IsError() {
 		return UpdateProjectRoleResponse{}, errors.NewAPIErrorWithResponse(operationUpdateProjectRole, response, nil)
+	}
+
+	return responseData, nil
+}
+
+func (client Client) DeleteProjectRoleV2(request DeleteProjectRoleV2Request) (DeleteProjectRoleV2Response, error) {
+	var responseData DeleteProjectRoleV2Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&responseData).
+		SetHeader("User-Agent", USER_AGENT).
+		Delete(fmt.Sprintf("api/v2/workspace/%s/roles/%s", request.ProjectId, request.RoleId))
+
+	if err != nil {
+		return DeleteProjectRoleV2Response{}, errors.NewGenericRequestError(operationDeleteProjectRoleV2, err)
+	}
+
+	if response.IsError() {
+		return DeleteProjectRoleV2Response{}, errors.NewAPIErrorWithResponse(operationDeleteProjectRoleV2, response, nil)
 	}
 
 	return responseData, nil
