@@ -118,6 +118,7 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 						path.MatchRoot("project_id"),
 					}...),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"project_id": schema.StringAttribute{
 				Description:   "The ID of the project to create role. Must provide either project_id or project_slug, but not both.",
