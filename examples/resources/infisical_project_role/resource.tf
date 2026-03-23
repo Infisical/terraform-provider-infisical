@@ -47,3 +47,16 @@ resource "infisical_project_role" "biller" {
     },
   ]
 }
+
+resource "infisical_project_role" "viewer" {
+  project_id  = infisical_project.example.id
+  name        = "Viewer"
+  description = "A viewer role"
+  slug        = "viewer"
+  permissions_v2 = [
+    {
+      subject = "secrets"
+      action  = ["read"]
+    },
+  ]
+}
