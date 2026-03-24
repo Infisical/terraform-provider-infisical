@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "infisical" {
-  host = "http://localhost:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
+  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
     universal = {
       client_id     = "<machine-identity-client-id>"
@@ -20,13 +20,13 @@ provider "infisical" {
 resource "infisical_identity" "machine-identity-jwks-1" {
   name   = "machine-identity-jwks-1"
   role   = "admin"
-  org_id = "a797dc61-9a3a-424f-bc1a-46b39ea8d369"
+  org_id = "<org-id>"
 }
 
 resource "infisical_identity" "machine-identity-static-1" {
   name   = "machine-identity-static-1"
   role   = "admin"
-  org_id = "a797dc61-9a3a-424f-bc1a-46b39ea8d369"
+  org_id = "<org-id>"
 }
 
 # JWKS configuration example
