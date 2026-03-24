@@ -189,6 +189,14 @@ func (r *IdentityJwtAuthResource) validatePEM(pemKeys []string, resp *resource.V
 			)
 			return
 		}
+		if block.Type != "PUBLIC KEY" && block.Type != "RSA PUBLIC KEY" && block.Type != "EC PUBLIC KEY" {
+			resp.Diagnostics.AddError(
+				"Invalid JWT auth configuration",
+				fmt.Sprintf("public_keys[%d] has unexpected PEM block type %q, expected a public key", i, block.Type),
+			)
+			return
+		}
+
 	}
 }
 
@@ -462,6 +470,8 @@ func (r *IdentityJwtAuthResource) Read(ctx context.Context, req resource.ReadReq
 			return
 		}
 	}
+
+	state.ID = types.StringValue(identityJwtAuth.ID)
 
 	updateJwtAuthStateByApi(ctx, resp.Diagnostics, &state, &identityJwtAuth)
 	diags = resp.State.Set(ctx, &state)
