@@ -270,9 +270,13 @@ func updateJwtAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pla
 	plan.ConfigurationType = types.StringValue(newIdentityJwtAuth.ConfigurationType)
 	plan.JwksUrl = types.StringValue(newIdentityJwtAuth.JwksUrl)
 	apiCaCert := strings.TrimRight(newIdentityJwtAuth.JwksCaCert, "\n")
-	planCaCert := strings.TrimRight(plan.JwksCaCert.ValueString(), "\n")
-	if apiCaCert != planCaCert {
-		plan.JwksCaCert = types.StringValue(newIdentityJwtAuth.JwksCaCert)
+	if plan.JwksCaCert.IsUnknown() {
+		plan.JwksCaCert = types.StringValue(apiCaCert)
+	} else {
+		planCaCert := strings.TrimRight(plan.JwksCaCert.ValueString(), "\n")
+		if apiCaCert != planCaCert {
+			plan.JwksCaCert = types.StringValue(newIdentityJwtAuth.JwksCaCert)
+		}
 	}
 	plan.BoundIssuer = types.StringValue(newIdentityJwtAuth.BoundIssuer)
 	plan.BoundSubject = types.StringValue(newIdentityJwtAuth.BoundSubject)
