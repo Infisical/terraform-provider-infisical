@@ -1784,6 +1784,53 @@ type RevokeIdentityKubernetesAuthResponse struct {
 	IdentityKubernetesAuth IdentityKubernetesAuth `json:"identityKubernetesAuth"`
 }
 
+type IdentityJwtAuth struct {
+	ID                      string                  `json:"id"`
+	AccessTokenTTL          int64                   `json:"accessTokenTTL"`
+	AccessTokenMaxTTL       int64                   `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit int64                   `json:"accessTokenNumUsesLimit"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIp `json:"accessTokenTrustedIps"`
+	CreatedAt               string                  `json:"createdAt"`
+	UpdatedAt               string                  `json:"updatedAt"`
+	IdentityID              string                  `json:"identityId"`
+	ConfigurationType       string                  `json:"configurationType"`
+	JwksUrl                 string                  `json:"jwksUrl"`
+	JwksCaCert              string                  `json:"jwksCaCert"`
+	PublicKeys              []string                `json:"publicKeys"`
+	BoundIssuer             string                  `json:"boundIssuer"`
+	BoundAudiences          string                  `json:"boundAudiences"`
+	BoundClaims             map[string]string       `json:"boundClaims"`
+	BoundSubject            string                  `json:"boundSubject"`
+}
+
+type IdentityJwtAuthRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	ConfigurationType       string                         `json:"configurationType"`
+	JwksUrl                 string                         `json:"jwksUrl"`
+	JwksCaCert              string                         `json:"jwksCaCert"`
+	PublicKeys              []string                       `json:"publicKeys"`
+	BoundIssuer             string                         `json:"boundIssuer"`
+	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type IdentityJwtAuthResponse struct {
+	IdentityJwtAuth IdentityJwtAuth `json:"identityJwtAuth"`
+}
+
+type GetIdentityJwtAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
+type RevokeIdentityJwtAuthRequest struct {
+	IdentityID string `json:"identityId"`
+}
+
 type CreateIntegrationAuthRequest struct {
 	AccessId            string              `json:"accessId,omitempty"`
 	AccessToken         string              `json:"accessToken,omitempty"`
