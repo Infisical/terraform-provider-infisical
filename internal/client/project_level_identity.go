@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"terraform-provider-infisical/internal/errors"
 )
 
@@ -21,7 +22,7 @@ func (client Client) CreateProjectLevelIdentity(request CreateProjectLevelIdenti
 		SetResult(&response).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post(fmt.Sprintf("api/v1/projects/%s/identities", request.ProjectID))
+		Post(fmt.Sprintf("api/v1/projects/%s/identities", url.PathEscape(request.ProjectID)))
 
 	if err != nil {
 		return ProjectLevelIdentity{}, errors.NewGenericRequestError(operationCreateProjectLevelIdentity, err)
@@ -41,7 +42,7 @@ func (client Client) GetProjectLevelIdentityByID(request GetProjectLevelIdentity
 		R().
 		SetResult(&response).
 		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v1/projects/%s/identities/%s", request.ProjectID, request.IdentityID))
+		Get(fmt.Sprintf("api/v1/projects/%s/identities/%s", url.PathEscape(request.ProjectID), url.PathEscape(request.IdentityID)))
 
 	if err != nil {
 		return ProjectLevelIdentity{}, errors.NewGenericRequestError(operationGetProjectLevelIdentity, err)
@@ -66,7 +67,7 @@ func (client Client) UpdateProjectLevelIdentity(request UpdateProjectLevelIdenti
 		SetResult(&response).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch(fmt.Sprintf("api/v1/projects/%s/identities/%s", request.ProjectID, request.IdentityID))
+		Patch(fmt.Sprintf("api/v1/projects/%s/identities/%s", url.PathEscape(request.ProjectID), url.PathEscape(request.IdentityID)))
 
 	if err != nil {
 		return ProjectLevelIdentity{}, errors.NewGenericRequestError(operationUpdateProjectLevelIdentity, err)
@@ -86,7 +87,7 @@ func (client Client) DeleteProjectLevelIdentity(request DeleteProjectLevelIdenti
 		R().
 		SetResult(&response).
 		SetHeader("User-Agent", USER_AGENT).
-		Delete(fmt.Sprintf("api/v1/projects/%s/identities/%s", request.ProjectID, request.IdentityID))
+		Delete(fmt.Sprintf("api/v1/projects/%s/identities/%s", url.PathEscape(request.ProjectID), url.PathEscape(request.IdentityID)))
 
 	if err != nil {
 		return ProjectLevelIdentity{}, errors.NewGenericRequestError(operationDeleteProjectLevelIdentity, err)

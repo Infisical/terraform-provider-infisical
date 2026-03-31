@@ -293,6 +293,14 @@ func (r *ProjectLevelIdentityResource) Delete(ctx context.Context, req resource.
 
 // ImportState restores state from a <project_id>,<identity_id> import ID.
 func (r *ProjectLevelIdentityResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project-level identity",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
 	parts := strings.Split(req.ID, ",")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		resp.Diagnostics.AddError(
