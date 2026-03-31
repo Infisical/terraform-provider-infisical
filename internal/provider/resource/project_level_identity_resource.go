@@ -154,7 +154,9 @@ func (r *ProjectLevelIdentityResource) Create(ctx context.Context, req resource.
 	plan.ID = types.StringValue(identity.ID)
 	plan.HasDeleteProtection = types.BoolValue(identity.HasDeleteProtection)
 	plan.AuthMethods = buildAuthMethodsList(identity.AuthMethods)
-	setMetadataFromAPI(&plan, identity.Metadata)
+	if plan.Metadata != nil {
+		setMetadataFromAPI(&plan, identity.Metadata)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -253,7 +255,9 @@ func (r *ProjectLevelIdentityResource) Update(ctx context.Context, req resource.
 	plan.ID = state.ID
 	plan.HasDeleteProtection = types.BoolValue(identity.HasDeleteProtection)
 	plan.AuthMethods = buildAuthMethodsList(identity.AuthMethods)
-	setMetadataFromAPI(&plan, identity.Metadata)
+	if plan.Metadata != nil {
+		setMetadataFromAPI(&plan, identity.Metadata)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -338,9 +342,6 @@ func (r *ProjectLevelIdentityResource) ImportState(ctx context.Context, req reso
 			Key:   types.StringValue(m.Key),
 			Value: types.StringValue(m.Value),
 		})
-	}
-	if metadata == nil {
-		metadata = []MetaEntry{}
 	}
 
 	state := ProjectLevelIdentityResourceModel{
