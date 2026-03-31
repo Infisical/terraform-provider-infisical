@@ -390,6 +390,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectSecretImportResource,
 		infisicalResource.NewGroupResource,
 		infisicalResource.NewGroupMachineIdentityResource,
+		infisicalResource.NewProjectLevelIdentityResource,
 		appConnectionResource.NewAppConnectionGcpResource,
 		appConnectionResource.NewAppConnectionAwsResource,
 		appConnectionResource.NewAppConnectionAzureResource,

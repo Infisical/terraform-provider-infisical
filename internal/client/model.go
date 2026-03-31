@@ -3298,3 +3298,58 @@ type GetOrgRoleByIdRequest struct {
 type GetOrgRoleByIdResponse struct {
 	Role OrgRole `json:"role"`
 }
+
+// ProjectLevelIdentity
+
+type ProjectLevelIdentity struct {
+	ID                  string      `json:"id"`
+	Name                string      `json:"name"`
+	OrgID               string      `json:"orgId"`
+	ProjectID           string      `json:"projectId"`
+	HasDeleteProtection bool        `json:"hasDeleteProtection"`
+	AuthMethods         []string    `json:"authMethods"`
+	CreatedAt           time.Time   `json:"createdAt"`
+	UpdatedAt           time.Time   `json:"updatedAt"`
+	Metadata            []MetaEntry `json:"metadata"`
+}
+
+type CreateProjectLevelIdentityRequest struct {
+	ProjectID           string            `json:"-"`
+	Name                string            `json:"name"`
+	HasDeleteProtection bool              `json:"hasDeleteProtection"`
+	Metadata            []CreateMetaEntry `json:"metadata,omitempty"`
+}
+
+type CreateProjectLevelIdentityResponse struct {
+	Identity ProjectLevelIdentity `json:"identity"`
+}
+
+type GetProjectLevelIdentityRequest struct {
+	ProjectID  string
+	IdentityID string
+}
+
+type GetProjectLevelIdentityResponse struct {
+	Identity ProjectLevelIdentity `json:"identity"`
+}
+
+type UpdateProjectLevelIdentityRequest struct {
+	ProjectID           string            `json:"-"`
+	IdentityID          string            `json:"-"`
+	Name                string            `json:"name,omitempty"`
+	HasDeleteProtection bool              `json:"hasDeleteProtection"`
+	Metadata            []CreateMetaEntry `json:"metadata"`
+}
+
+type UpdateProjectLevelIdentityResponse struct {
+	Identity ProjectLevelIdentity `json:"identity"`
+}
+
+type DeleteProjectLevelIdentityRequest struct {
+	ProjectID  string
+	IdentityID string
+}
+
+type DeleteProjectLevelIdentityResponse struct {
+	Identity ProjectLevelIdentity `json:"identity"`
+}
