@@ -23,6 +23,7 @@ const (
 	AppConnectionAppMsSql                 AppConnectionApp = "mssql"
 	AppConnectionAppPostgres              AppConnectionApp = "postgres"
 	AppConnectionAppOracle                AppConnectionApp = "oracledb"
+	AppConnectionAppRedis                 AppConnectionApp = "redis"
 	AppConnectionApp1Password             AppConnectionApp = "1password"
 	AppConnectionAppRender                AppConnectionApp = "render"
 	AppConnectionAppAzureClientSecrets    AppConnectionApp = "azure-client-secrets"
