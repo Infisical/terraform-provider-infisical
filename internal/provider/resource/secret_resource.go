@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	modifiers "terraform-provider-infisical/internal/pkg/modifiers"
 	pkg "terraform-provider-infisical/internal/pkg/strings"
 	"time"
 
@@ -188,9 +189,10 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed: true,
 			},
 			"tag_ids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Description: "Tag ids to be attached for the secrets.",
+				ElementType:   types.StringType,
+				Optional:      true,
+				Description:   "Tag ids to be attached for the secrets.",
+				PlanModifiers: []planmodifier.List{modifiers.UnorderedList()},
 			},
 			"metadata": schema.MapAttribute{
 				ElementType: types.StringType,
@@ -411,6 +413,26 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if !state.Value.IsNull() && !state.Value.IsUnknown() {
 		// Resource was configured with regular Value field
 		state.Value = types.StringValue(response.Secret.SecretValue)
+	}
+
+	if len(response.Secret.Tags) > 0 {
+		tagIDs := make([]string, 0, len(response.Secret.Tags))
+		for _, tag := range response.Secret.Tags {
+			tagIDs = append(tagIDs, tag.ID)
+		}
+		state.Tags, diags = types.ListValueFrom(ctx, types.StringType, tagIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	} else if state.Tags.IsNull() || state.Tags.IsUnknown() {
+		state.Tags = types.ListNull(types.StringType)
+	} else {
+		state.Tags, diags = types.ListValueFrom(ctx, types.StringType, []string{})
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	if len(response.Secret.SecretMetadata) > 0 {
