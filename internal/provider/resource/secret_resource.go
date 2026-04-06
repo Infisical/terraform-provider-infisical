@@ -413,6 +413,20 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		state.Value = types.StringValue(response.Secret.SecretValue)
 	}
 
+	if len(response.Secret.Tags) > 0 {
+		tagIDs := make([]string, 0, len(response.Secret.Tags))
+		for _, tag := range response.Secret.Tags {
+			tagIDs = append(tagIDs, tag.ID)
+		}
+		state.Tags, diags = types.ListValueFrom(ctx, types.StringType, tagIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	} else {
+		state.Tags = types.ListNull(types.StringType)
+	}
+
 	if len(response.Secret.SecretMetadata) > 0 {
 		metadataMap := make(map[string]types.String, len(response.Secret.SecretMetadata))
 		for _, item := range response.Secret.SecretMetadata {
