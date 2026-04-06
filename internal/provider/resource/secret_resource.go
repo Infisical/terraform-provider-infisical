@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	modifiers "terraform-provider-infisical/internal/pkg/modifiers"
 	pkg "terraform-provider-infisical/internal/pkg/strings"
 	"time"
 
@@ -188,9 +189,10 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed: true,
 			},
 			"tag_ids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Description: "Tag ids to be attached for the secrets.",
+				ElementType:   types.StringType,
+				Optional:      true,
+				Description:   "Tag ids to be attached for the secrets.",
+				PlanModifiers: []planmodifier.List{modifiers.UnorderedList()},
 			},
 			"metadata": schema.MapAttribute{
 				ElementType: types.StringType,
