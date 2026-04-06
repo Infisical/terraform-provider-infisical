@@ -423,8 +423,14 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		if resp.Diagnostics.HasError() {
 			return
 		}
-	} else {
+	} else if state.Tags.IsNull() || state.Tags.IsUnknown() {
 		state.Tags = types.ListNull(types.StringType)
+	} else {
+		state.Tags, diags = types.ListValueFrom(ctx, types.StringType, []string{})
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	if len(response.Secret.SecretMetadata) > 0 {
