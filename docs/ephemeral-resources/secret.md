@@ -52,8 +52,10 @@ ephemeral "infisical_secret" "postgres_password" {
 
 locals {
   credentials = {
-    username = ephemeral.infisical_secret.postgres_username.value
-    password = ephemeral.infisical_secret.postgres_password.value
+    username         = ephemeral.infisical_secret.postgres_username.value
+    username_version = ephemeral.infisical_secret.postgres_username.version
+    password         = ephemeral.infisical_secret.postgres_password.value
+    password_version = ephemeral.infisical_secret.postgres_password.version
   }
 }
 
