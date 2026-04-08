@@ -32,6 +32,7 @@ type ephemeralSecretResourceModel struct {
 	Value       types.String `tfsdk:"value"`
 	WorkspaceId types.String `tfsdk:"workspace_id"`
 	Metadata    types.Map    `tfsdk:"metadata"`
+	Version     types.Int64  `tfsdk:"version"`
 }
 
 // Metadata returns the resource type name.
@@ -72,6 +73,10 @@ func (r *ephemeralSecretResource) Schema(_ context.Context, _ ephemeral.SchemaRe
 			"metadata": schema.MapAttribute{
 				ElementType: types.StringType,
 				Description: "Metadata associated with the secret as key-value pairs.",
+				Computed:    true,
+			},
+			"version": schema.Int64Attribute{
+				Description: "The version number of the secret",
 				Computed:    true,
 			},
 		},
@@ -160,5 +165,6 @@ func (r *ephemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRe
 		EnvSlug:     config.EnvSlug,
 		WorkspaceId: config.WorkspaceId,
 		Metadata:    metadata,
+		Version:     types.Int64Value(int64(res.Secret.Version)),
 	})
 }
