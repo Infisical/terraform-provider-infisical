@@ -21,6 +21,14 @@ update_subcategory() {
     fi
 }
 
+echo "Removing hidden resource docs..."
+HIDDEN_RESOURCES=(
+    "project_identity_provisioning"
+)
+for resource in "${HIDDEN_RESOURCES[@]}"; do
+    rm -f "$DOCS_DIR/resources/${resource}.md"
+done
+
 echo "Updating documentation subcategories..."
 
 # Resources
