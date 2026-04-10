@@ -33,10 +33,10 @@ provider "infisical" {
 }
 
 data "infisical_secret_properties" "example" {
-  name         = "MY_SECRET"
-  environment_slug     = "dev"
-  project_id = "<project-id>"
-  folder_path  = "/"
+  name             = "MY_SECRET"
+  environment_slug = "<environment-slug>"
+  project_id       = "<project-id>"
+  folder_path      = "<folder-path>"
 }
 
 output "secret_version" {
@@ -47,7 +47,7 @@ output "secret_type" {
   value = data.infisical_secret_properties.example.secret_type
 }
 
-output "secret_tags" {
+output "tags" {
   value = data.infisical_secret_properties.example.tags
 }
 
@@ -61,10 +61,10 @@ output "secret_metadata" {
 
 ### Required
 
-- `name` (String) The name of the secret to retrieve properties for.
 - `environment_slug` (String) The environment slug where the secret resides.
-- `project_id` (String) The Infisical project ID.
 - `folder_path` (String) The path to the folder where the secret is located.
+- `name` (String) The name of the secret to retrieve properties for.
+- `project_id` (String) The Infisical project ID.
 
 ### Optional
 
@@ -72,6 +72,26 @@ output "secret_metadata" {
 
 ### Read-Only
 
+- `secret_metadata` (List of Object) Metadata associated with the secret as a list of key-value entries. (see [below for nested schema](#nestedatt--secret_metadata))
 - `secret_version` (Number) The version number of the secret.
-- `secret_metadata` (List of Object) Metadata associated with the secret as a list of key-value entries. Each entry has `key` (String), `value` (String), and `is_encrypted` (Boolean).
-- `tags` (List of Object) Tags associated with the secret. Each tag has `id` (String), `slug` (String), `name` (String), and `color` (String).
+- `tags` (List of Object) Tags associated with the secret. (see [below for nested schema](#nestedatt--tags))
+
+<a id="nestedatt--secret_metadata"></a>
+### Nested Schema for `secret_metadata`
+
+Read-Only:
+
+- `is_encrypted` (Boolean)
+- `key` (String)
+- `value` (String)
+
+
+<a id="nestedatt--tags"></a>
+### Nested Schema for `tags`
+
+Read-Only:
+
+- `color` (String)
+- `id` (String)
+- `name` (String)
+- `slug` (String)

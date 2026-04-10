@@ -18,10 +18,10 @@ provider "infisical" {
 }
 
 data "infisical_secret_properties" "example" {
-  name                 = "MY_SECRET"
-  environment_slug     = "<environment-slug>"
-  project_id           = "<project-id>"
-  folder_path          = "<folder-path>"
+  name             = "MY_SECRET"
+  environment_slug = "<environment-slug>"
+  project_id       = "<project-id>"
+  folder_path      = "<folder-path>"
 }
 
 output "secret_version" {
