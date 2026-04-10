@@ -17,7 +17,7 @@ provider "infisical" {
   }
 }
 
-data "infisical_secret_properties" "example" {
+data "infisical_secret_metadata" "example" {
   name             = "MY_SECRET"
   environment_slug = "<environment-slug>"
   project_id       = "<project-id>"
@@ -25,17 +25,17 @@ data "infisical_secret_properties" "example" {
 }
 
 output "secret_version" {
-  value = data.infisical_secret_properties.example.secret_version
+  value = data.infisical_secret_metadata.example.secret_version
 }
 
 output "secret_type" {
-  value = data.infisical_secret_properties.example.secret_type
+  value = data.infisical_secret_metadata.example.secret_type
 }
 
 output "tags" {
-  value = data.infisical_secret_properties.example.tags
+  value = data.infisical_secret_metadata.example.tags
 }
 
 output "secret_metadata" {
-  value = data.infisical_secret_properties.example.secret_metadata
+  value = data.infisical_secret_metadata.example.secret_metadata
 }

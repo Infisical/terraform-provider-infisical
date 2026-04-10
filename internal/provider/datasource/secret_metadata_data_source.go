@@ -13,19 +13,19 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &SecretPropertiesDataSource{}
+var _ datasource.DataSource = &SecretMetadataDataSource{}
 
-func NewSecretPropertiesDataSource() datasource.DataSource {
-	return &SecretPropertiesDataSource{}
+func NewSecretMetadataDataSource() datasource.DataSource {
+	return &SecretMetadataDataSource{}
 }
 
-type SecretPropertiesDataSource struct {
+type SecretMetadataDataSource struct {
 	client *infisical.Client
 }
 
 const defaultSecretType = "shared"
 
-type SecretPropertiesDataSourceModel struct {
+type SecretMetadataDataSourceModel struct {
 	Name            types.String `tfsdk:"name"`
 	EnvironmentSlug types.String `tfsdk:"environment_slug"`
 	ProjectID       types.String `tfsdk:"project_id"`
@@ -36,11 +36,11 @@ type SecretPropertiesDataSourceModel struct {
 	Tags            types.List   `tfsdk:"tags"`
 }
 
-func (d *SecretPropertiesDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secret_properties"
+func (d *SecretMetadataDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_secret_metadata"
 }
 
-func (d *SecretPropertiesDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *SecretMetadataDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Retrieve properties for a single Infisical secret without exposing the secret value.",
 
@@ -97,7 +97,7 @@ func (d *SecretPropertiesDataSource) Schema(ctx context.Context, req datasource.
 	}
 }
 
-func (d *SecretPropertiesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *SecretMetadataDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -114,7 +114,7 @@ func (d *SecretPropertiesDataSource) Configure(ctx context.Context, req datasour
 	d.client = client
 }
 
-func (d *SecretPropertiesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *SecretMetadataDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if !d.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to fetch secret properties",
@@ -123,7 +123,7 @@ func (d *SecretPropertiesDataSource) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
-	var data SecretPropertiesDataSourceModel
+	var data SecretMetadataDataSourceModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
