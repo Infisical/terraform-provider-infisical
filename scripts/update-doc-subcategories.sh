@@ -102,7 +102,7 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
     
     case "$filename" in
         # Secrets
-        secrets|secret_folders|secret_tag|secret_metadata)
+        secrets|secret_folders|secret_tag|secret_properties)
             update_subcategory "$file" "Secrets";;
         
         # Groups

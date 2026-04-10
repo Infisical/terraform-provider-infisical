@@ -394,7 +394,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		WorkspaceId: state.WorkspaceId.ValueString(),
 		Environment: state.EnvSlug.ValueString(),
 		SecretPath:  state.FolderPath.ValueString(),
-	})
+	}, nil)
 
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -693,7 +693,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 			SecretPath:  parts[2],
 			SecretName:  parts[3],
 			Type:        "shared", // Just use the secret uuid instead if (type is 'personal')
-		})
+		}, nil)
 
 		if err != nil {
 			if err == infisical.ErrNotFound {

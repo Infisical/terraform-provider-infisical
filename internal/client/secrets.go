@@ -11,18 +11,17 @@ import (
 )
 
 const (
-	operationGetSecretsV3                       = "CallGetSecretsV3"
-	operationCreateSecretsV3                    = "CallCreateSecretsV3"
-	operationDeleteSecretsV3                    = "CallDeleteSecretsV3"
-	operationUpdateSecretsV3                    = "CallUpdateSecretsV3"
-	operationGetSingleSecretByNameV3            = "CallGetSingleSecretByNameV3"
-	operationGetSingleSecretByIDV3              = "CallGetSingleSecretByIDV3"
-	operationGetSecretsRawV3                    = "CallGetSecretsRawV3"
-	operationCreateRawSecretsV3                 = "CallCreateRawSecretsV3"
-	operationDeleteRawSecretV3                  = "CallDeleteRawSecretV3"
-	operationUpdateRawSecretV3                  = "CallUpdateRawSecretV3"
-	operationGetSingleRawSecretByNameV3         = "CallGetSingleRawSecretByNameV3"
-	operationGetSingleRawSecretMetadataByNameV3 = "CallGetSingleRawSecretMetadataByNameV3"
+	operationGetSecretsV3               = "CallGetSecretsV3"
+	operationCreateSecretsV3            = "CallCreateSecretsV3"
+	operationDeleteSecretsV3            = "CallDeleteSecretsV3"
+	operationUpdateSecretsV3            = "CallUpdateSecretsV3"
+	operationGetSingleSecretByNameV3    = "CallGetSingleSecretByNameV3"
+	operationGetSingleSecretByIDV3      = "CallGetSingleSecretByIDV3"
+	operationGetSecretsRawV3            = "CallGetSecretsRawV3"
+	operationCreateRawSecretsV3         = "CallCreateRawSecretsV3"
+	operationDeleteRawSecretV3          = "CallDeleteRawSecretV3"
+	operationUpdateRawSecretV3          = "CallUpdateRawSecretV3"
+	operationGetSingleRawSecretByNameV3 = "CallGetSingleRawSecretByNameV3"
 )
 
 func (client Client) GetSecretsV3(request GetEncryptedSecretsV3Request) (GetEncryptedSecretsV3Response, error) {
@@ -117,7 +116,12 @@ func (client Client) UpdateSecretsV3(request UpdateSecretByNameV3Request) error 
 	return nil
 }
 
-func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleSecretByNameSecretResponse, error) {
+func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Request, viewSecretValue *bool) (GetSingleSecretByNameSecretResponse, error) {
+	shouldViewSecretValue := true
+	if viewSecretValue != nil {
+		shouldViewSecretValue = *viewSecretValue
+	}
+
 	var secretsResponse GetSingleSecretByNameSecretResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -126,6 +130,7 @@ func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Requ
 		SetQueryParam("workspaceId", request.WorkspaceId).
 		SetQueryParam("environment", request.Environment).
 		SetQueryParam("type", request.Type).
+		SetQueryParam("viewSecretValue", strconv.FormatBool(shouldViewSecretValue)).
 		SetQueryParam("secretPath", request.SecretPath).
 		Get(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
 
@@ -260,7 +265,12 @@ func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) e
 	return nil
 }
 
-func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3Request) (GetSingleRawSecretByNameSecretResponse, error) {
+func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3Request, viewSecretValue *bool) (GetSingleRawSecretByNameSecretResponse, error) {
+	shouldViewSecretValue := true
+	if viewSecretValue != nil {
+		shouldViewSecretValue = *viewSecretValue
+	}
+
 	var secretsResponse GetSingleRawSecretByNameSecretResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -270,6 +280,7 @@ func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3R
 		SetQueryParam("environment", request.Environment).
 		SetQueryParam("type", request.Type).
 		SetQueryParam("secretPath", request.SecretPath).
+		SetQueryParam("viewSecretValue", strconv.FormatBool(shouldViewSecretValue)).
 		Get(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
 
 	if err != nil {
@@ -284,34 +295,6 @@ func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3R
 
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
 		return GetSingleRawSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleRawSecretByNameV3, response, &additionalContext)
-	}
-
-	return secretsResponse, nil
-}
-
-func (client Client) GetSingleRawSecretMetadataByNameV3(request GetSingleSecretByNameV3Request) (GetSingleRawSecretByNameSecretResponse, error) {
-	var secretsResponse GetSingleRawSecretByNameSecretResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&secretsResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("workspaceId", request.WorkspaceId).
-		SetQueryParam("environment", request.Environment).
-		SetQueryParam("type", request.Type).
-		SetQueryParam("secretPath", request.SecretPath).
-		SetQueryParam("viewSecretValue", "false").
-		Get(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
-
-	if err != nil {
-		return GetSingleRawSecretByNameSecretResponse{}, errors.NewGenericRequestError(operationGetSingleRawSecretMetadataByNameV3, err)
-	}
-
-	if response.IsError() {
-		if response.StatusCode() == http.StatusNotFound {
-			return GetSingleRawSecretByNameSecretResponse{}, ErrNotFound
-		}
-		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
-		return GetSingleRawSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleRawSecretMetadataByNameV3, response, &additionalContext)
 	}
 
 	return secretsResponse, nil

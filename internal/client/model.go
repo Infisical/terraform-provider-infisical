@@ -559,8 +559,9 @@ type CreateRawSecretsV3Response struct {
 }
 
 type SecretMetadataItem struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	IsEncrypted bool   `json:"isEncrypted"`
 }
 
 type RawV3Secret struct {
