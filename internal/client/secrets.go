@@ -116,39 +116,6 @@ func (client Client) UpdateSecretsV3(request UpdateSecretByNameV3Request) error 
 	return nil
 }
 
-func (client Client) GetSingleSecretByNameV3(request GetSingleSecretByNameV3Request, viewSecretValue *bool) (GetSingleSecretByNameSecretResponse, error) {
-	shouldViewSecretValue := true
-	if viewSecretValue != nil {
-		shouldViewSecretValue = *viewSecretValue
-	}
-
-	var secretsResponse GetSingleSecretByNameSecretResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&secretsResponse).
-		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("workspaceId", request.WorkspaceId).
-		SetQueryParam("environment", request.Environment).
-		SetQueryParam("type", request.Type).
-		SetQueryParam("viewSecretValue", strconv.FormatBool(shouldViewSecretValue)).
-		SetQueryParam("secretPath", request.SecretPath).
-		Get(fmt.Sprintf("api/v3/secrets/%s", request.SecretName))
-
-	if err != nil {
-		return GetSingleSecretByNameSecretResponse{}, errors.NewGenericRequestError(operationGetSingleSecretByNameV3, err)
-	}
-
-	if response.IsError() {
-		if response.StatusCode() == http.StatusNotFound {
-			return GetSingleSecretByNameSecretResponse{}, ErrNotFound
-		}
-		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
-		return GetSingleSecretByNameSecretResponse{}, errors.NewAPIErrorWithResponse(operationGetSingleSecretByNameV3, response, &additionalContext)
-	}
-
-	return secretsResponse, nil
-}
-
 func (client Client) GetSingleSecretByIDV3(request GetSingleSecretByIDV3Request) (GetSingleSecretByIDV3Response, error) {
 	var secretsResponse GetSingleSecretByIDV3Response
 	response, err := client.Config.HttpClient.
