@@ -207,14 +207,11 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 
 	var environments []string
+	var environment string
 	if !plan.EnvironmentSlugs.IsNull() {
 		environments = infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
 	} else {
-		environments = []string{plan.EnvironmentSlug.ValueString()}
-	}
-	var environment string
-	if len(environments) > 0 {
-		environment = environments[0]
+		environment = plan.EnvironmentSlug.ValueString()
 	}
 
 	secretApprovalPolicy, err := r.client.CreateSecretApprovalPolicy(infisical.CreateSecretApprovalPolicyRequest{
