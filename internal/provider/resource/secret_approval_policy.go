@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -75,9 +76,10 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Optional:    true,
 			},
 			"environment_slugs": schema.ListAttribute{
-				Description: "The environments to apply the secret approval policy to",
-				Optional:    true,
-				ElementType: types.StringType,
+				Description:   "The environments to apply the secret approval policy to",
+				Optional:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"secret_path": schema.StringAttribute{
 				Description: "The secret path to apply the secret approval policy to",
