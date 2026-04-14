@@ -132,7 +132,7 @@ func (r *ephemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRe
 		WorkspaceId: config.WorkspaceId.ValueString(),
 		Environment: config.EnvSlug.ValueString(),
 		SecretPath:  config.FolderPath.ValueString(),
-	})
+	}, nil)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
