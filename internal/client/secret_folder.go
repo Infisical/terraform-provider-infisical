@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"terraform-provider-infisical/internal/errors"
+	"time"
 )
 
 const (
@@ -66,23 +68,65 @@ func (client Client) GetSecretFolderList(request ListSecretFolderRequest) (ListS
 }
 
 func (client Client) CreateSecretFolder(request CreateSecretFolderRequest) (CreateSecretFolderResponse, error) {
-	var body CreateSecretFolderResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&body).
-		SetHeader("User-Agent", USER_AGENT).
-		SetBody(request).
-		Post("api/v1/folders")
+	const maxRetries = 5
+	const retryDelay = 2 * time.Second
 
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		var body CreateSecretFolderResponse
+		response, err := client.Config.HttpClient.
+			R().
+			SetResult(&body).
+			SetHeader("User-Agent", USER_AGENT).
+			SetBody(request).
+			Post("api/v1/folders")
+
+		if err != nil {
+			return CreateSecretFolderResponse{}, errors.NewGenericRequestError(operationCreateSecretFolder, err)
+		}
+
+		if response.IsError() {
+			respStr := response.String()
+
+			// The environment may not be visible on read replicas yet. Retry.
+			if response.StatusCode() == http.StatusNotFound && attempt < maxRetries &&
+				strings.Contains(respStr, "Failed to retrieve path for folder") {
+				time.Sleep(retryDelay)
+				continue
+			}
+
+			// A prior attempt may have created the folder before returning an error.
+			// Recover by looking up the existing folder.
+			if response.StatusCode() == http.StatusBadRequest &&
+				strings.Contains(respStr, "already exists") {
+				return client.recoverExistingFolder(request)
+			}
+
+			return CreateSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationCreateSecretFolder, response, nil)
+		}
+
+		return body, nil
+	}
+
+	return CreateSecretFolderResponse{}, fmt.Errorf("%s: exhausted retries waiting for environment to become available", operationCreateSecretFolder)
+}
+
+func (client Client) recoverExistingFolder(request CreateSecretFolderRequest) (CreateSecretFolderResponse, error) {
+	folders, err := client.GetSecretFolderList(ListSecretFolderRequest{
+		ProjectID:   request.ProjectID,
+		Environment: request.Environment,
+		SecretPath:  request.SecretPath,
+	})
 	if err != nil {
-		return CreateSecretFolderResponse{}, errors.NewGenericRequestError(operationCreateSecretFolder, err)
+		return CreateSecretFolderResponse{}, fmt.Errorf("%s: folder already exists but failed to look it up: %w", operationCreateSecretFolder, err)
 	}
 
-	if response.IsError() {
-		return CreateSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationCreateSecretFolder, response, nil)
+	for _, folder := range folders.Folders {
+		if folder.Name == request.Name {
+			return CreateSecretFolderResponse{Folder: folder}, nil
+		}
 	}
 
-	return body, nil
+	return CreateSecretFolderResponse{}, fmt.Errorf("%s: folder already exists but could not be found in listing", operationCreateSecretFolder)
 }
 
 func (client Client) UpdateSecretFolder(request UpdateSecretFolderRequest) (UpdateSecretFolderResponse, error) {
