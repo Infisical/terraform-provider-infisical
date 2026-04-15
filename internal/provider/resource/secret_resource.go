@@ -387,14 +387,10 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	// Get refreshed order value from HashiCups
-	response, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
-		SecretName:  state.Name.ValueString(),
-		Type:        "shared",
-		WorkspaceId: state.WorkspaceId.ValueString(),
-		Environment: state.EnvSlug.ValueString(),
-		SecretPath:  state.FolderPath.ValueString(),
-	}, nil)
+	// Read by ID instead of name+path so folder renames don't cause a spurious deletion.
+	response, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+		ID: state.ID.ValueString(),
+	})
 
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -402,7 +398,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		} else {
 			resp.Diagnostics.AddError(
 				"Error Reading Infisical secret",
-				"Could not read Infisical secret named "+state.Name.ValueString()+": "+err.Error(),
+				"Could not read Infisical secret with ID "+state.ID.ValueString()+": "+err.Error(),
 			)
 		}
 		return
@@ -410,6 +406,8 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	state.Name = types.StringValue(response.Secret.SecretKey)
 	state.ID = types.StringValue(response.Secret.ID)
+	state.FolderPath = types.StringValue(response.Secret.SecretPath)
+	state.EnvSlug = types.StringValue(response.Secret.Environment)
 	if !state.Value.IsNull() && !state.Value.IsUnknown() {
 		// Resource was configured with regular Value field
 		state.Value = types.StringValue(response.Secret.SecretValue)
