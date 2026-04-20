@@ -64,6 +64,8 @@ func NewClient(cnf Config) (*Client, error) {
 		cnf.HttpClient.SetBaseURL(cnf.HostURL)
 	}
 
+	configureRetries(cnf.HttpClient)
+
 	var usingServiceToken = cnf.ServiceToken != ""
 
 	selectedAuthStrategy := cnf.AuthStrategy
