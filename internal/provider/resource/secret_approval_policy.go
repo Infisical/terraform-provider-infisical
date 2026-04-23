@@ -212,6 +212,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		environments = infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
 	} else {
 		environment = plan.EnvironmentSlug.ValueString()
+		environments = []string{}
 	}
 
 	secretApprovalPolicy, err := r.client.CreateSecretApprovalPolicy(infisical.CreateSecretApprovalPolicyRequest{
@@ -362,7 +363,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	if state.EnvironmentSlug != plan.EnvironmentSlug && infisicaltf.IsAttrValueEmpty(plan.EnvironmentSlugs) {
+	if state.EnvironmentSlug != plan.EnvironmentSlug && infisicaltf.IsAttrValueEmpty(plan.EnvironmentSlugs) && infisicaltf.IsAttrValueEmpty(plan.EnvironmentSlug) {
 		resp.Diagnostics.AddError(
 			"Unable to update secret approval policy",
 			fmt.Sprintf("Cannot change environment, previous environment: %s, new environment: %s", state.EnvironmentSlug, plan.EnvironmentSlug),
