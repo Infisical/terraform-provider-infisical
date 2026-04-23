@@ -212,6 +212,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		environments = infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
 	} else {
 		environment = plan.EnvironmentSlug.ValueString()
+		environments = []string{}
 	}
 
 	secretApprovalPolicy, err := r.client.CreateSecretApprovalPolicy(infisical.CreateSecretApprovalPolicyRequest{
