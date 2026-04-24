@@ -403,6 +403,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionMySqlResource,
 		appConnectionResource.NewAppConnectionMsSqlResource,
 		appConnectionResource.NewAppConnectionPostgresResource,
+		appConnectionResource.NewAppConnectionRedisResource,
 		appConnectionResource.NewAppConnectionOracleDbResource,
 		appConnectionResource.NewAppConnectionBitbucketResource,
 		appConnectionResource.NewAppConnectionDatabricksResource,
