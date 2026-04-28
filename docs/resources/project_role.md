@@ -3,12 +3,12 @@
 page_title: "infisical_project_role Resource - terraform-provider-infisical"
 subcategory: "Projects"
 description: |-
-  Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this data source.
+  Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_project_role (Resource)
 
-Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this data source.
+Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -49,10 +49,9 @@ resource "infisical_project_role" "biller" {
     },
     {
       subject = "secrets"
-      action  = ["read", "edit"]
+      action  = ["describeSecret", "readValue", "edit"]
       conditions = jsonencode({
         environment = {
-          "$in" = ["dev", "prod"]
           "$eq" = "dev"
         }
         secretPath = {
@@ -71,7 +70,7 @@ resource "infisical_project_role" "viewer" {
   permissions_v2 = [
     {
       subject = "secrets"
-      action  = ["read"]
+      action  = ["describeSecret", "readValue"]
     },
   ]
 }
@@ -89,7 +88,7 @@ resource "infisical_project_role" "viewer" {
 
 - `description` (String) The description for the new role. Defaults to an empty string.
 - `permissions` (Attributes List) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project role (see [below for nested schema](#nestedatt--permissions))
-- `permissions_v2` (Attributes List) The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
+- `permissions_v2` (Attributes List) The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions/project-permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 - `project_id` (String) The ID of the project to create role. Must provide either project_id or project_slug, but not both.
 - `project_slug` (String) The slug of the project to create role. Must provide either project_slug or project_id, but not both.
 

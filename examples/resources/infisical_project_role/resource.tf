@@ -34,10 +34,9 @@ resource "infisical_project_role" "biller" {
     },
     {
       subject = "secrets"
-      action  = ["read", "edit"]
+      action  = ["describeSecret", "readValue", "edit"]
       conditions = jsonencode({
         environment = {
-          "$in" = ["dev", "prod"]
           "$eq" = "dev"
         }
         secretPath = {
@@ -56,7 +55,7 @@ resource "infisical_project_role" "viewer" {
   permissions_v2 = [
     {
       subject = "secrets"
-      action  = ["read"]
+      action  = ["describeSecret", "readValue"]
     },
   ]
 }

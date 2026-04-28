@@ -81,7 +81,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Metadata(_ context.Co
 // Schema defines the schema for the resource.
 func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create additional privileges for identities & save to Infisical. Only Machine Identity authentication is supported for this data source.",
+		Description: "Create additional privileges for identities & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"identity_id": schema.StringAttribute{
 				Description: "The identity id to create identity specific privilege",
@@ -166,7 +166,7 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Schema(_ context.Cont
 			},
 			"permissions_v2": schema.ListNestedAttribute{
 				Optional:    true,
-				Description: "The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
+				Description: "The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions/project-permissions for its usage.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.SetAttribute{

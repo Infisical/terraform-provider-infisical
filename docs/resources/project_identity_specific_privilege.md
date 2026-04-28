@@ -3,12 +3,12 @@
 page_title: "infisical_project_identity_specific_privilege Resource - terraform-provider-infisical"
 subcategory: "Projects"
 description: |-
-  Create additional privileges for identities & save to Infisical. Only Machine Identity authentication is supported for this data source.
+  Create additional privileges for identities & save to Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_project_identity_specific_privilege (Resource)
 
-Create additional privileges for identities & save to Infisical. Only Machine Identity authentication is supported for this data source.
+Create additional privileges for identities & save to Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -53,15 +53,14 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
   permissions_v2 = [
     {
       action   = ["edit"]
-      subject  = "secret-folders",
-      inverted = true,
+      subject  = "secret-folders"
+      inverted = true
     },
     {
-      action  = ["read", "edit"]
-      subject = "secrets",
+      action  = ["describeSecret", "readValue", "edit"]
+      subject = "secrets"
       conditions = jsonencode({
         environment = {
-          "$in" = ["dev", "prod"]
           "$eq" = "dev"
         }
         secretPath = {
@@ -85,7 +84,7 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
 
 - `is_temporary` (Boolean) Flag to indicate the assigned specific privilege is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
 - `permission` (Attributes) (DEPRECATED, USE permissions_v2. Refer to the migration guide in https://infisical.com/docs/internals/permissions#migrating-from-permission-v1-to-permission-v2) The permissions assigned to the project identity specific privilege (see [below for nested schema](#nestedatt--permission))
-- `permissions_v2` (Attributes List) The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
+- `permissions_v2` (Attributes List) The permissions assigned to the project identity specific privilege. Refer to the documentation here https://infisical.com/docs/internals/permissions/project-permissions for its usage. (see [below for nested schema](#nestedatt--permissions_v2))
 - `slug` (String) The slug for the new privilege
 - `temporary_access_end_time` (String) ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time
 - `temporary_access_start_time` (String) ISO time for which temporary access should begin. The current time is used by default.

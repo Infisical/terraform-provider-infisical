@@ -38,15 +38,14 @@ resource "infisical_project_identity_specific_privilege" "test-privilege" {
   permissions_v2 = [
     {
       action   = ["edit"]
-      subject  = "secret-folders",
-      inverted = true,
+      subject  = "secret-folders"
+      inverted = true
     },
     {
-      action  = ["read", "edit"]
-      subject = "secrets",
+      action  = ["describeSecret", "readValue", "edit"]
+      subject = "secrets"
       conditions = jsonencode({
         environment = {
-          "$in" = ["dev", "prod"]
           "$eq" = "dev"
         }
         secretPath = {

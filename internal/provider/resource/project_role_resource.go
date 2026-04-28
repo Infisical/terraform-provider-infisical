@@ -91,7 +91,7 @@ var permissionsObjectType = types.ObjectType{
 // Schema defines the schema for the resource.
 func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this data source.",
+		Description: "Create custom project roles & save to Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
 				Description: "The slug for the new role",
@@ -137,7 +137,7 @@ func (r *projectRoleResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"permissions_v2": schema.ListNestedAttribute{
 				Optional:    true,
-				Description: "The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions for its usage.",
+				Description: "The permissions assigned to the project role. Refer to the documentation here https://infisical.com/docs/internals/permissions/project-permissions for its usage.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.SetAttribute{
