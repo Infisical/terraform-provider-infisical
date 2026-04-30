@@ -120,7 +120,7 @@ output "cert_private_key" {
 - `country` (String) The country (C) for the certificate (2-letter code)
 - `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr"))
 - `extended_key_usages` (List of String) Extended key usages for the certificate. Supported: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
-- `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, ECDSA_P256, ECDSA_P384, ECDSA_P521
+- `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `key_usages` (List of String) Key usages for the certificate. Supported: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
 - `locality` (String) The locality (L) for the certificate
 - `organization` (String) The organization (O) for the certificate
