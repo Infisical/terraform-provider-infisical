@@ -35,6 +35,7 @@ type AppConnectionBaseResourceModel struct {
 	ProjectId       types.String `tfsdk:"project_id"`
 	Credentials     types.Object `tfsdk:"credentials"`
 	CredentialsHash types.String `tfsdk:"credentials_hash"`
+	GatewayId       types.String `tfsdk:"gateway_id"`
 }
 
 // Metadata returns the resource type name.
@@ -76,6 +77,10 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 			"credentials_hash": schema.StringAttribute{
 				Computed:    true,
 				Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
+			},
+			"gateway_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "The ID of the gateway to use for this connection.",
 			},
 		},
 	}
@@ -148,6 +153,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 		Method:      plan.Method.ValueString(),
 		Credentials: credentialsMap,
 		ProjectId:   plan.ProjectId.ValueString(),
+		GatewayId:   plan.GatewayId.ValueString(),
 	})
 
 	if err != nil {
@@ -232,6 +238,12 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		state.ProjectId = types.StringNull()
 	}
 
+	if appConnection.GatewayId != nil {
+		state.GatewayId = types.StringValue(*appConnection.GatewayId)
+	} else {
+		state.GatewayId = types.StringNull()
+	}
+
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
@@ -293,6 +305,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		Method:      plan.Method.ValueString(),
 		Credentials: credentialsMap,
 		ProjectId:   plan.ProjectId.ValueString(),
+		GatewayId:   plan.GatewayId.ValueString(),
 	})
 
 	if err != nil {
