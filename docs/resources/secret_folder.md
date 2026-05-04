@@ -24,6 +24,7 @@ Create secret folder & save to Infisical.
 
 ### Optional
 
+- `description` (String) The description of the folder
 - `force_delete` (Boolean) Whether to force delete the folder even if it contains resources.
 
 ### Read-Only
