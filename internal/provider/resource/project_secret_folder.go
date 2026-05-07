@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -36,6 +37,7 @@ type projectSecretFolderResourceModel struct {
 	FolderPath      types.String `tfsdk:"folder_path"`
 	Path            types.String `tfsdk:"path"`
 	ForceDelete     types.Bool   `tfsdk:"force_delete"`
+	Description     types.String `tfsdk:"description"`
 }
 
 // Metadata returns the resource type name.
@@ -86,6 +88,12 @@ func (r *projectSecretFolderResource) Schema(_ context.Context, _ resource.Schem
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"description": schema.StringAttribute{
+				Description: "The description of the folder. Defaults to an empty string.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
 		},
 	}
 }
@@ -133,6 +141,7 @@ func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.C
 		ProjectID:   plan.ProjectID.ValueString(),
 		Environment: plan.EnvironmentSlug.ValueString(),
 		SecretPath:  plan.FolderPath.ValueString(),
+		Description: plan.Description.ValueString(),
 	})
 
 	if err != nil {
@@ -146,6 +155,7 @@ func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.C
 	plan.ID = types.StringValue(newProjectSecretFolder.Folder.ID)
 	plan.EnvironmentID = types.StringValue(newProjectSecretFolder.Folder.EnvID)
 	plan.Path = types.StringValue(newProjectSecretFolder.Folder.Path)
+	plan.Description = types.StringValue(newProjectSecretFolder.Folder.Description)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -193,6 +203,7 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 
 	state.EnvironmentID = types.StringValue(secretFolder.Folder.EnvID)
 	state.Path = types.StringValue(secretFolder.Folder.Path)
+	state.Description = types.StringValue(secretFolder.Folder.Description)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -231,6 +242,7 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 		ID:          plan.ID.ValueString(),
 		Environment: plan.EnvironmentSlug.ValueString(),
 		SecretPath:  plan.FolderPath.ValueString(),
+		Description: plan.Description.ValueString(),
 	})
 
 	if err != nil {
@@ -243,6 +255,7 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 
 	plan.EnvironmentID = types.StringValue(updatedFolder.Folder.EnvID)
 	plan.Path = types.StringValue(updatedFolder.Folder.Path)
+	plan.Description = types.StringValue(updatedFolder.Folder.Description)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -330,4 +343,5 @@ func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_slug"), folder.Folder.Environment.EnvSlug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), folder.Folder.ProjectID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("path"), folder.Folder.Path)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), folder.Folder.Description)...)
 }

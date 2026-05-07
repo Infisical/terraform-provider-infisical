@@ -22,6 +22,7 @@ resource "infisical_secret_folder" "folder-1" {
   environment_slug = "dev"
   project_id       = "<PROJECT-ID>"
   folder_path      = "/"
+  description      = "This is a description of the folder"
   # force_delete     = true
 }
 
@@ -30,6 +31,7 @@ resource "infisical_secret_folder" "folder-2" {
   environment_slug = "prod"
   project_id       = "<PROJECT-ID>"
   folder_path      = "/nested"
+  description      = "This is a description of the nested folder"
   # force_delete     = false
 }
 

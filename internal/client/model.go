@@ -342,10 +342,11 @@ type ProjectEnvironmentWithPosition struct {
 }
 
 type SecretFolder struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	EnvID string `json:"envId"`
-	Path  string `json:"path"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	EnvID       string `json:"envId"`
+	Path        string `json:"path"`
+	Description string `json:"description"`
 }
 
 type SecretFolderByID struct {
@@ -359,6 +360,7 @@ type SecretFolderByID struct {
 		EnvName string `json:"envName"`
 		EnvSlug string `json:"envSlug"`
 	} `json:"environment"`
+	Description string `json:"description"`
 }
 
 type SecretImport struct {
@@ -1228,6 +1230,7 @@ type CreateSecretFolderRequest struct {
 	Environment string `json:"environment"`
 	ProjectID   string `json:"workspaceId"`
 	SecretPath  string `json:"path"`
+	Description string `json:"description"`
 }
 
 type CreateSecretFolderResponse struct {
@@ -1240,6 +1243,7 @@ type UpdateSecretFolderRequest struct {
 	Environment string `json:"environment"`
 	ProjectID   string `json:"workspaceId"`
 	SecretPath  string `json:"path"`
+	Description string `json:"description"`
 }
 
 type UpdateSecretFolderResponse struct {
