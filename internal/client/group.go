@@ -74,6 +74,10 @@ func (client Client) DeleteGroup(request DeleteGroupRequest) (Group, error) {
 }
 
 func (client Client) GetGroupById(request GetGroupByIdRequest) (Group, error) {
+	if request.ID == "" {
+		return Group{}, ErrNotFound
+	}
+
 	var groupResponse Group
 	response, err := client.Config.HttpClient.
 		R().
