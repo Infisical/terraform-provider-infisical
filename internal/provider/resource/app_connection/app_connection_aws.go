@@ -161,9 +161,11 @@ func NewAppConnectionAwsResource() resource.Resource {
 			}
 
 			retryableMessages := []string{
-				"sts:assumerole",
+				"is not authorized to perform",
 				"cannot be assumed",
-				"is not authorized to perform: sts:assumerole",
+				"no such entity",
+				"not found",
+				"access denied",
 			}
 
 			msg := strings.ToLower(err.Error())
