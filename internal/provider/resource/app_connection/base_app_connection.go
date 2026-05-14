@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 	"time"
 	infisical "terraform-provider-infisical/internal/client"
@@ -29,18 +29,18 @@ type AppConnectionBaseResource struct {
 	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	OverwriteCredentialsFields       func(state *AppConnectionBaseResourceModel) diag.Diagnostics
 	// IsRetryableError, if set, is called on API errors during Create/Update.
-	// Returning true causes the operation to be retried with exponential backoff,
+	// Returning true causes the operation to be retried with exponential backoff.
 	IsRetryableError func(err error) bool
 }
 
 const (
-	appConnectionMaxRetries   = 3
-	appConnectionInitialDelay = 10 * time.Second
+	appConnectionMaxRetries    = 3
+	appConnectionInitialDelay  = 10 * time.Second
 	appConnectionBackoffFactor = 1.5
 )
 
-// retryAppConnectionOp calls fn repeatedly with exponential backoff while isRetryable returns true,
-// up to maxRetries additional attempts after the first try.
+// retryAppConnectionOp calls fn repeatedly with exponential backoff while isRetryable returns true.
+// It makes up to maxRetries additional attempts after the first try.
 func retryAppConnectionOp(
 	ctx context.Context,
 	isRetryable func(error) bool,
@@ -85,7 +85,7 @@ func retryAppConnectionOp(
 // jitter adds random noise (±fraction of d) to a duration to avoid thundering-herd retries.
 func jitter(d time.Duration, fraction float64) time.Duration {
 	delta := time.Duration(float64(d) * fraction)
-	return d - delta + time.Duration(rand.Int63n(int64(2*delta+1)))
+	return d - delta + time.Duration(rand.Int64N(int64(2*delta+1)))
 }
 
 type AppConnectionBaseResourceModel struct {
