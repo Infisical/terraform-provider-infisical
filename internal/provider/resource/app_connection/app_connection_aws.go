@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -151,6 +152,30 @@ func NewAppConnectionAwsResource() resource.Resource {
 			}
 
 			return credentialsConfig, diags
+		},
+		// Retry on AWS IAM propagation delays: a newly created IAM role may not be
+		// visible to STS immediately, causing AssumeRole calls to fail.
+		IsRetryableError: func(err error) bool {
+			if err == nil {
+				return false
+			}
+
+			retryableMessages := []string{
+				"is not authorized to perform",
+				"cannot be assumed",
+				"no such entity",
+				"not found",
+				"access denied",
+			}
+
+			msg := strings.ToLower(err.Error())
+			for _, m := range retryableMessages {
+				if strings.Contains(msg, m) {
+					return true
+				}
+			}
+
+			return false
 		},
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
 			credentialsConfig := map[string]attr.Value{

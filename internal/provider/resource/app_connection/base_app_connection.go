@@ -2,9 +2,12 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -25,6 +28,64 @@ type AppConnectionBaseResource struct {
 	ReadCredentialsForCreateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	OverwriteCredentialsFields       func(state *AppConnectionBaseResourceModel) diag.Diagnostics
+	// IsRetryableError, if set, is called on API errors during Create/Update.
+	// Returning true causes the operation to be retried with exponential backoff.
+	IsRetryableError func(err error) bool
+}
+
+const (
+	appConnectionMaxRetries    = 3
+	appConnectionInitialDelay  = 10 * time.Second
+	appConnectionBackoffFactor = 1.5
+)
+
+// retryAppConnectionOp calls fn repeatedly with exponential backoff while isRetryable returns true.
+// It makes up to maxRetries additional attempts after the first try.
+func retryAppConnectionOp(
+	ctx context.Context,
+	isRetryable func(error) bool,
+	fn func() error,
+) error {
+	delay := appConnectionInitialDelay
+	var lastErr error
+	for attempt := 0; attempt <= appConnectionMaxRetries; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+
+		if isRetryable == nil || !isRetryable(lastErr) {
+			return lastErr
+		}
+
+		if attempt == appConnectionMaxRetries {
+			break
+		}
+
+		sleep := jitter(delay, 0.2)
+		timer := time.NewTimer(sleep)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return errors.Join(ctx.Err(), lastErr)
+		case <-timer.C:
+		}
+
+		next := time.Duration(float64(delay) * appConnectionBackoffFactor)
+		delay = next
+	}
+
+	return lastErr
+}
+
+// jitter adds random noise (±fraction of d) to a duration to avoid thundering-herd retries.
+func jitter(d time.Duration, fraction float64) time.Duration {
+	delta := time.Duration(float64(d) * fraction)
+	return d - delta + time.Duration(rand.Int64N(int64(2*delta+1)))
 }
 
 type AppConnectionBaseResourceModel struct {
@@ -141,13 +202,18 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	appConnection, err := r.client.CreateAppConnection(infisical.CreateAppConnectionRequest{
-		App:         r.App,
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
-		Method:      plan.Method.ValueString(),
-		Credentials: credentialsMap,
-		ProjectId:   plan.ProjectId.ValueString(),
+	var appConnection infisical.AppConnection
+	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
+		var apiErr error
+		appConnection, apiErr = r.client.CreateAppConnection(infisical.CreateAppConnectionRequest{
+			App:         r.App,
+			Name:        plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
+			Method:      plan.Method.ValueString(),
+			Credentials: credentialsMap,
+			ProjectId:   plan.ProjectId.ValueString(),
+		})
+		return apiErr
 	})
 
 	if err != nil {
@@ -285,14 +351,19 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	appConnection, err := r.client.UpdateAppConnection(infisical.UpdateAppConnectionRequest{
-		ID:          state.ID.ValueString(),
-		App:         r.App,
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
-		Method:      plan.Method.ValueString(),
-		Credentials: credentialsMap,
-		ProjectId:   plan.ProjectId.ValueString(),
+	var appConnection infisical.AppConnection
+	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
+		var apiErr error
+		appConnection, apiErr = r.client.UpdateAppConnection(infisical.UpdateAppConnectionRequest{
+			ID:          state.ID.ValueString(),
+			App:         r.App,
+			Name:        plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
+			Method:      plan.Method.ValueString(),
+			Credentials: credentialsMap,
+			ProjectId:   plan.ProjectId.ValueString(),
+		})
+		return apiErr
 	})
 
 	if err != nil {
