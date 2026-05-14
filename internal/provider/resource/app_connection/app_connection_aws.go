@@ -156,8 +156,24 @@ func NewAppConnectionAwsResource() resource.Resource {
 		// Retry on AWS IAM propagation delays: a newly created IAM role may not be
 		// visible to STS immediately, causing AssumeRole calls to fail.
 		IsRetryableError: func(err error) bool {
+			if err == nil {
+				return false
+			}
+
+			retryableMessages := []string{
+				"sts:assumerole",
+				"cannot be assumed",
+				"is not authorized to perform: sts:assumerole",
+			}
+
 			msg := strings.ToLower(err.Error())
-			return strings.Contains(msg, "sts:assumerole") || strings.Contains(msg, "not authorized to perform")
+			for _, m := range retryableMessages {
+				if strings.Contains(msg, m) {
+					return true
+				}
+			}
+
+			return false
 		},
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
 			credentialsConfig := map[string]attr.Value{
