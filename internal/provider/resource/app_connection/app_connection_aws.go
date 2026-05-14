@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -151,6 +152,12 @@ func NewAppConnectionAwsResource() resource.Resource {
 			}
 
 			return credentialsConfig, diags
+		},
+		// Retry on AWS IAM propagation delays: a newly created IAM role may not be
+		// visible to STS immediately, causing AssumeRole calls to fail
+		IsRetryableError: func(err error) bool {
+			msg := strings.ToLower(err.Error())
+			return strings.Contains(msg, "sts:assumerole") || strings.Contains(msg, "not authorized to perform")
 		},
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
 			credentialsConfig := map[string]attr.Value{
