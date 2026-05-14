@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
-	"time"
 	infisical "terraform-provider-infisical/internal/client"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
