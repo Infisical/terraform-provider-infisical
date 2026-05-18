@@ -639,9 +639,25 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 	var secretReminder SecretReminder
 	var secretMetadata []infisical.SecretMetadataItem
 
-	if _, err := uuid.ParseUUID(req.ID); err == nil {
+	const writeOnlyPrefix = "write-only:"
+	isWriteOnly := false
+	importID := req.ID
+
+	if strings.HasPrefix(req.ID, writeOnlyPrefix) {
+		isWriteOnly = true
+		importID = strings.TrimPrefix(req.ID, writeOnlyPrefix)
+		if importID == "" {
+			resp.Diagnostics.AddError(
+				"Invalid Import ID",
+				"The import ID after the 'write-only:' prefix must not be empty. Expected 'write-only:<uuid>' or 'write-only:<workspace>:<env>:<secret-path>:<secret-name>'.",
+			)
+			return
+		}
+	}
+
+	if _, err := uuid.ParseUUID(importID); err == nil {
 		secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
-			ID: req.ID,
+			ID: importID,
 		})
 
 		if err != nil {
@@ -674,7 +690,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretId = secret.Secret.ID
 		secretMetadata = secret.Secret.SecretMetadata
 	} else {
-		parts := strings.SplitN(req.ID, ":", 4)
+		parts := strings.SplitN(importID, ":", 4)
 
 		if len(parts) != 4 {
 			resp.Diagnostics.AddError(
@@ -728,7 +744,11 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("env_slug"), environment)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), secretPath)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), secretName)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secretValue)...)
+	if isWriteOnly {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value_wo_version"), types.Int64Value(1))...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secretValue)...)
+	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tags)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("secret_reminder"), secretReminder)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretId)...)
