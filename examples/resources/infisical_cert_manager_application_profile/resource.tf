@@ -52,8 +52,8 @@ resource "infisical_cert_manager_certificate_profile" "web_server" {
   ca_id                 = infisical_cert_manager_internal_ca.issuing.id
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
-  name            = "web-server"
-  issuer_type     = "ca"
+  name        = "web-server"
+  issuer_type = "ca"
 
   defaults {
     common_name         = "service.example.com"

@@ -67,9 +67,9 @@ resource "infisical_cert_manager_certificate_profile" "web_server" {
   ca_id                 = infisical_cert_manager_internal_ca.issuing.id
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
-  name            = "web-server"
-  description     = "Profile for issuing web server certificates"
-  issuer_type     = "ca"
+  name        = "web-server"
+  description = "Profile for issuing web server certificates"
+  issuer_type = "ca"
 
   defaults {
     common_name         = "service.example.com"
@@ -84,9 +84,9 @@ resource "infisical_cert_manager_certificate_profile" "web_server" {
 resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
-  name            = "self-signed-dev"
-  description     = "Self-signed certificates for development"
-  issuer_type     = "self-signed"
+  name        = "self-signed-dev"
+  description = "Self-signed certificates for development"
+  issuer_type = "self-signed"
 
   defaults {
     common_name         = "dev.example.com"

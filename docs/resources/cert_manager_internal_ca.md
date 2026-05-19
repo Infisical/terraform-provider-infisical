@@ -3,27 +3,31 @@
 page_title: "infisical_cert_manager_internal_ca Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage internal certificate authorities (root or intermediate) in Infisical. Only Machine Identity authentication is supported for this resource.
+  Create and manage internal certificate authorities (root or intermediate) in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_internal_ca (Resource)
 
-Create and manage internal certificate authorities (root or intermediate) in Infisical. Only Machine Identity authentication is supported for this resource.
+Create and manage internal certificate authorities (root or intermediate) in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
 ```terraform
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  type        = "cert-manager"
-  description = "Project for managing SSL/TLS certificates"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
 }
 
-# Root CA example
-resource "infisical_cert_manager_internal_ca" "root" {
-  project_slug = infisical_project.pki.slug
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
+}
 
+resource "infisical_cert_manager_internal_ca" "root" {
   type          = "root"
   name          = "enterprise-root-ca"
   common_name   = "Enterprise Root Certificate Authority"
@@ -35,10 +39,7 @@ resource "infisical_cert_manager_internal_ca" "root" {
   key_algorithm = "RSA_2048"
 }
 
-# Intermediate CA example
 resource "infisical_cert_manager_internal_ca" "issuing" {
-  project_slug = infisical_project.pki.slug
-
   type          = "intermediate"
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"
@@ -57,7 +58,6 @@ resource "infisical_cert_manager_internal_ca" "issuing" {
 ### Required
 
 - `name` (String) The name of the CA
-- `project_slug` (String) The slug of the cert-manager project
 - `type` (String) The type of the CA. Supported values: root, intermediate
 
 ### Optional

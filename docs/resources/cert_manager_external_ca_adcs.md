@@ -3,26 +3,31 @@
 page_title: "infisical_cert_manager_external_ca_adcs Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in Infisical. Only Machine Identity authentication is supported for this resource.
+  Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <caId> (legacy format <projectSlug>:<caId> is also accepted).
 ---
 
 # infisical_cert_manager_external_ca_adcs (Resource)
 
-Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in Infisical. Only Machine Identity authentication is supported for this resource.
+Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>` (legacy format `<projectSlug>:<caId>` is also accepted).
 
 ## Example Usage
 
 ```terraform
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  type        = "cert-manager"
-  description = "Project for managing SSL/TLS certificates"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
+}
+
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
 resource "infisical_cert_manager_external_ca_adcs" "adcs" {
-  project_slug = infisical_project.pki.slug
-
   name   = "corporate-adcs"
   status = "active"
 
@@ -37,7 +42,6 @@ resource "infisical_cert_manager_external_ca_adcs" "adcs" {
 
 - `azure_adcs_connection_id` (String) The ID of the Azure ADCS app connection for certificate issuance
 - `name` (String) The name of the ADCS CA
-- `project_slug` (String) The slug of the cert-manager project
 
 ### Optional
 
