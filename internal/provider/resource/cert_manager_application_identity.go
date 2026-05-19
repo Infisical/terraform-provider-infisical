@@ -41,7 +41,7 @@ func (r *certManagerApplicationIdentityResource) Metadata(_ context.Context, req
 
 func (r *certManagerApplicationIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage identity memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<identityId>`.",
+		Description: "Manage identity memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<identityId>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the identity membership",
@@ -58,7 +58,7 @@ func (r *certManagerApplicationIdentityResource) Schema(_ context.Context, _ res
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "The ID of the PKI application",
+				Description: "The ID of the Certificate Manager application",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -124,7 +124,7 @@ func (r *certManagerApplicationIdentityResource) findMembershipByIdentityId(appl
 func (r *certManagerApplicationIdentityResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create PKI application identity membership",
+			"Unable to add identity to Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -142,7 +142,10 @@ func (r *certManagerApplicationIdentityResource) Create(ctx context.Context, req
 		Role:          plan.Role.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error adding identity to PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error adding identity to Certificate Manager application",
+			"Couldn't add identity to application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -167,7 +170,7 @@ func (r *certManagerApplicationIdentityResource) Create(ctx context.Context, req
 func (r *certManagerApplicationIdentityResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read PKI application identity membership",
+			"Unable to read Certificate Manager application identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -185,7 +188,10 @@ func (r *certManagerApplicationIdentityResource) Read(ctx context.Context, req r
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading PKI application identity membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application identity",
+			"Couldn't read identity membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -212,7 +218,7 @@ func (r *certManagerApplicationIdentityResource) Read(ctx context.Context, req r
 func (r *certManagerApplicationIdentityResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update PKI application identity membership",
+			"Unable to update Certificate Manager application identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -236,7 +242,10 @@ func (r *certManagerApplicationIdentityResource) Update(ctx context.Context, req
 		Role:          plan.Role.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating PKI application identity membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager application identity",
+			"Couldn't update identity membership in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -259,7 +268,7 @@ func (r *certManagerApplicationIdentityResource) Update(ctx context.Context, req
 func (r *certManagerApplicationIdentityResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete PKI application identity membership",
+			"Unable to remove identity from Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -276,7 +285,10 @@ func (r *certManagerApplicationIdentityResource) Delete(ctx context.Context, req
 		IdentityId:    state.IdentityId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error removing identity from PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error removing identity from Certificate Manager application",
+			"Couldn't remove identity from application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }

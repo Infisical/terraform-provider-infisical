@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_application_user Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage user memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <applicationId>:<userId>.
+  Manage user memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <applicationId>:<userId>.
 ---
 
 # infisical_cert_manager_application_user (Resource)
 
-Manage user memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<userId>`.
+Manage user memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<userId>`.
 
 ## Example Usage
 
@@ -55,7 +55,7 @@ resource "infisical_cert_manager_application_user" "platform_auditor" {
 
 ### Required
 
-- `application_id` (String) The ID of the PKI application
+- `application_id` (String) The ID of the Certificate Manager application
 - `email` (String) The email of the user to add
 - `role` (String) The role to assign to the user (admin, member, viewer, or a custom role slug)
 

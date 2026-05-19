@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_group Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage group memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <groupId>.
+  Manage group memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <groupId>.
 ---
 
 # infisical_cert_manager_group (Resource)
 
-Manage group memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <groupId>`.
+Manage group memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <groupId>`.
 
 ## Example Usage
 
@@ -60,7 +60,7 @@ resource "infisical_cert_manager_group" "oncall_rotation" {
 ### Required
 
 - `group_id` (String) The ID of the group
-- `roles` (Attributes List) The roles assigned to the cert manager membership (see [below for nested schema](#nestedatt--roles))
+- `roles` (Attributes List) The roles assigned to the Certificate Manager membership (see [below for nested schema](#nestedatt--roles))
 
 ### Read-Only
 

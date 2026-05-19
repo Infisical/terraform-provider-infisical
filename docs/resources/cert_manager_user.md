@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_user Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage user memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <email>.
+  Manage user memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <email>.
 ---
 
 # infisical_cert_manager_user (Resource)
 
-Manage user memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <email>`.
+Manage user memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <email>`.
 
 ## Example Usage
 
@@ -60,7 +60,7 @@ resource "infisical_cert_manager_user" "oncall" {
 ### Required
 
 - `email` (String) The email of the user
-- `roles` (Attributes List) The roles assigned to the cert manager membership (see [below for nested schema](#nestedatt--roles))
+- `roles` (Attributes List) The roles assigned to the Certificate Manager membership (see [below for nested schema](#nestedatt--roles))
 
 ### Read-Only
 

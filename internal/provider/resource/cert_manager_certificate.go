@@ -132,7 +132,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "The ID of the PKI application to scope the certificate under",
+				Description: "The ID of the Certificate Manager application to scope the certificate under",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

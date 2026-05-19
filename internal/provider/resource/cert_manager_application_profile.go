@@ -260,7 +260,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 		if _, err := r.client.ClearPkiApplicationApiEnrollment(infisical.ClearPkiApplicationApiEnrollmentRequest{
 			ApplicationId: appId, ProfileId: profileId,
 		}); err != nil {
-			diags.AddError("Error disabling API enrollment", err.Error())
+			diags.AddError(
+				"Error disabling API enrollment",
+				"Couldn't disable API enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	case plan.ApiConfig != nil:
@@ -273,7 +276,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 			setReq.RenewBeforeDays = &v
 		}
 		if _, err := r.client.SetPkiApplicationApiEnrollment(setReq); err != nil {
-			diags.AddError("Error setting API enrollment", err.Error())
+			diags.AddError(
+				"Error configuring API enrollment",
+				"Couldn't configure API enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	}
@@ -283,7 +289,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 		if _, err := r.client.ClearPkiApplicationEstEnrollment(infisical.ClearPkiApplicationEstEnrollmentRequest{
 			ApplicationId: appId, ProfileId: profileId,
 		}); err != nil {
-			diags.AddError("Error disabling EST enrollment", err.Error())
+			diags.AddError(
+				"Error disabling EST enrollment",
+				"Couldn't disable EST enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	case plan.EstConfig != nil:
@@ -300,7 +309,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 			setReq.CaChain = &v
 		}
 		if _, err := r.client.SetPkiApplicationEstEnrollment(setReq); err != nil {
-			diags.AddError("Error setting EST enrollment", err.Error())
+			diags.AddError(
+				"Error configuring EST enrollment",
+				"Couldn't configure EST enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	}
@@ -310,7 +322,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 		if _, err := r.client.ClearPkiApplicationAcmeEnrollment(infisical.ClearPkiApplicationAcmeEnrollmentRequest{
 			ApplicationId: appId, ProfileId: profileId,
 		}); err != nil {
-			diags.AddError("Error disabling ACME enrollment", err.Error())
+			diags.AddError(
+				"Error disabling ACME enrollment",
+				"Couldn't disable ACME enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	case plan.AcmeConfig != nil:
@@ -326,7 +341,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 			setReq.SkipEabBinding = &v
 		}
 		if _, err := r.client.SetPkiApplicationAcmeEnrollment(setReq); err != nil {
-			diags.AddError("Error setting ACME enrollment", err.Error())
+			diags.AddError(
+				"Error configuring ACME enrollment",
+				"Couldn't configure ACME enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	}
@@ -336,7 +354,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 		if _, err := r.client.ClearPkiApplicationScepEnrollment(infisical.ClearPkiApplicationScepEnrollmentRequest{
 			ApplicationId: appId, ProfileId: profileId,
 		}); err != nil {
-			diags.AddError("Error disabling SCEP enrollment", err.Error())
+			diags.AddError(
+				"Error disabling SCEP enrollment",
+				"Couldn't disable SCEP enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	case plan.ScepConfig != nil:
@@ -364,7 +385,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 			setReq.DynamicChallengeMaxPending = &v
 		}
 		if _, err := r.client.SetPkiApplicationScepEnrollment(setReq); err != nil {
-			diags.AddError("Error setting SCEP enrollment", err.Error())
+			diags.AddError(
+				"Error configuring SCEP enrollment",
+				"Couldn't configure SCEP enrollment in Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 	}
@@ -490,7 +514,10 @@ func (r *certManagerApplicationProfileResource) Create(ctx context.Context, req 
 		ApplicationId: plan.ApplicationId.ValueString(),
 		ProfileIds:    []string{plan.ProfileId.ValueString()},
 	}); err != nil {
-		resp.Diagnostics.AddError("Error attaching profile to application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error attaching profile to Certificate Manager application",
+			"Couldn't attach profile to application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -501,11 +528,17 @@ func (r *certManagerApplicationProfileResource) Create(ctx context.Context, req 
 
 	exists, err := r.refresh(&plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Error refreshing application profile after create", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application profile after create",
+			"Couldn't read application profile from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !exists {
-		resp.Diagnostics.AddError("Profile detached unexpectedly", "the profile attachment was not found after create")
+		resp.Diagnostics.AddError(
+			"Certificate Manager application profile not found after create",
+			"The profile attachment was not found in Infisical right after being created. This is unexpected — please retry, or contact Infisical support if the problem persists.",
+		)
 		return
 	}
 
@@ -530,7 +563,10 @@ func (r *certManagerApplicationProfileResource) Read(ctx context.Context, req re
 
 	exists, err := r.refresh(&state)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading application profile", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application profile",
+			"Couldn't read application profile from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !exists {
@@ -565,7 +601,10 @@ func (r *certManagerApplicationProfileResource) Update(ctx context.Context, req 
 
 	exists, err := r.refresh(&plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Error refreshing application profile after update", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application profile after update",
+			"Couldn't read application profile from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !exists {
@@ -596,7 +635,10 @@ func (r *certManagerApplicationProfileResource) Delete(ctx context.Context, req 
 		ApplicationId: state.ApplicationId.ValueString(),
 		ProfileId:     state.ProfileId.ValueString(),
 	}); err != nil {
-		resp.Diagnostics.AddError("Error detaching profile from application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error detaching profile from Certificate Manager application",
+			"Couldn't detach profile from application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }

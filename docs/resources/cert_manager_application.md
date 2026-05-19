@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_application Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage PKI applications in Infisical. Only Machine Identity authentication is supported for this resource.
+  Create and manage Certificate Manager applications in Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_application (Resource)
 
-Create and manage PKI applications in Infisical. Only Machine Identity authentication is supported for this resource.
+Create and manage Certificate Manager applications in Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -38,12 +38,12 @@ resource "infisical_cert_manager_application" "platform" {
 
 ### Required
 
-- `name` (String) The name of the PKI application
+- `name` (String) The name of the Certificate Manager application
 
 ### Optional
 
-- `description` (String) The description of the PKI application
+- `description` (String) The description of the Certificate Manager application
 
 ### Read-Only
 
-- `id` (String) The ID of the PKI application
+- `id` (String) The ID of the Certificate Manager application

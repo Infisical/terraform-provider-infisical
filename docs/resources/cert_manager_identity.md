@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_identity Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage identity memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <identityId>.
+  Manage identity memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <identityId>.
 ---
 
 # infisical_cert_manager_identity (Resource)
 
-Manage identity memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <identityId>`.
+Manage identity memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <identityId>`.
 
 ## Example Usage
 
@@ -60,7 +60,7 @@ resource "infisical_cert_manager_identity" "deploy_bot" {
 ### Required
 
 - `identity_id` (String) The ID of the identity
-- `roles` (Attributes List) The roles assigned to the cert manager membership (see [below for nested schema](#nestedatt--roles))
+- `roles` (Attributes List) The roles assigned to the Certificate Manager membership (see [below for nested schema](#nestedatt--roles))
 
 ### Read-Only
 

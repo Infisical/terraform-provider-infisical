@@ -26,7 +26,7 @@ type CertManagerMemberRole struct {
 func certManagerRolesSchema() schema.ListNestedAttribute {
 	return schema.ListNestedAttribute{
 		Required:    true,
-		Description: "The roles assigned to the cert manager membership",
+		Description: "The roles assigned to the Certificate Manager membership",
 		NestedObject: schema.NestedAttributeObject{
 			Attributes: map[string]schema.Attribute{
 				"id": schema.StringAttribute{

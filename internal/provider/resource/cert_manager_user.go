@@ -39,7 +39,7 @@ func (r *certManagerUserResource) Metadata(_ context.Context, req resource.Metad
 
 func (r *certManagerUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage user memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <email>`.",
+		Description: "Manage user memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <email>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the user membership",
@@ -110,7 +110,7 @@ func (r *certManagerUserResource) findUserByEmail(email string) (*infisical.Cert
 func (r *certManagerUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create cert manager user membership",
+			"Unable to create Certificate Manager user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -127,11 +127,17 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error parsing roles",
+			"Couldn't parse roles for Certificate Manager user, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !hasPermanent {
-		resp.Diagnostics.AddError("Error assigning role to user", "Must have at least one permanent role")
+		resp.Diagnostics.AddError(
+			"Error assigning roles to user",
+			"User must have at least one permanent (non-temporary) role.",
+		)
 		return
 	}
 
@@ -139,17 +145,26 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 		Emails: []string{plan.Email.ValueString()},
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error inviting cert manager user", err.Error())
+		resp.Diagnostics.AddError(
+			"Error inviting user to Certificate Manager",
+			"Couldn't invite user to Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
 	member, err := r.findUserByEmail(plan.Email.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error finding cert manager user after invite", err.Error())
+		resp.Diagnostics.AddError(
+			"Error finding user after invite",
+			"Couldn't look up user from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if member == nil {
-		resp.Diagnostics.AddError("Error finding cert manager user after invite", "User not found in cert manager after invite")
+		resp.Diagnostics.AddError(
+			"Error finding user after invite",
+			fmt.Sprintf("User %q was not found in Certificate Manager after invitation. Verify the email is correct and the user has accepted the invitation.", plan.Email.ValueString()),
+		)
 		return
 	}
 
@@ -158,7 +173,10 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 		Roles:  roles,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error assigning roles to cert manager user", err.Error())
+		resp.Diagnostics.AddError(
+			"Error assigning roles to Certificate Manager user",
+			"Couldn't update user roles in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -166,7 +184,10 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 		UserId: member.UserID,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error fetching cert manager user", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager user",
+			"Couldn't read user from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -182,7 +203,7 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 func (r *certManagerUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read cert manager user membership",
+			"Unable to read Certificate Manager user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -201,7 +222,10 @@ func (r *certManagerUserResource) Read(ctx context.Context, req resource.ReadReq
 				resp.State.RemoveResource(ctx)
 				return
 			}
-			resp.Diagnostics.AddError("Error fetching cert manager user", err.Error())
+			resp.Diagnostics.AddError(
+				"Error reading Certificate Manager user",
+				"Couldn't read user from Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 		if member == nil {
@@ -219,7 +243,10 @@ func (r *certManagerUserResource) Read(ctx context.Context, req resource.ReadReq
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error fetching cert manager user", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager user",
+			"Couldn't read user from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -238,7 +265,7 @@ func (r *certManagerUserResource) Read(ctx context.Context, req resource.ReadReq
 func (r *certManagerUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update cert manager user membership",
+			"Unable to update Certificate Manager user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -261,11 +288,17 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error parsing roles",
+			"Couldn't parse roles for Certificate Manager user, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !hasPermanent {
-		resp.Diagnostics.AddError("Error assigning role to user", "Must have at least one permanent role")
+		resp.Diagnostics.AddError(
+			"Error assigning roles to user",
+			"User must have at least one permanent (non-temporary) role.",
+		)
 		return
 	}
 
@@ -274,7 +307,10 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 		Roles:  roles,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating cert manager user roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager user",
+			"Couldn't update user roles in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -282,7 +318,10 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 		UserId: state.UserId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error fetching cert manager user", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager user",
+			"Couldn't read user from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -298,7 +337,7 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 func (r *certManagerUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete cert manager user membership",
+			"Unable to delete Certificate Manager user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -314,7 +353,10 @@ func (r *certManagerUserResource) Delete(ctx context.Context, req resource.Delet
 		UserId: state.UserId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error removing cert manager user", err.Error())
+		resp.Diagnostics.AddError(
+			"Error removing Certificate Manager user",
+			"Couldn't remove user from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }
@@ -322,7 +364,7 @@ func (r *certManagerUserResource) Delete(ctx context.Context, req resource.Delet
 func (r *certManagerUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to import cert manager user membership",
+			"Unable to import Certificate Manager user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -330,13 +372,16 @@ func (r *certManagerUserResource) ImportState(ctx context.Context, req resource.
 
 	member, err := r.findUserByEmail(req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error importing cert manager user membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error importing Certificate Manager user",
+			"Couldn't look up user from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if member == nil {
 		resp.Diagnostics.AddError(
-			"Unable to import cert manager user membership",
-			fmt.Sprintf("No cert manager user found matching email %q", req.ID),
+			"Unable to import Certificate Manager user",
+			fmt.Sprintf("No Certificate Manager user found matching email %q. Verify the email is correct and the user has been invited.", req.ID),
 		)
 		return
 	}

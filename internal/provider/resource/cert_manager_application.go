@@ -37,21 +37,21 @@ func (r *certManagerApplicationResource) Metadata(_ context.Context, req resourc
 
 func (r *certManagerApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage PKI applications in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage Certificate Manager applications in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the PKI application",
+				Description: "The ID of the Certificate Manager application",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the PKI application",
+				Description: "The name of the Certificate Manager application",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "The description of the PKI application",
+				Description: "The description of the Certificate Manager application",
 				Optional:    true,
 			},
 		},
@@ -78,7 +78,7 @@ func (r *certManagerApplicationResource) Configure(_ context.Context, req resour
 func (r *certManagerApplicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create PKI application",
+			"Unable to create Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -101,7 +101,10 @@ func (r *certManagerApplicationResource) Create(ctx context.Context, req resourc
 
 	application, err := r.client.CreatePkiApplication(createRequest)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error creating Certificate Manager application",
+			"Couldn't create application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -119,7 +122,7 @@ func (r *certManagerApplicationResource) Create(ctx context.Context, req resourc
 func (r *certManagerApplicationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read PKI application",
+			"Unable to read Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -139,7 +142,10 @@ func (r *certManagerApplicationResource) Read(ctx context.Context, req resource.
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application",
+			"Couldn't read application from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -157,7 +163,7 @@ func (r *certManagerApplicationResource) Read(ctx context.Context, req resource.
 func (r *certManagerApplicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update PKI application",
+			"Unable to update Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -180,7 +186,10 @@ func (r *certManagerApplicationResource) Update(ctx context.Context, req resourc
 
 	application, err := r.client.UpdatePkiApplication(updateRequest)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager application",
+			"Couldn't update application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -198,7 +207,7 @@ func (r *certManagerApplicationResource) Update(ctx context.Context, req resourc
 func (r *certManagerApplicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete PKI application",
+			"Unable to delete Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -214,7 +223,10 @@ func (r *certManagerApplicationResource) Delete(ctx context.Context, req resourc
 		ApplicationId: state.Id.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error deleting Certificate Manager application",
+			"Couldn't delete application from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }

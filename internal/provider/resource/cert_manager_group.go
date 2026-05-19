@@ -38,7 +38,7 @@ func (r *certManagerGroupResource) Metadata(_ context.Context, req resource.Meta
 
 func (r *certManagerGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage group memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <groupId>`.",
+		Description: "Manage group memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <groupId>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the group membership",
@@ -86,7 +86,7 @@ func (r *certManagerGroupResource) Configure(_ context.Context, req resource.Con
 func (r *certManagerGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create cert manager group membership",
+			"Unable to create Certificate Manager group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -103,11 +103,17 @@ func (r *certManagerGroupResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error parsing roles",
+			"Couldn't parse roles for Certificate Manager group, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !hasPermanent {
-		resp.Diagnostics.AddError("Error assigning role to group", "Must have at least one permanent role")
+		resp.Diagnostics.AddError(
+			"Error assigning roles to group",
+			"Group must have at least one permanent (non-temporary) role.",
+		)
 		return
 	}
 
@@ -116,7 +122,10 @@ func (r *certManagerGroupResource) Create(ctx context.Context, req resource.Crea
 		Roles:   roles,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error adding cert manager group", err.Error())
+		resp.Diagnostics.AddError(
+			"Error adding group to Certificate Manager",
+			"Couldn't add group to Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -132,7 +141,7 @@ func (r *certManagerGroupResource) Create(ctx context.Context, req resource.Crea
 func (r *certManagerGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read cert manager group membership",
+			"Unable to read Certificate Manager group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -152,7 +161,10 @@ func (r *certManagerGroupResource) Read(ctx context.Context, req resource.ReadRe
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error fetching cert manager group", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager group",
+			"Couldn't read group membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -167,7 +179,7 @@ func (r *certManagerGroupResource) Read(ctx context.Context, req resource.ReadRe
 func (r *certManagerGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update cert manager group membership",
+			"Unable to update Certificate Manager group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -184,11 +196,17 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error parsing roles",
+			"Couldn't parse roles for Certificate Manager group, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !hasPermanent {
-		resp.Diagnostics.AddError("Error assigning role to group", "Must have at least one permanent role")
+		resp.Diagnostics.AddError(
+			"Error assigning roles to group",
+			"Group must have at least one permanent (non-temporary) role.",
+		)
 		return
 	}
 
@@ -197,7 +215,10 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 		Roles:   roles,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating cert manager group roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager group",
+			"Couldn't update group roles in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -205,7 +226,10 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 		GroupId: plan.GroupId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error fetching cert manager group", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager group",
+			"Couldn't read group membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -220,7 +244,7 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 func (r *certManagerGroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete cert manager group membership",
+			"Unable to delete Certificate Manager group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -236,7 +260,10 @@ func (r *certManagerGroupResource) Delete(ctx context.Context, req resource.Dele
 		GroupId: state.GroupId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error removing cert manager group", err.Error())
+		resp.Diagnostics.AddError(
+			"Error removing Certificate Manager group",
+			"Couldn't remove group from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }
@@ -244,7 +271,7 @@ func (r *certManagerGroupResource) Delete(ctx context.Context, req resource.Dele
 func (r *certManagerGroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to import cert manager group membership",
+			"Unable to import Certificate Manager group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -255,8 +282,8 @@ func (r *certManagerGroupResource) ImportState(ctx context.Context, req resource
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to import cert manager group membership",
-			fmt.Sprintf("Could not find cert manager group membership for group_id %q: %s", req.ID, err.Error()),
+			"Unable to import Certificate Manager group",
+			fmt.Sprintf("Couldn't find Certificate Manager group for group_id %q: %s", req.ID, err.Error()),
 		)
 		return
 	}

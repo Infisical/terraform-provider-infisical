@@ -41,7 +41,7 @@ func (r *certManagerApplicationGroupResource) Metadata(_ context.Context, req re
 
 func (r *certManagerApplicationGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage group memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<groupId>`.",
+		Description: "Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<groupId>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the group membership",
@@ -58,7 +58,7 @@ func (r *certManagerApplicationGroupResource) Schema(_ context.Context, _ resour
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "The ID of the PKI application",
+				Description: "The ID of the Certificate Manager application",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -124,7 +124,7 @@ func (r *certManagerApplicationGroupResource) findMembershipByGroupId(applicatio
 func (r *certManagerApplicationGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create PKI application group membership",
+			"Unable to add group to Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -142,7 +142,10 @@ func (r *certManagerApplicationGroupResource) Create(ctx context.Context, req re
 		Role:          plan.Role.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error adding group to PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error adding group to Certificate Manager application",
+			"Couldn't add group to application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -167,7 +170,7 @@ func (r *certManagerApplicationGroupResource) Create(ctx context.Context, req re
 func (r *certManagerApplicationGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read PKI application group membership",
+			"Unable to read Certificate Manager application group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -185,7 +188,10 @@ func (r *certManagerApplicationGroupResource) Read(ctx context.Context, req reso
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading PKI application group membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application group",
+			"Couldn't read group membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -212,7 +218,7 @@ func (r *certManagerApplicationGroupResource) Read(ctx context.Context, req reso
 func (r *certManagerApplicationGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update PKI application group membership",
+			"Unable to update Certificate Manager application group",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -236,7 +242,10 @@ func (r *certManagerApplicationGroupResource) Update(ctx context.Context, req re
 		Role:          plan.Role.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating PKI application group membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager application group",
+			"Couldn't update group membership in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -259,7 +268,7 @@ func (r *certManagerApplicationGroupResource) Update(ctx context.Context, req re
 func (r *certManagerApplicationGroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete PKI application group membership",
+			"Unable to remove group from Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -276,7 +285,10 @@ func (r *certManagerApplicationGroupResource) Delete(ctx context.Context, req re
 		GroupId:       state.GroupId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error removing group from PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error removing group from Certificate Manager application",
+			"Couldn't remove group from application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }

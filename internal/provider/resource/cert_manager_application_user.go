@@ -42,7 +42,7 @@ func (r *certManagerApplicationUserResource) Metadata(_ context.Context, req res
 
 func (r *certManagerApplicationUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage user memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<userId>`.",
+		Description: "Manage user memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<userId>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the user membership",
@@ -59,7 +59,7 @@ func (r *certManagerApplicationUserResource) Schema(_ context.Context, _ resourc
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "The ID of the PKI application",
+				Description: "The ID of the Certificate Manager application",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -156,7 +156,7 @@ func (r *certManagerApplicationUserResource) findMembershipByUserId(applicationI
 func (r *certManagerApplicationUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create PKI application user membership",
+			"Unable to add user to Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -174,7 +174,10 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 		Role:          plan.Role.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error adding user to PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error adding user to Certificate Manager application",
+			"Couldn't add user to application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -183,8 +186,8 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 	for _, unresolved := range addResponse.Unresolved {
 		if strings.ToLower(unresolved) == emailLower {
 			resp.Diagnostics.AddError(
-				"Unresolved user",
-				fmt.Sprintf("User %q could not be resolved by the Infisical API. Verify the user exists in the organization.", email),
+				"Unable to add user to Certificate Manager application",
+				fmt.Sprintf("User %q was not found in the Infisical organization. Verify the email is correct and the user has been invited to the organization.", email),
 			)
 			return
 		}
@@ -192,8 +195,8 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 	for _, skipped := range addResponse.Skipped {
 		if strings.ToLower(skipped) == emailLower {
 			resp.Diagnostics.AddWarning(
-				"User membership skipped",
-				fmt.Sprintf("User %q was skipped by the Infisical API (likely already a member of the application). Continuing to reconcile state.", email),
+				"User is already a member of the Certificate Manager application",
+				fmt.Sprintf("User %q is already attached to this application. The existing membership will be adopted into Terraform state.", email),
 			)
 		}
 	}
@@ -216,11 +219,17 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 	if member == nil {
 		found, err := r.findMembershipByEmail(plan.ApplicationId.ValueString(), plan.Email.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Error reading user membership after create", err.Error())
+			resp.Diagnostics.AddError(
+				"Error reading user membership after create",
+				"Couldn't read user membership from Infisical, unexpected error: "+err.Error(),
+			)
 			return
 		}
 		if found == nil {
-			resp.Diagnostics.AddError("Error reading user membership after create", "User membership was not found after creation")
+			resp.Diagnostics.AddError(
+				"Error reading user membership after create",
+				"User membership was not found after creation. The Infisical API did not return the expected membership.",
+			)
 			return
 		}
 		member = found
@@ -249,7 +258,7 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 func (r *certManagerApplicationUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read PKI application user membership",
+			"Unable to read Certificate Manager application user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -275,7 +284,10 @@ func (r *certManagerApplicationUserResource) Read(ctx context.Context, req resou
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading PKI application user membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager application user",
+			"Couldn't read user membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -315,7 +327,7 @@ func (r *certManagerApplicationUserResource) Read(ctx context.Context, req resou
 func (r *certManagerApplicationUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update PKI application user membership",
+			"Unable to update Certificate Manager application user",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -339,7 +351,10 @@ func (r *certManagerApplicationUserResource) Update(ctx context.Context, req res
 		Role:          plan.Role.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating PKI application user membership", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager application user",
+			"Couldn't update user membership in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -367,7 +382,7 @@ func (r *certManagerApplicationUserResource) Update(ctx context.Context, req res
 func (r *certManagerApplicationUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete PKI application user membership",
+			"Unable to remove user from Certificate Manager application",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -384,7 +399,10 @@ func (r *certManagerApplicationUserResource) Delete(ctx context.Context, req res
 		UserId:        state.UserId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error removing user from PKI application", err.Error())
+		resp.Diagnostics.AddError(
+			"Error removing user from Certificate Manager application",
+			"Couldn't remove user from application in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }

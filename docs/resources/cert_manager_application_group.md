@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_application_group Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage group memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <applicationId>:<groupId>.
+  Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <applicationId>:<groupId>.
 ---
 
 # infisical_cert_manager_application_group (Resource)
 
-Manage group memberships for a PKI application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<groupId>`.
+Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<groupId>`.
 
 ## Example Usage
 
@@ -49,7 +49,7 @@ resource "infisical_cert_manager_application_group" "platform_devs" {
 
 ### Required
 
-- `application_id` (String) The ID of the PKI application
+- `application_id` (String) The ID of the Certificate Manager application
 - `group_id` (String) The ID of the group to add
 - `role` (String) The role to assign to the group (admin, member, viewer, or a custom role slug)
 

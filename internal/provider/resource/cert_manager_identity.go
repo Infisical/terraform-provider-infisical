@@ -38,7 +38,7 @@ func (r *certManagerIdentityResource) Metadata(_ context.Context, req resource.M
 
 func (r *certManagerIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage identity memberships at the cert manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <identityId>`.",
+		Description: "Manage identity memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <identityId>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the identity membership",
@@ -86,7 +86,7 @@ func (r *certManagerIdentityResource) Configure(_ context.Context, req resource.
 func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to create cert manager identity membership",
+			"Unable to create Certificate Manager identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -103,11 +103,17 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error parsing roles",
+			"Couldn't parse roles for Certificate Manager identity, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !hasPermanent {
-		resp.Diagnostics.AddError("Error assigning role to identity", "Must have at least one permanent role")
+		resp.Diagnostics.AddError(
+			"Error assigning roles to identity",
+			"Identity must have at least one permanent (non-temporary) role.",
+		)
 		return
 	}
 
@@ -116,7 +122,10 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 		Roles:      roles,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error adding cert manager identity", err.Error())
+		resp.Diagnostics.AddError(
+			"Error adding identity to Certificate Manager",
+			"Couldn't add identity to Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -126,7 +135,10 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 		IdentityId: plan.IdentityId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error fetching cert manager identity", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager identity",
+			"Couldn't read identity membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -141,7 +153,7 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 func (r *certManagerIdentityResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to read cert manager identity membership",
+			"Unable to read Certificate Manager identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -161,7 +173,10 @@ func (r *certManagerIdentityResource) Read(ctx context.Context, req resource.Rea
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error fetching cert manager identity", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager identity",
+			"Couldn't read identity membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -176,7 +191,7 @@ func (r *certManagerIdentityResource) Read(ctx context.Context, req resource.Rea
 func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to update cert manager identity membership",
+			"Unable to update Certificate Manager identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -193,11 +208,17 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 		return
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error parsing roles",
+			"Couldn't parse roles for Certificate Manager identity, unexpected error: "+err.Error(),
+		)
 		return
 	}
 	if !hasPermanent {
-		resp.Diagnostics.AddError("Error assigning role to identity", "Must have at least one permanent role")
+		resp.Diagnostics.AddError(
+			"Error assigning roles to identity",
+			"Identity must have at least one permanent (non-temporary) role.",
+		)
 		return
 	}
 
@@ -206,7 +227,10 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 		Roles:      roles,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating cert manager identity roles", err.Error())
+		resp.Diagnostics.AddError(
+			"Error updating Certificate Manager identity",
+			"Couldn't update identity roles in Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -214,7 +238,10 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 		IdentityId: plan.IdentityId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error fetching cert manager identity", err.Error())
+		resp.Diagnostics.AddError(
+			"Error reading Certificate Manager identity",
+			"Couldn't read identity membership from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -229,7 +256,7 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 func (r *certManagerIdentityResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to delete cert manager identity membership",
+			"Unable to delete Certificate Manager identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -245,7 +272,10 @@ func (r *certManagerIdentityResource) Delete(ctx context.Context, req resource.D
 		IdentityId: state.IdentityId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error removing cert manager identity", err.Error())
+		resp.Diagnostics.AddError(
+			"Error removing Certificate Manager identity",
+			"Couldn't remove identity from Infisical, unexpected error: "+err.Error(),
+		)
 		return
 	}
 }
@@ -253,7 +283,7 @@ func (r *certManagerIdentityResource) Delete(ctx context.Context, req resource.D
 func (r *certManagerIdentityResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
-			"Unable to import cert manager identity membership",
+			"Unable to import Certificate Manager identity",
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
@@ -264,8 +294,8 @@ func (r *certManagerIdentityResource) ImportState(ctx context.Context, req resou
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to import cert manager identity membership",
-			fmt.Sprintf("Could not find cert manager identity membership for identity_id %q: %s", req.ID, err.Error()),
+			"Unable to import Certificate Manager identity",
+			fmt.Sprintf("Couldn't find Certificate Manager identity for identity_id %q: %s", req.ID, err.Error()),
 		)
 		return
 	}

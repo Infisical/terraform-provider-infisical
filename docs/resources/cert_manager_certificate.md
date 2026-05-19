@@ -117,7 +117,7 @@ output "cert_private_key" {
 ### Optional
 
 - `alt_names` (List of String) Subject alternative names (SANs) for the certificate
-- `application_id` (String) The ID of the PKI application to scope the certificate under
+- `application_id` (String) The ID of the Certificate Manager application to scope the certificate under
 - `common_name` (String) The common name (CN) for the certificate. Required when not using CSR
 - `country` (String) The country (C) for the certificate (2-letter code)
 - `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")). NOTE: the CSR cannot be recovered after import; on import this attribute remains null in state.
