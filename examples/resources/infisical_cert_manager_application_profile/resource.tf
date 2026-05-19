@@ -17,30 +17,15 @@ resource "infisical_cert_manager_internal_ca" "issuing" {
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"
   organization  = "Example Corp"
-  ou            = "IT Security"
   country       = "US"
-  locality      = "San Francisco"
-  province      = "California"
   key_algorithm = "RSA_2048"
 }
 
 resource "infisical_cert_manager_certificate_policy" "web_server" {
-  name        = "web-server-policy"
-  description = "Policy for web server certificates"
+  name = "web-server-policy"
 
   subject {
     type     = "common_name"
-    allowed  = ["*.example.com"]
-    required = ["*.example.com"]
-  }
-
-  subject {
-    type     = "organization"
-    required = ["Example Corp"]
-  }
-
-  sans {
-    type     = "dns_name"
     allowed  = ["*.example.com"]
     required = ["*.example.com"]
   }
@@ -50,7 +35,7 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
   }
 
   extended_key_usages {
-    allowed = ["server_auth", "client_auth"]
+    allowed = ["server_auth"]
   }
 
   validity {
@@ -59,7 +44,7 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
 
   algorithms {
     signature     = ["SHA256-RSA"]
-    key_algorithm = ["RSA-2048", "RSA-3072"]
+    key_algorithm = ["RSA-2048"]
   }
 }
 
@@ -68,7 +53,6 @@ resource "infisical_cert_manager_certificate_profile" "web_server" {
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
   name            = "web-server"
-  description     = "Profile for issuing web server certificates"
   issuer_type     = "ca"
 
   defaults {
@@ -81,19 +65,20 @@ resource "infisical_cert_manager_certificate_profile" "web_server" {
   }
 }
 
-resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
-  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
+resource "infisical_cert_manager_application" "platform" {
+  name = "platform"
+}
 
-  name            = "self-signed-dev"
-  description     = "Self-signed certificates for development"
-  issuer_type     = "self-signed"
+# Attach the profile to the application and configure its enrollment methods. Each
+# enrollment block (api_config, est_config, acme_config, scep_config) is optional —
+# add, remove, or edit a block to enable, disable, or change the corresponding enrollment.
+# Only one resource per (application_id, profile_id) pair.
+resource "infisical_cert_manager_application_profile" "platform_web_server" {
+  application_id = infisical_cert_manager_application.platform.id
+  profile_id     = infisical_cert_manager_certificate_profile.web_server.id
 
-  defaults {
-    common_name         = "dev.example.com"
-    ttl_days            = 90
-    key_algorithm       = "RSA_2048"
-    signature_algorithm = "RSA-SHA256"
-    key_usages          = ["digital_signature"]
-    extended_key_usages = ["server_auth"]
+  api_config = {
+    auto_renew        = true
+    renew_before_days = 7
   }
 }

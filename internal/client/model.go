@@ -2843,7 +2843,6 @@ type CertificateAuthority struct {
 }
 
 type CreateInternalCARequest struct {
-	ProjectId     string                            `json:"projectId"`
 	Name          string                            `json:"name"`
 	Status        string                            `json:"status"`
 	Configuration CertificateAuthorityConfiguration `json:"configuration"`
@@ -2862,8 +2861,7 @@ type GetCAResponse struct {
 }
 
 type UpdateInternalCARequest struct {
-	ProjectId     string `json:"projectId"`
-	CAId          string
+	CAId          string                            `json:"-"`
 	Name          string                            `json:"name"`
 	Status        string                            `json:"status"`
 	Configuration CertificateAuthorityConfiguration `json:"configuration"`
@@ -2882,7 +2880,6 @@ type DeleteCAResponse struct {
 }
 
 type CreateACMECARequest struct {
-	ProjectId     string                            `json:"projectId"`
 	Name          string                            `json:"name"`
 	Status        string                            `json:"status"`
 	Configuration CertificateAuthorityConfiguration `json:"configuration"`
@@ -2893,8 +2890,7 @@ type CreateACMECAResponse struct {
 }
 
 type UpdateACMECARequest struct {
-	ProjectId     string `json:"projectId"`
-	CAId          string
+	CAId          string                            `json:"-"`
 	Name          string                            `json:"name"`
 	Status        string                            `json:"status"`
 	Configuration CertificateAuthorityConfiguration `json:"configuration"`
@@ -2905,7 +2901,6 @@ type UpdateACMECAResponse struct {
 }
 
 type CreateADCSCARequest struct {
-	ProjectId     string                            `json:"projectId"`
 	Name          string                            `json:"name"`
 	Status        string                            `json:"status"`
 	Configuration CertificateAuthorityConfiguration `json:"configuration"`
@@ -2916,8 +2911,7 @@ type CreateADCSCAResponse struct {
 }
 
 type UpdateADCSCARequest struct {
-	ProjectId     string `json:"projectId"`
-	CAId          string
+	CAId          string                            `json:"-"`
 	Name          string                            `json:"name"`
 	Status        string                            `json:"status"`
 	Configuration CertificateAuthorityConfiguration `json:"configuration"`
@@ -2978,7 +2972,6 @@ type CertificatePolicy struct {
 }
 
 type CreateCertificatePolicyRequest struct {
-	ProjectId         string                              `json:"projectId"`
 	Name              string                              `json:"name"`
 	Description       string                              `json:"description,omitempty"`
 	Subject           []CertificatePolicySubject          `json:"subject,omitempty"`
@@ -3025,60 +3018,45 @@ type DeleteCertificatePolicyResponse struct {
 	CertificatePolicy CertificatePolicy `json:"certificatePolicy"`
 }
 
-type CertificateProfileEstConfig struct {
-	Id                           string `json:"id"`
-	DisableBootstrapCaValidation bool   `json:"disableBootstrapCaValidation"`
-	Passphrase                   string `json:"passphrase"`
-	CaChain                      string `json:"caChain,omitempty"`
-}
-
-type CertificateProfileApiConfig struct {
-	Id              string `json:"id"`
-	AutoRenew       bool   `json:"autoRenew"`
-	RenewBeforeDays int    `json:"renewBeforeDays,omitempty"`
-}
-
 type CertificateProfileAcmeConfig struct {
 	Id           string `json:"id"`
 	DirectoryUrl string `json:"directoryUrl"`
 }
 
-type CertificateProfileExternalConfigs struct {
-	Template string `json:"template,omitempty"`
+type CertificateProfileDefaults struct {
+	TtlDays            *int     `json:"ttlDays,omitempty"`
+	CommonName         string   `json:"commonName,omitempty"`
+	KeyAlgorithm       string   `json:"keyAlgorithm,omitempty"`
+	SignatureAlgorithm string   `json:"signatureAlgorithm,omitempty"`
+	KeyUsages          []string `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages  []string `json:"extendedKeyUsages,omitempty"`
+	Organization       string   `json:"organization,omitempty"`
+	OrganizationalUnit string   `json:"organizationalUnit,omitempty"`
+	Country            string   `json:"country,omitempty"`
+	State              string   `json:"state,omitempty"`
+	Locality           string   `json:"locality,omitempty"`
 }
 
 type CertificateProfile struct {
-	Id                  string                             `json:"id"`
-	ProjectId           string                             `json:"projectId"`
-	CaId                string                             `json:"caId,omitempty"`
-	CertificatePolicyId string                             `json:"certificatePolicyId"`
-	Slug                string                             `json:"slug"`
-	Description         string                             `json:"description,omitempty"`
-	EnrollmentType      string                             `json:"enrollmentType"`
-	IssuerType          string                             `json:"issuerType"`
-	EstConfigId         string                             `json:"estConfigId,omitempty"`
-	ApiConfigId         string                             `json:"apiConfigId,omitempty"`
-	AcmeConfigId        string                             `json:"acmeConfigId,omitempty"`
-	ExternalConfigs     *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
-	EstConfig           *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
-	ApiConfig           *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
-	AcmeConfig          *CertificateProfileAcmeConfig      `json:"acmeConfig,omitempty"`
-	CreatedAt           string                             `json:"createdAt"`
-	UpdatedAt           string                             `json:"updatedAt"`
+	Id                  string                      `json:"id"`
+	ProjectId           string                      `json:"projectId"`
+	CaId                string                      `json:"caId,omitempty"`
+	CertificatePolicyId string                      `json:"certificatePolicyId"`
+	Slug                string                      `json:"slug"`
+	Description         *string                     `json:"description,omitempty"`
+	IssuerType          string                      `json:"issuerType"`
+	Defaults            *CertificateProfileDefaults `json:"defaults,omitempty"`
+	CreatedAt           string                      `json:"createdAt"`
+	UpdatedAt           string                      `json:"updatedAt"`
 }
 
 type CreateCertificateProfileRequest struct {
-	ProjectId           string                             `json:"projectId"`
-	CaId                string                             `json:"caId,omitempty"`
-	CertificatePolicyId string                             `json:"certificatePolicyId"`
-	Slug                string                             `json:"slug"`
-	Description         string                             `json:"description,omitempty"`
-	EnrollmentType      string                             `json:"enrollmentType"`
-	IssuerType          string                             `json:"issuerType,omitempty"`
-	EstConfig           *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
-	ApiConfig           *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
-	AcmeConfig          map[string]interface{}             `json:"acmeConfig,omitempty"`
-	ExternalConfigs     *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
+	CaId                string                      `json:"caId,omitempty"`
+	CertificatePolicyId string                      `json:"certificatePolicyId"`
+	Slug                string                      `json:"slug"`
+	Description         *string                     `json:"description,omitempty"`
+	IssuerType          string                      `json:"issuerType,omitempty"`
+	Defaults            *CertificateProfileDefaults `json:"defaults,omitempty"`
 }
 
 type CreateCertificateProfileResponse struct {
@@ -3095,14 +3073,11 @@ type GetCertificateProfileResponse struct {
 }
 
 type UpdateCertificateProfileRequest struct {
-	ProfileId       string                             `json:"-"`
-	Slug            string                             `json:"slug,omitempty"`
-	Description     string                             `json:"description,omitempty"`
-	EnrollmentType  string                             `json:"enrollmentType,omitempty"`
-	IssuerType      string                             `json:"issuerType,omitempty"`
-	EstConfig       *CertificateProfileEstConfig       `json:"estConfig,omitempty"`
-	ApiConfig       *CertificateProfileApiConfig       `json:"apiConfig,omitempty"`
-	ExternalConfigs *CertificateProfileExternalConfigs `json:"externalConfigs,omitempty"`
+	ProfileId  string `json:"-"`
+	Slug        string                      `json:"slug,omitempty"`
+	IssuerType  string                      `json:"issuerType,omitempty"`
+	Description *string                     `json:"description"`
+	Defaults    *CertificateProfileDefaults `json:"defaults"`
 }
 
 type UpdateCertificateProfileResponse struct {
@@ -3156,29 +3131,47 @@ type GetSpecificCACertificateRequest struct {
 }
 
 type GetSpecificCACertificateResponse struct {
-	CertId           string `json:"certId"`
-	Certificate      string `json:"certificate"`
-	CertificateChain string `json:"certificateChain"`
-	SerialNumber     string `json:"serialNumber"`
+	CertId           string  `json:"certId"`
+	Certificate      string  `json:"certificate"`
+	CertificateChain string  `json:"certificateChain"`
+	SerialNumber     string  `json:"serialNumber"`
+	NotBefore        *string `json:"notBefore,omitempty"`
+	NotAfter         *string `json:"notAfter,omitempty"`
+	MaxPathLength    *int64  `json:"maxPathLength,omitempty"`
+	ParentCaId       *string `json:"parentCaId,omitempty"`
+}
+
+type CertificateBasicConstraints struct {
+	IsCA       bool  `json:"isCA"`
+	PathLength *int  `json:"pathLength,omitempty"`
 }
 
 type Certificate struct {
-	Id                 string      `json:"id"`
-	ProjectId          string      `json:"projectId"`
-	ProfileId          string      `json:"profileId"`
-	Status             string      `json:"status"` // pending, issued, failed
-	CommonName         string      `json:"commonName"`
-	AltNames           interface{} `json:"altNames,omitempty"`
-	SerialNumber       string      `json:"serialNumber,omitempty"`
-	NotBefore          string      `json:"notBefore,omitempty"`
-	NotAfter           string      `json:"notAfter,omitempty"`
-	Certificate        string      `json:"certificate,omitempty"`
-	PrivateKey         string      `json:"privateKey,omitempty"`
-	CertificateChain   string      `json:"certificateChain,omitempty"`
-	KeyAlgorithm       string      `json:"keyAlgorithm,omitempty"`
-	SignatureAlgorithm string      `json:"signatureAlgorithm,omitempty"`
-	CreatedAt          string      `json:"createdAt"`
-	UpdatedAt          string      `json:"updatedAt"`
+	Id                        string                       `json:"id"`
+	ProjectId                 string                       `json:"projectId"`
+	ProfileId                 string                       `json:"profileId"`
+	ApplicationId             string                       `json:"applicationId,omitempty"`
+	Status                    string                       `json:"status"` // pending, issued, failed
+	CommonName                string                       `json:"commonName"`
+	AltNames                  interface{}                  `json:"altNames,omitempty"`
+	SerialNumber              string                       `json:"serialNumber,omitempty"`
+	NotBefore                 string                       `json:"notBefore,omitempty"`
+	NotAfter                  string                       `json:"notAfter,omitempty"`
+	Certificate               string                       `json:"certificate,omitempty"`
+	PrivateKey                string                       `json:"privateKey,omitempty"`
+	CertificateChain          string                       `json:"certificateChain,omitempty"`
+	KeyAlgorithm              string                       `json:"keyAlgorithm,omitempty"`
+	SignatureAlgorithm        string                       `json:"signatureAlgorithm,omitempty"`
+	KeyUsages                 []string                     `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages         []string                     `json:"extendedKeyUsages,omitempty"`
+	SubjectOrganization       string                       `json:"subjectOrganization,omitempty"`
+	SubjectOrganizationalUnit string                       `json:"subjectOrganizationalUnit,omitempty"`
+	SubjectCountry            string                       `json:"subjectCountry,omitempty"`
+	SubjectState              string                       `json:"subjectState,omitempty"`
+	SubjectLocality           string                       `json:"subjectLocality,omitempty"`
+	BasicConstraints          *CertificateBasicConstraints `json:"basicConstraints,omitempty"`
+	CreatedAt                 string                       `json:"createdAt"`
+	UpdatedAt                 string                       `json:"updatedAt"`
 }
 
 type CertificateAltName struct {
@@ -3205,6 +3198,7 @@ type CertificateAttributes struct {
 
 type RequestCertificateRequest struct {
 	ProfileId            string                 `json:"profileId"`
+	ApplicationId        string                 `json:"applicationId,omitempty"`
 	CSR                  string                 `json:"csr,omitempty"`
 	Attributes           *CertificateAttributes `json:"attributes,omitempty"`
 	RemoveRootsFromChain bool                   `json:"removeRootsFromChain,omitempty"`
@@ -3357,4 +3351,588 @@ type DeleteProjectLevelIdentityRequest struct {
 
 type DeleteProjectLevelIdentityResponse struct {
 	Identity ProjectLevelIdentity `json:"identity"`
+}
+
+type PkiApplication struct {
+	Id          string    `json:"id"`
+	ProjectId   string    `json:"projectId"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type CreatePkiApplicationRequest struct {
+	Name        string   `json:"name"`
+	Description *string  `json:"description,omitempty"`
+	ProfileIds  []string `json:"profileIds,omitempty"`
+}
+
+type CreatePkiApplicationResponse struct {
+	Application PkiApplication `json:"application"`
+}
+
+type GetPkiApplicationRequest struct {
+	ApplicationId string
+}
+
+type GetPkiApplicationResponse struct {
+	Application PkiApplication `json:"application"`
+}
+
+type UpdatePkiApplicationRequest struct {
+	ApplicationId string  `json:"-"`
+	Name          string  `json:"name,omitempty"`
+	Description   *string `json:"description"`
+}
+
+type UpdatePkiApplicationResponse struct {
+	Application PkiApplication `json:"application"`
+}
+
+type DeletePkiApplicationRequest struct {
+	ApplicationId string
+}
+
+type DeletePkiApplicationResponse struct {
+	Application PkiApplication `json:"application"`
+}
+
+type PkiApplicationProfile struct {
+	ApplicationId      string    `json:"applicationId"`
+	ProfileId          string    `json:"profileId"`
+	ProfileSlug        string    `json:"profileSlug"`
+	ProfileDescription *string   `json:"profileDescription,omitempty"`
+	EstConfigId        *string   `json:"estConfigId,omitempty"`
+	ApiConfigId        *string   `json:"apiConfigId,omitempty"`
+	AcmeConfigId       *string   `json:"acmeConfigId,omitempty"`
+	ScepConfigId       *string   `json:"scepConfigId,omitempty"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
+}
+
+type ListPkiApplicationProfilesRequest struct {
+	ApplicationId string
+}
+
+type ListPkiApplicationProfilesResponse struct {
+	Profiles []PkiApplicationProfile `json:"profiles"`
+}
+
+type AttachPkiApplicationProfilesRequest struct {
+	ApplicationId string   `json:"-"`
+	ProfileIds    []string `json:"profileIds"`
+}
+
+type AttachPkiApplicationProfilesResponse struct {
+	Profiles []PkiApplicationProfile `json:"profiles"`
+}
+
+type DetachPkiApplicationProfileRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type DetachPkiApplicationProfileResponse struct {
+	ApplicationId string `json:"applicationId"`
+	ProfileId     string `json:"profileId"`
+}
+
+type PkiApplicationMemberDetails struct {
+	Email    *string `json:"email,omitempty"`
+	Username *string `json:"username,omitempty"`
+}
+
+type PkiApplicationMember struct {
+	MembershipId    string                       `json:"membershipId"`
+	ApplicationId   string                       `json:"applicationId"`
+	ActorUserId     *string                      `json:"actorUserId,omitempty"`
+	ActorIdentityId *string                      `json:"actorIdentityId,omitempty"`
+	ActorGroupId    *string                      `json:"actorGroupId,omitempty"`
+	Role            string                       `json:"role"`
+	CustomRoleId    *string                      `json:"customRoleId,omitempty"`
+	CreatedAt       time.Time                    `json:"createdAt"`
+	UpdatedAt       time.Time                    `json:"updatedAt"`
+	Details         *PkiApplicationMemberDetails `json:"details,omitempty"`
+}
+
+type AddPkiApplicationUserMembersRequest struct {
+	ApplicationId string   `json:"-"`
+	Emails        []string `json:"emails,omitempty"`
+	Role          string   `json:"role"`
+}
+
+type AddPkiApplicationUserMembersResponse struct {
+	Memberships []PkiApplicationMember `json:"memberships"`
+	Skipped     []string               `json:"skipped"`
+	Unresolved  []string               `json:"unresolved"`
+}
+
+type ListPkiApplicationUserMembersRequest struct {
+	ApplicationId string
+}
+
+type ListPkiApplicationUserMembersResponse struct {
+	Memberships []PkiApplicationMember `json:"memberships"`
+}
+
+type UpdatePkiApplicationUserMemberRoleRequest struct {
+	ApplicationId string `json:"-"`
+	UserId        string `json:"-"`
+	Role          string `json:"role"`
+}
+
+type UpdatePkiApplicationUserMemberRoleResponse struct {
+	Membership PkiApplicationMember `json:"membership"`
+}
+
+type RemovePkiApplicationUserMemberRequest struct {
+	ApplicationId string
+	UserId        string
+}
+
+type RemovePkiApplicationUserMemberResponse struct {
+	MembershipId  string `json:"membershipId"`
+	ApplicationId string `json:"applicationId"`
+}
+
+type ListPkiApplicationGroupMembersRequest struct {
+	ApplicationId string
+}
+
+type ListPkiApplicationGroupMembersResponse struct {
+	Memberships []PkiApplicationMember `json:"memberships"`
+}
+
+type AddPkiApplicationGroupMemberRequest struct {
+	ApplicationId string `json:"-"`
+	GroupId       string `json:"-"`
+	Role          string `json:"role"`
+}
+
+type AddPkiApplicationGroupMemberResponse struct {
+	Membership PkiApplicationMember `json:"membership"`
+}
+
+type UpdatePkiApplicationGroupMemberRoleRequest struct {
+	ApplicationId string `json:"-"`
+	GroupId       string `json:"-"`
+	Role          string `json:"role"`
+}
+
+type UpdatePkiApplicationGroupMemberRoleResponse struct {
+	Membership PkiApplicationMember `json:"membership"`
+}
+
+type RemovePkiApplicationGroupMemberRequest struct {
+	ApplicationId string
+	GroupId       string
+}
+
+type RemovePkiApplicationGroupMemberResponse struct {
+	MembershipId  string `json:"membershipId"`
+	ApplicationId string `json:"applicationId"`
+}
+
+type ListPkiApplicationIdentityMembersRequest struct {
+	ApplicationId string
+}
+
+type ListPkiApplicationIdentityMembersResponse struct {
+	Memberships []PkiApplicationMember `json:"memberships"`
+}
+
+type AddPkiApplicationIdentityMemberRequest struct {
+	ApplicationId string `json:"-"`
+	IdentityId    string `json:"-"`
+	Role          string `json:"role"`
+}
+
+type AddPkiApplicationIdentityMemberResponse struct {
+	Membership PkiApplicationMember `json:"membership"`
+}
+
+type UpdatePkiApplicationIdentityMemberRoleRequest struct {
+	ApplicationId string `json:"-"`
+	IdentityId    string `json:"-"`
+	Role          string `json:"role"`
+}
+
+type UpdatePkiApplicationIdentityMemberRoleResponse struct {
+	Membership PkiApplicationMember `json:"membership"`
+}
+
+type RemovePkiApplicationIdentityMemberRequest struct {
+	ApplicationId string
+	IdentityId    string
+}
+
+type RemovePkiApplicationIdentityMemberResponse struct {
+	MembershipId  string `json:"membershipId"`
+	ApplicationId string `json:"applicationId"`
+}
+
+type PkiApplicationApiEnrollment struct {
+	Id              string `json:"id"`
+	AutoRenew       bool   `json:"autoRenew"`
+	RenewBeforeDays *int   `json:"renewBeforeDays,omitempty"`
+}
+
+type PkiApplicationEstEnrollmentState struct {
+	Id                           string `json:"id"`
+	DisableBootstrapCaValidation bool   `json:"disableBootstrapCaValidation"`
+	EstEndpointUrl               string `json:"estEndpointUrl"`
+}
+
+type PkiApplicationAcmeEnrollmentState struct {
+	Id                           string `json:"id"`
+	SkipDnsOwnershipVerification bool   `json:"skipDnsOwnershipVerification"`
+	SkipEabBinding               bool   `json:"skipEabBinding"`
+	DirectoryUrl                 string `json:"directoryUrl"`
+}
+
+type PkiApplicationScepEnrollmentState struct {
+	Id                            string    `json:"id"`
+	ChallengeType                 string    `json:"challengeType"`
+	IncludeCaCertInResponse       bool      `json:"includeCaCertInResponse"`
+	AllowCertBasedRenewal         bool      `json:"allowCertBasedRenewal"`
+	DynamicChallengeExpiryMinutes *int      `json:"dynamicChallengeExpiryMinutes,omitempty"`
+	DynamicChallengeMaxPending    *int      `json:"dynamicChallengeMaxPending,omitempty"`
+	ScepEndpointUrl               string    `json:"scepEndpointUrl"`
+	ChallengeEndpointUrl          *string   `json:"challengeEndpointUrl,omitempty"`
+	RaCertificatePem              string    `json:"raCertificatePem"`
+	RaCertExpiresAt               time.Time `json:"raCertExpiresAt"`
+}
+
+type GetPkiApplicationEnrollmentRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type GetPkiApplicationEnrollmentResponse struct {
+	ApplicationId  string                             `json:"applicationId"`
+	ProfileId      string                             `json:"profileId"`
+	Api            *PkiApplicationApiEnrollment       `json:"api,omitempty"`
+	Est            *PkiApplicationEstEnrollmentState  `json:"est,omitempty"`
+	Acme           *PkiApplicationAcmeEnrollmentState `json:"acme,omitempty"`
+	Scep           *PkiApplicationScepEnrollmentState `json:"scep,omitempty"`
+	EstConfigured  bool                               `json:"estConfigured"`
+	AcmeConfigured bool                               `json:"acmeConfigured"`
+	ScepConfigured bool                               `json:"scepConfigured"`
+}
+
+type SetPkiApplicationApiEnrollmentRequest struct {
+	ApplicationId   string `json:"-"`
+	ProfileId       string `json:"-"`
+	AutoRenew       bool   `json:"autoRenew"`
+	RenewBeforeDays *int   `json:"renewBeforeDays,omitempty"`
+}
+
+type SetPkiApplicationApiEnrollmentResponse struct {
+	ApplicationId string                      `json:"applicationId"`
+	ProfileId     string                      `json:"profileId"`
+	Api           PkiApplicationApiEnrollment `json:"api"`
+}
+
+type ClearPkiApplicationApiEnrollmentRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type ClearPkiApplicationApiEnrollmentResponse struct {
+	ApplicationId string `json:"applicationId"`
+	ProfileId     string `json:"profileId"`
+}
+
+type SetPkiApplicationEstEnrollmentRequest struct {
+	ApplicationId                string  `json:"-"`
+	ProfileId                    string  `json:"-"`
+	Passphrase                   string  `json:"passphrase"`
+	DisableBootstrapCaValidation *bool   `json:"disableBootstrapCaValidation,omitempty"`
+	CaChain                      *string `json:"caChain,omitempty"`
+}
+
+type PkiApplicationEstEnrollment struct {
+	Id                           string `json:"id"`
+	DisableBootstrapCaValidation bool   `json:"disableBootstrapCaValidation"`
+}
+
+type SetPkiApplicationEstEnrollmentResponse struct {
+	ApplicationId string                      `json:"applicationId"`
+	ProfileId     string                      `json:"profileId"`
+	Est           PkiApplicationEstEnrollment `json:"est"`
+}
+
+type ClearPkiApplicationEstEnrollmentRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type ClearPkiApplicationEstEnrollmentResponse struct {
+	ApplicationId string `json:"applicationId"`
+	ProfileId     string `json:"profileId"`
+}
+
+type SetPkiApplicationAcmeEnrollmentRequest struct {
+	ApplicationId                string `json:"-"`
+	ProfileId                    string `json:"-"`
+	SkipDnsOwnershipVerification *bool  `json:"skipDnsOwnershipVerification,omitempty"`
+	SkipEabBinding               *bool  `json:"skipEabBinding,omitempty"`
+}
+
+type PkiApplicationAcmeEnrollment struct {
+	Id                           string `json:"id"`
+	SkipDnsOwnershipVerification bool   `json:"skipDnsOwnershipVerification"`
+	SkipEabBinding               bool   `json:"skipEabBinding"`
+}
+
+type SetPkiApplicationAcmeEnrollmentResponse struct {
+	ApplicationId string                       `json:"applicationId"`
+	ProfileId     string                       `json:"profileId"`
+	Acme          PkiApplicationAcmeEnrollment `json:"acme"`
+}
+
+type ClearPkiApplicationAcmeEnrollmentRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type ClearPkiApplicationAcmeEnrollmentResponse struct {
+	ApplicationId string `json:"applicationId"`
+	ProfileId     string `json:"profileId"`
+}
+
+type RevealPkiApplicationAcmeEabSecretRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type RevealPkiApplicationAcmeEabSecretResponse struct {
+	ApplicationId string `json:"applicationId"`
+	ProfileId     string `json:"profileId"`
+	EabKid        string `json:"eabKid"`
+	EabSecret     string `json:"eabSecret"`
+}
+
+type SetPkiApplicationScepEnrollmentRequest struct {
+	ApplicationId                 string `json:"-"`
+	ProfileId                     string `json:"-"`
+	ChallengeType                 string `json:"challengeType,omitempty"`
+	ChallengePassword             string `json:"challengePassword,omitempty"`
+	IncludeCaCertInResponse       *bool  `json:"includeCaCertInResponse,omitempty"`
+	AllowCertBasedRenewal         *bool  `json:"allowCertBasedRenewal,omitempty"`
+	DynamicChallengeExpiryMinutes *int   `json:"dynamicChallengeExpiryMinutes,omitempty"`
+	DynamicChallengeMaxPending    *int   `json:"dynamicChallengeMaxPending,omitempty"`
+}
+
+type PkiApplicationScepEnrollment struct {
+	Id            string `json:"id"`
+	ChallengeType string `json:"challengeType"`
+}
+
+type SetPkiApplicationScepEnrollmentResponse struct {
+	ApplicationId string                       `json:"applicationId"`
+	ProfileId     string                       `json:"profileId"`
+	Scep          PkiApplicationScepEnrollment `json:"scep"`
+}
+
+type ClearPkiApplicationScepEnrollmentRequest struct {
+	ApplicationId string
+	ProfileId     string
+}
+
+type ClearPkiApplicationScepEnrollmentResponse struct {
+	ApplicationId string `json:"applicationId"`
+	ProfileId     string `json:"profileId"`
+}
+
+type CertManagerMembershipRole struct {
+	Id                       string     `json:"id"`
+	Role                     string     `json:"role"`
+	CustomRoleId             *string    `json:"customRoleId,omitempty"`
+	CustomRoleName           *string    `json:"customRoleName,omitempty"`
+	CustomRoleSlug           *string    `json:"customRoleSlug,omitempty"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            *string    `json:"temporaryMode,omitempty"`
+	TemporaryRange           *string    `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime,omitempty"`
+	TemporaryAccessEndTime   *time.Time `json:"temporaryAccessEndTime,omitempty"`
+}
+
+type CertManagerMembershipRoleUpdate struct {
+	Role                     string    `json:"role"`
+	IsTemporary              bool      `json:"isTemporary"`
+	TemporaryMode            string    `json:"temporaryMode,omitempty"`
+	TemporaryRange           string    `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime time.Time `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type CertManagerUserMembership struct {
+	ID     string                      `json:"id"`
+	UserID string                      `json:"userId"`
+	Roles  []CertManagerMembershipRole `json:"roles"`
+	User   struct {
+		ID        string `json:"id"`
+		Email     string `json:"email"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		Username  string `json:"username"`
+	} `json:"user"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type ListCertManagerUsersResponse struct {
+	Memberships []CertManagerUserMembership `json:"memberships"`
+}
+
+type GetCertManagerUserRequest struct {
+	UserId string
+}
+
+type GetCertManagerUserResponse struct {
+	Membership CertManagerUserMembership `json:"membership"`
+}
+
+type InviteCertManagerUsersRequest struct {
+	Emails    []string `json:"emails,omitempty"`
+	Usernames []string `json:"usernames,omitempty"`
+	RoleSlugs []string `json:"roleSlugs,omitempty"`
+}
+
+type CertManagerUserMembershipBasic struct {
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+}
+
+type InviteCertManagerUsersResponse struct {
+	Memberships []CertManagerUserMembershipBasic `json:"memberships"`
+}
+
+type UpdateCertManagerUserRequest struct {
+	UserId string                            `json:"-"`
+	Roles  []CertManagerMembershipRoleUpdate `json:"roles"`
+}
+
+type UpdateCertManagerUserResponse struct {
+	Roles []CertManagerMembershipRole `json:"roles"`
+}
+
+type RemoveCertManagerUserRequest struct {
+	UserId string
+}
+
+type RemoveCertManagerUserResponse struct {
+	Membership CertManagerUserMembershipBasic `json:"membership"`
+}
+
+type CertManagerGroupSummary struct {
+	ID    string  `json:"id"`
+	Name  string  `json:"name"`
+	Slug  string  `json:"slug"`
+	OrgID *string `json:"orgId,omitempty"`
+}
+
+type CertManagerGroupMembership struct {
+	ID        string                      `json:"id"`
+	GroupId   string                      `json:"groupId"`
+	Group     CertManagerGroupSummary     `json:"group"`
+	Roles     []CertManagerMembershipRole `json:"roles"`
+	CreatedAt time.Time                   `json:"createdAt"`
+	UpdatedAt time.Time                   `json:"updatedAt"`
+}
+
+type GetCertManagerGroupRequest struct {
+	GroupId string
+}
+
+type GetCertManagerGroupResponse struct {
+	GroupMembership CertManagerGroupMembership `json:"groupMembership"`
+}
+
+type AddCertManagerGroupRequest struct {
+	GroupId string                            `json:"-"`
+	Roles   []CertManagerMembershipRoleUpdate `json:"roles,omitempty"`
+}
+
+type AddCertManagerGroupResponse struct {
+	GroupMembership CertManagerGroupMembership `json:"groupMembership"`
+}
+
+type UpdateCertManagerGroupRequest struct {
+	GroupId string                            `json:"-"`
+	Roles   []CertManagerMembershipRoleUpdate `json:"roles"`
+}
+
+type UpdateCertManagerGroupResponse struct {
+	Roles []CertManagerMembershipRole `json:"roles"`
+}
+
+type RemoveCertManagerGroupRequest struct {
+	GroupId string
+}
+
+type RemoveCertManagerGroupResponseMembership struct {
+	ID        string    `json:"id"`
+	GroupId   string    `json:"groupId"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type RemoveCertManagerGroupResponse struct {
+	GroupMembership RemoveCertManagerGroupResponseMembership `json:"groupMembership"`
+}
+
+type CertManagerIdentitySummary struct {
+	Name      string  `json:"name"`
+	ID        string  `json:"id"`
+	OrgID     *string `json:"orgId,omitempty"`
+	ProjectID *string `json:"projectId,omitempty"`
+}
+
+type CertManagerIdentityMembership struct {
+	ID         string                      `json:"id"`
+	IdentityId string                      `json:"identityId"`
+	Identity   CertManagerIdentitySummary  `json:"identity"`
+	Roles      []CertManagerMembershipRole `json:"roles"`
+	CreatedAt  time.Time                   `json:"createdAt"`
+	UpdatedAt  time.Time                   `json:"updatedAt"`
+}
+
+type GetCertManagerIdentityRequest struct {
+	IdentityId string
+}
+
+type GetCertManagerIdentityResponse struct {
+	IdentityMembership CertManagerIdentityMembership `json:"identityMembership"`
+}
+
+type AddCertManagerIdentityRequest struct {
+	IdentityId string                            `json:"-"`
+	Roles      []CertManagerMembershipRoleUpdate `json:"roles,omitempty"`
+}
+
+type CertManagerIdentityMembershipBasic struct {
+	ID         string `json:"id"`
+	IdentityId string `json:"identityId"`
+}
+
+type AddCertManagerIdentityResponse struct {
+	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
+}
+
+type UpdateCertManagerIdentityRequest struct {
+	IdentityId string                            `json:"-"`
+	Roles      []CertManagerMembershipRoleUpdate `json:"roles"`
+}
+
+type UpdateCertManagerIdentityResponse struct {
+	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
+}
+
+type RemoveCertManagerIdentityRequest struct {
+	IdentityId string
+}
+
+type RemoveCertManagerIdentityResponse struct {
+	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
 }

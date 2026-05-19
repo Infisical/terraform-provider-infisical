@@ -49,7 +49,7 @@ func (r *certManagerCACertificateResource) Metadata(_ context.Context, req resou
 
 func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>:<certId>`.",
 		Attributes: map[string]schema.Attribute{
 			"ca_id": schema.StringAttribute{
 				Description: "The ID of the certificate authority to generate a certificate for",
@@ -247,7 +247,7 @@ func (r *certManagerCACertificateResource) Read(ctx context.Context, req resourc
 		return
 	}
 
-	if certificate.SerialNumber != state.SerialNumber.ValueString() {
+	if !state.SerialNumber.IsNull() && state.SerialNumber.ValueString() != "" && certificate.SerialNumber != state.SerialNumber.ValueString() {
 		resp.Diagnostics.AddWarning(
 			"CA certificate has changed",
 			"The CA certificate appears to have been regenerated. The current certificate has a different serial number.",
@@ -257,6 +257,20 @@ func (r *certManagerCACertificateResource) Read(ctx context.Context, req resourc
 	state.Certificate = types.StringValue(certificate.Certificate)
 	state.CertificateChain = types.StringValue(certificate.CertificateChain)
 	state.SerialNumber = types.StringValue(certificate.SerialNumber)
+
+	if certificate.NotBefore != nil {
+		state.NotBefore = types.StringValue(*certificate.NotBefore)
+	}
+	if certificate.NotAfter != nil {
+		state.NotAfter = types.StringValue(*certificate.NotAfter)
+	}
+	if certificate.MaxPathLength != nil {
+		state.MaxPathLength = types.Int64Value(*certificate.MaxPathLength)
+	}
+	if certificate.ParentCaId != nil && *certificate.ParentCaId != "" {
+		state.ParentCaId = types.StringValue(*certificate.ParentCaId)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -298,15 +312,14 @@ func (r *certManagerCACertificateResource) Delete(ctx context.Context, req resou
 func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, ":")
 
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		resp.Diagnostics.AddError(
 			"Invalid import ID format",
-			fmt.Sprintf("Expected format: 'ca_id:certificate_id', but got: '%s'\n\n"+
+			fmt.Sprintf("import format must be <ca_id>:<cert_id>, got: '%s'\n\n"+
 				"To import a CA certificate:\n"+
 				"1. Find your CA ID in the Infisical dashboard (Certificate Manager → CAs)\n"+
 				"2. Find the certificate ID in the CA's certificates list\n"+
-				"3. Use: terraform import infisical_cert_manager_ca_certificate.name \"ca_id:certificate_id\"\n\n"+
-				"Example: terraform import infisical_cert_manager_ca_certificate.my_cert \"87501291-4677-4328-92dd-f229aa0e21df:e3b6427a-6bf0-43fc-bdac-7022e996842c\"",
+				"3. Use: terraform import infisical_cert_manager_ca_certificate.name \"ca_id:certificate_id\"",
 				req.ID),
 		)
 		return
@@ -334,8 +347,24 @@ func (r *certManagerCACertificateResource) ImportState(ctx context.Context, req 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("certificate_chain"), certificate.CertificateChain)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("serial_number"), certificate.SerialNumber)...)
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringNull())...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringNull())...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Null())...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), types.StringNull())...)
+	if certificate.NotBefore != nil {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), *certificate.NotBefore)...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_before"), types.StringNull())...)
+	}
+	if certificate.NotAfter != nil {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), *certificate.NotAfter)...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("not_after"), types.StringNull())...)
+	}
+	if certificate.MaxPathLength != nil {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), *certificate.MaxPathLength)...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("max_path_length"), types.Int64Null())...)
+	}
+	if certificate.ParentCaId != nil && *certificate.ParentCaId != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), *certificate.ParentCaId)...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_ca_id"), types.StringNull())...)
+	}
 }

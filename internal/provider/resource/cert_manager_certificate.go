@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -39,7 +41,40 @@ var (
 		"client_auth", "server_auth", "code_signing",
 		"email_protection", "ocsp_signing", "time_stamping",
 	}
+	legacyKeyUsageMap = map[string]string{
+		"digitalSignature": "digital_signature",
+		"keyEncipherment":  "key_encipherment",
+		"nonRepudiation":   "non_repudiation",
+		"dataEncipherment": "data_encipherment",
+		"keyAgreement":     "key_agreement",
+		"keyCertSign":      "key_cert_sign",
+		"cRLSign":          "crl_sign",
+		"encipherOnly":     "encipher_only",
+		"decipherOnly":     "decipher_only",
+	}
+	legacyExtendedKeyUsageMap = map[string]string{
+		"clientAuth":      "client_auth",
+		"serverAuth":      "server_auth",
+		"codeSigning":     "code_signing",
+		"emailProtection": "email_protection",
+		"ocspSigning":     "ocsp_signing",
+		"timeStamping":    "time_stamping",
+	}
 )
+
+func normalizeKeyUsage(usage string) string {
+	if v, ok := legacyKeyUsageMap[usage]; ok {
+		return v
+	}
+	return usage
+}
+
+func normalizeExtendedKeyUsage(usage string) string {
+	if v, ok := legacyExtendedKeyUsageMap[usage]; ok {
+		return v
+	}
+	return usage
+}
 
 var (
 	_ resource.Resource = &certManagerCertificateResource{}
@@ -55,6 +90,7 @@ type certManagerCertificateResource struct {
 
 type certManagerCertificateResourceModel struct {
 	ProfileId            types.String `tfsdk:"profile_id"`
+	ApplicationId        types.String `tfsdk:"application_id"`
 	CSR                  types.String `tfsdk:"csr"`
 	CommonName           types.String `tfsdk:"common_name"`
 	AltNames             types.List   `tfsdk:"alt_names"`
@@ -95,11 +131,20 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"csr": schema.StringAttribute{
-				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\"))",
+			"application_id": schema.StringAttribute{
+				Description: "The ID of the PKI application to scope the certificate under",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"csr": schema.StringAttribute{
+				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")). NOTE: the CSR cannot be recovered after import; on import this attribute remains null in state.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"common_name": schema.StringAttribute{
@@ -108,6 +153,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"alt_names": schema.ListAttribute{
@@ -117,44 +163,55 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplace(),
+					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"organization": schema.StringAttribute{
 				Description: "The organization (O) for the certificate",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"ou": schema.StringAttribute{
 				Description: "The organizational unit (OU) for the certificate",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"country": schema.StringAttribute{
 				Description: "The country (C) for the certificate (2-letter code)",
 				Optional:    true,
+				Computed:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(2, 2),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"province": schema.StringAttribute{
 				Description: "The state/province (ST) for the certificate",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"locality": schema.StringAttribute{
 				Description: "The locality (L) for the certificate",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
@@ -182,30 +239,36 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 			"key_usages": schema.ListAttribute{
 				Description: "Key usages for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_USAGES, ", "),
 				Optional:    true,
+				Computed:    true,
 				ElementType: types.StringType,
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_USAGES...)),
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplace(),
+					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"extended_key_usages": schema.ListAttribute{
 				Description: "Extended key usages for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_EXTENDED_KEY_USAGES, ", "),
 				Optional:    true,
+				Computed:    true,
 				ElementType: types.StringType,
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_EXTENDED_KEY_USAGES...)),
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplace(),
+					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"ttl": schema.StringAttribute{
-				Description: "Time to live for the certificate (e.g., '30d', '90d', '1y')",
+				Description: "Time to live for the certificate (e.g., '30d', '90d', '1y'). NOTE: the original TTL string is not recoverable after import; state preserves the prior value when present.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"timeout_seconds": schema.Int64Attribute{
@@ -213,6 +276,9 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				Default:     int64default.StaticInt64(3600),
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"id": schema.StringAttribute{
 				Description: "The ID of the certificate",
@@ -245,17 +311,26 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 			},
 			"certificate": schema.StringAttribute{
-				Description: "The issued certificate in PEM format",
+				Description: "The issued certificate in PEM format. NOTE: only available at issuance time; after import this attribute will be empty.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"private_key": schema.StringAttribute{
-				Description: "The private key in PEM format (only available for direct field requests, not CSR-based)",
+				Description: "The private key in PEM format (only available for direct field requests, not CSR-based). NOTE: only available at issuance time; after import this attribute will be empty.",
 				Computed:    true,
 				Sensitive:   true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"certificate_chain": schema.StringAttribute{
-				Description: "The certificate chain in PEM format",
+				Description: "The certificate chain in PEM format. NOTE: only available at issuance time; after import this attribute will be empty.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -312,6 +387,10 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 
 	certRequest := infisical.RequestCertificateRequest{
 		ProfileId: plan.ProfileId.ValueString(),
+	}
+
+	if !plan.ApplicationId.IsNull() && !plan.ApplicationId.IsUnknown() {
+		certRequest.ApplicationId = plan.ApplicationId.ValueString()
 	}
 
 	if hasCSR {
@@ -490,6 +569,90 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 	if cert.CertificateChain != "" {
 		plan.CertificateChain = types.StringValue(cert.CertificateChain)
 	}
+
+	if cert.ProfileId != "" {
+		plan.ProfileId = types.StringValue(cert.ProfileId)
+	}
+
+	if cert.ApplicationId != "" {
+		plan.ApplicationId = types.StringValue(cert.ApplicationId)
+	} else if plan.ApplicationId.IsUnknown() {
+		plan.ApplicationId = types.StringNull()
+	}
+
+	if cert.SubjectOrganization != "" {
+		plan.Organization = types.StringValue(cert.SubjectOrganization)
+	} else if plan.Organization.IsUnknown() {
+		plan.Organization = types.StringNull()
+	}
+
+	if cert.SubjectOrganizationalUnit != "" {
+		plan.OU = types.StringValue(cert.SubjectOrganizationalUnit)
+	} else if plan.OU.IsUnknown() {
+		plan.OU = types.StringNull()
+	}
+
+	if cert.SubjectCountry != "" {
+		plan.Country = types.StringValue(cert.SubjectCountry)
+	} else if plan.Country.IsUnknown() {
+		plan.Country = types.StringNull()
+	}
+
+	if cert.SubjectState != "" {
+		plan.Province = types.StringValue(cert.SubjectState)
+	} else if plan.Province.IsUnknown() {
+		plan.Province = types.StringNull()
+	}
+
+	if cert.SubjectLocality != "" {
+		plan.Locality = types.StringValue(cert.SubjectLocality)
+	} else if plan.Locality.IsUnknown() {
+		plan.Locality = types.StringNull()
+	}
+
+	if len(cert.KeyUsages) > 0 {
+		normalized := make([]string, len(cert.KeyUsages))
+		for i, u := range cert.KeyUsages {
+			normalized[i] = normalizeKeyUsage(u)
+		}
+		if list, diags := types.ListValueFrom(ctx, types.StringType, normalized); !diags.HasError() {
+			plan.KeyUsages = list
+		}
+	} else if plan.KeyUsages.IsUnknown() {
+		plan.KeyUsages = types.ListNull(types.StringType)
+	}
+
+	if len(cert.ExtendedKeyUsages) > 0 {
+		normalized := make([]string, len(cert.ExtendedKeyUsages))
+		for i, u := range cert.ExtendedKeyUsages {
+			normalized[i] = normalizeExtendedKeyUsage(u)
+		}
+		if list, diags := types.ListValueFrom(ctx, types.StringType, normalized); !diags.HasError() {
+			plan.ExtendedKeyUsages = list
+		}
+	} else if plan.ExtendedKeyUsages.IsUnknown() {
+		plan.ExtendedKeyUsages = types.ListNull(types.StringType)
+	}
+
+	if plan.CSR.IsUnknown() {
+		plan.CSR = types.StringNull()
+	}
+	if plan.TTL.IsUnknown() {
+		if nb, err := time.Parse(time.RFC3339, cert.NotBefore); err == nil {
+			if na, err := time.Parse(time.RFC3339, cert.NotAfter); err == nil {
+				days := int(math.Round(na.Sub(nb).Hours() / 24))
+				if days > 0 {
+					plan.TTL = types.StringValue(fmt.Sprintf("%dd", days))
+				} else {
+					plan.TTL = types.StringNull()
+				}
+			} else {
+				plan.TTL = types.StringNull()
+			}
+		} else {
+			plan.TTL = types.StringNull()
+		}
+	}
 }
 
 func (r *certManagerCertificateResource) parseAltNames(ctx context.Context, altNames interface{}) types.List {
@@ -543,7 +706,6 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	startTime := time.Now()
 
-	// Exponential backoff: start at 2s, max 30s
 	minInterval := 2 * time.Second
 	maxInterval := 30 * time.Second
 	currentInterval := minInterval
@@ -717,6 +879,86 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 	state.KeyAlgorithm = types.StringValue(cert.KeyAlgorithm)
 	state.SignatureAlgorithm = types.StringValue(cert.SignatureAlgorithm)
 
+	if state.TTL.IsNull() || state.TTL.IsUnknown() {
+		if nb, err := time.Parse(time.RFC3339, cert.NotBefore); err == nil {
+			if na, err := time.Parse(time.RFC3339, cert.NotAfter); err == nil {
+				diff := na.Sub(nb)
+				days := int(math.Round(diff.Hours() / 24))
+				if days > 0 {
+					state.TTL = types.StringValue(fmt.Sprintf("%dd", days))
+				}
+			}
+		}
+	}
+
+	if cert.ProfileId != "" {
+		state.ProfileId = types.StringValue(cert.ProfileId)
+	}
+
+	if state.TimeoutSeconds.IsNull() || state.TimeoutSeconds.IsUnknown() {
+		state.TimeoutSeconds = types.Int64Value(3600)
+	}
+
+	if cert.ApplicationId != "" {
+		state.ApplicationId = types.StringValue(cert.ApplicationId)
+	} else {
+		state.ApplicationId = types.StringNull()
+	}
+
+	if len(cert.KeyUsages) > 0 {
+		normalized := make([]string, len(cert.KeyUsages))
+		for i, u := range cert.KeyUsages {
+			normalized[i] = normalizeKeyUsage(u)
+		}
+		keyUsagesList, diags := types.ListValueFrom(ctx, types.StringType, normalized)
+		resp.Diagnostics.Append(diags...)
+		state.KeyUsages = keyUsagesList
+	} else if state.KeyUsages.IsNull() || state.KeyUsages.IsUnknown() {
+		state.KeyUsages = types.ListNull(types.StringType)
+	}
+
+	if len(cert.ExtendedKeyUsages) > 0 {
+		normalized := make([]string, len(cert.ExtendedKeyUsages))
+		for i, u := range cert.ExtendedKeyUsages {
+			normalized[i] = normalizeExtendedKeyUsage(u)
+		}
+		extKeyUsagesList, diags := types.ListValueFrom(ctx, types.StringType, normalized)
+		resp.Diagnostics.Append(diags...)
+		state.ExtendedKeyUsages = extKeyUsagesList
+	} else if state.ExtendedKeyUsages.IsNull() || state.ExtendedKeyUsages.IsUnknown() {
+		state.ExtendedKeyUsages = types.ListNull(types.StringType)
+	}
+
+	if cert.SubjectOrganization != "" {
+		state.Organization = types.StringValue(cert.SubjectOrganization)
+	} else if state.Organization.IsUnknown() {
+		state.Organization = types.StringNull()
+	}
+
+	if cert.SubjectOrganizationalUnit != "" {
+		state.OU = types.StringValue(cert.SubjectOrganizationalUnit)
+	} else if state.OU.IsUnknown() {
+		state.OU = types.StringNull()
+	}
+
+	if cert.SubjectCountry != "" {
+		state.Country = types.StringValue(cert.SubjectCountry)
+	} else if state.Country.IsUnknown() {
+		state.Country = types.StringNull()
+	}
+
+	if cert.SubjectState != "" {
+		state.Province = types.StringValue(cert.SubjectState)
+	} else if state.Province.IsUnknown() {
+		state.Province = types.StringNull()
+	}
+
+	if cert.SubjectLocality != "" {
+		state.Locality = types.StringValue(cert.SubjectLocality)
+	} else if state.Locality.IsUnknown() {
+		state.Locality = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -728,7 +970,6 @@ func (r *certManagerCertificateResource) Update(ctx context.Context, req resourc
 }
 
 func (r *certManagerCertificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Certificates cannot be deleted from Infisical. Only removed from state.
 }
 
 func (r *certManagerCertificateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

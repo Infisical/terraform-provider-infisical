@@ -12,9 +12,7 @@ provider "infisical" {
   client_secret = var.client_secret
 }
 
-resource "infisical_cert_manager_external_ca_adcs" "adcs" {
-  name   = "corporate-adcs"
-  status = "active"
-
-  azure_adcs_connection_id = "your-azure-adcs-connection-id"
+resource "infisical_cert_manager_application" "platform" {
+  name        = "platform"
+  description = "Certificates issued for the platform team"
 }

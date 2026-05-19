@@ -29,7 +29,6 @@ type certManagerExternalCAADCSResource struct {
 }
 
 type certManagerExternalCAADCSResourceModel struct {
-	ProjectSlug           types.String `tfsdk:"project_slug"`
 	Id                    types.String `tfsdk:"id"`
 	Name                  types.String `tfsdk:"name"`
 	Status                types.String `tfsdk:"status"`
@@ -42,15 +41,8 @@ func (r *certManagerExternalCAADCSResource) Metadata(_ context.Context, req reso
 
 func (r *certManagerExternalCAADCSResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>` (legacy format `<projectSlug>:<caId>` is also accepted).",
 		Attributes: map[string]schema.Attribute{
-			"project_slug": schema.StringAttribute{
-				Description: "The slug of the cert-manager project",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"name": schema.StringAttribute{
 				Description: "The name of the ADCS CA",
 				Required:    true,
@@ -114,27 +106,14 @@ func (r *certManagerExternalCAADCSResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
 	status := "active"
 	if !plan.Status.IsNull() && !plan.Status.IsUnknown() {
 		status = plan.Status.ValueString()
 	}
 
 	newCA, err := r.client.CreateADCSCA(infisical.CreateADCSCARequest{
-		ProjectId: project.ID,
-		Name:      plan.Name.ValueString(),
-		Status:    status,
+		Name:   plan.Name.ValueString(),
+		Status: status,
 		Configuration: infisical.CertificateAuthorityConfiguration{
 			AzureAdcsConnectionId: plan.AzureAdcsConnectionId.ValueString(),
 		},
@@ -233,23 +212,10 @@ func (r *certManagerExternalCAADCSResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
 	updatedCA, err := r.client.UpdateADCSCA(infisical.UpdateADCSCARequest{
-		ProjectId: project.ID,
-		CAId:      plan.Id.ValueString(),
-		Name:      plan.Name.ValueString(),
-		Status:    plan.Status.ValueString(),
+		CAId:   plan.Id.ValueString(),
+		Name:   plan.Name.ValueString(),
+		Status: plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
 			AzureAdcsConnectionId: plan.AzureAdcsConnectionId.ValueString(),
 		},
@@ -308,15 +274,17 @@ func (r *certManagerExternalCAADCSResource) Delete(ctx context.Context, req reso
 }
 
 func (r *certManagerExternalCAADCSResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := strings.Split(req.ID, ":")
-	if len(parts) != 2 {
+	id := req.ID
+	if strings.Contains(id, ":") {
+		parts := strings.Split(id, ":")
+		id = parts[len(parts)-1]
+	}
+	if id == "" {
 		resp.Diagnostics.AddError(
-			"Invalid import ID",
-			"Import ID must be in the format 'project_slug:ca_id'",
+			"Unexpected import identifier",
+			fmt.Sprintf("Expected <caId> or <projectSlug>:<caId>, got: %q", req.ID),
 		)
 		return
 	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
 }
