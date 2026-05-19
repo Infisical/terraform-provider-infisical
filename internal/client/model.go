@@ -3073,7 +3073,7 @@ type GetCertificateProfileResponse struct {
 }
 
 type UpdateCertificateProfileRequest struct {
-	ProfileId  string `json:"-"`
+	ProfileId   string                      `json:"-"`
 	Slug        string                      `json:"slug,omitempty"`
 	IssuerType  string                      `json:"issuerType,omitempty"`
 	Description *string                     `json:"description"`
@@ -3142,8 +3142,8 @@ type GetSpecificCACertificateResponse struct {
 }
 
 type CertificateBasicConstraints struct {
-	IsCA       bool  `json:"isCA"`
-	PathLength *int  `json:"pathLength,omitempty"`
+	IsCA       bool `json:"isCA"`
+	PathLength *int `json:"pathLength,omitempty"`
 }
 
 type Certificate struct {

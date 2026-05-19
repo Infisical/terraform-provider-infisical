@@ -8,10 +8,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -31,13 +31,13 @@ type certManagerApplicationProfileResource struct {
 }
 
 type certManagerApplicationProfileResourceModel struct {
-	Id            types.String                              `tfsdk:"id"`
-	ApplicationId types.String                              `tfsdk:"application_id"`
-	ProfileId     types.String                              `tfsdk:"profile_id"`
-	ApiConfig     *certManagerApplicationProfileApiConfig   `tfsdk:"api_config"`
-	EstConfig     *certManagerApplicationProfileEstConfig   `tfsdk:"est_config"`
-	AcmeConfig    *certManagerApplicationProfileAcmeConfig  `tfsdk:"acme_config"`
-	ScepConfig    *certManagerApplicationProfileScepConfig  `tfsdk:"scep_config"`
+	Id            types.String                             `tfsdk:"id"`
+	ApplicationId types.String                             `tfsdk:"application_id"`
+	ProfileId     types.String                             `tfsdk:"profile_id"`
+	ApiConfig     *certManagerApplicationProfileApiConfig  `tfsdk:"api_config"`
+	EstConfig     *certManagerApplicationProfileEstConfig  `tfsdk:"est_config"`
+	AcmeConfig    *certManagerApplicationProfileAcmeConfig `tfsdk:"acme_config"`
+	ScepConfig    *certManagerApplicationProfileScepConfig `tfsdk:"scep_config"`
 }
 
 type certManagerApplicationProfileApiConfig struct {
@@ -114,9 +114,9 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 					},
 					"renew_before_days": schema.Int64Attribute{
 						Description: "Number of days before expiration to renew (1-30). Defaults to 7 when omitted.",
-						Optional:      true,
-						Computed:      true,
-						Validators:    []validator.Int64{int64validator.Between(1, 30)},
+						Optional:    true,
+						Computed:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 30)},
 					},
 				},
 			},
@@ -131,8 +131,8 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 					},
 					"disable_bootstrap_ca_validation": schema.BoolAttribute{
 						Description: "Whether to disable bootstrap CA validation. Defaults to false.",
-						Optional:      true,
-						Computed:      true,
+						Optional:    true,
+						Computed:    true,
 					},
 					"ca_chain": schema.StringAttribute{
 						Description: "PEM-encoded CA chain used for bootstrap CA validation (only honored when disable_bootstrap_ca_validation is false).",
@@ -140,7 +140,7 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 					},
 					"est_endpoint_url": schema.StringAttribute{
 						Description: "The EST endpoint URL clients should use.",
-						Computed:      true,
+						Computed:    true,
 					},
 				},
 			},
@@ -150,17 +150,17 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 				Attributes: map[string]schema.Attribute{
 					"skip_dns_ownership_verification": schema.BoolAttribute{
 						Description: "Skip DNS ownership verification. Defaults to false.",
-						Optional:      true,
-						Computed:      true,
+						Optional:    true,
+						Computed:    true,
 					},
 					"skip_eab_binding": schema.BoolAttribute{
 						Description: "Skip External Account Binding. Defaults to false. Cannot be set to true at the same time as skip_dns_ownership_verification.",
-						Optional:      true,
-						Computed:      true,
+						Optional:    true,
+						Computed:    true,
 					},
 					"directory_url": schema.StringAttribute{
 						Description: "The ACME directory URL clients should use.",
-						Computed:      true,
+						Computed:    true,
 					},
 					"eab_kid": schema.StringAttribute{
 						Description: "External Account Binding key identifier. Populated on create and on import; routine refreshes don't re-fetch it. Rotated only by the explicit rotate endpoint, never by Terraform.",
@@ -180,9 +180,9 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 				Attributes: map[string]schema.Attribute{
 					"challenge_type": schema.StringAttribute{
 						Description: "SCEP challenge type. Supported values: static, dynamic. Defaults to static.",
-						Optional:      true,
-						Computed:      true,
-						Validators:    []validator.String{stringvalidator.OneOf("static", "dynamic")},
+						Optional:    true,
+						Computed:    true,
+						Validators:  []validator.String{stringvalidator.OneOf("static", "dynamic")},
 					},
 					"challenge_password": schema.StringAttribute{
 						Description: "Static-mode SCEP challenge password (min 8 chars). Required when challenge_type is static.",
@@ -191,41 +191,41 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 					},
 					"include_ca_cert_in_response": schema.BoolAttribute{
 						Description: "Include the issuing CA certificate in SCEP responses. Defaults to true.",
-						Optional:      true,
-						Computed:      true,
+						Optional:    true,
+						Computed:    true,
 					},
 					"allow_cert_based_renewal": schema.BoolAttribute{
 						Description: "Allow certificate-based renewal. Defaults to true.",
-						Optional:      true,
-						Computed:      true,
+						Optional:    true,
+						Computed:    true,
 					},
 					"dynamic_challenge_expiry_minutes": schema.Int64Attribute{
 						Description: "Expiry of a dynamic challenge in minutes (1-1440). Only used when challenge_type is dynamic.",
-						Optional:      true,
-						Computed:      true,
-						Validators:    []validator.Int64{int64validator.Between(1, 1440)},
+						Optional:    true,
+						Computed:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 1440)},
 					},
 					"dynamic_challenge_max_pending": schema.Int64Attribute{
 						Description: "Maximum pending dynamic challenges (1-1000). Only used when challenge_type is dynamic.",
-						Optional:      true,
-						Computed:      true,
-						Validators:    []validator.Int64{int64validator.Between(1, 1000)},
+						Optional:    true,
+						Computed:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 1000)},
 					},
 					"scep_endpoint_url": schema.StringAttribute{
 						Description: "The SCEP endpoint URL clients should use.",
-						Computed:      true,
+						Computed:    true,
 					},
 					"challenge_endpoint_url": schema.StringAttribute{
 						Description: "The SCEP dynamic challenge endpoint URL (only set when challenge_type is dynamic).",
-						Computed:      true,
+						Computed:    true,
 					},
 					"ra_certificate_pem": schema.StringAttribute{
 						Description: "The PEM-encoded RA certificate used by the SCEP service.",
-						Computed:      true,
+						Computed:    true,
 					},
 					"ra_cert_expires_at": schema.StringAttribute{
 						Description: "ISO-8601 timestamp when the RA certificate expires.",
-						Computed:      true,
+						Computed:    true,
 					},
 				},
 			},
