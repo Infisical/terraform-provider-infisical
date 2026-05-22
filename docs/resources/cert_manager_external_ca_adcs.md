@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_external_ca_adcs Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <caId> (legacy format <projectSlug>:<caId> is also accepted).
+  Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_external_ca_adcs (Resource)
 
-Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>` (legacy format `<projectSlug>:<caId>` is also accepted).
+Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -50,3 +50,12 @@ resource "infisical_cert_manager_external_ca_adcs" "adcs" {
 ### Read-Only
 
 - `id` (String) The ID of the ADCS CA
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the external ADCS CA by its ID
+terraform import infisical_cert_manager_external_ca_adcs.example <ca_id>
+```

@@ -26,10 +26,10 @@ type certManagerGroupResource struct {
 }
 
 type certManagerGroupResourceModel struct {
-	Id           types.String            `tfsdk:"id"`
-	MembershipId types.String            `tfsdk:"membership_id"`
-	GroupId      types.String            `tfsdk:"group_id"`
-	Roles        []CertManagerMemberRole `tfsdk:"roles"`
+	Id           types.String `tfsdk:"id"`
+	MembershipId types.String `tfsdk:"membership_id"`
+	GroupId      types.String `tfsdk:"group_id"`
+	Role         types.String `tfsdk:"role"`
 }
 
 func (r *certManagerGroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -38,7 +38,7 @@ func (r *certManagerGroupResource) Metadata(_ context.Context, req resource.Meta
 
 func (r *certManagerGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage group memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <groupId>`.",
+		Description: "Manage group memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the group membership",
@@ -61,7 +61,10 @@ func (r *certManagerGroupResource) Schema(_ context.Context, _ resource.SchemaRe
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"roles": certManagerRolesSchema(),
+			"role": schema.StringAttribute{
+				Description: "The role to assign to the group (admin, member, or viewer)",
+				Required:    true,
+			},
 		},
 	}
 }
@@ -98,28 +101,9 @@ func (r *certManagerGroupResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	roles, hasPermanent, err := certManagerBuildRoleUpdates(plan.Roles, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing roles",
-			"Couldn't parse roles for Certificate Manager group, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	if !hasPermanent {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to group",
-			"Group must have at least one permanent (non-temporary) role.",
-		)
-		return
-	}
-
 	added, err := r.client.AddCertManagerGroup(infisical.AddCertManagerGroupRequest{
 		GroupId: plan.GroupId.ValueString(),
-		Roles:   roles,
+		Roles:   []infisical.CertManagerMembershipRoleUpdate{{Role: plan.Role.ValueString()}},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -132,8 +116,7 @@ func (r *certManagerGroupResource) Create(ctx context.Context, req resource.Crea
 	plan.Id = types.StringValue(added.GroupMembership.ID)
 	plan.MembershipId = types.StringValue(added.GroupMembership.ID)
 	plan.GroupId = types.StringValue(added.GroupMembership.GroupId)
-	apiRoles := certManagerRolesFromAPI(added.GroupMembership.Roles)
-	plan.Roles = orderCertManagerRolesByPlan(plan.Roles, apiRoles)
+	plan.Role = types.StringValue(firstRole(added.GroupMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -170,8 +153,7 @@ func (r *certManagerGroupResource) Read(ctx context.Context, req resource.ReadRe
 
 	state.Id = types.StringValue(refreshed.GroupMembership.ID)
 	state.MembershipId = types.StringValue(refreshed.GroupMembership.ID)
-	apiRoles := certManagerRolesFromAPI(refreshed.GroupMembership.Roles)
-	state.Roles = orderCertManagerRolesByPlan(state.Roles, apiRoles)
+	state.Role = types.StringValue(firstRole(refreshed.GroupMembership.Roles, state.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -191,28 +173,9 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	roles, hasPermanent, err := certManagerBuildRoleUpdates(plan.Roles, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing roles",
-			"Couldn't parse roles for Certificate Manager group, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	if !hasPermanent {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to group",
-			"Group must have at least one permanent (non-temporary) role.",
-		)
-		return
-	}
-
-	_, err = r.client.UpdateCertManagerGroup(infisical.UpdateCertManagerGroupRequest{
+	_, err := r.client.UpdateCertManagerGroup(infisical.UpdateCertManagerGroupRequest{
 		GroupId: plan.GroupId.ValueString(),
-		Roles:   roles,
+		Roles:   []infisical.CertManagerMembershipRoleUpdate{{Role: plan.Role.ValueString()}},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -235,8 +198,7 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 
 	plan.Id = types.StringValue(refreshed.GroupMembership.ID)
 	plan.MembershipId = types.StringValue(refreshed.GroupMembership.ID)
-	apiRoles := certManagerRolesFromAPI(refreshed.GroupMembership.Roles)
-	plan.Roles = orderCertManagerRolesByPlan(plan.Roles, apiRoles)
+	plan.Role = types.StringValue(firstRole(refreshed.GroupMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

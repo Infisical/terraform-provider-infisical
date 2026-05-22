@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_application_identity Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage identity memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <applicationId>:<identityId>.
+  Manage identity memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_application_identity (Resource)
 
-Manage identity memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<identityId>`.
+Manage identity memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -51,10 +51,18 @@ resource "infisical_cert_manager_application_identity" "platform_readonly" {
 
 - `application_id` (String) The ID of the Certificate Manager application
 - `identity_id` (String) The ID of the identity to add
-- `role` (String) The role to assign to the identity (admin, member, viewer, or a custom role slug)
+- `role` (String) The role to assign to the identity (admin, operator, or auditor)
 
 ### Read-Only
 
-- `custom_role_id` (String) The ID of the custom role, when role is canonicalized to 'custom' by the backend
 - `id` (String) The ID of the identity membership
 - `membership_id` (String) The ID of the identity membership
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the application identity membership by application ID and identity ID
+terraform import infisical_cert_manager_application_identity.example <application_id>:<identity_id>
+```

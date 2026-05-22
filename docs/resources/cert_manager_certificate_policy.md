@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_certificate_policy Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage certificate policies in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.
+  Create and manage certificate policies in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_certificate_policy (Resource)
 
-Create and manage certificate policies in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.
+Create and manage certificate policies in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -204,3 +204,12 @@ Optional:
 Optional:
 
 - `max` (String) Maximum validity period (e.g., '90d', '2y', '6m')
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the certificate policy by its ID
+terraform import infisical_cert_manager_certificate_policy.example <policy_id>
+```

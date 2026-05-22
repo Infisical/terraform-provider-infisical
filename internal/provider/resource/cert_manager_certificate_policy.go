@@ -104,7 +104,7 @@ func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req r
 
 func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage certificate policies in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage certificate policies in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the certificate policy",

@@ -49,7 +49,7 @@ func (r *certManagerCACertificateResource) Metadata(_ context.Context, req resou
 
 func (r *certManagerCACertificateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>:<certId>`.",
+		Description: "Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"ca_id": schema.StringAttribute{
 				Description: "The ID of the certificate authority to generate a certificate for",

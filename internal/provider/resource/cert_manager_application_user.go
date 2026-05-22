@@ -33,7 +33,6 @@ type certManagerApplicationUserResourceModel struct {
 	Email         types.String `tfsdk:"email"`
 	UserId        types.String `tfsdk:"user_id"`
 	Role          types.String `tfsdk:"role"`
-	CustomRoleId  types.String `tfsdk:"custom_role_id"`
 }
 
 func (r *certManagerApplicationUserResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -42,7 +41,7 @@ func (r *certManagerApplicationUserResource) Metadata(_ context.Context, req res
 
 func (r *certManagerApplicationUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage user memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<userId>`.",
+		Description: "Manage user memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the user membership",
@@ -80,15 +79,8 @@ func (r *certManagerApplicationUserResource) Schema(_ context.Context, _ resourc
 				},
 			},
 			"role": schema.StringAttribute{
-				Description: "The role to assign to the user (admin, member, viewer, or a custom role slug)",
+				Description: "The role to assign to the user (admin, operator, or auditor)",
 				Required:    true,
-			},
-			"custom_role_id": schema.StringAttribute{
-				Description: "The ID of the custom role, when role is canonicalized to 'custom' by the backend",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
@@ -242,15 +234,7 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 	} else {
 		plan.UserId = types.StringNull()
 	}
-	if member.Role == "custom" && member.CustomRoleId != nil && !plan.Role.IsNull() && plan.Role.ValueString() != "" && plan.Role.ValueString() != "custom" {
-	} else {
-		plan.Role = types.StringValue(member.Role)
-	}
-	if member.CustomRoleId != nil {
-		plan.CustomRoleId = types.StringValue(*member.CustomRoleId)
-	} else {
-		plan.CustomRoleId = types.StringNull()
-	}
+	plan.Role = types.StringValue(member.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -301,15 +285,7 @@ func (r *certManagerApplicationUserResource) Read(ctx context.Context, req resou
 	if member.ActorUserId != nil {
 		state.UserId = types.StringValue(*member.ActorUserId)
 	}
-	if member.Role == "custom" && member.CustomRoleId != nil && !state.Role.IsNull() && state.Role.ValueString() != "" && state.Role.ValueString() != "custom" {
-	} else {
-		state.Role = types.StringValue(member.Role)
-	}
-	if member.CustomRoleId != nil {
-		state.CustomRoleId = types.StringValue(*member.CustomRoleId)
-	} else {
-		state.CustomRoleId = types.StringNull()
-	}
+	state.Role = types.StringValue(member.Role)
 
 	if state.Email.IsNull() || state.Email.ValueString() == "" {
 		if member.Details != nil {
@@ -366,15 +342,7 @@ func (r *certManagerApplicationUserResource) Update(ctx context.Context, req res
 	} else {
 		plan.UserId = state.UserId
 	}
-	if member.Role == "custom" && member.CustomRoleId != nil && !plan.Role.IsNull() && plan.Role.ValueString() != "" && plan.Role.ValueString() != "custom" {
-	} else {
-		plan.Role = types.StringValue(member.Role)
-	}
-	if member.CustomRoleId != nil {
-		plan.CustomRoleId = types.StringValue(*member.CustomRoleId)
-	} else {
-		plan.CustomRoleId = types.StringNull()
-	}
+	plan.Role = types.StringValue(member.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

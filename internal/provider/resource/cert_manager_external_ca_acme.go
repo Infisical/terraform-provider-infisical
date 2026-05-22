@@ -51,7 +51,7 @@ func (r *certManagerExternalCAACMEResource) Metadata(_ context.Context, req reso
 
 func (r *certManagerExternalCAACMEResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage external ACME certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>` (legacy format `<projectSlug>:<caId>` is also accepted).",
+		Description: "Create and manage external ACME certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Description: "The name of the ACME CA",

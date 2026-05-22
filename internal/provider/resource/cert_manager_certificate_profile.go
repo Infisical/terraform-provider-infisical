@@ -65,7 +65,7 @@ func (r *certManagerCertificateProfileResource) Metadata(_ context.Context, req 
 
 func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage certificate profiles in the organization's Cert Manager. Enrollment behavior is configured per (application, profile) pair via the `infisical_pki_application_enrollment_*` resources. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage certificate profiles in Certificate Manager. Enrollment methods are configured on the application via the `infisical_cert_manager_application_profile` resource. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the certificate profile",

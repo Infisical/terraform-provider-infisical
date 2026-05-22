@@ -26,10 +26,10 @@ type certManagerIdentityResource struct {
 }
 
 type certManagerIdentityResourceModel struct {
-	Id           types.String            `tfsdk:"id"`
-	MembershipId types.String            `tfsdk:"membership_id"`
-	IdentityId   types.String            `tfsdk:"identity_id"`
-	Roles        []CertManagerMemberRole `tfsdk:"roles"`
+	Id           types.String `tfsdk:"id"`
+	MembershipId types.String `tfsdk:"membership_id"`
+	IdentityId   types.String `tfsdk:"identity_id"`
+	Role         types.String `tfsdk:"role"`
 }
 
 func (r *certManagerIdentityResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -38,7 +38,7 @@ func (r *certManagerIdentityResource) Metadata(_ context.Context, req resource.M
 
 func (r *certManagerIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage identity memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <identityId>`.",
+		Description: "Manage identity memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the identity membership",
@@ -61,7 +61,10 @@ func (r *certManagerIdentityResource) Schema(_ context.Context, _ resource.Schem
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"roles": certManagerRolesSchema(),
+			"role": schema.StringAttribute{
+				Description: "The role to assign to the identity (admin, member, or viewer)",
+				Required:    true,
+			},
 		},
 	}
 }
@@ -98,28 +101,9 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	roles, hasPermanent, err := certManagerBuildRoleUpdates(plan.Roles, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing roles",
-			"Couldn't parse roles for Certificate Manager identity, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	if !hasPermanent {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to identity",
-			"Identity must have at least one permanent (non-temporary) role.",
-		)
-		return
-	}
-
 	added, err := r.client.AddCertManagerIdentity(infisical.AddCertManagerIdentityRequest{
 		IdentityId: plan.IdentityId.ValueString(),
-		Roles:      roles,
+		Roles:      []infisical.CertManagerMembershipRoleUpdate{{Role: plan.Role.ValueString()}},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -144,8 +128,7 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 
 	plan.Id = types.StringValue(refreshed.IdentityMembership.ID)
 	plan.MembershipId = types.StringValue(refreshed.IdentityMembership.ID)
-	apiRoles := certManagerRolesFromAPI(refreshed.IdentityMembership.Roles)
-	plan.Roles = orderCertManagerRolesByPlan(plan.Roles, apiRoles)
+	plan.Role = types.StringValue(firstRole(refreshed.IdentityMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -182,8 +165,7 @@ func (r *certManagerIdentityResource) Read(ctx context.Context, req resource.Rea
 
 	state.Id = types.StringValue(refreshed.IdentityMembership.ID)
 	state.MembershipId = types.StringValue(refreshed.IdentityMembership.ID)
-	apiRoles := certManagerRolesFromAPI(refreshed.IdentityMembership.Roles)
-	state.Roles = orderCertManagerRolesByPlan(state.Roles, apiRoles)
+	state.Role = types.StringValue(firstRole(refreshed.IdentityMembership.Roles, state.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -203,33 +185,14 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	roles, hasPermanent, err := certManagerBuildRoleUpdates(plan.Roles, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing roles",
-			"Couldn't parse roles for Certificate Manager identity, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	if !hasPermanent {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to identity",
-			"Identity must have at least one permanent (non-temporary) role.",
-		)
-		return
-	}
-
-	_, err = r.client.UpdateCertManagerIdentity(infisical.UpdateCertManagerIdentityRequest{
+	_, err := r.client.UpdateCertManagerIdentity(infisical.UpdateCertManagerIdentityRequest{
 		IdentityId: plan.IdentityId.ValueString(),
-		Roles:      roles,
+		Roles:      []infisical.CertManagerMembershipRoleUpdate{{Role: plan.Role.ValueString()}},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Certificate Manager identity",
-			"Couldn't update identity roles in Infisical, unexpected error: "+err.Error(),
+			"Couldn't update identity role in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -247,8 +210,7 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 
 	plan.Id = types.StringValue(refreshed.IdentityMembership.ID)
 	plan.MembershipId = types.StringValue(refreshed.IdentityMembership.ID)
-	apiRoles := certManagerRolesFromAPI(refreshed.IdentityMembership.Roles)
-	plan.Roles = orderCertManagerRolesByPlan(plan.Roles, apiRoles)
+	plan.Role = types.StringValue(firstRole(refreshed.IdentityMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

@@ -47,3 +47,12 @@ resource "infisical_cert_manager_application" "platform" {
 ### Read-Only
 
 - `id` (String) The ID of the Certificate Manager application
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the Certificate Manager application by its ID
+terraform import infisical_cert_manager_application.example <application_id>
+```

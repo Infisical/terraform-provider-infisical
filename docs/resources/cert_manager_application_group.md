@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_application_group Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <applicationId>:<groupId>.
+  Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_application_group (Resource)
 
-Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<groupId>`.
+Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -51,10 +51,18 @@ resource "infisical_cert_manager_application_group" "platform_devs" {
 
 - `application_id` (String) The ID of the Certificate Manager application
 - `group_id` (String) The ID of the group to add
-- `role` (String) The role to assign to the group (admin, member, viewer, or a custom role slug)
+- `role` (String) The role to assign to the group (admin, operator, or auditor)
 
 ### Read-Only
 
-- `custom_role_id` (String) The ID of the custom role, when role is canonicalized to 'custom' by the backend
 - `id` (String) The ID of the group membership
 - `membership_id` (String) The ID of the group membership
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the application group membership by application ID and group ID
+terraform import infisical_cert_manager_application_group.example <application_id>:<group_id>
+```

@@ -14,26 +14,10 @@ provider "infisical" {
 
 resource "infisical_cert_manager_user" "admin" {
   email = "admin@example.com"
-
-  roles = [
-    {
-      role_slug = "admin"
-    }
-  ]
+  role  = "admin"
 }
 
 resource "infisical_cert_manager_user" "oncall" {
   email = "oncall@example.com"
-
-  roles = [
-    {
-      role_slug = "viewer"
-    },
-    {
-      role_slug       = "admin"
-      is_temporary    = true
-      temporary_mode  = "relative"
-      temporary_range = "8h"
-    }
-  ]
+  role  = "member"
 }

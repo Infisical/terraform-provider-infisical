@@ -49,7 +49,7 @@ type certManagerApplicationProfileEstConfig struct {
 	Passphrase                   types.String `tfsdk:"passphrase"`
 	DisableBootstrapCaValidation types.Bool   `tfsdk:"disable_bootstrap_ca_validation"`
 	CaChain                      types.String `tfsdk:"ca_chain"`
-	EstEndpointUrl               types.String `tfsdk:"est_endpoint_url"`
+	EstEndpointUrl               types.String `tfsdk:"endpoint_url"`
 }
 
 type certManagerApplicationProfileAcmeConfig struct {
@@ -79,7 +79,7 @@ func (r *certManagerApplicationProfileResource) Metadata(_ context.Context, req 
 
 func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Attach a certificate profile to a Certificate Manager application and configure its enrollment methods. Each enrollment block (api_config, est_config, acme_config, scep_config) is optional; add, edit, or remove a block to update the matching enrollment on the (application, profile) pair. Only Machine Identity authentication is supported. Import: `terraform import <addr> <applicationId>:<profileId>`.",
+		Description: "Attach a certificate profile to a Certificate Manager application and configure its enrollment methods. Each enrollment block (api_config, est_config, acme_config, scep_config) is optional; add, edit, or remove a block to update the matching enrollment. Only Machine Identity authentication is supported.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Composite identifier in the format <applicationId>:<profileId>",
@@ -103,7 +103,7 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 				},
 			},
 			"api_config": schema.SingleNestedAttribute{
-				Description: "Enable the API enrollment method on the (application, profile) pair. Omit the block to disable API enrollment.",
+				Description: "Enable the API enrollment method. Omit the block to disable API enrollment.",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"auto_renew": schema.BoolAttribute{
@@ -121,11 +121,11 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 				},
 			},
 			"est_config": schema.SingleNestedAttribute{
-				Description: "Enable the EST enrollment method on the (application, profile) pair. Omit the block to disable EST enrollment.",
+				Description: "Enable the EST enrollment method. Omit the block to disable EST enrollment.",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"passphrase": schema.StringAttribute{
-						Description: "EST passphrase used to authorize certificate requests. Sensitive: stored only on the client side; the backend stores a hash.",
+						Description: "EST passphrase used to authorize certificate requests.",
 						Required:    true,
 						Sensitive:   true,
 					},
@@ -138,14 +138,14 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 						Description: "PEM-encoded CA chain used for bootstrap CA validation (only honored when disable_bootstrap_ca_validation is false).",
 						Optional:    true,
 					},
-					"est_endpoint_url": schema.StringAttribute{
+					"endpoint_url": schema.StringAttribute{
 						Description: "The EST endpoint URL clients should use.",
 						Computed:    true,
 					},
 				},
 			},
 			"acme_config": schema.SingleNestedAttribute{
-				Description: "Enable the ACME enrollment method on the (application, profile) pair. Omit the block to disable ACME enrollment.",
+				Description: "Enable the ACME enrollment method. Omit the block to disable ACME enrollment.",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"skip_dns_ownership_verification": schema.BoolAttribute{
@@ -175,7 +175,7 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 				},
 			},
 			"scep_config": schema.SingleNestedAttribute{
-				Description: "Enable the SCEP enrollment method on the (application, profile) pair. Omit the block to disable SCEP enrollment.",
+				Description: "Enable the SCEP enrollment method. Omit the block to disable SCEP enrollment.",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"challenge_type": schema.StringAttribute{

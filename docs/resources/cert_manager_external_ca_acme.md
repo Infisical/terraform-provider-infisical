@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_external_ca_acme Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage external ACME certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <caId> (legacy format <projectSlug>:<caId> is also accepted).
+  Create and manage external ACME certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_external_ca_acme (Resource)
 
-Create and manage external ACME certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>` (legacy format `<projectSlug>:<caId>` is also accepted).
+Create and manage external ACME certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -61,3 +61,12 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 ### Read-Only
 
 - `id` (String) The ID of the ACME CA
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the external ACME CA by its ID
+terraform import infisical_cert_manager_external_ca_acme.example <ca_id>
+```

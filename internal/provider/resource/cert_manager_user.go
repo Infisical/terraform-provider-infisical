@@ -26,11 +26,11 @@ type certManagerUserResource struct {
 }
 
 type certManagerUserResourceModel struct {
-	Id           types.String            `tfsdk:"id"`
-	MembershipId types.String            `tfsdk:"membership_id"`
-	Email        types.String            `tfsdk:"email"`
-	UserId       types.String            `tfsdk:"user_id"`
-	Roles        []CertManagerMemberRole `tfsdk:"roles"`
+	Id           types.String `tfsdk:"id"`
+	MembershipId types.String `tfsdk:"membership_id"`
+	Email        types.String `tfsdk:"email"`
+	UserId       types.String `tfsdk:"user_id"`
+	Role         types.String `tfsdk:"role"`
 }
 
 func (r *certManagerUserResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -39,7 +39,7 @@ func (r *certManagerUserResource) Metadata(_ context.Context, req resource.Metad
 
 func (r *certManagerUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage user memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <email>`.",
+		Description: "Manage user memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the user membership",
@@ -69,7 +69,10 @@ func (r *certManagerUserResource) Schema(_ context.Context, _ resource.SchemaReq
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"roles": certManagerRolesSchema(),
+			"role": schema.StringAttribute{
+				Description: "The role to assign to the user (admin, member, or viewer)",
+				Required:    true,
+			},
 		},
 	}
 }
@@ -122,26 +125,7 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	roles, hasPermanent, err := certManagerBuildRoleUpdates(plan.Roles, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing roles",
-			"Couldn't parse roles for Certificate Manager user, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	if !hasPermanent {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to user",
-			"User must have at least one permanent (non-temporary) role.",
-		)
-		return
-	}
-
-	_, err = r.client.InviteCertManagerUsers(infisical.InviteCertManagerUsersRequest{
+	_, err := r.client.InviteCertManagerUsers(infisical.InviteCertManagerUsersRequest{
 		Emails: []string{plan.Email.ValueString()},
 	})
 	if err != nil {
@@ -170,12 +154,12 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 
 	_, err = r.client.UpdateCertManagerUser(infisical.UpdateCertManagerUserRequest{
 		UserId: member.UserID,
-		Roles:  roles,
+		Roles:  []infisical.CertManagerMembershipRoleUpdate{{Role: plan.Role.ValueString()}},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error assigning roles to Certificate Manager user",
-			"Couldn't update user roles in Infisical, unexpected error: "+err.Error(),
+			"Error assigning role to Certificate Manager user",
+			"Couldn't update user role in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -194,8 +178,7 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 	plan.Id = types.StringValue(refreshed.Membership.ID)
 	plan.MembershipId = types.StringValue(refreshed.Membership.ID)
 	plan.UserId = types.StringValue(refreshed.Membership.UserID)
-	apiRoles := certManagerRolesFromAPI(refreshed.Membership.Roles)
-	plan.Roles = orderCertManagerRolesByPlan(plan.Roles, apiRoles)
+	plan.Role = types.StringValue(firstRole(refreshed.Membership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -256,8 +239,7 @@ func (r *certManagerUserResource) Read(ctx context.Context, req resource.ReadReq
 	if state.Email.IsNull() || state.Email.ValueString() == "" {
 		state.Email = types.StringValue(refreshed.Membership.User.Email)
 	}
-	apiRoles := certManagerRolesFromAPI(refreshed.Membership.Roles)
-	state.Roles = orderCertManagerRolesByPlan(state.Roles, apiRoles)
+	state.Role = types.StringValue(firstRole(refreshed.Membership.Roles, state.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -283,33 +265,14 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	roles, hasPermanent, err := certManagerBuildRoleUpdates(plan.Roles, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing roles",
-			"Couldn't parse roles for Certificate Manager user, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	if !hasPermanent {
-		resp.Diagnostics.AddError(
-			"Error assigning roles to user",
-			"User must have at least one permanent (non-temporary) role.",
-		)
-		return
-	}
-
-	_, err = r.client.UpdateCertManagerUser(infisical.UpdateCertManagerUserRequest{
+	_, err := r.client.UpdateCertManagerUser(infisical.UpdateCertManagerUserRequest{
 		UserId: state.UserId.ValueString(),
-		Roles:  roles,
+		Roles:  []infisical.CertManagerMembershipRoleUpdate{{Role: plan.Role.ValueString()}},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Certificate Manager user",
-			"Couldn't update user roles in Infisical, unexpected error: "+err.Error(),
+			"Couldn't update user role in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -328,8 +291,7 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 	plan.Id = types.StringValue(refreshed.Membership.ID)
 	plan.MembershipId = types.StringValue(refreshed.Membership.ID)
 	plan.UserId = types.StringValue(refreshed.Membership.UserID)
-	apiRoles := certManagerRolesFromAPI(refreshed.Membership.Roles)
-	plan.Roles = orderCertManagerRolesByPlan(plan.Roles, apiRoles)
+	plan.Role = types.StringValue(firstRole(refreshed.Membership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

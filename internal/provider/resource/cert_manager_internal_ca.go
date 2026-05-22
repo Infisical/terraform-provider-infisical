@@ -63,7 +63,7 @@ func (r *certManagerInternalCAResource) Metadata(_ context.Context, req resource
 
 func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage internal certificate authorities (root or intermediate) in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage internal certificate authorities (root or intermediate) in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"type": schema.StringAttribute{
 				Description: "The type of the CA. Supported values: " + strings.Join(SUPPORTED_CA_TYPES, ", "),

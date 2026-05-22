@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_ca_certificate Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <caId>:<certId>.
+  Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_ca_certificate (Resource)
 
-Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>:<certId>`.
+Create and manage CA certificates in Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -116,3 +116,12 @@ output "issuing_ca_chain" {
 - `certificate_chain` (String, Sensitive) The certificate chain of the CA in PEM format
 - `id` (String) The unique identifier for this CA certificate resource
 - `serial_number` (String) The serial number of the CA certificate
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the CA certificate by CA ID and certificate ID
+terraform import infisical_cert_manager_ca_certificate.example <ca_id>:<cert_id>
+```

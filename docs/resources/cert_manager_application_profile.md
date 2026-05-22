@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_application_profile Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Attach a certificate profile to a Certificate Manager application and configure its enrollment methods. Each enrollment block (api_config, est_config, acme_config, scep_config) is optional; add, edit, or remove a block to update the matching enrollment on the (application, profile) pair. Only Machine Identity authentication is supported. Import: terraform import <addr> <applicationId>:<profileId>.
+  Attach a certificate profile to a Certificate Manager application and configure its enrollment methods. Each enrollment block (api_config, est_config, acme_config, scep_config) is optional; add, edit, or remove a block to update the matching enrollment. Only Machine Identity authentication is supported.
 ---
 
 # infisical_cert_manager_application_profile (Resource)
 
-Attach a certificate profile to a Certificate Manager application and configure its enrollment methods. Each enrollment block (api_config, est_config, acme_config, scep_config) is optional; add, edit, or remove a block to update the matching enrollment on the (application, profile) pair. Only Machine Identity authentication is supported. Import: `terraform import <addr> <applicationId>:<profileId>`.
+Attach a certificate profile to a Certificate Manager application and configure its enrollment methods. Each enrollment block (api_config, est_config, acme_config, scep_config) is optional; add, edit, or remove a block to update the matching enrollment. Only Machine Identity authentication is supported.
 
 ## Example Usage
 
@@ -109,10 +109,10 @@ resource "infisical_cert_manager_application_profile" "platform_web_server" {
 
 ### Optional
 
-- `acme_config` (Attributes) Enable the ACME enrollment method on the (application, profile) pair. Omit the block to disable ACME enrollment. (see [below for nested schema](#nestedatt--acme_config))
-- `api_config` (Attributes) Enable the API enrollment method on the (application, profile) pair. Omit the block to disable API enrollment. (see [below for nested schema](#nestedatt--api_config))
-- `est_config` (Attributes) Enable the EST enrollment method on the (application, profile) pair. Omit the block to disable EST enrollment. (see [below for nested schema](#nestedatt--est_config))
-- `scep_config` (Attributes) Enable the SCEP enrollment method on the (application, profile) pair. Omit the block to disable SCEP enrollment. (see [below for nested schema](#nestedatt--scep_config))
+- `acme_config` (Attributes) Enable the ACME enrollment method. Omit the block to disable ACME enrollment. (see [below for nested schema](#nestedatt--acme_config))
+- `api_config` (Attributes) Enable the API enrollment method. Omit the block to disable API enrollment. (see [below for nested schema](#nestedatt--api_config))
+- `est_config` (Attributes) Enable the EST enrollment method. Omit the block to disable EST enrollment. (see [below for nested schema](#nestedatt--est_config))
+- `scep_config` (Attributes) Enable the SCEP enrollment method. Omit the block to disable SCEP enrollment. (see [below for nested schema](#nestedatt--scep_config))
 
 ### Read-Only
 
@@ -147,7 +147,7 @@ Optional:
 
 Required:
 
-- `passphrase` (String, Sensitive) EST passphrase used to authorize certificate requests. Sensitive: stored only on the client side; the backend stores a hash.
+- `passphrase` (String, Sensitive) EST passphrase used to authorize certificate requests.
 
 Optional:
 
@@ -156,7 +156,7 @@ Optional:
 
 Read-Only:
 
-- `est_endpoint_url` (String) The EST endpoint URL clients should use.
+- `endpoint_url` (String) The EST endpoint URL clients should use.
 
 
 <a id="nestedatt--scep_config"></a>
@@ -177,3 +177,12 @@ Read-Only:
 - `ra_cert_expires_at` (String) ISO-8601 timestamp when the RA certificate expires.
 - `ra_certificate_pem` (String) The PEM-encoded RA certificate used by the SCEP service.
 - `scep_endpoint_url` (String) The SCEP endpoint URL clients should use.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the application-profile attachment by application ID and profile ID
+terraform import infisical_cert_manager_application_profile.example <application_id>:<profile_id>
+```

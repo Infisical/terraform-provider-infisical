@@ -41,7 +41,7 @@ func (r *certManagerExternalCAADCSResource) Metadata(_ context.Context, req reso
 
 func (r *certManagerExternalCAADCSResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <caId>` (legacy format `<projectSlug>:<caId>` is also accepted).",
+		Description: "Create and manage external ADCS (Microsoft Active Directory Certificate Services) certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Description: "The name of the ADCS CA",

@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_certificate_profile Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage certificate profiles in the organization's Cert Manager. Enrollment behavior is configured per (application, profile) pair via the infisical_pki_application_enrollment_* resources. Only Machine Identity authentication is supported for this resource.
+  Create and manage certificate profiles in Certificate Manager. Enrollment methods are configured on the application via the infisical_cert_manager_application_profile resource. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_certificate_profile (Resource)
 
-Create and manage certificate profiles in the organization's Cert Manager. Enrollment behavior is configured per (application, profile) pair via the `infisical_pki_application_enrollment_*` resources. Only Machine Identity authentication is supported for this resource.
+Create and manage certificate profiles in Certificate Manager. Enrollment methods are configured on the application via the `infisical_cert_manager_application_profile` resource. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -149,3 +149,12 @@ Optional:
 - `signature_algorithm` (String) Default signature algorithm. Supported values: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
 - `state` (String) Default state/province (ST)
 - `ttl_days` (Number) Default certificate validity in days
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the certificate profile by its ID
+terraform import infisical_cert_manager_certificate_profile.example <profile_id>
+```

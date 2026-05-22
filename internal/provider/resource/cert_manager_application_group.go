@@ -32,7 +32,6 @@ type certManagerApplicationGroupResourceModel struct {
 	ApplicationId types.String `tfsdk:"application_id"`
 	GroupId       types.String `tfsdk:"group_id"`
 	Role          types.String `tfsdk:"role"`
-	CustomRoleId  types.String `tfsdk:"custom_role_id"`
 }
 
 func (r *certManagerApplicationGroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -41,7 +40,7 @@ func (r *certManagerApplicationGroupResource) Metadata(_ context.Context, req re
 
 func (r *certManagerApplicationGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <applicationId>:<groupId>`.",
+		Description: "Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the group membership",
@@ -72,15 +71,8 @@ func (r *certManagerApplicationGroupResource) Schema(_ context.Context, _ resour
 				},
 			},
 			"role": schema.StringAttribute{
-				Description: "The role to assign to the group (admin, member, viewer, or a custom role slug)",
+				Description: "The role to assign to the group (admin, operator, or auditor)",
 				Required:    true,
-			},
-			"custom_role_id": schema.StringAttribute{
-				Description: "The ID of the custom role, when role is canonicalized to 'custom' by the backend",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
@@ -154,15 +146,7 @@ func (r *certManagerApplicationGroupResource) Create(ctx context.Context, req re
 	if added.Membership.ActorGroupId != nil {
 		plan.GroupId = types.StringValue(*added.Membership.ActorGroupId)
 	}
-	if added.Membership.Role == "custom" && added.Membership.CustomRoleId != nil && !plan.Role.IsNull() && plan.Role.ValueString() != "" && plan.Role.ValueString() != "custom" {
-	} else {
-		plan.Role = types.StringValue(added.Membership.Role)
-	}
-	if added.Membership.CustomRoleId != nil {
-		plan.CustomRoleId = types.StringValue(*added.Membership.CustomRoleId)
-	} else {
-		plan.CustomRoleId = types.StringNull()
-	}
+	plan.Role = types.StringValue(added.Membership.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -202,15 +186,7 @@ func (r *certManagerApplicationGroupResource) Read(ctx context.Context, req reso
 
 	state.Id = types.StringValue(member.MembershipId)
 	state.MembershipId = types.StringValue(member.MembershipId)
-	if member.Role == "custom" && member.CustomRoleId != nil && !state.Role.IsNull() && state.Role.ValueString() != "" && state.Role.ValueString() != "custom" {
-	} else {
-		state.Role = types.StringValue(member.Role)
-	}
-	if member.CustomRoleId != nil {
-		state.CustomRoleId = types.StringValue(*member.CustomRoleId)
-	} else {
-		state.CustomRoleId = types.StringNull()
-	}
+	state.Role = types.StringValue(member.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -252,15 +228,7 @@ func (r *certManagerApplicationGroupResource) Update(ctx context.Context, req re
 	member := updateResp.Membership
 	plan.Id = types.StringValue(member.MembershipId)
 	plan.MembershipId = types.StringValue(member.MembershipId)
-	if member.Role == "custom" && member.CustomRoleId != nil && !plan.Role.IsNull() && plan.Role.ValueString() != "" && plan.Role.ValueString() != "custom" {
-	} else {
-		plan.Role = types.StringValue(member.Role)
-	}
-	if member.CustomRoleId != nil {
-		plan.CustomRoleId = types.StringValue(*member.CustomRoleId)
-	} else {
-		plan.CustomRoleId = types.StringNull()
-	}
+	plan.Role = types.StringValue(member.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

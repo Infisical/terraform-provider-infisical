@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_internal_ca Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage internal certificate authorities (root or intermediate) in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.
+  Create and manage internal certificate authorities (root or intermediate) in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_internal_ca (Resource)
 
-Create and manage internal certificate authorities (root or intermediate) in the organization's Cert Manager. Only Machine Identity authentication is supported for this resource.
+Create and manage internal certificate authorities (root or intermediate) in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 

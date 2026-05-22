@@ -132,14 +132,14 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "The ID of the Certificate Manager application to scope the certificate under",
-				Optional:    true,
+				Description: "The ID of the Certificate Manager application to issue this certificate from",
+				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"csr": schema.StringAttribute{
-				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")). NOTE: the CSR cannot be recovered after import; on import this attribute remains null in state.",
+				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")).",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -263,7 +263,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"ttl": schema.StringAttribute{
-				Description: "Time to live for the certificate (e.g., '30d', '90d', '1y'). NOTE: the original TTL string is not recoverable after import; state preserves the prior value when present.",
+				Description: "Time to live for the certificate (e.g., '30d', '90d', '1y').",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -311,14 +311,14 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 			},
 			"certificate": schema.StringAttribute{
-				Description: "The issued certificate in PEM format. NOTE: only available at issuance time; after import this attribute will be empty.",
+				Description: "The issued certificate in PEM format. Only populated at issuance time.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"private_key": schema.StringAttribute{
-				Description: "The private key in PEM format (only available for direct field requests, not CSR-based). NOTE: only available at issuance time; after import this attribute will be empty.",
+				Description: "The private key in PEM format (only available for direct field requests, not CSR-based). Only populated at issuance time.",
 				Computed:    true,
 				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
@@ -326,7 +326,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"certificate_chain": schema.StringAttribute{
-				Description: "The certificate chain in PEM format. NOTE: only available at issuance time; after import this attribute will be empty.",
+				Description: "The certificate chain in PEM format. Only populated at issuance time.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -386,11 +386,8 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 	}
 
 	certRequest := infisical.RequestCertificateRequest{
-		ProfileId: plan.ProfileId.ValueString(),
-	}
-
-	if !plan.ApplicationId.IsNull() && !plan.ApplicationId.IsUnknown() {
-		certRequest.ApplicationId = plan.ApplicationId.ValueString()
+		ProfileId:     plan.ProfileId.ValueString(),
+		ApplicationId: plan.ApplicationId.ValueString(),
 	}
 
 	if hasCSR {
@@ -576,8 +573,6 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 
 	if cert.ApplicationId != "" {
 		plan.ApplicationId = types.StringValue(cert.ApplicationId)
-	} else if plan.ApplicationId.IsUnknown() {
-		plan.ApplicationId = types.StringNull()
 	}
 
 	if cert.SubjectOrganization != "" {
@@ -901,8 +896,6 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 
 	if cert.ApplicationId != "" {
 		state.ApplicationId = types.StringValue(cert.ApplicationId)
-	} else {
-		state.ApplicationId = types.StringNull()
 	}
 
 	if len(cert.KeyUsages) > 0 {

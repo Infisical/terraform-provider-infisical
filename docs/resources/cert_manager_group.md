@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_group Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Manage group memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: terraform import <addr> <groupId>.
+  Manage group memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_group (Resource)
 
-Manage group memberships at the Certificate Manager scope in Infisical. Only Machine Identity authentication is supported for this resource. Import: `terraform import <addr> <groupId>`.
+Manage group memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -29,28 +29,12 @@ provider "infisical" {
 
 resource "infisical_cert_manager_group" "sre" {
   group_id = "<group-id>"
-
-  roles = [
-    {
-      role_slug = "admin"
-    }
-  ]
+  role     = "admin"
 }
 
 resource "infisical_cert_manager_group" "oncall_rotation" {
   group_id = "<group-id>"
-
-  roles = [
-    {
-      role_slug = "viewer"
-    },
-    {
-      role_slug       = "admin"
-      is_temporary    = true
-      temporary_mode  = "relative"
-      temporary_range = "8h"
-    }
-  ]
+  role     = "member"
 }
 ```
 
@@ -60,29 +44,18 @@ resource "infisical_cert_manager_group" "oncall_rotation" {
 ### Required
 
 - `group_id` (String) The ID of the group
-- `roles` (Attributes List) The roles assigned to the Certificate Manager membership (see [below for nested schema](#nestedatt--roles))
+- `role` (String) The role to assign to the group (admin, member, or viewer)
 
 ### Read-Only
 
 - `id` (String) The ID of the group membership
 - `membership_id` (String) The ID of the group membership
 
-<a id="nestedatt--roles"></a>
-### Nested Schema for `roles`
+## Import
 
-Required:
+Import is supported using the following syntax:
 
-- `role_slug` (String) The slug of the role
-
-Optional:
-
-- `custom_role_id` (String) The id of the custom role slug
-- `is_temporary` (Boolean) Flag to indicate the assigned role is temporary or not. When is_temporary is true fields temporary_mode, temporary_range and temporary_access_start_time is required.
-- `temporary_access_end_time` (String) ISO time for which temporary access will end. Computed based on temporary_range and temporary_access_start_time
-- `temporary_access_start_time` (String) ISO time for which temporary access should begin. The current time is used by default.
-- `temporary_mode` (String) Type of temporary access given. Types: relative. Default: relative
-- `temporary_range` (String) TTL for the temporary time. Eg: 1m, 1h, 1d. Default: 1h
-
-Read-Only:
-
-- `id` (String) The ID of the role assignment
+```shell
+# This will import the Certificate Manager group membership by the group ID
+terraform import infisical_cert_manager_group.example <group_id>
+```

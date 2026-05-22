@@ -14,26 +14,10 @@ provider "infisical" {
 
 resource "infisical_cert_manager_group" "sre" {
   group_id = "<group-id>"
-
-  roles = [
-    {
-      role_slug = "admin"
-    }
-  ]
+  role     = "admin"
 }
 
 resource "infisical_cert_manager_group" "oncall_rotation" {
   group_id = "<group-id>"
-
-  roles = [
-    {
-      role_slug = "viewer"
-    },
-    {
-      role_slug       = "admin"
-      is_temporary    = true
-      temporary_mode  = "relative"
-      temporary_range = "8h"
-    }
-  ]
+  role     = "member"
 }

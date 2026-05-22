@@ -112,15 +112,15 @@ output "cert_private_key" {
 
 ### Required
 
+- `application_id` (String) The ID of the Certificate Manager application to issue this certificate from
 - `profile_id` (String) The ID of the certificate profile to use for issuance
 
 ### Optional
 
 - `alt_names` (List of String) Subject alternative names (SANs) for the certificate
-- `application_id` (String) The ID of the Certificate Manager application to scope the certificate under
 - `common_name` (String) The common name (CN) for the certificate. Required when not using CSR
 - `country` (String) The country (C) for the certificate (2-letter code)
-- `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")). NOTE: the CSR cannot be recovered after import; on import this attribute remains null in state.
+- `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")).
 - `extended_key_usages` (List of String) Extended key usages for the certificate. Supported: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 - `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `key_usages` (List of String) Key usages for the certificate. Supported: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
@@ -130,16 +130,25 @@ output "cert_private_key" {
 - `province` (String) The state/province (ST) for the certificate
 - `signature_algorithm` (String) The signature algorithm for the certificate. Supported: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
 - `timeout_seconds` (Number) Maximum time to wait for certificate issuance in seconds. Defaults to 3600 (1 hour)
-- `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y'). NOTE: the original TTL string is not recoverable after import; state preserves the prior value when present.
+- `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y').
 
 ### Read-Only
 
-- `certificate` (String) The issued certificate in PEM format. NOTE: only available at issuance time; after import this attribute will be empty.
-- `certificate_chain` (String) The certificate chain in PEM format. NOTE: only available at issuance time; after import this attribute will be empty.
+- `certificate` (String) The issued certificate in PEM format. Only populated at issuance time.
+- `certificate_chain` (String) The certificate chain in PEM format. Only populated at issuance time.
 - `certificate_request_id` (String) The ID of the certificate request
 - `id` (String) The ID of the certificate
 - `not_after` (String) The not-after (expiration) date of the certificate (RFC3339 format)
 - `not_before` (String) The not-before date of the certificate (RFC3339 format)
-- `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based). NOTE: only available at issuance time; after import this attribute will be empty.
+- `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based). Only populated at issuance time.
 - `serial_number` (String) The serial number of the issued certificate
 - `status` (String) The status of the certificate (pending, issued, failed)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the certificate by its ID
+terraform import infisical_cert_manager_certificate.example <certificate_id>
+```
