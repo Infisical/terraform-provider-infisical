@@ -44,12 +44,11 @@ resource "infisical_cert_manager_user" "oncall" {
 ### Required
 
 - `email` (String) The email of the user
-- `role` (String) The role to assign to the user (admin, member, or viewer)
+- `role` (String) The role to assign to the user (admin or member)
 
 ### Read-Only
 
-- `id` (String) The ID of the user membership
-- `membership_id` (String) The ID of the user membership
+- `id` (String) The ID of the Certificate Manager user membership
 - `user_id` (String) The ID of the user
 
 ## Import

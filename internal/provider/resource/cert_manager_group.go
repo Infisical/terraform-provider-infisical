@@ -26,10 +26,9 @@ type certManagerGroupResource struct {
 }
 
 type certManagerGroupResourceModel struct {
-	Id           types.String `tfsdk:"id"`
-	MembershipId types.String `tfsdk:"membership_id"`
-	GroupId      types.String `tfsdk:"group_id"`
-	Role         types.String `tfsdk:"role"`
+	Id      types.String `tfsdk:"id"`
+	GroupId types.String `tfsdk:"group_id"`
+	Role    types.String `tfsdk:"role"`
 }
 
 func (r *certManagerGroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -41,14 +40,7 @@ func (r *certManagerGroupResource) Schema(_ context.Context, _ resource.SchemaRe
 		Description: "Manage group memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the group membership",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"membership_id": schema.StringAttribute{
-				Description: "The ID of the group membership",
+				Description: "The ID of the Certificate Manager group membership",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -62,7 +54,7 @@ func (r *certManagerGroupResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"role": schema.StringAttribute{
-				Description: "The role to assign to the group (admin, member, or viewer)",
+				Description: "The role to assign to the group (admin or member)",
 				Required:    true,
 			},
 		},
@@ -114,7 +106,6 @@ func (r *certManagerGroupResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	plan.Id = types.StringValue(added.GroupMembership.ID)
-	plan.MembershipId = types.StringValue(added.GroupMembership.ID)
 	plan.GroupId = types.StringValue(added.GroupMembership.GroupId)
 	plan.Role = types.StringValue(firstRole(added.GroupMembership.Roles, plan.Role.ValueString()))
 
@@ -152,7 +143,6 @@ func (r *certManagerGroupResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	state.Id = types.StringValue(refreshed.GroupMembership.ID)
-	state.MembershipId = types.StringValue(refreshed.GroupMembership.ID)
 	state.Role = types.StringValue(firstRole(refreshed.GroupMembership.Roles, state.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -197,7 +187,6 @@ func (r *certManagerGroupResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	plan.Id = types.StringValue(refreshed.GroupMembership.ID)
-	plan.MembershipId = types.StringValue(refreshed.GroupMembership.ID)
 	plan.Role = types.StringValue(firstRole(refreshed.GroupMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -252,5 +241,4 @@ func (r *certManagerGroupResource) ImportState(ctx context.Context, req resource
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group_id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), refreshed.GroupMembership.ID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("membership_id"), refreshed.GroupMembership.ID)...)
 }

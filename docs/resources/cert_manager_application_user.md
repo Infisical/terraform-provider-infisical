@@ -27,25 +27,40 @@ provider "infisical" {
   client_secret = var.client_secret
 }
 
+resource "infisical_cert_manager_user" "admin" {
+  email = "admin@example.com"
+  role  = "member"
+}
+
+resource "infisical_cert_manager_user" "operator" {
+  email = "operator@example.com"
+  role  = "member"
+}
+
+resource "infisical_cert_manager_user" "auditor" {
+  email = "auditor@example.com"
+  role  = "member"
+}
+
 resource "infisical_cert_manager_application" "platform" {
   name = "platform"
 }
 
 resource "infisical_cert_manager_application_user" "platform_admin" {
   application_id = infisical_cert_manager_application.platform.id
-  email          = "admin@example.com"
+  email          = infisical_cert_manager_user.admin.email
   role           = "admin"
 }
 
 resource "infisical_cert_manager_application_user" "platform_operator" {
   application_id = infisical_cert_manager_application.platform.id
-  email          = "operator@example.com"
+  email          = infisical_cert_manager_user.operator.email
   role           = "operator"
 }
 
 resource "infisical_cert_manager_application_user" "platform_auditor" {
   application_id = infisical_cert_manager_application.platform.id
-  email          = "auditor@example.com"
+  email          = infisical_cert_manager_user.auditor.email
   role           = "auditor"
 }
 ```
@@ -61,8 +76,7 @@ resource "infisical_cert_manager_application_user" "platform_auditor" {
 
 ### Read-Only
 
-- `id` (String) The ID of the user membership
-- `membership_id` (String) The ID of the user membership
+- `id` (String) The ID of the application user membership
 - `user_id` (String) The ID of the user
 
 ## Import
@@ -70,6 +84,6 @@ resource "infisical_cert_manager_application_user" "platform_auditor" {
 Import is supported using the following syntax:
 
 ```shell
-# This will import the application user membership by application ID and user ID
-terraform import infisical_cert_manager_application_user.example <application_id>:<user_id>
+# This will import the application user membership by application ID and email
+terraform import infisical_cert_manager_application_user.example <application_id>:<email>
 ```

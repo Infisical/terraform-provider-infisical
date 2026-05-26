@@ -96,6 +96,23 @@ resource "infisical_cert_manager_application_profile" "platform_web_server" {
     auto_renew        = true
     renew_before_days = 7
   }
+
+  est_config = {
+    passphrase                      = "change-me-est-secret"
+    disable_bootstrap_ca_validation = false
+  }
+
+  acme_config = {
+    skip_dns_ownership_verification = false
+    skip_eab_binding                = false
+  }
+
+  scep_config = {
+    challenge_type              = "static"
+    challenge_password          = "change-me-scep-secret"
+    include_ca_cert_in_response = true
+    allow_cert_based_renewal    = true
+  }
 }
 ```
 

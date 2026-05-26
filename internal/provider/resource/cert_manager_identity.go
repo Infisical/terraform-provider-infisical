@@ -26,10 +26,9 @@ type certManagerIdentityResource struct {
 }
 
 type certManagerIdentityResourceModel struct {
-	Id           types.String `tfsdk:"id"`
-	MembershipId types.String `tfsdk:"membership_id"`
-	IdentityId   types.String `tfsdk:"identity_id"`
-	Role         types.String `tfsdk:"role"`
+	Id         types.String `tfsdk:"id"`
+	IdentityId types.String `tfsdk:"identity_id"`
+	Role       types.String `tfsdk:"role"`
 }
 
 func (r *certManagerIdentityResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -41,14 +40,7 @@ func (r *certManagerIdentityResource) Schema(_ context.Context, _ resource.Schem
 		Description: "Manage identity memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the identity membership",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"membership_id": schema.StringAttribute{
-				Description: "The ID of the identity membership",
+				Description: "The ID of the Certificate Manager identity membership",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -62,7 +54,7 @@ func (r *certManagerIdentityResource) Schema(_ context.Context, _ resource.Schem
 				},
 			},
 			"role": schema.StringAttribute{
-				Description: "The role to assign to the identity (admin, member, or viewer)",
+				Description: "The role to assign to the identity (admin or member)",
 				Required:    true,
 			},
 		},
@@ -127,7 +119,6 @@ func (r *certManagerIdentityResource) Create(ctx context.Context, req resource.C
 	}
 
 	plan.Id = types.StringValue(refreshed.IdentityMembership.ID)
-	plan.MembershipId = types.StringValue(refreshed.IdentityMembership.ID)
 	plan.Role = types.StringValue(firstRole(refreshed.IdentityMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -164,7 +155,6 @@ func (r *certManagerIdentityResource) Read(ctx context.Context, req resource.Rea
 	}
 
 	state.Id = types.StringValue(refreshed.IdentityMembership.ID)
-	state.MembershipId = types.StringValue(refreshed.IdentityMembership.ID)
 	state.Role = types.StringValue(firstRole(refreshed.IdentityMembership.Roles, state.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -209,7 +199,6 @@ func (r *certManagerIdentityResource) Update(ctx context.Context, req resource.U
 	}
 
 	plan.Id = types.StringValue(refreshed.IdentityMembership.ID)
-	plan.MembershipId = types.StringValue(refreshed.IdentityMembership.ID)
 	plan.Role = types.StringValue(firstRole(refreshed.IdentityMembership.Roles, plan.Role.ValueString()))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -264,5 +253,4 @@ func (r *certManagerIdentityResource) ImportState(ctx context.Context, req resou
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("identity_id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), refreshed.IdentityMembership.ID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("membership_id"), refreshed.IdentityMembership.ID)...)
 }

@@ -26,11 +26,10 @@ type certManagerUserResource struct {
 }
 
 type certManagerUserResourceModel struct {
-	Id           types.String `tfsdk:"id"`
-	MembershipId types.String `tfsdk:"membership_id"`
-	Email        types.String `tfsdk:"email"`
-	UserId       types.String `tfsdk:"user_id"`
-	Role         types.String `tfsdk:"role"`
+	Id     types.String `tfsdk:"id"`
+	Email  types.String `tfsdk:"email"`
+	UserId types.String `tfsdk:"user_id"`
+	Role   types.String `tfsdk:"role"`
 }
 
 func (r *certManagerUserResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -42,14 +41,7 @@ func (r *certManagerUserResource) Schema(_ context.Context, _ resource.SchemaReq
 		Description: "Manage user memberships in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the user membership",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"membership_id": schema.StringAttribute{
-				Description: "The ID of the user membership",
+				Description: "The ID of the Certificate Manager user membership",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -70,7 +62,7 @@ func (r *certManagerUserResource) Schema(_ context.Context, _ resource.SchemaReq
 				},
 			},
 			"role": schema.StringAttribute{
-				Description: "The role to assign to the user (admin, member, or viewer)",
+				Description: "The role to assign to the user (admin or member)",
 				Required:    true,
 			},
 		},
@@ -147,7 +139,7 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 	if member == nil {
 		resp.Diagnostics.AddError(
 			"Error finding user after invite",
-			fmt.Sprintf("User %q was not found in Certificate Manager after invitation. Verify the email is correct and the user has accepted the invitation.", plan.Email.ValueString()),
+			fmt.Sprintf("User %q was not found in Certificate Manager after invitation. Verify the email is correct and that the user exists in the organization.", plan.Email.ValueString()),
 		)
 		return
 	}
@@ -176,7 +168,6 @@ func (r *certManagerUserResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	plan.Id = types.StringValue(refreshed.Membership.ID)
-	plan.MembershipId = types.StringValue(refreshed.Membership.ID)
 	plan.UserId = types.StringValue(refreshed.Membership.UserID)
 	plan.Role = types.StringValue(firstRole(refreshed.Membership.Roles, plan.Role.ValueString()))
 
@@ -234,7 +225,6 @@ func (r *certManagerUserResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	state.Id = types.StringValue(refreshed.Membership.ID)
-	state.MembershipId = types.StringValue(refreshed.Membership.ID)
 	state.UserId = types.StringValue(refreshed.Membership.UserID)
 	if state.Email.IsNull() || state.Email.ValueString() == "" {
 		state.Email = types.StringValue(refreshed.Membership.User.Email)
@@ -289,7 +279,6 @@ func (r *certManagerUserResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	plan.Id = types.StringValue(refreshed.Membership.ID)
-	plan.MembershipId = types.StringValue(refreshed.Membership.ID)
 	plan.UserId = types.StringValue(refreshed.Membership.UserID)
 	plan.Role = types.StringValue(firstRole(refreshed.Membership.Roles, plan.Role.ValueString()))
 
@@ -343,7 +332,7 @@ func (r *certManagerUserResource) ImportState(ctx context.Context, req resource.
 	if member == nil {
 		resp.Diagnostics.AddError(
 			"Unable to import Certificate Manager user",
-			fmt.Sprintf("No Certificate Manager user found matching email %q. Verify the email is correct and the user has been invited.", req.ID),
+			fmt.Sprintf("No Certificate Manager user found matching email %q. Verify the email is correct and that the user is a member of Certificate Manager.", req.ID),
 		)
 		return
 	}
@@ -351,5 +340,4 @@ func (r *certManagerUserResource) ImportState(ctx context.Context, req resource.
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_id"), member.UserID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), member.ID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("membership_id"), member.ID)...)
 }

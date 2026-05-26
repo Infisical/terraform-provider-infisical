@@ -12,24 +12,39 @@ provider "infisical" {
   client_secret = var.client_secret
 }
 
+resource "infisical_cert_manager_user" "admin" {
+  email = "admin@example.com"
+  role  = "member"
+}
+
+resource "infisical_cert_manager_user" "operator" {
+  email = "operator@example.com"
+  role  = "member"
+}
+
+resource "infisical_cert_manager_user" "auditor" {
+  email = "auditor@example.com"
+  role  = "member"
+}
+
 resource "infisical_cert_manager_application" "platform" {
   name = "platform"
 }
 
 resource "infisical_cert_manager_application_user" "platform_admin" {
   application_id = infisical_cert_manager_application.platform.id
-  email          = "admin@example.com"
+  email          = infisical_cert_manager_user.admin.email
   role           = "admin"
 }
 
 resource "infisical_cert_manager_application_user" "platform_operator" {
   application_id = infisical_cert_manager_application.platform.id
-  email          = "operator@example.com"
+  email          = infisical_cert_manager_user.operator.email
   role           = "operator"
 }
 
 resource "infisical_cert_manager_application_user" "platform_auditor" {
   application_id = infisical_cert_manager_application.platform.id
-  email          = "auditor@example.com"
+  email          = infisical_cert_manager_user.auditor.email
   role           = "auditor"
 }

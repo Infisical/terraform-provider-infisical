@@ -28,7 +28,6 @@ type certManagerApplicationGroupResource struct {
 
 type certManagerApplicationGroupResourceModel struct {
 	Id            types.String `tfsdk:"id"`
-	MembershipId  types.String `tfsdk:"membership_id"`
 	ApplicationId types.String `tfsdk:"application_id"`
 	GroupId       types.String `tfsdk:"group_id"`
 	Role          types.String `tfsdk:"role"`
@@ -43,14 +42,7 @@ func (r *certManagerApplicationGroupResource) Schema(_ context.Context, _ resour
 		Description: "Manage group memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the group membership",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"membership_id": schema.StringAttribute{
-				Description: "The ID of the group membership",
+				Description: "The ID of the application group membership",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -142,7 +134,6 @@ func (r *certManagerApplicationGroupResource) Create(ctx context.Context, req re
 	}
 
 	plan.Id = types.StringValue(added.Membership.MembershipId)
-	plan.MembershipId = types.StringValue(added.Membership.MembershipId)
 	if added.Membership.ActorGroupId != nil {
 		plan.GroupId = types.StringValue(*added.Membership.ActorGroupId)
 	}
@@ -185,7 +176,6 @@ func (r *certManagerApplicationGroupResource) Read(ctx context.Context, req reso
 	}
 
 	state.Id = types.StringValue(member.MembershipId)
-	state.MembershipId = types.StringValue(member.MembershipId)
 	state.Role = types.StringValue(member.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -227,7 +217,6 @@ func (r *certManagerApplicationGroupResource) Update(ctx context.Context, req re
 
 	member := updateResp.Membership
 	plan.Id = types.StringValue(member.MembershipId)
-	plan.MembershipId = types.StringValue(member.MembershipId)
 	plan.Role = types.StringValue(member.Role)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)

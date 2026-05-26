@@ -12,18 +12,23 @@ provider "infisical" {
   client_secret = var.client_secret
 }
 
+resource "infisical_cert_manager_identity" "ci" {
+  identity_id = "<identity-id>"
+  role        = "member"
+}
+
 resource "infisical_cert_manager_application" "platform" {
   name = "platform"
 }
 
 resource "infisical_cert_manager_application_identity" "platform_ci" {
   application_id = infisical_cert_manager_application.platform.id
-  identity_id    = "<identity-id>"
+  identity_id    = infisical_cert_manager_identity.ci.identity_id
   role           = "operator"
 }
 
 resource "infisical_cert_manager_application_identity" "platform_readonly" {
   application_id = infisical_cert_manager_application.platform.id
-  identity_id    = "<identity-id>"
+  identity_id    = infisical_cert_manager_identity.ci.identity_id
   role           = "auditor"
 }

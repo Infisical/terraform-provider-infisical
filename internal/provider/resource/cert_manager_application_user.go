@@ -28,7 +28,6 @@ type certManagerApplicationUserResource struct {
 
 type certManagerApplicationUserResourceModel struct {
 	Id            types.String `tfsdk:"id"`
-	MembershipId  types.String `tfsdk:"membership_id"`
 	ApplicationId types.String `tfsdk:"application_id"`
 	Email         types.String `tfsdk:"email"`
 	UserId        types.String `tfsdk:"user_id"`
@@ -44,14 +43,7 @@ func (r *certManagerApplicationUserResource) Schema(_ context.Context, _ resourc
 		Description: "Manage user memberships for a Certificate Manager application in Infisical. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the user membership",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"membership_id": schema.StringAttribute{
-				Description: "The ID of the user membership",
+				Description: "The ID of the application user membership",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -228,7 +220,6 @@ func (r *certManagerApplicationUserResource) Create(ctx context.Context, req res
 	}
 
 	plan.Id = types.StringValue(member.MembershipId)
-	plan.MembershipId = types.StringValue(member.MembershipId)
 	if member.ActorUserId != nil {
 		plan.UserId = types.StringValue(*member.ActorUserId)
 	} else {
@@ -281,7 +272,6 @@ func (r *certManagerApplicationUserResource) Read(ctx context.Context, req resou
 	}
 
 	state.Id = types.StringValue(member.MembershipId)
-	state.MembershipId = types.StringValue(member.MembershipId)
 	if member.ActorUserId != nil {
 		state.UserId = types.StringValue(*member.ActorUserId)
 	}
@@ -336,7 +326,6 @@ func (r *certManagerApplicationUserResource) Update(ctx context.Context, req res
 
 	member := updateResp.Membership
 	plan.Id = types.StringValue(member.MembershipId)
-	plan.MembershipId = types.StringValue(member.MembershipId)
 	if member.ActorUserId != nil {
 		plan.UserId = types.StringValue(*member.ActorUserId)
 	} else {
@@ -376,15 +365,15 @@ func (r *certManagerApplicationUserResource) Delete(ctx context.Context, req res
 }
 
 func (r *certManagerApplicationUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := strings.Split(req.ID, ":")
+	parts := strings.SplitN(req.ID, ":", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		resp.Diagnostics.AddError(
 			"Unexpected Import Identifier",
-			fmt.Sprintf("Expected import identifier in the format <applicationId>:<userId>, got: %s", req.ID),
+			fmt.Sprintf("Expected import identifier in the format <applicationId>:<email>, got: %s", req.ID),
 		)
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("application_id"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_id"), parts[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), parts[1])...)
 }

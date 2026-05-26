@@ -44,12 +44,11 @@ resource "infisical_cert_manager_group" "oncall_rotation" {
 ### Required
 
 - `group_id` (String) The ID of the group
-- `role` (String) The role to assign to the group (admin, member, or viewer)
+- `role` (String) The role to assign to the group (admin or member)
 
 ### Read-Only
 
-- `id` (String) The ID of the group membership
-- `membership_id` (String) The ID of the group membership
+- `id` (String) The ID of the Certificate Manager group membership
 
 ## Import
 

@@ -44,12 +44,11 @@ resource "infisical_cert_manager_identity" "deploy_bot" {
 ### Required
 
 - `identity_id` (String) The ID of the identity
-- `role` (String) The role to assign to the identity (admin, member, or viewer)
+- `role` (String) The role to assign to the identity (admin or member)
 
 ### Read-Only
 
-- `id` (String) The ID of the identity membership
-- `membership_id` (String) The ID of the identity membership
+- `id` (String) The ID of the Certificate Manager identity membership
 
 ## Import
 

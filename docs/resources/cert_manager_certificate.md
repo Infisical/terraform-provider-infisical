@@ -134,13 +134,13 @@ output "cert_private_key" {
 
 ### Read-Only
 
-- `certificate` (String) The issued certificate in PEM format. Only populated at issuance time.
-- `certificate_chain` (String) The certificate chain in PEM format. Only populated at issuance time.
+- `certificate` (String) The issued certificate in PEM format.
+- `certificate_chain` (String) The certificate chain in PEM format.
 - `certificate_request_id` (String) The ID of the certificate request
 - `id` (String) The ID of the certificate
 - `not_after` (String) The not-after (expiration) date of the certificate (RFC3339 format)
 - `not_before` (String) The not-before date of the certificate (RFC3339 format)
-- `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based). Only populated at issuance time.
+- `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based).
 - `serial_number` (String) The serial number of the issued certificate
 - `status` (String) The status of the certificate (pending, issued, failed)
 

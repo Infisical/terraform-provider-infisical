@@ -311,14 +311,14 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 			},
 			"certificate": schema.StringAttribute{
-				Description: "The issued certificate in PEM format. Only populated at issuance time.",
+				Description: "The issued certificate in PEM format.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"private_key": schema.StringAttribute{
-				Description: "The private key in PEM format (only available for direct field requests, not CSR-based). Only populated at issuance time.",
+				Description: "The private key in PEM format (only available for direct field requests, not CSR-based).",
 				Computed:    true,
 				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
@@ -326,7 +326,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"certificate_chain": schema.StringAttribute{
-				Description: "The certificate chain in PEM format. Only populated at issuance time.",
+				Description: "The certificate chain in PEM format.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
