@@ -44,7 +44,6 @@ type certManagerInternalCAResource struct {
 }
 
 type certManagerInternalCAResourceModel struct {
-	ProjectSlug  types.String `tfsdk:"project_slug"`
 	Id           types.String `tfsdk:"id"`
 	Type         types.String `tfsdk:"type"`
 	Name         types.String `tfsdk:"name"`
@@ -64,15 +63,8 @@ func (r *certManagerInternalCAResource) Metadata(_ context.Context, req resource
 
 func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage internal certificate authorities (root or intermediate) in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage internal certificate authorities (root or intermediate) in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
-			"project_slug": schema.StringAttribute{
-				Description: "The slug of the cert-manager project",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"type": schema.StringAttribute{
 				Description: "The type of the CA. Supported values: " + strings.Join(SUPPORTED_CA_TYPES, ", "),
 				Required:    true,
@@ -86,9 +78,6 @@ func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.Sch
 			"name": schema.StringAttribute{
 				Description: "The name of the CA",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"common_name": schema.StringAttribute{
 				Description: "The common name (CN) of the CA certificate",
@@ -200,7 +189,6 @@ func (r *certManagerInternalCAResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	// Validate that at least one subject field is provided
 	subjectFields := []types.String{
 		plan.CommonName, plan.Organization, plan.OU,
 		plan.Country, plan.Province, plan.Locality,
@@ -220,22 +208,9 @@ func (r *certManagerInternalCAResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
 	newCA, err := r.client.CreateInternalCA(infisical.CreateInternalCARequest{
-		ProjectId: project.ID,
-		Name:      plan.Name.ValueString(),
-		Status:    plan.Status.ValueString(),
+		Name:   plan.Name.ValueString(),
+		Status: plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
 			Type:         plan.Type.ValueString(),
 			CommonName:   plan.CommonName.ValueString(),
@@ -365,7 +340,6 @@ func (r *certManagerInternalCAResource) Update(ctx context.Context, req resource
 		return
 	}
 
-	// Validate that at least one subject field is provided
 	subjectFields := []types.String{
 		plan.CommonName, plan.Organization, plan.OU,
 		plan.Country, plan.Province, plan.Locality,
@@ -385,23 +359,10 @@ func (r *certManagerInternalCAResource) Update(ctx context.Context, req resource
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading project",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	_, err = r.client.UpdateInternalCA(infisical.UpdateInternalCARequest{
-		ProjectId: project.ID,
-		CAId:      plan.Id.ValueString(),
-		Name:      plan.Name.ValueString(),
-		Status:    plan.Status.ValueString(),
+	_, err := r.client.UpdateInternalCA(infisical.UpdateInternalCARequest{
+		CAId:   plan.Id.ValueString(),
+		Name:   plan.Name.ValueString(),
+		Status: plan.Status.ValueString(),
 		Configuration: infisical.CertificateAuthorityConfiguration{
 			Type:         plan.Type.ValueString(),
 			CommonName:   plan.CommonName.ValueString(),
@@ -459,45 +420,5 @@ func (r *certManagerInternalCAResource) Delete(ctx context.Context, req resource
 }
 
 func (r *certManagerInternalCAResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if !r.client.Config.IsMachineIdentityAuth {
-		resp.Diagnostics.AddError(
-			"Unable to import CA",
-			"Only Machine Identity authentication is supported for this operation",
-		)
-		return
-	}
-
-	ca, err := r.client.GetInternalCA(infisical.GetCARequest{
-		CAId: req.ID,
-	})
-
-	if err != nil {
-		if err == infisical.ErrNotFound {
-			resp.Diagnostics.AddError(
-				"Error importing CA",
-				fmt.Sprintf("CA with ID %s not found", req.ID),
-			)
-			return
-		}
-		resp.Diagnostics.AddError(
-			"Error importing CA",
-			"Couldn't read CA from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	project, err := r.client.GetProjectById(infisical.GetProjectByIdRequest{
-		ID: ca.ProjectId,
-	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error importing CA",
-			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_slug"), project.Slug)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

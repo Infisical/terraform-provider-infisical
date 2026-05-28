@@ -1,46 +1,48 @@
 terraform {
   required_providers {
     infisical = {
-      # version = <latest version>
       source = "infisical/infisical"
     }
   }
 }
 
 provider "infisical" {
-  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  auth = {
-    universal = {
-      client_id     = "<machine-identity-client-id>"
-      client_secret = "<machine-identity-client-secret>"
-    }
-  }
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
-# Request a certificate
-resource "infisical_cert_manager_certificate" "my_cert" {
-  profile_id          = "<internal-ca-profile-id>"
+resource "infisical_cert_manager_application" "platform" {
+  name        = "platform"
+  description = "Certificates issued for the platform team"
+}
+
+resource "infisical_cert_manager_certificate" "api_direct" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
+
   common_name         = "api.example.com"
   alt_names           = ["api.example.com", "api-internal.example.com"]
   organization        = "Example Corp"
   country             = "US"
   key_algorithm       = "RSA_2048"
   signature_algorithm = "RSA-SHA256"
+  key_usages          = ["digital_signature", "key_encipherment"]
+  extended_key_usages = ["server_auth"]
   ttl                 = "90d"
   timeout_seconds     = 300
 }
 
+resource "infisical_cert_manager_certificate" "api_csr_file" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
 
-# Request a certificate using a CSR file
-resource "infisical_cert_manager_certificate" "csr_based_cert" {
-  profile_id      = "<profile-id>"
   csr             = file("./my-certificate.csr")
   ttl             = "90d"
   timeout_seconds = 300
 }
 
-# Request a certificate using an inline CSR
-resource "infisical_cert_manager_certificate" "inline_csr_cert" {
+resource "infisical_cert_manager_certificate" "api_csr_inline" {
   profile_id = "<profile-id>"
 
   csr = <<-CSR
@@ -66,26 +68,25 @@ CSR
   timeout_seconds = 300
 }
 
-# Outputs
 output "cert_details" {
   value = {
-    id            = infisical_cert_manager_certificate.my_cert.id
-    status        = infisical_cert_manager_certificate.my_cert.status
-    serial_number = infisical_cert_manager_certificate.my_cert.serial_number
-    not_before    = infisical_cert_manager_certificate.my_cert.not_before
-    not_after     = infisical_cert_manager_certificate.my_cert.not_after
+    id            = infisical_cert_manager_certificate.api_direct.id
+    status        = infisical_cert_manager_certificate.api_direct.status
+    serial_number = infisical_cert_manager_certificate.api_direct.serial_number
+    not_before    = infisical_cert_manager_certificate.api_direct.not_before
+    not_after     = infisical_cert_manager_certificate.api_direct.not_after
   }
 }
 
 output "cert_pem" {
-  value = infisical_cert_manager_certificate.my_cert.certificate
+  value = infisical_cert_manager_certificate.api_direct.certificate
 }
 
 output "cert_chain" {
-  value = infisical_cert_manager_certificate.my_cert.certificate_chain
+  value = infisical_cert_manager_certificate.api_direct.certificate_chain
 }
 
 output "cert_private_key" {
-  value     = infisical_cert_manager_certificate.my_cert.private_key
+  value     = infisical_cert_manager_certificate.api_direct.private_key
   sensitive = true
 }

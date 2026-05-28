@@ -16,46 +16,48 @@ Request and manage certificates from Infisical certificate profiles. Supports bo
 terraform {
   required_providers {
     infisical = {
-      # version = <latest version>
       source = "infisical/infisical"
     }
   }
 }
 
 provider "infisical" {
-  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  auth = {
-    universal = {
-      client_id     = "<machine-identity-client-id>"
-      client_secret = "<machine-identity-client-secret>"
-    }
-  }
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
-# Request a certificate
-resource "infisical_cert_manager_certificate" "my_cert" {
-  profile_id          = "<internal-ca-profile-id>"
+resource "infisical_cert_manager_application" "platform" {
+  name        = "platform"
+  description = "Certificates issued for the platform team"
+}
+
+resource "infisical_cert_manager_certificate" "api_direct" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
+
   common_name         = "api.example.com"
   alt_names           = ["api.example.com", "api-internal.example.com"]
   organization        = "Example Corp"
   country             = "US"
   key_algorithm       = "RSA_2048"
   signature_algorithm = "RSA-SHA256"
+  key_usages          = ["digital_signature", "key_encipherment"]
+  extended_key_usages = ["server_auth"]
   ttl                 = "90d"
   timeout_seconds     = 300
 }
 
+resource "infisical_cert_manager_certificate" "api_csr_file" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
 
-# Request a certificate using a CSR file
-resource "infisical_cert_manager_certificate" "csr_based_cert" {
-  profile_id      = "<profile-id>"
   csr             = file("./my-certificate.csr")
   ttl             = "90d"
   timeout_seconds = 300
 }
 
-# Request a certificate using an inline CSR
-resource "infisical_cert_manager_certificate" "inline_csr_cert" {
+resource "infisical_cert_manager_certificate" "api_csr_inline" {
   profile_id = "<profile-id>"
 
   csr = <<-CSR
@@ -81,27 +83,26 @@ CSR
   timeout_seconds = 300
 }
 
-# Outputs
 output "cert_details" {
   value = {
-    id            = infisical_cert_manager_certificate.my_cert.id
-    status        = infisical_cert_manager_certificate.my_cert.status
-    serial_number = infisical_cert_manager_certificate.my_cert.serial_number
-    not_before    = infisical_cert_manager_certificate.my_cert.not_before
-    not_after     = infisical_cert_manager_certificate.my_cert.not_after
+    id            = infisical_cert_manager_certificate.api_direct.id
+    status        = infisical_cert_manager_certificate.api_direct.status
+    serial_number = infisical_cert_manager_certificate.api_direct.serial_number
+    not_before    = infisical_cert_manager_certificate.api_direct.not_before
+    not_after     = infisical_cert_manager_certificate.api_direct.not_after
   }
 }
 
 output "cert_pem" {
-  value = infisical_cert_manager_certificate.my_cert.certificate
+  value = infisical_cert_manager_certificate.api_direct.certificate
 }
 
 output "cert_chain" {
-  value = infisical_cert_manager_certificate.my_cert.certificate_chain
+  value = infisical_cert_manager_certificate.api_direct.certificate_chain
 }
 
 output "cert_private_key" {
-  value     = infisical_cert_manager_certificate.my_cert.private_key
+  value     = infisical_cert_manager_certificate.api_direct.private_key
   sensitive = true
 }
 ```
@@ -111,6 +112,7 @@ output "cert_private_key" {
 
 ### Required
 
+- `application_id` (String) The ID of the Certificate Manager application to issue this certificate from
 - `profile_id` (String) The ID of the certificate profile to use for issuance
 
 ### Optional
@@ -118,7 +120,7 @@ output "cert_private_key" {
 - `alt_names` (List of String) Subject alternative names (SANs) for the certificate
 - `common_name` (String) The common name (CN) for the certificate. Required when not using CSR
 - `country` (String) The country (C) for the certificate (2-letter code)
-- `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr"))
+- `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")).
 - `extended_key_usages` (List of String) Extended key usages for the certificate. Supported: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 - `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `key_usages` (List of String) Key usages for the certificate. Supported: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
@@ -128,16 +130,25 @@ output "cert_private_key" {
 - `province` (String) The state/province (ST) for the certificate
 - `signature_algorithm` (String) The signature algorithm for the certificate. Supported: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
 - `timeout_seconds` (Number) Maximum time to wait for certificate issuance in seconds. Defaults to 3600 (1 hour)
-- `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y')
+- `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y').
 
 ### Read-Only
 
-- `certificate` (String) The issued certificate in PEM format
-- `certificate_chain` (String) The certificate chain in PEM format
+- `certificate` (String) The issued certificate in PEM format.
+- `certificate_chain` (String) The certificate chain in PEM format.
 - `certificate_request_id` (String) The ID of the certificate request
 - `id` (String) The ID of the certificate
 - `not_after` (String) The not-after (expiration) date of the certificate (RFC3339 format)
 - `not_before` (String) The not-before date of the certificate (RFC3339 format)
-- `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based)
+- `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based).
 - `serial_number` (String) The serial number of the issued certificate
 - `status` (String) The status of the certificate (pending, issued, failed)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the certificate by its ID
+terraform import infisical_cert_manager_certificate.example <certificate_id>
+```

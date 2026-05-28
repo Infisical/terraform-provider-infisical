@@ -3,30 +3,34 @@
 page_title: "infisical_cert_manager_certificate_policy Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage certificate policies in Infisical. Only Machine Identity authentication is supported for this resource.
+  Create and manage certificate policies in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_certificate_policy (Resource)
 
-Create and manage certificate policies in Infisical. Only Machine Identity authentication is supported for this resource.
+Create and manage certificate policies in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
 ```terraform
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  description = "Project for PKI certificate management"
-  type        = "cert-manager"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
+}
+
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
 resource "infisical_cert_manager_certificate_policy" "web_server" {
-  project_slug = infisical_project.pki.slug
-
   name        = "web-server-policy"
   description = "Policy for web server certificates"
 
-  # Subject Attribute Policies
   subject {
     type     = "common_name"
     allowed  = ["*.example.com", "*.internal.example.com"]
@@ -43,7 +47,6 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
     required = ["US"]
   }
 
-  # Subject Alternative Name Policies
   sans {
     type     = "dns_name"
     allowed  = ["*.example.com", "*.internal.example.com"]
@@ -60,7 +63,6 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
     allowed = ["10.0.0.0/8", "192.168.0.0/16"]
   }
 
-  # Certificate Properties
   key_usages {
     allowed = ["digital_signature", "key_encipherment"]
   }
@@ -69,12 +71,10 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
     allowed = ["server_auth", "client_auth"]
   }
 
-  # Validity Constraints
   validity {
-    max = "90d" # Uses simplified format: 90d, 12m, 1y, 24h
+    max = "90d"
   }
 
-  # Algorithm Constraints
   algorithms {
     signature     = ["SHA256-RSA", "SHA256-ECDSA", "SHA384-ECDSA"]
     key_algorithm = ["RSA-2048", "RSA-3072", "ECDSA-P256", "ECDSA-P384"]
@@ -82,12 +82,9 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
 }
 
 resource "infisical_cert_manager_certificate_policy" "code_signing" {
-  project_slug = infisical_project.pki.slug
-
   name        = "code-signing-policy"
   description = "Policy for code signing certificates"
 
-  # Subject Attribute Policies
   subject {
     type     = "common_name"
     allowed  = ["Example Corp Code Signing"]
@@ -104,7 +101,6 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
     required = ["US"]
   }
 
-  # Certificate Properties
   key_usages {
     allowed = ["digital_signature"]
   }
@@ -113,12 +109,10 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
     allowed = ["code_signing"]
   }
 
-  # Validity Constraints
   validity {
     max = "1y"
   }
 
-  # Algorithm Constraints
   algorithms {
     signature     = ["SHA256-RSA", "SHA256-ECDSA"]
     key_algorithm = ["RSA-2048", "RSA-3072", "ECDSA-P256"]
@@ -132,7 +126,6 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
 ### Required
 
 - `name` (String) The name of the certificate policy
-- `project_slug` (String) The slug of the cert-manager project
 
 ### Optional
 
@@ -211,3 +204,12 @@ Optional:
 Optional:
 
 - `max` (String) Maximum validity period (e.g., '90d', '2y', '6m')
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the certificate policy by its ID
+terraform import infisical_cert_manager_certificate_policy.example <policy_id>
+```

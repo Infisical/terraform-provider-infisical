@@ -87,7 +87,6 @@ type certManagerCertificatePolicyValidityModel struct {
 }
 
 type certManagerCertificatePolicyResourceModel struct {
-	ProjectSlug       types.String                                        `tfsdk:"project_slug"`
 	Id                types.String                                        `tfsdk:"id"`
 	Name              types.String                                        `tfsdk:"name"`
 	Description       types.String                                        `tfsdk:"description"`
@@ -105,15 +104,8 @@ func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req r
 
 func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage certificate policies in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage certificate policies in Certificate Manager. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
-			"project_slug": schema.StringAttribute{
-				Description: "The slug of the cert-manager project",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"id": schema.StringAttribute{
 				Description: "The ID of the certificate policy",
 				Computed:    true,
@@ -316,16 +308,7 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("Error finding project by slug", err.Error())
-		return
-	}
-
 	createPolicyRequest := infisical.CreateCertificatePolicyRequest{
-		ProjectId:   project.ID,
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	}
@@ -496,7 +479,6 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 	}
 
 	state.Id = types.StringValue(policy.CertificatePolicy.Id)
-	state.ProjectSlug = currentState.ProjectSlug
 	state.Name = types.StringValue(policy.CertificatePolicy.Name)
 	if policy.CertificatePolicy.Description != "" {
 		state.Description = types.StringValue(policy.CertificatePolicy.Description)
@@ -574,70 +556,58 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 		}
 	}
 
-	if currentState.KeyUsages != nil {
+	if policy.CertificatePolicy.KeyUsages != nil {
 		state.KeyUsages = &certManagerCertificatePolicyKeyUsagesModel{}
 
-		if policy.CertificatePolicy.KeyUsages != nil {
-			if len(policy.CertificatePolicy.KeyUsages.Allowed) > 0 {
-				allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Allowed)
-				resp.Diagnostics.Append(diags...)
-				state.KeyUsages.Allowed = allowedList
-			} else {
-				state.KeyUsages.Allowed = types.ListNull(types.StringType)
-			}
-
-			if len(policy.CertificatePolicy.KeyUsages.Required) > 0 {
-				requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Required)
-				resp.Diagnostics.Append(diags...)
-				state.KeyUsages.Required = requiredList
-			} else {
-				state.KeyUsages.Required = types.ListNull(types.StringType)
-			}
-
-			if len(policy.CertificatePolicy.KeyUsages.Denied) > 0 {
-				deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Denied)
-				resp.Diagnostics.Append(diags...)
-				state.KeyUsages.Denied = deniedList
-			} else {
-				state.KeyUsages.Denied = types.ListNull(types.StringType)
-			}
+		if len(policy.CertificatePolicy.KeyUsages.Allowed) > 0 {
+			allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Allowed)
+			resp.Diagnostics.Append(diags...)
+			state.KeyUsages.Allowed = allowedList
 		} else {
 			state.KeyUsages.Allowed = types.ListNull(types.StringType)
+		}
+
+		if len(policy.CertificatePolicy.KeyUsages.Required) > 0 {
+			requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Required)
+			resp.Diagnostics.Append(diags...)
+			state.KeyUsages.Required = requiredList
+		} else {
 			state.KeyUsages.Required = types.ListNull(types.StringType)
+		}
+
+		if len(policy.CertificatePolicy.KeyUsages.Denied) > 0 {
+			deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Denied)
+			resp.Diagnostics.Append(diags...)
+			state.KeyUsages.Denied = deniedList
+		} else {
 			state.KeyUsages.Denied = types.ListNull(types.StringType)
 		}
 	}
 
-	if currentState.ExtendedKeyUsages != nil {
+	if policy.CertificatePolicy.ExtendedKeyUsages != nil {
 		state.ExtendedKeyUsages = &certManagerCertificatePolicyExtendedKeyUsagesModel{}
 
-		if policy.CertificatePolicy.ExtendedKeyUsages != nil {
-			if len(policy.CertificatePolicy.ExtendedKeyUsages.Allowed) > 0 {
-				allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Allowed)
-				resp.Diagnostics.Append(diags...)
-				state.ExtendedKeyUsages.Allowed = allowedList
-			} else {
-				state.ExtendedKeyUsages.Allowed = types.ListNull(types.StringType)
-			}
-
-			if len(policy.CertificatePolicy.ExtendedKeyUsages.Required) > 0 {
-				requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Required)
-				resp.Diagnostics.Append(diags...)
-				state.ExtendedKeyUsages.Required = requiredList
-			} else {
-				state.ExtendedKeyUsages.Required = types.ListNull(types.StringType)
-			}
-
-			if len(policy.CertificatePolicy.ExtendedKeyUsages.Denied) > 0 {
-				deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Denied)
-				resp.Diagnostics.Append(diags...)
-				state.ExtendedKeyUsages.Denied = deniedList
-			} else {
-				state.ExtendedKeyUsages.Denied = types.ListNull(types.StringType)
-			}
+		if len(policy.CertificatePolicy.ExtendedKeyUsages.Allowed) > 0 {
+			allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Allowed)
+			resp.Diagnostics.Append(diags...)
+			state.ExtendedKeyUsages.Allowed = allowedList
 		} else {
 			state.ExtendedKeyUsages.Allowed = types.ListNull(types.StringType)
+		}
+
+		if len(policy.CertificatePolicy.ExtendedKeyUsages.Required) > 0 {
+			requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Required)
+			resp.Diagnostics.Append(diags...)
+			state.ExtendedKeyUsages.Required = requiredList
+		} else {
 			state.ExtendedKeyUsages.Required = types.ListNull(types.StringType)
+		}
+
+		if len(policy.CertificatePolicy.ExtendedKeyUsages.Denied) > 0 {
+			deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Denied)
+			resp.Diagnostics.Append(diags...)
+			state.ExtendedKeyUsages.Denied = deniedList
+		} else {
 			state.ExtendedKeyUsages.Denied = types.ListNull(types.StringType)
 		}
 	}

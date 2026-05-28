@@ -1,16 +1,18 @@
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  type        = "cert-manager"
-  description = "Project for managing SSL/TLS certificates"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
 }
 
-# First create an app connection for DNS challenge validation (example with Route53)
-# This would be created separately or referenced from another module
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
+}
 
 resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
-  project_slug = infisical_project.pki.slug
-
   name   = "letsencrypt-prod"
   status = "active"
 
@@ -20,8 +22,4 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 
   directory_url = "https://acme-v02.api.letsencrypt.org/directory"
   account_email = "admin@acme.com"
-
-  # External Account Binding (optional, required by some CAs)
-  # eab_kid      = "your-eab-key-id"
-  # eab_hmac_key = "your-eab-hmac-key"
 }

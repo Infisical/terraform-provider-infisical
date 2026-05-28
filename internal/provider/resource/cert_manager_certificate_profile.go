@@ -6,13 +6,12 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -21,8 +20,7 @@ import (
 )
 
 var (
-	SUPPORTED_ENROLLMENT_TYPES = []string{"api", "est", "acme"}
-	SUPPORTED_ISSUER_TYPES     = []string{"ca", "self-signed"}
+	SUPPORTED_ISSUER_TYPES = []string{"ca", "self-signed"}
 )
 
 var (
@@ -37,33 +35,28 @@ type certManagerCertificateProfileResource struct {
 	client *infisical.Client
 }
 
-type certManagerCertificateProfileEstConfigModel struct {
-	DisableBootstrapCaValidation types.Bool   `tfsdk:"disable_bootstrap_ca_validation"`
-	Passphrase                   types.String `tfsdk:"passphrase"`
-	CaChain                      types.String `tfsdk:"ca_chain"`
-}
-
-type certManagerCertificateProfileApiConfigModel struct {
-	AutoRenew       types.Bool  `tfsdk:"auto_renew"`
-	RenewBeforeDays types.Int64 `tfsdk:"renew_before_days"`
-}
-
-type certManagerCertificateProfileExternalConfigsModel struct {
-	Template types.String `tfsdk:"template"`
+type certManagerCertificateProfileDefaultsModel struct {
+	CommonName         types.String `tfsdk:"common_name"`
+	TtlDays            types.Int64  `tfsdk:"ttl_days"`
+	KeyAlgorithm       types.String `tfsdk:"key_algorithm"`
+	SignatureAlgorithm types.String `tfsdk:"signature_algorithm"`
+	KeyUsages          types.List   `tfsdk:"key_usages"`
+	ExtendedKeyUsages  types.List   `tfsdk:"extended_key_usages"`
+	Organization       types.String `tfsdk:"organization"`
+	OrganizationalUnit types.String `tfsdk:"organizational_unit"`
+	Country            types.String `tfsdk:"country"`
+	State              types.String `tfsdk:"state"`
+	Locality           types.String `tfsdk:"locality"`
 }
 
 type certManagerCertificateProfileResourceModel struct {
-	ProjectSlug         types.String                                       `tfsdk:"project_slug"`
-	Id                  types.String                                       `tfsdk:"id"`
-	CaId                types.String                                       `tfsdk:"ca_id"`
-	CertificatePolicyId types.String                                       `tfsdk:"certificate_policy_id"`
-	Name                types.String                                       `tfsdk:"name" json:"slug"`
-	Description         types.String                                       `tfsdk:"description"`
-	EnrollmentType      types.String                                       `tfsdk:"enrollment_type"`
-	IssuerType          types.String                                       `tfsdk:"issuer_type"`
-	EstConfig           *certManagerCertificateProfileEstConfigModel       `tfsdk:"est_config"`
-	ApiConfig           *certManagerCertificateProfileApiConfigModel       `tfsdk:"api_config"`
-	ExternalConfigs     *certManagerCertificateProfileExternalConfigsModel `tfsdk:"external_configs"`
+	Id                  types.String                                `tfsdk:"id"`
+	CaId                types.String                                `tfsdk:"ca_id"`
+	CertificatePolicyId types.String                                `tfsdk:"certificate_policy_id"`
+	Name                types.String                                `tfsdk:"name" json:"slug"`
+	Description         types.String                                `tfsdk:"description"`
+	IssuerType          types.String                                `tfsdk:"issuer_type"`
+	Defaults            *certManagerCertificateProfileDefaultsModel `tfsdk:"defaults"`
 }
 
 func (r *certManagerCertificateProfileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -72,15 +65,8 @@ func (r *certManagerCertificateProfileResource) Metadata(_ context.Context, req 
 
 func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage certificate profiles in Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage certificate profiles in Certificate Manager. Enrollment methods are configured on the application via the `infisical_cert_manager_application_profile` resource. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
-			"project_slug": schema.StringAttribute{
-				Description: "The slug of the cert-manager project",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"id": schema.StringAttribute{
 				Description: "The ID of the certificate profile",
 				Computed:    true,
@@ -105,23 +91,10 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 			"name": schema.StringAttribute{
 				Description: "The unique name of the certificate profile",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"description": schema.StringAttribute{
 				Description: "The description of the certificate profile",
 				Optional:    true,
-			},
-			"enrollment_type": schema.StringAttribute{
-				Description: "The enrollment type for the profile. Supported values: " + strings.Join(SUPPORTED_ENROLLMENT_TYPES, ", "),
-				Required:    true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(SUPPORTED_ENROLLMENT_TYPES...),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"issuer_type": schema.StringAttribute{
 				Description: "The issuer type for the profile. Supported values: " + strings.Join(SUPPORTED_ISSUER_TYPES, ", ") + ". Defaults to 'ca'.",
@@ -131,58 +104,68 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 				Validators: []validator.String{
 					stringvalidator.OneOf(SUPPORTED_ISSUER_TYPES...),
 				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 		},
 		Blocks: map[string]schema.Block{
-			"est_config": schema.SingleNestedBlock{
-				Description: "EST configuration (required when enrollment_type is 'est')",
+			"defaults": schema.SingleNestedBlock{
+				Description: "Default certificate attribute values applied when issuing certificates from this profile",
 				Attributes: map[string]schema.Attribute{
-					"disable_bootstrap_ca_validation": schema.BoolAttribute{
-						Description: "Whether to disable bootstrap CA validation",
+					"common_name": schema.StringAttribute{
+						Description: "Default common name",
 						Optional:    true,
-						Computed:    true,
-						Default:     booldefault.StaticBool(false),
 					},
-					"passphrase": schema.StringAttribute{
-						Description: "The passphrase for EST enrollment",
+					"ttl_days": schema.Int64Attribute{
+						Description: "Default certificate validity in days",
 						Optional:    true,
-						Sensitive:   true,
 					},
-					"ca_chain": schema.StringAttribute{
-						Description: "The CA certificate chain for EST enrollment",
+					"key_algorithm": schema.StringAttribute{
+						Description: "Default key algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", "),
 						Optional:    true,
-						Sensitive:   true,
-					},
-				},
-			},
-			"api_config": schema.SingleNestedBlock{
-				Description: "API configuration (required when enrollment_type is 'api')",
-				Attributes: map[string]schema.Attribute{
-					"auto_renew": schema.BoolAttribute{
-						Description: "Whether to automatically renew certificates",
-						Optional:    true,
-						Computed:    true,
-						Default:     booldefault.StaticBool(false),
-					},
-					"renew_before_days": schema.Int64Attribute{
-						Description: "Number of days before expiration to renew certificates (1-30)",
-						Optional:    true,
-						Computed:    true,
-						Default:     int64default.StaticInt64(7),
-						Validators: []validator.Int64{
-							int64validator.Between(1, 30),
+						Validators: []validator.String{
+							stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS...),
 						},
 					},
-				},
-			},
-			"external_configs": schema.SingleNestedBlock{
-				Description: "External configuration for external CA types (e.g., ADCS template name)",
-				Attributes: map[string]schema.Attribute{
-					"template": schema.StringAttribute{
-						Description: "Certificate template name for Azure AD CS",
+					"signature_algorithm": schema.StringAttribute{
+						Description: "Default signature algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", "),
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS...),
+						},
+					},
+					"key_usages": schema.ListAttribute{
+						Description: "Default key usages. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_USAGES, ", "),
+						Optional:    true,
+						ElementType: types.StringType,
+						Validators: []validator.List{
+							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_USAGES...)),
+						},
+					},
+					"extended_key_usages": schema.ListAttribute{
+						Description: "Default extended key usages. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_EXTENDED_KEY_USAGES, ", "),
+						Optional:    true,
+						ElementType: types.StringType,
+						Validators: []validator.List{
+							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_EXTENDED_KEY_USAGES...)),
+						},
+					},
+					"organization": schema.StringAttribute{
+						Description: "Default organization (O)",
+						Optional:    true,
+					},
+					"organizational_unit": schema.StringAttribute{
+						Description: "Default organizational unit (OU)",
+						Optional:    true,
+					},
+					"country": schema.StringAttribute{
+						Description: "Default country (C)",
+						Optional:    true,
+					},
+					"state": schema.StringAttribute{
+						Description: "Default state/province (ST)",
+						Optional:    true,
+					},
+					"locality": schema.StringAttribute{
+						Description: "Default locality (L)",
 						Optional:    true,
 					},
 				},
@@ -208,6 +191,56 @@ func (r *certManagerCertificateProfileResource) Configure(_ context.Context, req
 	r.client = client
 }
 
+func (r *certManagerCertificateProfileResource) buildDefaults(ctx context.Context, plan *certManagerCertificateProfileResourceModel, diags *diag.Diagnostics) *infisical.CertificateProfileDefaults {
+	if plan.Defaults == nil {
+		return nil
+	}
+
+	result := &infisical.CertificateProfileDefaults{}
+	d := plan.Defaults
+
+	if !d.CommonName.IsNull() && !d.CommonName.IsUnknown() {
+		result.CommonName = d.CommonName.ValueString()
+	}
+	if !d.TtlDays.IsNull() && !d.TtlDays.IsUnknown() {
+		days := int(d.TtlDays.ValueInt64())
+		result.TtlDays = &days
+	}
+	if !d.KeyAlgorithm.IsNull() && !d.KeyAlgorithm.IsUnknown() {
+		result.KeyAlgorithm = d.KeyAlgorithm.ValueString()
+	}
+	if !d.SignatureAlgorithm.IsNull() && !d.SignatureAlgorithm.IsUnknown() {
+		result.SignatureAlgorithm = d.SignatureAlgorithm.ValueString()
+	}
+	if !d.KeyUsages.IsNull() && !d.KeyUsages.IsUnknown() {
+		values := make([]string, 0, len(d.KeyUsages.Elements()))
+		diags.Append(d.KeyUsages.ElementsAs(ctx, &values, false)...)
+		result.KeyUsages = values
+	}
+	if !d.ExtendedKeyUsages.IsNull() && !d.ExtendedKeyUsages.IsUnknown() {
+		values := make([]string, 0, len(d.ExtendedKeyUsages.Elements()))
+		diags.Append(d.ExtendedKeyUsages.ElementsAs(ctx, &values, false)...)
+		result.ExtendedKeyUsages = values
+	}
+	if !d.Organization.IsNull() && !d.Organization.IsUnknown() {
+		result.Organization = d.Organization.ValueString()
+	}
+	if !d.OrganizationalUnit.IsNull() && !d.OrganizationalUnit.IsUnknown() {
+		result.OrganizationalUnit = d.OrganizationalUnit.ValueString()
+	}
+	if !d.Country.IsNull() && !d.Country.IsUnknown() {
+		result.Country = d.Country.ValueString()
+	}
+	if !d.State.IsNull() && !d.State.IsUnknown() {
+		result.State = d.State.ValueString()
+	}
+	if !d.Locality.IsNull() && !d.Locality.IsUnknown() {
+		result.Locality = d.Locality.ValueString()
+	}
+
+	return result
+}
+
 func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -224,33 +257,6 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 		return
 	}
 
-	enrollmentType := plan.EnrollmentType.ValueString()
-
-	switch enrollmentType {
-	case "est":
-		if plan.EstConfig == nil {
-			resp.Diagnostics.AddError("Missing EST configuration", "est_config block is required when enrollment_type is 'est'")
-			return
-		}
-		if plan.EstConfig.Passphrase.IsNull() || plan.EstConfig.Passphrase.ValueString() == "" {
-			resp.Diagnostics.AddError("Missing EST passphrase", "est_config.passphrase is required when enrollment_type is 'est'")
-			return
-		}
-	case "api":
-		if plan.ApiConfig == nil {
-			resp.Diagnostics.AddError("Missing API configuration", "api_config block is required when enrollment_type is 'api'")
-			return
-		}
-	case "acme":
-		if plan.IssuerType.ValueString() == "self-signed" {
-			resp.Diagnostics.AddError("Invalid issuer type for ACME", "ACME enrollment_type cannot be used with self-signed issuer_type")
-			return
-		}
-	default:
-		resp.Diagnostics.AddError("Invalid enrollment type", fmt.Sprintf("enrollment_type must be one of: api, est, acme. Got: %s", enrollmentType))
-		return
-	}
-
 	if plan.IssuerType.ValueString() == "self-signed" && !plan.CaId.IsNull() {
 		resp.Diagnostics.AddError("Invalid CA ID for self-signed", "ca_id should not be specified when issuer_type is 'self-signed'")
 		return
@@ -261,20 +267,13 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 		return
 	}
 
-	project, err := r.client.GetProject(infisical.GetProjectRequest{
-		Slug: plan.ProjectSlug.ValueString(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("Error finding project by slug", err.Error())
-		return
-	}
-
 	createProfileRequest := infisical.CreateCertificateProfileRequest{
-		ProjectId:           project.ID,
 		CertificatePolicyId: plan.CertificatePolicyId.ValueString(),
 		Slug:                plan.Name.ValueString(),
-		EnrollmentType:      plan.EnrollmentType.ValueString(),
-		Description:         plan.Description.ValueString(),
+	}
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		d := plan.Description.ValueString()
+		createProfileRequest.Description = &d
 	}
 
 	if !plan.CaId.IsNull() {
@@ -285,30 +284,11 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 		createProfileRequest.IssuerType = plan.IssuerType.ValueString()
 	}
 
-	if plan.EstConfig != nil {
-		createProfileRequest.EstConfig = &infisical.CertificateProfileEstConfig{
-			DisableBootstrapCaValidation: plan.EstConfig.DisableBootstrapCaValidation.ValueBool(),
-			Passphrase:                   plan.EstConfig.Passphrase.ValueString(),
-		}
-		if !plan.EstConfig.CaChain.IsNull() {
-			createProfileRequest.EstConfig.CaChain = plan.EstConfig.CaChain.ValueString()
-		}
+	defaults := r.buildDefaults(ctx, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
-
-	if plan.ApiConfig != nil {
-		createProfileRequest.ApiConfig = &infisical.CertificateProfileApiConfig{
-			AutoRenew: plan.ApiConfig.AutoRenew.ValueBool(),
-		}
-		if !plan.ApiConfig.RenewBeforeDays.IsNull() {
-			createProfileRequest.ApiConfig.RenewBeforeDays = int(plan.ApiConfig.RenewBeforeDays.ValueInt64())
-		}
-	}
-
-	if plan.ExternalConfigs != nil && !plan.ExternalConfigs.Template.IsNull() {
-		createProfileRequest.ExternalConfigs = &infisical.CertificateProfileExternalConfigs{
-			Template: plan.ExternalConfigs.Template.ValueString(),
-		}
-	}
+	createProfileRequest.Defaults = defaults
 
 	profile, err := r.client.CreateCertificateProfile(createProfileRequest)
 	if err != nil {
@@ -319,6 +299,54 @@ func (r *certManagerCertificateProfileResource) Create(ctx context.Context, req 
 	plan.Id = types.StringValue(profile.CertificateProfile.Id)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
+
+func (r *certManagerCertificateProfileResource) defaultsToState(ctx context.Context, src *infisical.CertificateProfileDefaults, diags *diag.Diagnostics) *certManagerCertificateProfileDefaultsModel {
+	if src == nil {
+		return nil
+	}
+
+	out := &certManagerCertificateProfileDefaultsModel{
+		CommonName:         stringValueOrNull(src.CommonName),
+		KeyAlgorithm:       stringValueOrNull(src.KeyAlgorithm),
+		SignatureAlgorithm: stringValueOrNull(src.SignatureAlgorithm),
+		Organization:       stringValueOrNull(src.Organization),
+		OrganizationalUnit: stringValueOrNull(src.OrganizationalUnit),
+		Country:            stringValueOrNull(src.Country),
+		State:              stringValueOrNull(src.State),
+		Locality:           stringValueOrNull(src.Locality),
+	}
+
+	if src.TtlDays != nil {
+		out.TtlDays = types.Int64Value(int64(*src.TtlDays))
+	} else {
+		out.TtlDays = types.Int64Null()
+	}
+
+	if len(src.KeyUsages) > 0 {
+		l, d := types.ListValueFrom(ctx, types.StringType, src.KeyUsages)
+		diags.Append(d...)
+		out.KeyUsages = l
+	} else {
+		out.KeyUsages = types.ListNull(types.StringType)
+	}
+
+	if len(src.ExtendedKeyUsages) > 0 {
+		l, d := types.ListValueFrom(ctx, types.StringType, src.ExtendedKeyUsages)
+		diags.Append(d...)
+		out.ExtendedKeyUsages = l
+	} else {
+		out.ExtendedKeyUsages = types.ListNull(types.StringType)
+	}
+
+	return out
+}
+
+func stringValueOrNull(s string) types.String {
+	if s == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(s)
 }
 
 func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -340,7 +368,7 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 
 	profile, err := r.client.GetCertificateProfile(infisical.GetCertificateProfileRequest{
 		ProfileId:      currentState.Id.ValueString(),
-		IncludeConfigs: true,
+		IncludeConfigs: false,
 	})
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -353,10 +381,12 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	}
 
 	state.Id = types.StringValue(profile.CertificateProfile.Id)
-	state.ProjectSlug = currentState.ProjectSlug
 	state.Name = types.StringValue(profile.CertificateProfile.Slug)
-	state.Description = types.StringValue(profile.CertificateProfile.Description)
-	state.EnrollmentType = types.StringValue(profile.CertificateProfile.EnrollmentType)
+	if profile.CertificateProfile.Description != nil {
+		state.Description = types.StringValue(*profile.CertificateProfile.Description)
+	} else {
+		state.Description = types.StringNull()
+	}
 	state.IssuerType = types.StringValue(profile.CertificateProfile.IssuerType)
 	state.CertificatePolicyId = types.StringValue(profile.CertificateProfile.CertificatePolicyId)
 
@@ -364,47 +394,7 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 		state.CaId = types.StringValue(profile.CertificateProfile.CaId)
 	}
 
-	if profile.CertificateProfile.EstConfig != nil {
-		state.EstConfig = &certManagerCertificateProfileEstConfigModel{
-			DisableBootstrapCaValidation: types.BoolValue(profile.CertificateProfile.EstConfig.DisableBootstrapCaValidation),
-		}
-
-		if currentState.EstConfig != nil && !currentState.EstConfig.Passphrase.IsNull() {
-			state.EstConfig.Passphrase = currentState.EstConfig.Passphrase
-		} else {
-			state.EstConfig.Passphrase = types.StringNull()
-		}
-
-		if profile.CertificateProfile.EstConfig.CaChain != "" {
-			state.EstConfig.CaChain = types.StringValue(profile.CertificateProfile.EstConfig.CaChain)
-		} else {
-			state.EstConfig.CaChain = types.StringNull()
-		}
-	} else {
-		state.EstConfig = nil
-	}
-
-	if currentState.ApiConfig != nil {
-		if profile.CertificateProfile.ApiConfig != nil {
-			state.ApiConfig = &certManagerCertificateProfileApiConfigModel{
-				AutoRenew:       types.BoolValue(profile.CertificateProfile.ApiConfig.AutoRenew),
-				RenewBeforeDays: types.Int64Value(int64(profile.CertificateProfile.ApiConfig.RenewBeforeDays)),
-			}
-		} else {
-			state.ApiConfig = &certManagerCertificateProfileApiConfigModel{
-				AutoRenew:       types.BoolNull(),
-				RenewBeforeDays: types.Int64Null(),
-			}
-		}
-	}
-
-	if profile.CertificateProfile.ExternalConfigs != nil {
-		state.ExternalConfigs = &certManagerCertificateProfileExternalConfigsModel{
-			Template: types.StringValue(profile.CertificateProfile.ExternalConfigs.Template),
-		}
-	} else {
-		state.ExternalConfigs = nil
-	}
+	state.Defaults = r.defaultsToState(ctx, profile.CertificateProfile.Defaults, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -426,35 +416,20 @@ func (r *certManagerCertificateProfileResource) Update(ctx context.Context, req 
 	}
 
 	updateProfileRequest := infisical.UpdateCertificateProfileRequest{
-		ProfileId:   plan.Id.ValueString(),
-		Slug:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
+		ProfileId:  plan.Id.ValueString(),
+		Slug:       plan.Name.ValueString(),
+		IssuerType: plan.IssuerType.ValueString(),
+	}
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		d := plan.Description.ValueString()
+		updateProfileRequest.Description = &d
 	}
 
-	if plan.EstConfig != nil {
-		updateProfileRequest.EstConfig = &infisical.CertificateProfileEstConfig{
-			DisableBootstrapCaValidation: plan.EstConfig.DisableBootstrapCaValidation.ValueBool(),
-			Passphrase:                   plan.EstConfig.Passphrase.ValueString(),
-		}
-		if !plan.EstConfig.CaChain.IsNull() {
-			updateProfileRequest.EstConfig.CaChain = plan.EstConfig.CaChain.ValueString()
-		}
+	defaults := r.buildDefaults(ctx, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
-
-	if plan.ApiConfig != nil {
-		updateProfileRequest.ApiConfig = &infisical.CertificateProfileApiConfig{
-			AutoRenew: plan.ApiConfig.AutoRenew.ValueBool(),
-		}
-		if !plan.ApiConfig.RenewBeforeDays.IsNull() {
-			updateProfileRequest.ApiConfig.RenewBeforeDays = int(plan.ApiConfig.RenewBeforeDays.ValueInt64())
-		}
-	}
-
-	if plan.ExternalConfigs != nil && !plan.ExternalConfigs.Template.IsNull() {
-		updateProfileRequest.ExternalConfigs = &infisical.CertificateProfileExternalConfigs{
-			Template: plan.ExternalConfigs.Template.ValueString(),
-		}
-	}
+	updateProfileRequest.Defaults = defaults
 
 	_, err := r.client.UpdateCertificateProfile(updateProfileRequest)
 	if err != nil {

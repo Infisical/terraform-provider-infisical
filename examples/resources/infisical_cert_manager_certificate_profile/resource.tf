@@ -1,27 +1,18 @@
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  description = "Project for PKI certificate management"
-  type        = "cert-manager"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
 }
 
-resource "infisical_cert_manager_internal_ca" "root" {
-  project_slug = infisical_project.pki.slug
-
-  type          = "root"
-  name          = "enterprise-root-ca"
-  common_name   = "Enterprise Root Certificate Authority"
-  organization  = "Example Corp"
-  ou            = "IT Security"
-  country       = "US"
-  locality      = "San Francisco"
-  province      = "California"
-  key_algorithm = "RSA_2048"
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
 resource "infisical_cert_manager_internal_ca" "issuing" {
-  project_slug = infisical_project.pki.slug
-
   type          = "intermediate"
   name          = "enterprise-issuing-ca"
   common_name   = "Enterprise Issuing Certificate Authority"
@@ -34,14 +25,12 @@ resource "infisical_cert_manager_internal_ca" "issuing" {
 }
 
 resource "infisical_cert_manager_certificate_policy" "web_server" {
-  project_slug = infisical_project.pki.slug
-
   name        = "web-server-policy"
   description = "Policy for web server certificates"
 
   subject {
     type     = "common_name"
-    allowed  = ["*.example.com", "*.internal.example.com"]
+    allowed  = ["*.example.com"]
     required = ["*.example.com"]
   }
 
@@ -50,20 +39,10 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
     required = ["Example Corp"]
   }
 
-  subject {
-    type     = "country"
-    required = ["US"]
-  }
-
   sans {
     type     = "dns_name"
-    allowed  = ["*.example.com", "*.internal.example.com"]
+    allowed  = ["*.example.com"]
     required = ["*.example.com"]
-  }
-
-  sans {
-    type    = "email"
-    allowed = ["*@example.com"]
   }
 
   key_usages {
@@ -79,117 +58,42 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
   }
 
   algorithms {
-    signature     = ["SHA256-RSA", "SHA256-ECDSA", "SHA384-ECDSA"]
-    key_algorithm = ["RSA-2048", "RSA-3072", "ECDSA-P256", "ECDSA-P384"]
+    signature     = ["SHA256-RSA"]
+    key_algorithm = ["RSA-2048", "RSA-3072"]
   }
 }
 
-# API enrollment profile for web server certificates
-resource "infisical_cert_manager_certificate_profile" "web_server_api" {
-  project_slug          = infisical_project.pki.slug
+resource "infisical_cert_manager_certificate_profile" "web_server" {
   ca_id                 = infisical_cert_manager_internal_ca.issuing.id
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
-  name            = "web-server-api"
-  description     = "API enrollment for web server certificates"
-  enrollment_type = "api"
-  issuer_type     = "ca"
+  name        = "web-server"
+  description = "Profile for issuing web server certificates"
+  issuer_type = "ca"
 
-  api_config {
-    auto_renew        = true
-    renew_before_days = 7
+  defaults {
+    common_name         = "service.example.com"
+    ttl_days            = 90
+    key_algorithm       = "RSA_2048"
+    signature_algorithm = "RSA-SHA256"
+    key_usages          = ["digital_signature"]
+    extended_key_usages = ["server_auth"]
   }
 }
 
-# EST enrollment profile for web server certificates
-resource "infisical_cert_manager_certificate_profile" "web_server_est" {
-  project_slug          = infisical_project.pki.slug
-  ca_id                 = infisical_cert_manager_internal_ca.issuing.id
-  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
-
-  name            = "web-server-est"
-  description     = "EST enrollment for web server certificates"
-  enrollment_type = "est"
-  issuer_type     = "ca"
-
-  est_config {
-    passphrase                      = var.est_passphrase
-    disable_bootstrap_ca_validation = false
-    ca_chain                        = var.encrypted_ca_chain
-  }
-}
-
-# Self-signed profile for development
 resource "infisical_cert_manager_certificate_profile" "self_signed_dev" {
-  project_slug          = infisical_project.pki.slug
   certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
 
-  name            = "self-signed-dev"
-  description     = "Self-signed certificates for development"
-  enrollment_type = "api"
-  issuer_type     = "self-signed"
+  name        = "self-signed-dev"
+  description = "Self-signed certificates for development"
+  issuer_type = "self-signed"
 
-  api_config {
-    auto_renew        = false
-    renew_before_days = 7
+  defaults {
+    common_name         = "dev.example.com"
+    ttl_days            = 90
+    key_algorithm       = "RSA_2048"
+    signature_algorithm = "RSA-SHA256"
+    key_usages          = ["digital_signature"]
+    extended_key_usages = ["server_auth"]
   }
-}
-
-# ACME profile
-resource "infisical_cert_manager_certificate_profile" "acme_profile" {
-  project_slug          = infisical_project.pki.slug
-  ca_id                 = var.acme_ca_id
-  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
-
-  name            = "acme-letsencrypt"
-  description     = "Let's Encrypt ACME certificates"
-  enrollment_type = "acme"
-  issuer_type     = "ca"
-}
-
-# ADCS profile (requires external ADCS CA to be configured)
-resource "infisical_cert_manager_certificate_profile" "adcs_profile" {
-  project_slug          = infisical_project.pki.slug
-  ca_id                 = var.adcs_ca_id # Reference to existing ADCS CA
-  certificate_policy_id = infisical_cert_manager_certificate_policy.web_server.id
-
-  name            = "adcs-corporate"
-  description     = "Corporate ADCS certificates"
-  enrollment_type = "api"
-  issuer_type     = "ca"
-
-  api_config {
-    auto_renew        = true
-    renew_before_days = 14
-  }
-
-  external_configs {
-    template = "WebServerTemplate" # ADCS template name
-  }
-}
-
-# Variables for sensitive values
-variable "est_passphrase" {
-  description = "Passphrase for EST enrollment"
-  type        = string
-  sensitive   = true
-}
-
-variable "encrypted_ca_chain" {
-  description = "Encrypted CA certificate chain for EST enrollment"
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "acme_ca_id" {
-  description = "ID of the ACME CA resource"
-  type        = string
-  default     = null
-}
-
-variable "adcs_ca_id" {
-  description = "ID of the ADCS CA resource"
-  type        = string
-  default     = null
 }

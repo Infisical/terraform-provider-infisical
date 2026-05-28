@@ -1,13 +1,18 @@
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  type        = "cert-manager"
-  description = "Project for managing SSL/TLS certificates"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
+}
+
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
 resource "infisical_cert_manager_external_ca_adcs" "adcs" {
-  project_slug = infisical_project.pki.slug
-
   name   = "corporate-adcs"
   status = "active"
 

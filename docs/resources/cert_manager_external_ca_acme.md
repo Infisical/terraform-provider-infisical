@@ -3,29 +3,31 @@
 page_title: "infisical_cert_manager_external_ca_acme Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage external ACME certificate authorities in Infisical. Only Machine Identity authentication is supported for this resource.
+  Create and manage external ACME certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_cert_manager_external_ca_acme (Resource)
 
-Create and manage external ACME certificate authorities in Infisical. Only Machine Identity authentication is supported for this resource.
+Create and manage external ACME certificate authorities in Certificate Manager. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
 ```terraform
-resource "infisical_project" "pki" {
-  name        = "PKI Project"
-  slug        = "pki-project"
-  type        = "cert-manager"
-  description = "Project for managing SSL/TLS certificates"
+terraform {
+  required_providers {
+    infisical = {
+      source = "infisical/infisical"
+    }
+  }
 }
 
-# First create an app connection for DNS challenge validation (example with Route53)
-# This would be created separately or referenced from another module
+provider "infisical" {
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
+}
 
 resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
-  project_slug = infisical_project.pki.slug
-
   name   = "letsencrypt-prod"
   status = "active"
 
@@ -35,10 +37,6 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 
   directory_url = "https://acme-v02.api.letsencrypt.org/directory"
   account_email = "admin@acme.com"
-
-  # External Account Binding (optional, required by some CAs)
-  # eab_kid      = "your-eab-key-id"
-  # eab_hmac_key = "your-eab-hmac-key"
 }
 ```
 
@@ -52,7 +50,6 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 - `dns_app_connection_id` (String) The ID of the DNS app connection for ACME challenge validation
 - `dns_provider` (String) The DNS provider for ACME challenge validation. Supported values: route53, cloudflare, dns-made-easy
 - `name` (String) The name of the ACME CA
-- `project_slug` (String) The slug of the cert-manager project
 
 ### Optional
 
@@ -64,3 +61,12 @@ resource "infisical_cert_manager_external_ca_acme" "letsencrypt" {
 ### Read-Only
 
 - `id` (String) The ID of the ACME CA
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the external ACME CA by its ID
+terraform import infisical_cert_manager_external_ca_acme.example <ca_id>
+```
