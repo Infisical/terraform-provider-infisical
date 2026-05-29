@@ -70,7 +70,7 @@ resource "infisical_app_connection_gitlab" "gitlab_connection" {
 Required:
 
 - `access_token` (String, Sensitive) The Access Token used to access GitLab.
-- `access_token_type` (String) The type of token used to connect with GitLab. Supported options: 'project' and 'personal'
+- `access_token_type` (String) The type of token used to connect with GitLab. Supported options: 'project', 'personal', and 'group'
 
 Optional:
 

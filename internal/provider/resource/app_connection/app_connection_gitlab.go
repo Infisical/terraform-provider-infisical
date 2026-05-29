@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"slices"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -20,6 +21,8 @@ type AppConnectionGitlabCredentialsModel struct {
 }
 
 const AppConnectionGitlabAuthMethodAccessToken = "access-token"
+
+var validGitlabAccessTokenTypes = []string{"project", "personal", "group"}
 
 func NewAppConnectionGitlabResource() resource.Resource {
 	return &AppConnectionBaseResource{
@@ -39,7 +42,7 @@ func NewAppConnectionGitlabResource() resource.Resource {
 			},
 			"access_token_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of token used to connect with GitLab. Supported options: 'project' and 'personal'",
+				Description: "The type of token used to connect with GitLab. Supported options: 'project', 'personal', and 'group'",
 			},
 		},
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
@@ -61,10 +64,10 @@ func NewAppConnectionGitlabResource() resource.Resource {
 
 			accessTokenType := credentials.AccessTokenType.ValueString()
 
-			if accessTokenType != "project" && accessTokenType != "personal" {
+			if !slices.Contains(validGitlabAccessTokenTypes, accessTokenType) {
 				diags.AddError(
-					"Unable to update GitLab app connection",
-					fmt.Sprintf("Invalid access_token_type. Only 'project' and 'personal' is supported - got %s", accessTokenType),
+					"Unable to create GitLab app connection",
+					fmt.Sprintf("Invalid access_token_type. Only 'project', 'personal', and 'group' is supported - got %s", accessTokenType),
 				)
 				return nil, diags
 			}
@@ -106,10 +109,10 @@ func NewAppConnectionGitlabResource() resource.Resource {
 				accessTokenType = credentialsFromState.AccessTokenType
 			}
 
-			if accessTokenType.IsNull() || (accessTokenType.ValueString() != "project" && accessTokenType.ValueString() != "personal") {
+			if accessTokenType.IsNull() || !slices.Contains(validGitlabAccessTokenTypes, accessTokenType.ValueString()) {
 				diags.AddError(
 					"Unable to update GitLab app connection",
-					fmt.Sprintf("Invalid access_token_type. Only 'project' and 'personal' is supported - got %s", accessTokenType),
+					fmt.Sprintf("Invalid access_token_type. Only 'project', 'personal', and 'group' is supported - got %s", accessTokenType),
 				)
 				return nil, diags
 			}
