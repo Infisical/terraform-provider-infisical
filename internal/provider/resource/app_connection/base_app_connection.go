@@ -123,50 +123,45 @@ func (r *AppConnectionBaseResource) Metadata(_ context.Context, req resource.Met
 }
 
 func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	attributes := map[string]schema.Attribute{
-		"id": schema.StringAttribute{
-			Description:   "The ID of the app connection",
-			Computed:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-		},
-		"method": schema.StringAttribute{
-			Required:    true,
-			Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
-		},
-		"name": schema.StringAttribute{
-			Required:    true,
-			Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
-		},
-		"description": schema.StringAttribute{
-			Optional:    true,
-			Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
-		},
-		"project_id": schema.StringAttribute{
-			Optional:      true,
-			Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-		},
-		"credentials": schema.SingleNestedAttribute{
-			Required:    true,
-			Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
-			Attributes:  r.CredentialsAttributes,
-		},
-		"credentials_hash": schema.StringAttribute{
-			Computed:    true,
-			Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
-		},
-	}
-
-	if r.SupportsGateway {
-		attributes["gateway_id"] = schema.StringAttribute{
-			Optional:    true,
-			Description: "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.",
-		}
-	}
-
 	resp.Schema = schema.Schema{
 		Description: fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName),
-		Attributes:  attributes,
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description:   "The ID of the app connection",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"method": schema.StringAttribute{
+				Required:    true,
+				Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
+			},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
+			},
+			"description": schema.StringAttribute{
+				Optional:    true,
+				Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
+			},
+			"project_id": schema.StringAttribute{
+				Optional:      true,
+				Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"credentials": schema.SingleNestedAttribute{
+				Required:    true,
+				Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
+				Attributes:  r.CredentialsAttributes,
+			},
+			"credentials_hash": schema.StringAttribute{
+				Computed:    true,
+				Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
+			},
+			"gateway_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.",
+			},
+		},
 	}
 }
 

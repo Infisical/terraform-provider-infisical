@@ -57,6 +57,7 @@ resource "infisical_app_connection_github" "github_connection" {
 ### Optional
 
 - `description` (String) An optional description for the GitHub App Connection.
+- `gateway_id` (String) The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.
 - `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
