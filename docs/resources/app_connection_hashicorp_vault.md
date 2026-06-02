@@ -36,11 +36,12 @@ resource "infisical_app_connection_hashicorp_vault" "app-connection-vault-access
   name   = "vault-access-token-app-connection"
   method = "access-token"
   credentials = {
-    instance_url = "https://vault.example.com"
+    instance_url = "<vault-instance-url>"
     access_token = "<vault-access-token>"
     # namespace  = "<namespace>" # Optional, only for HCP Vault Dedicated/Enterprise
   }
-  # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
+
+  gateway_id  = "<gateway-id>" # Optional, only required if you want to use a specific gateway
   description = "I am a test app connection"
 }
 
@@ -54,6 +55,7 @@ resource "infisical_app_connection_hashicorp_vault" "app-connection-vault-app-ro
     # namespace  = "<namespace>" # Optional, only for HCP Vault Dedicated/Enterprise
   }
   # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
+  gateway_id  = "<gateway-id>" # Optional, only required if you want to use a specific gateway
   description = "I am a test app connection"
 }
 ```
@@ -70,6 +72,7 @@ resource "infisical_app_connection_hashicorp_vault" "app-connection-vault-app-ro
 ### Optional
 
 - `description` (String) An optional description for the HashiCorp Vault App Connection.
+- `gateway_id` (String) The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.
 - `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only

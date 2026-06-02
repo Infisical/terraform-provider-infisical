@@ -22,6 +22,7 @@ type AppConnectionBaseResource struct {
 	App                              infisical.AppConnectionApp // used for identifying secret sync route
 	ResourceTypeName                 string                     // terraform resource name suffix
 	AppConnectionName                string                     // complete descriptive name of the app connection
+	SupportsGateway                  bool                       // when true, exposes gateway_id on the resource
 	client                           *infisical.Client
 	AllowedMethods                   []string
 	CredentialsAttributes            map[string]schema.Attribute
@@ -96,6 +97,24 @@ type AppConnectionBaseResourceModel struct {
 	ProjectId       types.String `tfsdk:"project_id"`
 	Credentials     types.Object `tfsdk:"credentials"`
 	CredentialsHash types.String `tfsdk:"credentials_hash"`
+	GatewayId       types.String `tfsdk:"gateway_id"`
+}
+
+// gatewayIdForRequest returns the gateway_id value to send to the API.
+// It returns a non-nil pointer only when the resource supports gateways and a
+// value is set. When the gateway has been removed from the configuration it
+// returns nil, which serializes to an explicit `null` so the API resets the
+// connection back to the Internet Gateway (omitting the field would leave the
+// existing gateway untouched).
+func (r *AppConnectionBaseResource) gatewayIdForRequest(gatewayId types.String) *string {
+	if !r.SupportsGateway {
+		return nil
+	}
+	if gatewayId.IsNull() || gatewayId.IsUnknown() || gatewayId.ValueString() == "" {
+		return nil
+	}
+	value := gatewayId.ValueString()
+	return &value
 }
 
 // Metadata returns the resource type name.
@@ -104,41 +123,50 @@ func (r *AppConnectionBaseResource) Metadata(_ context.Context, req resource.Met
 }
 
 func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	attributes := map[string]schema.Attribute{
+		"id": schema.StringAttribute{
+			Description:   "The ID of the app connection",
+			Computed:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+		},
+		"method": schema.StringAttribute{
+			Required:    true,
+			Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
+		},
+		"name": schema.StringAttribute{
+			Required:    true,
+			Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
+		},
+		"description": schema.StringAttribute{
+			Optional:    true,
+			Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
+		},
+		"project_id": schema.StringAttribute{
+			Optional:      true,
+			Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
+			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+		},
+		"credentials": schema.SingleNestedAttribute{
+			Required:    true,
+			Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
+			Attributes:  r.CredentialsAttributes,
+		},
+		"credentials_hash": schema.StringAttribute{
+			Computed:    true,
+			Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
+		},
+	}
+
+	if r.SupportsGateway {
+		attributes["gateway_id"] = schema.StringAttribute{
+			Optional:    true,
+			Description: "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.",
+		}
+	}
+
 	resp.Schema = schema.Schema{
 		Description: fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName),
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description:   "The ID of the app connection",
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"method": schema.StringAttribute{
-				Required:    true,
-				Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
-			},
-			"name": schema.StringAttribute{
-				Required:    true,
-				Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
-			},
-			"description": schema.StringAttribute{
-				Optional:    true,
-				Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
-			},
-			"project_id": schema.StringAttribute{
-				Optional:      true,
-				Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"credentials": schema.SingleNestedAttribute{
-				Required:    true,
-				Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
-				Attributes:  r.CredentialsAttributes,
-			},
-			"credentials_hash": schema.StringAttribute{
-				Computed:    true,
-				Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
-			},
-		},
+		Attributes:  attributes,
 	}
 }
 
@@ -212,6 +240,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 			Method:      plan.Method.ValueString(),
 			Credentials: credentialsMap,
 			ProjectId:   plan.ProjectId.ValueString(),
+			GatewayId:   r.gatewayIdForRequest(plan.GatewayId),
 		})
 		return apiErr
 	})
@@ -298,6 +327,14 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		state.ProjectId = types.StringNull()
 	}
 
+	if r.SupportsGateway {
+		if appConnection.GatewayId != nil {
+			state.GatewayId = types.StringValue(*appConnection.GatewayId)
+		} else {
+			state.GatewayId = types.StringNull()
+		}
+	}
+
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
@@ -362,6 +399,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 			Method:      plan.Method.ValueString(),
 			Credentials: credentialsMap,
 			ProjectId:   plan.ProjectId.ValueString(),
+			GatewayId:   r.gatewayIdForRequest(plan.GatewayId),
 		})
 		return apiErr
 	})
