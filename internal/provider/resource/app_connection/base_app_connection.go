@@ -9,11 +9,13 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -212,6 +214,9 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 		attributes["gateway_id"] = schema.StringAttribute{
 			Optional:    true,
 			Description: "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.",
+			Validators: []validator.String{
+				stringvalidator.LengthAtLeast(1),
+			},
 		}
 	}
 
@@ -283,15 +288,23 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 	var appConnection infisical.AppConnection
 	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
 		var apiErr error
-		appConnection, apiErr = r.client.CreateAppConnection(infisical.CreateAppConnectionRequest{
+		baseRequest := infisical.CreateAppConnectionRequest{
 			App:         r.App,
 			Name:        plan.Name.ValueString(),
 			Description: plan.Description.ValueString(),
 			Method:      plan.Method.ValueString(),
 			Credentials: credentialsMap,
 			ProjectId:   plan.ProjectId.ValueString(),
-			GatewayId:   r.gatewayIdForRequest(gatewayId),
-		})
+		}
+
+		if r.SupportsGateway {
+			appConnection, apiErr = r.client.CreateAppConnectionWithGateway(infisical.CreateAppConnectionWithGateway{
+				CreateAppConnectionRequest: baseRequest,
+				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+			})
+		} else {
+			appConnection, apiErr = r.client.CreateAppConnection(baseRequest)
+		}
 		return apiErr
 	})
 
@@ -305,6 +318,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 
 	plan.ID = types.StringValue(appConnection.Id)
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
+	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
 
 	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
 	resp.Diagnostics.Append(diags...)
@@ -433,7 +447,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	var appConnection infisical.AppConnection
 	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
 		var apiErr error
-		appConnection, apiErr = r.client.UpdateAppConnection(infisical.UpdateAppConnectionRequest{
+		baseRequest := infisical.UpdateAppConnectionRequest{
 			ID:          state.ID.ValueString(),
 			App:         r.App,
 			Name:        plan.Name.ValueString(),
@@ -441,8 +455,16 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 			Method:      plan.Method.ValueString(),
 			Credentials: credentialsMap,
 			ProjectId:   plan.ProjectId.ValueString(),
-			GatewayId:   r.gatewayIdForRequest(gatewayId),
-		})
+		}
+
+		if r.SupportsGateway {
+			appConnection, apiErr = r.client.UpdateAppConnectionWithGateway(infisical.UpdateAppConnectionWithGateway{
+				UpdateAppConnectionRequest: baseRequest,
+				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+			})
+		} else {
+			appConnection, apiErr = r.client.UpdateAppConnection(baseRequest)
+		}
 		return apiErr
 	})
 
@@ -455,6 +477,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
+	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
 
 	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
 	resp.Diagnostics.Append(diags...)

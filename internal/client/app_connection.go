@@ -40,14 +40,17 @@ const (
 )
 
 const (
-	operationCreateAppConnection  = "CallCreateAppConnection"
-	operationGetAppConnectionById = "CallGetAppConnectionById"
-	operationUpdateAppConnection  = "CallUpdateAppConnection"
-	operationDeleteAppConnection  = "CallDeleteAppConnection"
+	operationCreateAppConnection            = "CallCreateAppConnection"
+	operationGetAppConnectionById           = "CallGetAppConnectionById"
+	operationUpdateAppConnection            = "CallUpdateAppConnection"
+	operationDeleteAppConnection            = "CallDeleteAppConnection"
+	operationCreateAppConnectionWithGateway = "CallCreateAppConnectionWithGateway"
+	operationUpdateAppConnectionWithGateway = "CallUpdateAppConnectionWithGateway"
 )
 
 func (client Client) CreateAppConnection(request CreateAppConnectionRequest) (AppConnection, error) {
 	var body CreateAppConnectionResponse
+
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
@@ -61,6 +64,27 @@ func (client Client) CreateAppConnection(request CreateAppConnectionRequest) (Ap
 
 	if response.IsError() {
 		return AppConnection{}, errors.NewAPIErrorWithResponse(operationCreateAppConnection, response, nil)
+	}
+
+	return body.AppConnection, nil
+}
+
+func (client Client) CreateAppConnectionWithGateway(request CreateAppConnectionWithGateway) (AppConnection, error) {
+	var body CreateAppConnectionResponse
+
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post("api/v1/app-connections/" + string(request.App))
+
+	if err != nil {
+		return AppConnection{}, errors.NewGenericRequestError(operationCreateAppConnectionWithGateway, err)
+	}
+
+	if response.IsError() {
+		return AppConnection{}, errors.NewAPIErrorWithResponse(operationCreateAppConnectionWithGateway, response, nil)
 	}
 
 	return body.AppConnection, nil
@@ -103,6 +127,27 @@ func (client Client) UpdateAppConnection(request UpdateAppConnectionRequest) (Ap
 
 	if response.IsError() {
 		return AppConnection{}, errors.NewAPIErrorWithResponse(operationUpdateAppConnection, response, nil)
+	}
+
+	return body.AppConnection, nil
+}
+
+func (client Client) UpdateAppConnectionWithGateway(request UpdateAppConnectionWithGateway) (AppConnection, error) {
+	var body UpdateAppConnectionResponse
+
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("api/v1/app-connections/%s/%s", request.App, request.ID))
+
+	if err != nil {
+		return AppConnection{}, errors.NewGenericRequestError(operationUpdateAppConnectionWithGateway, err)
+	}
+
+	if response.IsError() {
+		return AppConnection{}, errors.NewAPIErrorWithResponse(operationUpdateAppConnectionWithGateway, response, nil)
 	}
 
 	return body.AppConnection, nil
