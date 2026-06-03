@@ -26,6 +26,7 @@ resource "infisical_app_connection_hashicorp_vault" "app-connection-vault-access
     # namespace  = "<namespace>" # Optional, only for HCP Vault Dedicated/Enterprise
   }
   # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
+  # gateway_id   = "<gateway-id>" # Optional, route through a specific Infisical Gateway instead of the Internet Gateway
   description = "I am a test app connection"
 }
 
@@ -39,5 +40,6 @@ resource "infisical_app_connection_hashicorp_vault" "app-connection-vault-app-ro
     # namespace  = "<namespace>" # Optional, only for HCP Vault Dedicated/Enterprise
   }
   # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
+  # gateway_id   = "<gateway-id>" # Optional, route through a specific Infisical Gateway instead of the Internet Gateway
   description = "I am a test app connection"
 }
