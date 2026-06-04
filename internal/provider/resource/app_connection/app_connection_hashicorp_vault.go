@@ -28,6 +28,7 @@ func NewAppConnectionHashicorpVaultResource() resource.Resource {
 		App:               infisical.AppConnectionAppHashicorpVault,
 		AppConnectionName: "HashiCorp Vault",
 		ResourceTypeName:  "_app_connection_hashicorp_vault",
+		SupportsGateway:   true,
 		AllowedMethods:    []string{HashicorpVaultAppConnectionAccessTokenMethod, HashicorpVaultAppConnectionAppRoleMethod},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"instance_url": schema.StringAttribute{

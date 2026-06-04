@@ -9,11 +9,13 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -22,6 +24,7 @@ type AppConnectionBaseResource struct {
 	App                              infisical.AppConnectionApp // used for identifying secret sync route
 	ResourceTypeName                 string                     // terraform resource name suffix
 	AppConnectionName                string                     // complete descriptive name of the app connection
+	SupportsGateway                  bool                       // when true, exposes gateway_id and sends it to the API
 	client                           *infisical.Client
 	AllowedMethods                   []string
 	CredentialsAttributes            map[string]schema.Attribute
@@ -98,47 +101,128 @@ type AppConnectionBaseResourceModel struct {
 	CredentialsHash types.String `tfsdk:"credentials_hash"`
 }
 
+// appConnectionGatewayResourceModel is used for plan/state I/O on connections that support
+// gateways. The embedded base model's tfsdk fields are promoted, so this matches the schema
+// that includes gateway_id. Connections without gateway support keep using the base model
+// directly, leaving their schema untouched.
+type appConnectionGatewayResourceModel struct {
+	AppConnectionBaseResourceModel
+	GatewayId types.String `tfsdk:"gateway_id"`
+}
+
+// planStateGetter is satisfied by both tfsdk.Plan and tfsdk.State (value receivers), letting
+// readModel handle plan and state reads uniformly.
+type planStateGetter interface {
+	Get(ctx context.Context, target interface{}) diag.Diagnostics
+}
+
+// readModel reads plan/state into the base model. For gateway-enabled connections it also
+// returns the configured gateway_id; otherwise that value is null.
+func (r *AppConnectionBaseResource) readModel(ctx context.Context, src planStateGetter) (AppConnectionBaseResourceModel, types.String, diag.Diagnostics) {
+	if r.SupportsGateway {
+		var m appConnectionGatewayResourceModel
+		diags := src.Get(ctx, &m)
+		return m.AppConnectionBaseResourceModel, m.GatewayId, diags
+	}
+
+	var m AppConnectionBaseResourceModel
+	diags := src.Get(ctx, &m)
+	return m, types.StringNull(), diags
+}
+
+// stateValue returns the value to write to state, gateway-aware when the connection supports
+// gateways so the struct matches the schema (which then includes gateway_id).
+func (r *AppConnectionBaseResource) stateValue(model AppConnectionBaseResourceModel, gatewayId types.String) interface{} {
+	if r.SupportsGateway {
+		return appConnectionGatewayResourceModel{
+			AppConnectionBaseResourceModel: model,
+			GatewayId:                      gatewayId,
+		}
+	}
+	return model
+}
+
+// reconcileGatewayId returns the gateway_id to persist from the API response. For connections
+// that don't support gateways it leaves the current value untouched.
+func (r *AppConnectionBaseResource) reconcileGatewayId(current types.String, appConnection infisical.AppConnection) types.String {
+	if !r.SupportsGateway {
+		return current
+	}
+	if appConnection.GatewayId != nil {
+		return types.StringValue(*appConnection.GatewayId)
+	}
+	return types.StringNull()
+}
+
+// gatewayIdForRequest returns the gateway_id value to send to the API. It returns a non-nil
+// pointer only when the resource supports gateways and a value is set. When the gateway has
+// been removed from the configuration it returns nil, which serializes to an explicit `null`
+// so the API resets the connection back to the Internet Gateway (omitting the field would
+// leave the existing gateway untouched).
+func (r *AppConnectionBaseResource) gatewayIdForRequest(gatewayId types.String) *string {
+	if !r.SupportsGateway {
+		return nil
+	}
+	if gatewayId.IsNull() || gatewayId.IsUnknown() || gatewayId.ValueString() == "" {
+		return nil
+	}
+	value := gatewayId.ValueString()
+	return &value
+}
+
 // Metadata returns the resource type name.
 func (r *AppConnectionBaseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + r.ResourceTypeName
 }
 
 func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	attributes := map[string]schema.Attribute{
+		"id": schema.StringAttribute{
+			Description:   "The ID of the app connection",
+			Computed:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+		},
+		"method": schema.StringAttribute{
+			Required:    true,
+			Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
+		},
+		"name": schema.StringAttribute{
+			Required:    true,
+			Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
+		},
+		"description": schema.StringAttribute{
+			Optional:    true,
+			Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
+		},
+		"project_id": schema.StringAttribute{
+			Optional:      true,
+			Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
+			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+		},
+		"credentials": schema.SingleNestedAttribute{
+			Required:    true,
+			Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
+			Attributes:  r.CredentialsAttributes,
+		},
+		"credentials_hash": schema.StringAttribute{
+			Computed:    true,
+			Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
+		},
+	}
+
+	if r.SupportsGateway {
+		attributes["gateway_id"] = schema.StringAttribute{
+			Optional:    true,
+			Description: "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.",
+			Validators: []validator.String{
+				stringvalidator.LengthAtLeast(1),
+			},
+		}
+	}
+
 	resp.Schema = schema.Schema{
 		Description: fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName),
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description:   "The ID of the app connection",
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"method": schema.StringAttribute{
-				Required:    true,
-				Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
-			},
-			"name": schema.StringAttribute{
-				Required:    true,
-				Description: fmt.Sprintf("The name of the %s App Connection to create. Must be slug-friendly", r.AppConnectionName),
-			},
-			"description": schema.StringAttribute{
-				Optional:    true,
-				Description: fmt.Sprintf("An optional description for the %s App Connection.", r.AppConnectionName),
-			},
-			"project_id": schema.StringAttribute{
-				Optional:      true,
-				Description:   "The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"credentials": schema.SingleNestedAttribute{
-				Required:    true,
-				Description: fmt.Sprintf("The credentials for the %s App Connection", r.AppConnectionName),
-				Attributes:  r.CredentialsAttributes,
-			},
-			"credentials_hash": schema.StringAttribute{
-				Computed:    true,
-				Description: fmt.Sprintf("The hash of the %s App Connection credentials", r.AppConnectionName),
-			},
-		},
+		Attributes:  attributes,
 	}
 }
 
@@ -173,8 +257,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Retrieve values from plan
-	var plan AppConnectionBaseResourceModel
-	diags := req.Plan.Get(ctx, &plan)
+	plan, gatewayId, diags := r.readModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -205,14 +288,23 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 	var appConnection infisical.AppConnection
 	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
 		var apiErr error
-		appConnection, apiErr = r.client.CreateAppConnection(infisical.CreateAppConnectionRequest{
+		baseRequest := infisical.CreateAppConnectionRequest{
 			App:         r.App,
 			Name:        plan.Name.ValueString(),
 			Description: plan.Description.ValueString(),
 			Method:      plan.Method.ValueString(),
 			Credentials: credentialsMap,
 			ProjectId:   plan.ProjectId.ValueString(),
-		})
+		}
+
+		if r.SupportsGateway {
+			appConnection, apiErr = r.client.CreateAppConnectionWithGateway(infisical.CreateAppConnectionWithGateway{
+				CreateAppConnectionRequest: baseRequest,
+				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+			})
+		} else {
+			appConnection, apiErr = r.client.CreateAppConnection(baseRequest)
+		}
 		return apiErr
 	})
 
@@ -226,8 +318,9 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 
 	plan.ID = types.StringValue(appConnection.Id)
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
+	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
 
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -245,8 +338,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	// Get current state
-	var state AppConnectionBaseResourceModel
-	diags := req.State.Get(ctx, &state)
+	state, gatewayId, diags := r.readModel(ctx, req.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -270,6 +362,9 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		}
 	}
 
+	// Reconcile gateway_id from the API so out-of-band changes are detected as drift.
+	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+
 	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
 		resp.Diagnostics.AddWarning(
 			"App connection credentials conflict",
@@ -283,7 +378,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 			return
 		}
 
-		diags = resp.State.Set(ctx, state)
+		diags = resp.State.Set(ctx, r.stateValue(state, gatewayId))
 		resp.Diagnostics.Append(diags...)
 		return
 	}
@@ -301,7 +396,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
-	diags = resp.State.Set(ctx, state)
+	diags = resp.State.Set(ctx, r.stateValue(state, gatewayId))
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -315,15 +410,13 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	// Retrieve values from plan
-	var plan AppConnectionBaseResourceModel
-	diags := req.Plan.Get(ctx, &plan)
+	plan, gatewayId, diags := r.readModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state AppConnectionBaseResourceModel
-	diags = req.State.Get(ctx, &state)
+	state, _, diags := r.readModel(ctx, req.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -354,7 +447,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	var appConnection infisical.AppConnection
 	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
 		var apiErr error
-		appConnection, apiErr = r.client.UpdateAppConnection(infisical.UpdateAppConnectionRequest{
+		baseRequest := infisical.UpdateAppConnectionRequest{
 			ID:          state.ID.ValueString(),
 			App:         r.App,
 			Name:        plan.Name.ValueString(),
@@ -362,7 +455,16 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 			Method:      plan.Method.ValueString(),
 			Credentials: credentialsMap,
 			ProjectId:   plan.ProjectId.ValueString(),
-		})
+		}
+
+		if r.SupportsGateway {
+			appConnection, apiErr = r.client.UpdateAppConnectionWithGateway(infisical.UpdateAppConnectionWithGateway{
+				UpdateAppConnectionRequest: baseRequest,
+				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+			})
+		} else {
+			appConnection, apiErr = r.client.UpdateAppConnection(baseRequest)
+		}
 		return apiErr
 	})
 
@@ -375,8 +477,9 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
+	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
 
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -392,8 +495,7 @@ func (r *AppConnectionBaseResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	var state AppConnectionBaseResourceModel
-	diags := req.State.Get(ctx, &state)
+	state, _, diags := r.readModel(ctx, req.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
