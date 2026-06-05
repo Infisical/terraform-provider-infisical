@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
-	modifiers "terraform-provider-infisical/internal/pkg/modifiers"
 	pkg "terraform-provider-infisical/internal/pkg/strings"
-	"time"
 
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -55,7 +53,7 @@ type secretResourceModel struct {
 	ValueWOVersion types.Int64     `tfsdk:"value_wo_version"`
 	WorkspaceId    types.String    `tfsdk:"workspace_id"`
 	LastUpdated    types.String    `tfsdk:"last_updated"`
-	Tags           types.List      `tfsdk:"tag_ids"`
+	Tags           types.Set       `tfsdk:"tag_ids"`
 	Metadata       types.Map       `tfsdk:"metadata"`
 	ID             types.String    `tfsdk:"id"`
 }
@@ -186,13 +184,13 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 
 			"last_updated": schema.StringAttribute{
-				Computed: true,
+				Description: "The last time the secret was updated.",
+				Computed:    true,
 			},
-			"tag_ids": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Optional:      true,
-				Description:   "Tag ids to be attached for the secrets.",
-				PlanModifiers: []planmodifier.List{modifiers.UnorderedList()},
+			"tag_ids": schema.SetAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Description: "Tag ids to be attached for the secrets.",
 			},
 			"metadata": schema.MapAttribute{
 				ElementType: types.StringType,
@@ -352,6 +350,9 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	plan.ID = types.StringValue(secret.ID)
+	if secret.UpdatedAt != "" {
+		plan.LastUpdated = types.StringValue(secret.UpdatedAt)
+	}
 
 	if len(secret.SecretMetadata) > 0 {
 		metadataMap := make(map[string]types.String, len(secret.SecretMetadata))
@@ -368,7 +369,6 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	plan.WorkspaceId = types.StringValue(workspaceId)
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -408,6 +408,9 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.ID = types.StringValue(response.Secret.ID)
 	state.FolderPath = types.StringValue(response.Secret.SecretPath)
 	state.EnvSlug = types.StringValue(response.Secret.Environment)
+	if response.Secret.UpdatedAt != "" {
+		state.LastUpdated = types.StringValue(response.Secret.UpdatedAt)
+	}
 	if !state.Value.IsNull() && !state.Value.IsUnknown() {
 		// Resource was configured with regular Value field
 		state.Value = types.StringValue(response.Secret.SecretValue)
@@ -418,15 +421,15 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		for _, tag := range response.Secret.Tags {
 			tagIDs = append(tagIDs, tag.ID)
 		}
-		state.Tags, diags = types.ListValueFrom(ctx, types.StringType, tagIDs)
+		state.Tags, diags = types.SetValueFrom(ctx, types.StringType, tagIDs)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	} else if state.Tags.IsNull() || state.Tags.IsUnknown() {
-		state.Tags = types.ListNull(types.StringType)
+		state.Tags = types.SetNull(types.StringType)
 	} else {
-		state.Tags, diags = types.ListValueFrom(ctx, types.StringType, []string{})
+		state.Tags, diags = types.SetValueFrom(ctx, types.StringType, []string{})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -564,7 +567,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		updateRequest.NewSecretName = plan.Name.ValueString()
 	}
 
-	err = r.client.UpdateRawSecretV3(updateRequest)
+	updatedSecret, err := r.client.UpdateRawSecretV3(updateRequest)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -572,6 +575,10 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	if updatedSecret.UpdatedAt != "" {
+		plan.LastUpdated = types.StringValue(updatedSecret.UpdatedAt)
 	}
 
 	if len(secretMetadata) > 0 {
@@ -588,7 +595,6 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plan.Metadata = types.MapNull(types.StringType)
 	}
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 	plan.WorkspaceId = types.StringValue(workspaceId)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -636,6 +642,7 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 func (r *secretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var workspace, environment, secretPath, secretName, secretValue, secretId string
 	var tags []string
+	var updatedAt string
 	var secretReminder SecretReminder
 	var secretMetadata []infisical.SecretMetadataItem
 
@@ -689,6 +696,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretValue = secret.Secret.SecretValue
 		secretId = secret.Secret.ID
 		secretMetadata = secret.Secret.SecretMetadata
+		updatedAt = secret.Secret.UpdatedAt
 	} else {
 		parts := strings.SplitN(importID, ":", 4)
 
@@ -738,6 +746,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		secretValue = secret.Secret.SecretValue
 		secretId = secret.Secret.ID
 		secretMetadata = secret.Secret.SecretMetadata
+		updatedAt = secret.Secret.UpdatedAt
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), workspace)...)
@@ -750,6 +759,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), secretValue)...)
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_ids"), tags)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("last_updated"), updatedAt)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("secret_reminder"), secretReminder)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), secretId)...)
 

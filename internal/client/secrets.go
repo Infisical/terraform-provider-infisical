@@ -211,8 +211,10 @@ func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {
 	return nil
 }
 
-func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) error {
-	var secretsResponse GetRawSecretsV3Response
+func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) (RawV3Secret, error) {
+	var secretsResponse struct {
+		Secret RawV3Secret `json:"secret"`
+	}
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
@@ -221,15 +223,15 @@ func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) e
 		Patch(fmt.Sprintf("api/v3/secrets/raw/%s", request.SecretName))
 
 	if err != nil {
-		return errors.NewGenericRequestError(operationUpdateRawSecretV3, err)
+		return RawV3Secret{}, errors.NewGenericRequestError(operationUpdateRawSecretV3, err)
 	}
 
 	if response.IsError() {
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
-		return errors.NewAPIErrorWithResponse(operationUpdateRawSecretV3, response, &additionalContext)
+		return RawV3Secret{}, errors.NewAPIErrorWithResponse(operationUpdateRawSecretV3, response, &additionalContext)
 	}
 
-	return nil
+	return secretsResponse.Secret, nil
 }
 
 func (client Client) GetSingleRawSecretByNameV3(request GetSingleSecretByNameV3Request, viewSecretValue *bool) (GetSingleRawSecretByNameSecretResponse, error) {

@@ -576,6 +576,7 @@ type RawV3Secret struct {
 	SecretKey     string `json:"secretKey"`
 	SecretValue   string `json:"secretValue"`
 	SecretComment string `json:"secretComment"`
+	UpdatedAt     string `json:"updatedAt"`
 
 	SecretReminderNote       string               `json:"secretReminderNote"`
 	SecretReminderRepeatDays int64                `json:"secretReminderRepeatDays"`
@@ -607,6 +608,7 @@ type GetSingleSecretByIDV3Response = struct {
 		SecretValue   string `json:"secretValue"`
 		SecretComment string `json:"secretComment"`
 		SecretPath    string `json:"secretPath"`
+		UpdatedAt     string `json:"updatedAt"`
 
 		SecretReminderNote       string               `json:"secretReminderNote"`
 		SecretReminderRepeatDays int64                `json:"secretReminderRepeatDays"`
