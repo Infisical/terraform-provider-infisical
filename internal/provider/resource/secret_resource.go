@@ -184,8 +184,9 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 
 			"last_updated": schema.StringAttribute{
-				Description: "The last time the secret was updated.",
-				Computed:    true,
+				Description:   "The last time the secret was updated.",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tag_ids": schema.SetAttribute{
 				ElementType: types.StringType,
