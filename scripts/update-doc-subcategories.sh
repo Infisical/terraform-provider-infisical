@@ -85,6 +85,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         secret|secret_folder|secret_tag|secret_import)
             update_subcategory "$file" "Secrets";;
 
+        # Webhooks
+        webhook)
+            update_subcategory "$file" "Webhooks";;
+
         # External KMS
         external_kms_*)
             update_subcategory "$file" "External KMS";;

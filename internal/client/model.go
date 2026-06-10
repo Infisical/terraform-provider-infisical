@@ -1278,6 +1278,68 @@ type GetSecretFolderByPathRequest struct {
 	SecretPath  string
 }
 
+type WebhookEnvironment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type WebhookEventFilter struct {
+	EventName string `json:"eventName"`
+}
+
+type Webhook struct {
+	ID           string               `json:"id"`
+	SecretPath   string               `json:"secretPath"`
+	IsDisabled   bool                 `json:"isDisabled"`
+	Type         string               `json:"type"`
+	ProjectID    string               `json:"projectId"`
+	URL          string               `json:"url"`
+	EnvID        string               `json:"envId"`
+	Environment  WebhookEnvironment   `json:"environment"`
+	EventsFilter []WebhookEventFilter `json:"eventsFilter"`
+}
+
+type CreateWebhookRequest struct {
+	ProjectID        string               `json:"projectId"`
+	Environment      string               `json:"environment"`
+	WebhookUrl       string               `json:"webhookUrl"`
+	WebhookSecretKey string               `json:"webhookSecretKey,omitempty"`
+	SecretPath       string               `json:"secretPath,omitempty"`
+	Type             string               `json:"type,omitempty"`
+	EventsFilter     []WebhookEventFilter `json:"eventsFilter"`
+}
+
+type CreateWebhookResponse struct {
+	Webhook Webhook `json:"webhook"`
+}
+
+type GetWebhookByIDRequest struct {
+	ID string `json:"id"`
+}
+
+type GetWebhookByIDResponse struct {
+	Webhook Webhook `json:"webhook"`
+}
+
+type UpdateWebhookRequest struct {
+	ID           string                `json:"-"`
+	IsDisabled   *bool                 `json:"isDisabled,omitempty"`
+	EventsFilter *[]WebhookEventFilter `json:"eventsFilter,omitempty"`
+}
+
+type UpdateWebhookResponse struct {
+	Webhook Webhook `json:"webhook"`
+}
+
+type DeleteWebhookRequest struct {
+	ID string `json:"-"`
+}
+
+type DeleteWebhookResponse struct {
+	Webhook Webhook `json:"webhook"`
+}
+
 type GetSecretFolderByPathResponse struct {
 	Folder SecretFolder `json:"folder"`
 }
