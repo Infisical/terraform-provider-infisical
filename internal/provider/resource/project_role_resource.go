@@ -25,9 +25,10 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_                   resource.Resource = &projectRoleResource{}
-	PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
+	_                   resource.Resource                = &projectRoleResource{}
+	_                   resource.ResourceWithImportState = &projectRoleResource{}
+	PERMISSION_ACTIONS                                   = []string{"create", "edit", "delete", "read"}
+	PERMISSION_SUBJECTS                                  = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -814,6 +815,49 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// ImportState imports an existing project role into Terraform state.
+// The import ID format is: <project_id>,<role_slug>.
+func (r *projectRoleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project role",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Import ID must be in the format <project_id>,<role_slug>.",
+		)
+		return
+	}
+
+	projectID := strings.TrimSpace(parts[0])
+	roleSlug := strings.TrimSpace(parts[1])
+
+	// Verify the project exists and retrieve the role to populate the ID.
+	projectRole, err := r.client.GetProjectRoleBySlugV2(infisical.GetProjectRoleBySlugV2Request{
+		ProjectId: projectID,
+		RoleSlug:  roleSlug,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching project role",
+			"Couldn't fetch project role from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Bootstrap the minimal state that Read needs.
+	// Terraform calls Read automatically after ImportState to populate the full state.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), roleSlug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), projectRole.Role.ID)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
