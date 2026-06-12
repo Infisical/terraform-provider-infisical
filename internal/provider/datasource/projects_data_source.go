@@ -2,6 +2,7 @@ package datasource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -170,11 +171,17 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		Slug: data.Slug.ValueString(),
 	})
 	if err != nil {
+		if errors.Is(err, infisical.ErrNotFound) {
+			data.Environments = make(map[string]ProjectEnvironmentDetails)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Something went wrong while fetching the project",
 			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
 				"Infisical Client Error: "+err.Error(),
 		)
+		return
 	}
 
 	data = ProjectDataSourceModel{
