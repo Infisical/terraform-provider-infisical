@@ -238,9 +238,19 @@ func (r *webhookResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	plan.EventsFilter = filterSet
 
+	// Capture the requested disabled state before overwriting with the server's (always-enabled) create result.
+	desiredDisabled := plan.IsDisabled
+	plan.IsDisabled = types.BoolValue(webhook.Webhook.IsDisabled)
+
+	// Persist state right after create so a failed follow-up disable can't orphan the webhook.
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Create always provisions the webhook enabled; honor a requested disabled state with a follow-up update.
-	if !plan.IsDisabled.IsNull() && !plan.IsDisabled.IsUnknown() && plan.IsDisabled.ValueBool() != webhook.Webhook.IsDisabled {
-		isDisabled := plan.IsDisabled.ValueBool()
+	if !desiredDisabled.IsNull() && !desiredDisabled.IsUnknown() && desiredDisabled.ValueBool() != webhook.Webhook.IsDisabled {
+		isDisabled := desiredDisabled.ValueBool()
 		updated, err := r.client.UpdateWebhook(infisical.UpdateWebhookRequest{
 			ID:         webhook.Webhook.ID,
 			IsDisabled: &isDisabled,
@@ -253,11 +263,8 @@ func (r *webhookResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 		plan.IsDisabled = types.BoolValue(updated.Webhook.IsDisabled)
-	} else {
-		plan.IsDisabled = types.BoolValue(webhook.Webhook.IsDisabled)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *webhookResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
