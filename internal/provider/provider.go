@@ -369,6 +369,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectGroupResource,
 		infisicalResource.NewProjectSecretTagResource,
 		infisicalResource.NewProjectSecretFolderResource,
+		infisicalResource.NewWebhookResource,
 		infisicalResource.NewProjectEnvironmentResource,
 		infisicalResource.NewIdentityResource,
 		infisicalResource.NewIdentityUniversalAuthResource,
