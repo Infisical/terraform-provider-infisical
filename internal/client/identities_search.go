@@ -78,14 +78,14 @@ type IdentitySearchIdentity struct {
 	ActiveLockoutAuthMethods []string `json:"activeLockoutAuthMethods"`
 }
 
-// SearchIdentityIDsByName searches for identities and returns:
-//  - identityIds: deduped list of matching identity ids
-//  - identities: deduped list of full, typed match objects
-//  - totalCount: total matches as returned by Infisical for the last page request
-func (client Client) SearchIdentityIDsByName(request SearchIdentityIDsByNameRequest) ([]string, []IdentitySearchMatch, int, error) {
+// SearchIdentitiesByName searches for identities and returns:
+// - identities: list of full, typed match objects (preserves multiple memberships
+//   for the same identity when scope="both"), deduped by match/membership id
+// - totalCount: total matches as returned by Infisical for the last page request
+func (client Client) SearchIdentitiesByName(request SearchIdentityIDsByNameRequest) ([]IdentitySearchMatch, int, error) {
 	identityName := strings.TrimSpace(request.IdentityName)
 	if identityName == "" {
-		return nil, nil, 0, fmt.Errorf("%s: identity name cannot be empty", operationSearchIdentityIDsByName)
+		return nil, 0, fmt.Errorf("%s: identity name cannot be empty", operationSearchIdentityIDsByName)
 	}
 
 	mode := request.Mode
@@ -104,8 +104,9 @@ func (client Client) SearchIdentityIDsByName(request SearchIdentityIDsByNameRequ
 	}
 
 	offset := 0
-	seen := make(map[string]struct{}, limit) // dedupe by identity id
-	identityIDs := make([]string, 0, limit)
+	// - `identities` is a list of match objects and must preserve multiple memberships
+	//   for the same IdentityID when scope="both" is requested.
+	seenMatchIDs := make(map[string]struct{}, limit) // dedupe identities by match/membership id
 	identities := make([]IdentitySearchMatch, 0, limit)
 
 	var totalCount int
@@ -136,11 +137,11 @@ func (client Client) SearchIdentityIDsByName(request SearchIdentityIDsByNameRequ
 
 		response, err := httpRequest.SetBody(body).Post("api/v2/identities/search")
 		if err != nil {
-			return nil, nil, 0, errors.NewGenericRequestError(operationSearchIdentityIDsByName, err)
+			return nil, 0, errors.NewGenericRequestError(operationSearchIdentityIDsByName, err)
 		}
 
 		if response.IsError() {
-			return nil, nil, 0, errors.NewAPIErrorWithResponse(operationSearchIdentityIDsByName, response, nil)
+			return nil, 0, errors.NewAPIErrorWithResponse(operationSearchIdentityIDsByName, response, nil)
 		}
 
 		totalCount = respBody.TotalCount
@@ -154,16 +155,26 @@ func (client Client) SearchIdentityIDsByName(request SearchIdentityIDsByNameRequ
 				continue
 			}
 
-			if _, ok := seen[identityID]; ok {
-				continue
-			}
-
-			seen[identityID] = struct{}{}
-			identityIDs = append(identityIDs, identityID)
 			// Ensure the returned match has `identityId` populated consistently for Terraform consumers.
 			if item.IdentityID == "" {
 				item.IdentityID = identityID
 			}
+
+			// Preserve all membership matches, but dedupe them deterministically by match id.
+			matchID := strings.TrimSpace(item.ID)
+			if matchID == "" {
+				// Fallback for unexpected payloads: derive a stable key from core fields.
+				projectID := ""
+				if item.ProjectID != nil {
+					projectID = strings.TrimSpace(*item.ProjectID)
+				}
+				matchID = fmt.Sprintf("%s|%s|%s", identityID, strings.TrimSpace(item.Scope), projectID)
+			}
+
+			if _, ok := seenMatchIDs[matchID]; ok {
+				continue
+			}
+			seenMatchIDs[matchID] = struct{}{}
 			identities = append(identities, item)
 		}
 
@@ -177,6 +188,6 @@ func (client Client) SearchIdentityIDsByName(request SearchIdentityIDsByNameRequ
 		offset += limit
 	}
 
-	return identityIDs, identities, totalCount, nil
+	return identities, totalCount, nil
 }
 

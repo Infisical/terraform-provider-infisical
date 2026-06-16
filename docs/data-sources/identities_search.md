@@ -3,12 +3,12 @@
 page_title: "infisical_identities_search Data Source - terraform-provider-infisical"
 subcategory: "Identities"
 description: |-
-  Search Infisical machine identities by name and return matching identity IDs and details.
+  Search Infisical machine identities by name and return matching identity details.
 ---
 
 # infisical_identities_search (Data Source)
 
-Search Infisical machine identities by name and return matching identity IDs and details.
+Search Infisical machine identities by name and return matching identity details.
 
 ## Example Usage
 
@@ -38,10 +38,6 @@ data "infisical_identities_search" "by_name" {
   scope         = "both"     # organization | project | both
 }
 
-output "identity_ids" {
-  value = data.infisical_identities_search.by_name.identity_ids
-}
-
 output "identity_matches" {
   value = data.infisical_identities_search.by_name.identities
 }
@@ -61,7 +57,6 @@ output "identity_matches" {
 
 ### Read-Only
 
-- `identity_ids` (List of String) Matching identity IDs.
 - `identities` (List of Objects) Matching identity match objects.
 - `total_count` (Number) Total identities matching the filter (as reported by Infisical).
 

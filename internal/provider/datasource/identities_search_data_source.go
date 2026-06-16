@@ -29,7 +29,6 @@ type IdentitiesSearchDataSourceModel struct {
 	Mode         types.String `tfsdk:"mode"`
 	Scope        types.String `tfsdk:"scope"`
 
-	IdentityIDs types.List  `tfsdk:"identity_ids"`
 	Identities   types.List  `tfsdk:"identities"`
 	TotalCount  types.Int64 `tfsdk:"total_count"`
 }
@@ -40,7 +39,7 @@ func (d *IdentitiesSearchDataSource) Metadata(ctx context.Context, req datasourc
 
 func (d *IdentitiesSearchDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Search Infisical machine identities and return matching identity IDs and match objects.",
+		Description: "Search Infisical machine identities by name and return matching identity match objects.",
 		Attributes: map[string]schema.Attribute{
 			"identity_name": schema.StringAttribute{
 				Description: "Identity name to search for.",
@@ -61,11 +60,6 @@ func (d *IdentitiesSearchDataSource) Schema(ctx context.Context, req datasource.
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{"organization", "project", "both"}...),
 				},
-			},
-			"identity_ids": schema.ListAttribute{
-				Description: "Matching identity IDs.",
-				Computed:    true,
-				ElementType: types.StringType,
 			},
 			"identities": schema.ListNestedAttribute{
 				Description: "Matching identity match objects.",
@@ -223,7 +217,7 @@ func (d *IdentitiesSearchDataSource) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
-	ids, identities, totalCount, err := d.client.SearchIdentityIDsByName(infisical.SearchIdentityIDsByNameRequest{
+	identities, totalCount, err := d.client.SearchIdentitiesByName(infisical.SearchIdentityIDsByNameRequest{
 		IdentityName: data.IdentityName.ValueString(),
 		Mode:         mode,
 		Scopes:       scopes,
@@ -233,19 +227,6 @@ func (d *IdentitiesSearchDataSource) Read(ctx context.Context, req datasource.Re
 		resp.Diagnostics.AddError("Unable to search identities", "Error while searching identities: "+err.Error())
 		return
 	}
-
-	idValues := make([]types.String, 0, len(ids))
-	for _, id := range ids {
-		idValues = append(idValues, types.StringValue(id))
-	}
-
-	idList, diags := types.ListValueFrom(ctx, types.StringType, idValues)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	data.IdentityIDs = idList
 
 	// Prepare nested object types for `identities`.
 	roleObjectAttrTypes := map[string]attr.Type{

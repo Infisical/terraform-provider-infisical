@@ -23,10 +23,6 @@ data "infisical_identities_search" "by_name_contains_both" {
   scope         = "both"     # organization | project | both
 }
 
-output "identity_ids" {
-  value = data.infisical_identities_search.by_name_contains_both.identity_ids
-}
-
 output "identity_matches" {
   value = data.infisical_identities_search.by_name_contains_both.identities
 }
