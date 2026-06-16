@@ -380,6 +380,8 @@ func (d *IdentitiesSearchDataSource) Read(ctx context.Context, req datasource.Re
 
 	data.Identities = types.ListValueMust(matchObjectType, matchObjValues)
 	data.TotalCount = types.Int64Value(int64(totalCount))
+	data.Mode = types.StringValue(mode)
+	data.Scope = types.StringValue(scope)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
