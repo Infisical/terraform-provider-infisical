@@ -170,7 +170,7 @@ func (client Client) SearchIdentityIDsByName(request SearchIdentityIDsByNameRequ
 		// Stop conditions:
 		// - fetched fewer than the requested limit (likely last page)
 		// - or we advanced beyond totalCount
-		if len(respBody.Identities) < limit || offset >= totalCount {
+		if len(respBody.Identities) < limit || offset+limit >= totalCount {
 			break
 		}
 
