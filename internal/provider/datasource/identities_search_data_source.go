@@ -204,6 +204,11 @@ func (d *IdentitiesSearchDataSource) Read(ctx context.Context, req datasource.Re
 		scope = "both"
 	}
 
+	// Persist the effective values back into state so users can inspect
+	// which values were actually used (schema fields are Optional+Computed).
+	data.Mode = types.StringValue(mode)
+	data.Scope = types.StringValue(scope)
+
 	var scopes []string
 	switch scope {
 	case "organization":
