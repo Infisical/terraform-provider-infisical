@@ -39,7 +39,7 @@ func (d *ProjectRoleDataSource) Metadata(ctx context.Context, req datasource.Met
 
 func (d *ProjectRoleDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Look up a project role by project ID and slug. Returns empty values if the role does not exist. Only Machine Identity authentication is supported for this data source.",
+		Description: "Look up a project role by project ID and slug. Returns null values if the role does not exist. Only Machine Identity authentication is supported for this data source.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Description: "The ID of the project",

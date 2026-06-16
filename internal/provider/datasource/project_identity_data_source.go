@@ -131,7 +131,11 @@ func (d *ProjectIdentityDataSource) Read(ctx context.Context, req datasource.Rea
 			slug = role.CustomRoleSlug
 		}
 		data.RoleSlug = types.StringValue(slug)
-		data.CustomRoleID = types.StringValue(role.CustomRoleId)
+		if role.CustomRoleId != "" {
+			data.CustomRoleID = types.StringValue(role.CustomRoleId)
+		} else {
+			data.CustomRoleID = types.StringNull()
+		}
 	} else {
 		data.RoleSlug = types.StringNull()
 		data.CustomRoleID = types.StringNull()
