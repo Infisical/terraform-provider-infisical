@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -110,6 +111,10 @@ func (d *ProjectRoleDataSource) Read(ctx context.Context, req datasource.ReadReq
 	})
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
+			tflog.Debug(ctx, "Project role not found", map[string]interface{}{
+				"slug":       data.Slug.ValueString(),
+				"project_id": data.ProjectID.ValueString(),
+			})
 			data.ID = types.StringNull()
 			data.Name = types.StringNull()
 			data.Description = types.StringNull()
