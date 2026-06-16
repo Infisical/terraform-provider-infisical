@@ -145,6 +145,12 @@ func (client Client) SearchIdentitiesByName(request SearchIdentityIDsByNameReque
 		}
 
 		totalCount = respBody.TotalCount
+		// Defensive guard: if the API returns an empty page, we're done.
+		// This makes the loop behavior explicit and avoids relying on pagination
+		// math when `totalCount` is unexpectedly 0 or missing.
+		if len(respBody.Identities) == 0 {
+			break
+		}
 
 		for _, item := range respBody.Identities {
 			identityID := strings.TrimSpace(item.IdentityID)
