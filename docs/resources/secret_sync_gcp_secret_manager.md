@@ -89,7 +89,8 @@ Required:
 
 Optional:
 
-- `scope` (String) The scope of the sync with GCP Secret Manager. Supported options: global
+- `location_id` (String) The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.
+- `scope` (String) The scope of the sync with GCP Secret Manager. Supported options: global, region
 
 
 <a id="nestedatt--sync_options"></a>

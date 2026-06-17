@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -14,18 +15,49 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-const gcpSecretManagerScopeGlobal = "global"
+const (
+	gcpSecretManagerScopeGlobal = "global"
+	gcpSecretManagerScopeRegion = "region"
+)
 
 // SecretSyncGcpResourceModel describes the data source data model.
 type SecretSyncGcpSecretManagerDestinationConfigModel struct {
-	ProjectID types.String `tfsdk:"project_id"`
-	Scope     types.String `tfsdk:"scope"`
+	ProjectID  types.String `tfsdk:"project_id"`
+	Scope      types.String `tfsdk:"scope"`
+	LocationID types.String `tfsdk:"location_id"`
 }
 
 type SecretSyncGcpSecretManagerSyncOptionsModel struct {
 	InitialSyncBehavior   types.String `tfsdk:"initial_sync_behavior"`
 	DisableSecretDeletion types.Bool   `tfsdk:"disable_secret_deletion"`
 	KeySchema             types.String `tfsdk:"key_schema"`
+}
+
+// populateGcpSecretManagerDestinationConfig validates the scope/location_id
+// combination and writes the resulting fields into destinationConfig.
+func populateGcpSecretManagerDestinationConfig(destinationConfig map[string]interface{}, gcpConfig SecretSyncGcpSecretManagerDestinationConfigModel) error {
+	scope := gcpConfig.Scope.ValueString()
+	locationId := gcpConfig.LocationID.ValueString()
+	hasLocationId := !gcpConfig.LocationID.IsNull() && locationId != ""
+
+	switch scope {
+	case gcpSecretManagerScopeGlobal:
+		if hasLocationId {
+			return fmt.Errorf("location_id must not be set when scope is 'global'")
+		}
+	case gcpSecretManagerScopeRegion:
+		if !hasLocationId {
+			return fmt.Errorf("location_id is required when scope is 'region'")
+		}
+		destinationConfig["locationId"] = locationId
+	default:
+		return fmt.Errorf("invalid value for scope field. Possible values are: global, region")
+	}
+
+	destinationConfig["scope"] = scope
+	destinationConfig["projectId"] = gcpConfig.ProjectID.ValueString()
+
+	return nil
 }
 
 func NewSecretSyncGcpSecretManagerResource() resource.Resource {
@@ -58,9 +90,13 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 			},
 			"scope": schema.StringAttribute{
 				Optional:    true,
-				Description: "The scope of the sync with GCP Secret Manager. Supported options: global",
+				Description: "The scope of the sync with GCP Secret Manager. Supported options: global, region",
 				Default:     stringdefault.StaticString("global"),
 				Computed:    true,
+			},
+			"location_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.",
 			},
 		},
 
@@ -135,16 +171,10 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 				return nil, diags
 			}
 
-			if gcpConfig.Scope.ValueString() != gcpSecretManagerScopeGlobal {
-				diags.AddError(
-					"Unable to create GCP secret manager secret sync",
-					"Invalid value for scope field. Possible values are: global",
-				)
+			if err := populateGcpSecretManagerDestinationConfig(destinationConfig, gcpConfig); err != nil {
+				diags.AddError("Unable to create GCP secret manager secret sync", err.Error())
 				return nil, diags
 			}
-
-			destinationConfig["scope"] = gcpConfig.Scope.ValueString()
-			destinationConfig["projectId"] = gcpConfig.ProjectID.ValueString()
 
 			return destinationConfig, diags
 		},
@@ -157,16 +187,10 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 				return nil, diags
 			}
 
-			if gcpConfig.Scope.ValueString() != gcpSecretManagerScopeGlobal {
-				diags.AddError(
-					"Unable to update GCP secret manager secret sync",
-					"Invalid value for scope field. Possible values are: global",
-				)
+			if err := populateGcpSecretManagerDestinationConfig(destinationConfig, gcpConfig); err != nil {
+				diags.AddError("Unable to update GCP secret manager secret sync", err.Error())
 				return nil, diags
 			}
-
-			destinationConfig["scope"] = gcpConfig.Scope.ValueString()
-			destinationConfig["projectId"] = gcpConfig.ProjectID.ValueString()
 
 			return destinationConfig, diags
 		},
@@ -196,9 +220,17 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 				"project_id": types.StringValue(projectIdVal),
 			}
 
+			locationIdVal, ok := secretSync.DestinationConfig["locationId"].(string)
+			if !ok || locationIdVal == "" {
+				destinationConfig["location_id"] = types.StringNull()
+			} else {
+				destinationConfig["location_id"] = types.StringValue(locationIdVal)
+			}
+
 			return types.ObjectValue(map[string]attr.Type{
-				"scope":      types.StringType,
-				"project_id": types.StringType,
+				"scope":       types.StringType,
+				"project_id":  types.StringType,
+				"location_id": types.StringType,
 			}, destinationConfig)
 		},
 	}
