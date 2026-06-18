@@ -293,6 +293,8 @@ type ProjectRole struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Slug        string `json:"slug"`
+	ProjectID   string `json:"projectId"`
 	// because permission can have multiple structure.
 	Permissions []map[string]any
 }
@@ -934,6 +936,10 @@ type GetProjectRoleBySlugResponse struct {
 type GetProjectRoleBySlugV2Request struct {
 	ProjectId string
 	RoleSlug  string
+}
+
+type GetProjectRoleByIdRequest struct {
+	RoleId string
 }
 
 type GetProjectRoleBySlugV2Response struct {

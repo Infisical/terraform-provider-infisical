@@ -25,9 +25,10 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_                   resource.Resource = &projectRoleResource{}
-	PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
+	_                   resource.Resource                = &projectRoleResource{}
+	_                   resource.ResourceWithImportState = &projectRoleResource{}
+	PERMISSION_ACTIONS                                   = []string{"create", "edit", "delete", "read"}
+	PERMISSION_SUBJECTS                                  = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -871,4 +872,32 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		}
 	}
 
+}
+
+func (r *projectRoleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project role",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	projectRole, err := r.client.GetProjectRoleById(infisical.GetProjectRoleByIdRequest{
+		RoleId: req.ID,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing project role",
+			"Couldn't import project role from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// The role is keyed by project; seed id, slug, and project_id so the
+	// post-import Read can refresh the remaining fields (name, description,
+	// permissions_v2) via the V2 read path.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), projectRole.Role.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), projectRole.Role.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectRole.Role.ProjectID)...)
 }
