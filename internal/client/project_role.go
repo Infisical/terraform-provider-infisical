@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"terraform-provider-infisical/internal/errors"
 )
 
@@ -182,17 +183,21 @@ func (client Client) GetProjectRoleBySlugV2(request GetProjectRoleBySlugV2Reques
 
 func (client Client) GetProjectRoleById(request GetProjectRoleByIdRequest) (GetProjectRoleBySlugV2Response, error) {
 	var responseData GetProjectRoleBySlugV2Response
+	escapedRoleId := url.PathEscape(request.RoleId)
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&responseData).
 		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v1/projects/roles/%s", request.RoleId))
+		Get(fmt.Sprintf("api/v1/projects/roles/%s", escapedRoleId))
 
 	if err != nil {
 		return GetProjectRoleBySlugV2Response{}, errors.NewGenericRequestError(operationGetProjectRoleById, err)
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectRoleBySlugV2Response{}, ErrNotFound
+		}
 		return GetProjectRoleBySlugV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleById, response, nil)
 	}
 
