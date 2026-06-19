@@ -313,7 +313,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project role",
-				"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+				"Couldn't save project to Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -373,7 +373,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project role",
-				"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+				"Couldn't save project to Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -426,7 +426,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project role",
-				"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -443,7 +443,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid action field in permission",
+						"Couldn't read project role from Infisical, invalid action field in permission",
 					)
 					return
 				}
@@ -462,7 +462,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid action field in permission",
+						"Couldn't read project role from Infisical, invalid action field in permission",
 					)
 					return
 				}
@@ -474,7 +474,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid subject field in permission",
+						"Couldn't read project role from Infisical, invalid subject field in permission",
 					)
 					return
 				}
@@ -486,7 +486,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid conditions field in permission",
+						"Couldn't read project role from Infisical, invalid conditions field in permission",
 					)
 					return
 				}
@@ -565,7 +565,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project role",
-				"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -745,7 +745,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project role",
-				"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -803,7 +803,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project role",
-				"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -843,7 +843,7 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting project role",
-				"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't delete project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -865,7 +865,7 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting project role",
-				"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't delete project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}

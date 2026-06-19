@@ -121,7 +121,7 @@ func (r *projectSecretTagResource) Create(ctx context.Context, req resource.Crea
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project secret tag",
-			"Couldn't save tag to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save tag to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -167,7 +167,7 @@ func (r *projectSecretTagResource) Read(ctx context.Context, req resource.ReadRe
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading project secret tag",
-				"Couldn't read project secret tag from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project secret tag from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -219,7 +219,7 @@ func (r *projectSecretTagResource) Update(ctx context.Context, req resource.Upda
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating secret tag",
-			"Couldn't update secret tag from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update secret tag from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -307,7 +307,7 @@ func (r *projectSecretTagResource) Delete(ctx context.Context, req resource.Dele
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting secret tag",
-			"Couldn't delete secret tag from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete secret tag from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

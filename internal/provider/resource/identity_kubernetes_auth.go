@@ -349,7 +349,7 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity kubernetes auth",
-			"Couldn't save kubernetes auth to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save kubernetes auth to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -394,7 +394,7 @@ func (r *IdentityKubernetesAuthResource) Read(ctx context.Context, req resource.
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity kubernetes auth",
-				"Couldn't read identity kubernetes auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -479,7 +479,7 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity kubernetes auth",
-			"Couldn't update identity kubernetes auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -518,7 +518,7 @@ func (r *IdentityKubernetesAuthResource) Delete(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity kubernetes auth",
-			"Couldn't delete identity kubernetes auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

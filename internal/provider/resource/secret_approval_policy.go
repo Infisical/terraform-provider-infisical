@@ -274,7 +274,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching secret approval policy from your project",
-				"Couldn't read secret approval policy from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read secret approval policy from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}

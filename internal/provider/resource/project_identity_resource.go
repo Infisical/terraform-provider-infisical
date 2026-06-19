@@ -279,7 +279,7 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching identity to project",
-			"Couldn't create project identity to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create project identity to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -617,7 +617,7 @@ func (r *ProjectIdentityResource) Delete(ctx context.Context, req resource.Delet
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project identity",
-			"Couldn't delete project identity from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project identity from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

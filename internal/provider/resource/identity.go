@@ -160,7 +160,7 @@ func (r *IdentityResource) Create(ctx context.Context, req resource.CreateReques
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity",
-			"Couldn't save tag to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save tag to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -221,7 +221,7 @@ func (r *IdentityResource) Read(ctx context.Context, req resource.ReadRequest, r
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity",
-				"Couldn't read identity from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -313,7 +313,7 @@ func (r *IdentityResource) Update(ctx context.Context, req resource.UpdateReques
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity",
-			"Couldn't update identity from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -362,7 +362,7 @@ func (r *IdentityResource) Delete(ctx context.Context, req resource.DeleteReques
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity",
-			"Couldn't delete identity from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -392,7 +392,7 @@ func (r *IdentityResource) ImportState(ctx context.Context, req resource.ImportS
 		} else {
 			resp.Diagnostics.AddError(
 				"Error importing identity",
-				"Couldn't read identity from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
