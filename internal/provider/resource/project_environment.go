@@ -175,7 +175,7 @@ func (r *projectEnvironmentResource) Delete(ctx context.Context, req resource.De
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project environment",
-			"Couldn't delete project environment from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project environment from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -216,7 +216,7 @@ func (r *projectEnvironmentResource) Read(ctx context.Context, req resource.Read
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching environment from your project",
-				"Couldn't read project environment from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project environment from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -269,7 +269,7 @@ func (r *projectEnvironmentResource) Update(ctx context.Context, req resource.Up
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating project environment",
-			"Couldn't update project environment from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update project environment from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -300,7 +300,7 @@ func (r *projectEnvironmentResource) ImportState(ctx context.Context, req resour
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching project environment",
-				"Couldn't fetch project environment from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't fetch project environment from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return

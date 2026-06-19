@@ -284,7 +284,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error inviting user",
-			"Couldn't create project user to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create project user to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -641,7 +641,7 @@ func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project user",
-			"Couldn't delete project user from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project user from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

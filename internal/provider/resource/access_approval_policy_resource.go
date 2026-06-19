@@ -297,7 +297,7 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching access approval policy from your project",
-				"Couldn't read access approval policy from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read access approval policy from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}

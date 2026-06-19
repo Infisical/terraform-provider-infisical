@@ -325,7 +325,7 @@ func (r *IdentityOidcAuthResource) Create(ctx context.Context, req resource.Crea
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity oidc auth",
-			"Couldn't save oidc auth to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save oidc auth to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -370,7 +370,7 @@ func (r *IdentityOidcAuthResource) Read(ctx context.Context, req resource.ReadRe
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity oidc auth",
-				"Couldn't read identity oidc auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity oidc auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -450,7 +450,7 @@ func (r *IdentityOidcAuthResource) Update(ctx context.Context, req resource.Upda
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity oidc auth",
-			"Couldn't update identity oidc auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity oidc auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -489,7 +489,7 @@ func (r *IdentityOidcAuthResource) Delete(ctx context.Context, req resource.Dele
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity oidc auth",
-			"Couldn't delete identity oidc auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity oidc auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

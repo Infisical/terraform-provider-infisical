@@ -177,7 +177,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching group to project",
-			"Couldn't create project group to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create project group to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -231,7 +231,7 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading project group membership",
-				"Couldn't read project group membership from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project group membership from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}

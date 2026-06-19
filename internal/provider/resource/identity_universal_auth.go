@@ -229,7 +229,7 @@ func (r *IdentityUniversalAuthResource) Create(ctx context.Context, req resource
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity universal auth",
-			"Couldn't save tag to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save tag to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -279,7 +279,7 @@ func (r *IdentityUniversalAuthResource) Read(ctx context.Context, req resource.R
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity universal auth",
-				"Couldn't read identity universal auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity universal auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -332,7 +332,7 @@ func (r *IdentityUniversalAuthResource) Update(ctx context.Context, req resource
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity universal auth",
-			"Couldn't update identity universal auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity universal auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -371,7 +371,7 @@ func (r *IdentityUniversalAuthResource) Delete(ctx context.Context, req resource
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity universal auth",
-			"Couldn't delete identity universal auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity universal auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

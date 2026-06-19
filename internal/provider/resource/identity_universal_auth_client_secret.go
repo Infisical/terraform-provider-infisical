@@ -142,7 +142,7 @@ func (r *IdentityUniversalAuthClientSecretResource) Create(ctx context.Context, 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity universal auth client secret",
-			"Couldn't save universal auth client secret to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save universal auth client secret to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -157,7 +157,7 @@ func (r *IdentityUniversalAuthClientSecretResource) Create(ctx context.Context, 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity universal auth client secret",
-			"Couldn't save universal auth client secret to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save universal auth client secret to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -209,7 +209,7 @@ func (r *IdentityUniversalAuthClientSecretResource) Read(ctx context.Context, re
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity universal auth client secret",
-				"Couldn't read identity universal auth client secret from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity universal auth client secret from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -263,7 +263,7 @@ func (r *IdentityUniversalAuthClientSecretResource) Delete(ctx context.Context, 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity universal auth client secret",
-			"Couldn't delete identity universal auth client secret from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity universal auth client secret from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
