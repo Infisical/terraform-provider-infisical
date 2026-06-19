@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
@@ -18,7 +19,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &ProjectUserResource{}
+	_ resource.Resource                = &ProjectUserResource{}
+	_ resource.ResourceWithImportState = &ProjectUserResource{}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -646,4 +648,34 @@ func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
+}
+
+func (r *ProjectUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	parts := strings.SplitN(req.ID, ",", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Expected format: <project_id>,<username>",
+		)
+		return
+	}
+
+	projectID := parts[0]
+	username := parts[1]
+
+	projectUserDetails, err := r.client.GetProjectUserByUsername(infisical.GetProjectUserByUserNameRequest{
+		ProjectID: projectID,
+		Username:  username,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching project user",
+			"Couldn't find user in project, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("username"), username)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("membership_id"), projectUserDetails.Membership.ID)...)
 }
