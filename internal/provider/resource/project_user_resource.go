@@ -651,11 +651,19 @@ func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteReq
 }
 
 func (r *ProjectUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project user",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
 	parts := strings.SplitN(req.ID, ",", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		resp.Diagnostics.AddError(
 			"Invalid import ID",
-			"Expected format: <project_id>,<username>",
+			"Expected format: <project_id>,<username-or-email>",
 		)
 		return
 	}

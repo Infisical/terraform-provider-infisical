@@ -95,7 +95,7 @@ Read-Only:
 
 ## Import
 
-Import using `<project_id>,<username>`:
+Import using `<project_id>,<username-or-email>`:
 
 ```shell
 terraform import infisical_project_user.example <project-id>,<username-or-email>
