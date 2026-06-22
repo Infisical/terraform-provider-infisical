@@ -8,6 +8,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -19,7 +20,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &ProjectUserResource{}
+	_ resource.Resource                = &ProjectUserResource{}
+	_ resource.ResourceWithImportState = &ProjectUserResource{}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -661,13 +663,28 @@ func (r *ProjectUserResource) ImportState(ctx context.Context, req resource.Impo
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		resp.Diagnostics.AddError(
 			"Invalid import ID",
-			"Expected format: <project_id>,<username-or-email>",
+			"Expected format: <project_id>,<user_id>",
 		)
 		return
 	}
 
 	projectID := parts[0]
 	userID := parts[1]
+
+	if _, err := uuid.ParseUUID(projectID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("project_id %q must be a valid UUID", projectID),
+		)
+		return
+	}
+	if _, err := uuid.ParseUUID(userID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("user_id %q must be a valid UUID", userID),
+		)
+		return
+	}
 
 	projectUserDetails, err := r.client.GetProjectMembershipByUserID(infisical.GetProjectMembershipByUserIDRequest{
 		ProjectID: projectID,

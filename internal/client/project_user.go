@@ -114,6 +114,9 @@ func (client Client) GetProjectMembershipByUserID(request GetProjectMembershipBy
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectUserByUserNameResponse{}, ErrNotFound
+		}
 		return GetProjectUserByUserNameResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectMembershipByUserID, response, nil)
 	}
 
