@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	operationInviteUsersToProject     = "CallInviteUsersToProject"
-	operationDeleteProjectUser        = "CallDeleteProjectUser"
-	operationUpdateProjectUser        = "CallUpdateProjectUser"
-	operationGetProjectUserByUsername = "CallGetProjectUserByUsername"
+	operationInviteUsersToProject         = "CallInviteUsersToProject"
+	operationDeleteProjectUser            = "CallDeleteProjectUser"
+	operationUpdateProjectUser            = "CallUpdateProjectUser"
+	operationGetProjectUserByUsername     = "CallGetProjectUserByUsername"
+	operationGetProjectMembershipByUserID = "CallGetProjectMembershipByUserID"
 )
 
 func (client Client) InviteUsersToProject(request InviteUsersToProjectRequest) ([]ProjectMemberships, error) {
@@ -96,4 +97,25 @@ func (client Client) GetProjectUserByUsername(request GetProjectUserByUserNameRe
 	}
 
 	return projectUserResponse, nil
+}
+
+func (client Client) GetProjectMembershipByUserID(request GetProjectMembershipByUserIDRequest) (GetProjectUserByUserNameResponse, error) {
+	var projectMembershipResponse GetProjectUserByUserNameResponse
+
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&projectMembershipResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Get(fmt.Sprintf("api/v1/projects/%s/memberships/user/%s", request.ProjectID, request.UserID))
+
+	if err != nil {
+		return GetProjectUserByUserNameResponse{}, errors.NewGenericRequestError(operationGetProjectMembershipByUserID, err)
+	}
+
+	if response.IsError() {
+		return GetProjectUserByUserNameResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectMembershipByUserID, response, nil)
+	}
+
+	return projectMembershipResponse, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
@@ -645,5 +646,54 @@ func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteReq
 		)
 		return
 	}
+}
 
+func (r *ProjectUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project user",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Expected format: <project_id>,<username-or-email>",
+		)
+		return
+	}
+
+	projectID := parts[0]
+	userID := parts[1]
+
+	projectUserDetails, err := r.client.GetProjectMembershipByUserID(infisical.GetProjectMembershipByUserIDRequest{
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Project or user not found",
+				fmt.Sprintf(
+					"No project user membership was found for project_id=%q and user_id=%q. Verify that the project exists and the user is a member of that project.",
+					projectID,
+					userID,
+				),
+			)
+			return
+		}
+
+		resp.Diagnostics.AddError(
+			"Error fetching project user",
+			"Couldn't get user details from project, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("username"), projectUserDetails.Membership.User.Username)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("membership_id"), projectUserDetails.Membership.ID)...)
 }
