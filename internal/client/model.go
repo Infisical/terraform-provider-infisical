@@ -71,6 +71,7 @@ type ProjectUser struct {
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
 		PublicKey string `json:"publicKey"`
+		Username  string `json:"username"`
 	} `json:"user"`
 	Roles []ProjectMemberRole
 }
@@ -725,6 +726,11 @@ type CreateProjectUserResponseMembers struct {
 type GetProjectUserByUserNameRequest struct {
 	ProjectID string `json:"projectId"`
 	Username  string `json:"username"`
+}
+
+type GetProjectMembershipByUserIDRequest struct {
+	ProjectID string `json:"projectId"`
+	UserID    string `json:"userId"`
 }
 
 type GetProjectUserByUserNameResponse struct {

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -18,7 +20,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &ProjectUserResource{}
+	_ resource.Resource                = &ProjectUserResource{}
+	_ resource.ResourceWithImportState = &ProjectUserResource{}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -194,6 +197,49 @@ func orderAPIRolesByPlan(planRoles []ProjectUserRole, apiRoles []ProjectUserRole
 	return ordered
 }
 
+// mapAPIRolesToModel converts the membership roles returned by the API into the
+// resource model representation, applying the custom role slug and nulling out
+// temporary fields for non-temporary roles.
+func mapAPIRolesToModel(roles []infisical.ProjectMemberRole) []ProjectUserRole {
+	apiRoles := make([]ProjectUserRole, 0, len(roles))
+	for _, el := range roles {
+		val := ProjectUserRole{
+			ID:                      types.StringValue(el.ID),
+			RoleSlug:                types.StringValue(el.Role),
+			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
+			TemporaryRange:          types.StringValue(el.TemporaryRange),
+			TemporaryMode:           types.StringValue(el.TemporaryMode),
+			CustomRoleID:            types.StringValue(el.CustomRoleId),
+			IsTemporary:             types.BoolValue(el.IsTemporary),
+			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+
+		if el.CustomRoleId != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+		}
+
+		if !el.IsTemporary {
+			val.TemporaryMode = types.StringNull()
+			val.TemporaryRange = types.StringNull()
+			val.TemporaryAccesStartTime = types.StringNull()
+			val.TemporaryAccessEndTime = types.StringNull()
+		}
+		apiRoles = append(apiRoles, val)
+	}
+	return apiRoles
+}
+
+// mapUserPersonalDetails converts the membership user details returned by the API
+// into the resource model representation.
+func mapUserPersonalDetails(membership infisical.ProjectUser) ProjectUserPersonalDetails {
+	return ProjectUserPersonalDetails{
+		Email:     types.StringValue(membership.User.Email),
+		FirstName: types.StringValue(membership.User.FirstName),
+		LastName:  types.StringValue(membership.User.LastName),
+		ID:        types.StringValue(membership.User.ID),
+	}
+}
+
 // Configure adds the provider configured client to the resource.
 func (r *ProjectUserResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -334,32 +380,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	apiRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
-	for _, el := range projectUserDetails.Membership.Roles {
-		val := ProjectUserRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		apiRoles = append(apiRoles, val)
-	}
-	plan.Roles = orderAPIRolesByPlan(plan.Roles, apiRoles)
+	plan.Roles = orderAPIRolesByPlan(plan.Roles, mapAPIRolesToModel(projectUserDetails.Membership.Roles))
 	plan.MembershipId = types.StringValue(projectUserDetails.Membership.ID)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -367,13 +388,7 @@ func (r *ProjectUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	userPersonalDetails := ProjectUserPersonalDetails{
-		Email:     types.StringValue(projectUserDetails.Membership.User.Email),
-		FirstName: types.StringValue(projectUserDetails.Membership.User.FirstName),
-		LastName:  types.StringValue(projectUserDetails.Membership.User.LastName),
-		ID:        types.StringValue(projectUserDetails.Membership.User.ID),
-	}
-	diags = resp.State.SetAttribute(ctx, path.Root("user"), userPersonalDetails)
+	diags = resp.State.SetAttribute(ctx, path.Root("user"), mapUserPersonalDetails(projectUserDetails.Membership))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -423,44 +438,14 @@ func (r *ProjectUserResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	apiRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
-	for _, el := range projectUserDetails.Membership.Roles {
-		val := ProjectUserRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		apiRoles = append(apiRoles, val)
-	}
-
-	state.Roles = orderAPIRolesByPlan(state.Roles, apiRoles)
+	state.Roles = orderAPIRolesByPlan(state.Roles, mapAPIRolesToModel(projectUserDetails.Membership.Roles))
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	userPersonalDetails := ProjectUserPersonalDetails{
-		Email:     types.StringValue(projectUserDetails.Membership.User.Email),
-		FirstName: types.StringValue(projectUserDetails.Membership.User.FirstName),
-		LastName:  types.StringValue(projectUserDetails.Membership.User.LastName),
-		ID:        types.StringValue(projectUserDetails.Membership.User.ID),
-	}
-	diags = resp.State.SetAttribute(ctx, path.Root("user"), userPersonalDetails)
+	diags = resp.State.SetAttribute(ctx, path.Root("user"), mapUserPersonalDetails(projectUserDetails.Membership))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -572,43 +557,14 @@ func (r *ProjectUserResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	apiRoles := make([]ProjectUserRole, 0, len(projectUserDetails.Membership.Roles))
-	for _, el := range projectUserDetails.Membership.Roles {
-		val := ProjectUserRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		apiRoles = append(apiRoles, val)
-	}
-	plan.Roles = orderAPIRolesByPlan(plan.Roles, apiRoles)
+	plan.Roles = orderAPIRolesByPlan(plan.Roles, mapAPIRolesToModel(projectUserDetails.Membership.Roles))
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	userPersonalDetails := ProjectUserPersonalDetails{
-		Email:     types.StringValue(projectUserDetails.Membership.User.Email),
-		FirstName: types.StringValue(projectUserDetails.Membership.User.FirstName),
-		LastName:  types.StringValue(projectUserDetails.Membership.User.LastName),
-		ID:        types.StringValue(projectUserDetails.Membership.User.ID),
-	}
-	diags = resp.State.SetAttribute(ctx, path.Root("user"), userPersonalDetails)
+	diags = resp.State.SetAttribute(ctx, path.Root("user"), mapUserPersonalDetails(projectUserDetails.Membership))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -645,5 +601,71 @@ func (r *ProjectUserResource) Delete(ctx context.Context, req resource.DeleteReq
 		)
 		return
 	}
+}
 
+func (r *ProjectUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project user",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	parts := strings.SplitN(req.ID, ",", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Expected format: <project_id>,<user_id>",
+		)
+		return
+	}
+
+	projectID := parts[0]
+	userID := parts[1]
+
+	if _, err := uuid.ParseUUID(projectID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("project_id %q must be a valid UUID", projectID),
+		)
+		return
+	}
+	if _, err := uuid.ParseUUID(userID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("user_id %q must be a valid UUID", userID),
+		)
+		return
+	}
+
+	projectUserDetails, err := r.client.GetProjectMembershipByUserID(infisical.GetProjectMembershipByUserIDRequest{
+		ProjectID: projectID,
+		UserID:    userID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Project or user not found",
+				fmt.Sprintf(
+					"No project user membership was found for project_id=%q and user_id=%q. Verify that the project exists and the user is a member of that project.",
+					projectID,
+					userID,
+				),
+			)
+			return
+		}
+
+		resp.Diagnostics.AddError(
+			"Error fetching project user",
+			"Couldn't get user details from project, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("username"), projectUserDetails.Membership.User.Username)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("membership_id"), projectUserDetails.Membership.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("roles"), orderAPIRolesByPlan(nil, mapAPIRolesToModel(projectUserDetails.Membership.Roles)))...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user"), mapUserPersonalDetails(projectUserDetails.Membership))...)
 }
