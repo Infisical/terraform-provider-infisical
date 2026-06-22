@@ -107,7 +107,7 @@ func (client Client) GetProjectMembershipByUserID(request GetProjectMembershipBy
 		SetResult(&projectMembershipResponse).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Get(fmt.Sprintf("api/v1/projects/%s/memberships/user/%s", request.ProjectID, request.UserID))
+		Get(fmt.Sprintf("api/v1/projects/%s/user/%s/membership", request.ProjectID, request.UserID))
 
 	if err != nil {
 		return GetProjectUserByUserNameResponse{}, errors.NewGenericRequestError(operationGetProjectMembershipByUserID, err)
