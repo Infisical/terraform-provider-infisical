@@ -25,3 +25,7 @@ data "infisical_project_user" "example" {
 output "membership-id" {
   value = data.infisical_project_user.example.membership_id
 }
+
+output "user-id" {
+  value = data.infisical_project_user.example.user_id
+}

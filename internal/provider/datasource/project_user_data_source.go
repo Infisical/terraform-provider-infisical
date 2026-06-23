@@ -30,6 +30,7 @@ type ProjectUserDataSourceModel struct {
 	ProjectID    types.String `tfsdk:"project_id"`
 	Username     types.String `tfsdk:"username"`
 	MembershipID types.String `tfsdk:"membership_id"`
+	UserID       types.String `tfsdk:"user_id"`
 }
 
 func (d *ProjectUserDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -50,6 +51,10 @@ func (d *ProjectUserDataSource) Schema(ctx context.Context, req datasource.Schem
 			},
 			"membership_id": schema.StringAttribute{
 				Description: "The membership UUID. Null if the membership does not exist.",
+				Computed:    true,
+			},
+			"user_id": schema.StringAttribute{
+				Description: "The user's Infisical UUID. Null if the membership does not exist.",
 				Computed:    true,
 			},
 		},
@@ -104,6 +109,7 @@ func (d *ProjectUserDataSource) Read(ctx context.Context, req datasource.ReadReq
 				"project_id": data.ProjectID.ValueString(),
 			})
 			data.MembershipID = types.StringNull()
+			data.UserID = types.StringNull()
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
@@ -116,6 +122,7 @@ func (d *ProjectUserDataSource) Read(ctx context.Context, req datasource.ReadReq
 	}
 
 	data.MembershipID = types.StringValue(membership.Membership.ID)
+	data.UserID = types.StringValue(membership.Membership.User.ID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
