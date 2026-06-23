@@ -57,6 +57,10 @@ resource "infisical_project_identity" "test-identity" {
 - `project_id` (String) The id of the project
 - `roles` (Attributes List) The roles assigned to the project identity (see [below for nested schema](#nestedatt--roles))
 
+### Optional
+
+- `adopt_existing` (Boolean) When true, if the identity is already a member of the project (e.g. auto-added by Infisical when the project was created by this identity), the existing membership is adopted and its roles are updated to match the desired state instead of returning an error. Defaults to false.
+
 ### Read-Only
 
 - `identity` (Attributes) The identity details of the project identity (see [below for nested schema](#nestedatt--identity))
