@@ -25,3 +25,8 @@ data "infisical_project_identity" "example" {
 output "membership-id" {
   value = data.infisical_project_identity.example.membership_id
 }
+
+# All roles assigned to the identity
+output "roles" {
+  value = data.infisical_project_identity.example.roles
+}
