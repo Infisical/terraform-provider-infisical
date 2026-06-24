@@ -99,8 +99,9 @@ func (d *ProjectEnvironmentDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	project, err := d.client.GetProjectById(infisical.GetProjectByIdRequest{
-		ID: data.ProjectID.ValueString(),
+	environment, err := d.client.GetProjectEnvironmentBySlug(infisical.GetProjectEnvironmentBySlugRequest{
+		ProjectID:       data.ProjectID.ValueString(),
+		EnvironmentSlug: data.Slug.ValueString(),
 	})
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
@@ -117,18 +118,8 @@ func (d *ProjectEnvironmentDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	for _, env := range project.Environments {
-		if env.Slug == data.Slug.ValueString() {
-			data.ID = types.StringValue(env.ID)
-			data.Name = types.StringValue(env.Name)
-			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-			return
-		}
-	}
-
-	// Environment not found in project
-	data.ID = types.StringNull()
-	data.Name = types.StringNull()
+	data.ID = types.StringValue(environment.ID)
+	data.Name = types.StringValue(environment.Name)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
