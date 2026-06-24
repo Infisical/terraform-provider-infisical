@@ -25,3 +25,12 @@ data "infisical_project_role" "example" {
 output "role-id" {
   value = data.infisical_project_role.example.id
 }
+
+
+output "name" {
+  value = data.infisical_project_role.example.name
+}
+
+output "description" {
+  value = data.infisical_project_role.example.description
+}
