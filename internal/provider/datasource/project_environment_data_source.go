@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -105,9 +104,6 @@ func (d *ProjectEnvironmentDataSource) Read(ctx context.Context, req datasource.
 	})
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
-			tflog.Debug(ctx, "Project not found", map[string]interface{}{
-				"project_id": data.ProjectID.ValueString(),
-			})
 			data.ID = types.StringNull()
 			data.Name = types.StringNull()
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -131,10 +127,6 @@ func (d *ProjectEnvironmentDataSource) Read(ctx context.Context, req datasource.
 	}
 
 	// Environment not found in project
-	tflog.Debug(ctx, "Project environment not found", map[string]interface{}{
-		"slug":       data.Slug.ValueString(),
-		"project_id": data.ProjectID.ValueString(),
-	})
 	data.ID = types.StringNull()
 	data.Name = types.StringNull()
 

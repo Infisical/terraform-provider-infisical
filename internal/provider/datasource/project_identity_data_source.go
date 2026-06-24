@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -109,10 +108,6 @@ func (d *ProjectIdentityDataSource) Read(ctx context.Context, req datasource.Rea
 	})
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
-			tflog.Debug(ctx, "Project identity membership not found", map[string]interface{}{
-				"identity_id": data.IdentityID.ValueString(),
-				"project_id":  data.ProjectID.ValueString(),
-			})
 			data.MembershipID = types.StringNull()
 			data.RoleSlug = types.StringNull()
 			data.CustomRoleID = types.StringNull()
