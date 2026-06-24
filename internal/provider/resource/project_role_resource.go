@@ -25,9 +25,10 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_                   resource.Resource = &projectRoleResource{}
-	PERMISSION_ACTIONS                    = []string{"create", "edit", "delete", "read"}
-	PERMISSION_SUBJECTS                   = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
+	_                   resource.Resource                = &projectRoleResource{}
+	_                   resource.ResourceWithImportState = &projectRoleResource{}
+	PERMISSION_ACTIONS                                   = []string{"create", "edit", "delete", "read"}
+	PERMISSION_SUBJECTS                                  = []string{"role", "member", "groups", "settings", "integrations", "webhooks", "service-tokens", "environments", "tags", "audit-logs", "ip-allowlist", "workspace", "secrets", "secret-rollback", "secret-approval", "secret-rotation", "identity", "certificate-authorities", "certificates", "certificate-policies", "kms", "pki-alerts", "pki-collections"}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -313,7 +314,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project role",
-				"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+				"Couldn't save project to Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -373,7 +374,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating project role",
-				"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+				"Couldn't save project to Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -426,7 +427,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project role",
-				"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -443,7 +444,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid action field in permission",
+						"Couldn't read project role from Infisical, invalid action field in permission",
 					)
 					return
 				}
@@ -462,7 +463,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid action field in permission",
+						"Couldn't read project role from Infisical, invalid action field in permission",
 					)
 					return
 				}
@@ -474,7 +475,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid subject field in permission",
+						"Couldn't read project role from Infisical, invalid subject field in permission",
 					)
 					return
 				}
@@ -486,7 +487,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 				if !isValid {
 					resp.Diagnostics.AddError(
 						"Error reading project role",
-						"Couldn't read project role from Infiscial, invalid conditions field in permission",
+						"Couldn't read project role from Infisical, invalid conditions field in permission",
 					)
 					return
 				}
@@ -565,7 +566,7 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading project role",
-				"Couldn't read project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -745,7 +746,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project role",
-				"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -803,7 +804,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project role",
-				"Couldn't update project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -843,7 +844,7 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting project role",
-				"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't delete project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -865,10 +866,38 @@ func (r *projectRoleResource) Delete(ctx context.Context, req resource.DeleteReq
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting project role",
-				"Couldn't delete project role from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't delete project role from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
 	}
 
+}
+
+func (r *projectRoleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import project role",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	projectRole, err := r.client.GetProjectRoleById(infisical.GetProjectRoleByIdRequest{
+		RoleId: req.ID,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing project role",
+			"Couldn't import project role from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// The role is keyed by project; seed id, slug, and project_id so the
+	// post-import Read can refresh the remaining fields (name, description,
+	// permissions_v2) via the V2 read path.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), projectRole.Role.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), projectRole.Role.Slug)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectRole.Role.ProjectID)...)
 }

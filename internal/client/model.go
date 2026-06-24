@@ -71,6 +71,7 @@ type ProjectUser struct {
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
 		PublicKey string `json:"publicKey"`
+		Username  string `json:"username"`
 	} `json:"user"`
 	Roles []ProjectMemberRole
 }
@@ -293,6 +294,8 @@ type ProjectRole struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Slug        string `json:"slug"`
+	ProjectID   string `json:"projectId"`
 	// because permission can have multiple structure.
 	Permissions []map[string]any
 }
@@ -725,6 +728,11 @@ type GetProjectUserByUserNameRequest struct {
 	Username  string `json:"username"`
 }
 
+type GetProjectMembershipByUserIDRequest struct {
+	ProjectID string `json:"projectId"`
+	UserID    string `json:"userId"`
+}
+
 type GetProjectUserByUserNameResponse struct {
 	Membership ProjectUser `json:"membership"`
 }
@@ -934,6 +942,10 @@ type GetProjectRoleBySlugResponse struct {
 type GetProjectRoleBySlugV2Request struct {
 	ProjectId string
 	RoleSlug  string
+}
+
+type GetProjectRoleByIdRequest struct {
+	RoleId string
 }
 
 type GetProjectRoleBySlugV2Response struct {

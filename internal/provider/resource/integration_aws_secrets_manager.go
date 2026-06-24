@@ -592,7 +592,7 @@ func (r *IntegrationAWSSecretsManagerResource) Delete(ctx context.Context, req r
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting AWS Secrets Manager Integration",
-			"Couldn't delete AWS Secrets Manager integration from your Infiscial project, unexpected error: "+err.Error(),
+			"Couldn't delete AWS Secrets Manager integration from your Infisical project, unexpected error: "+err.Error(),
 		)
 		return
 	}

@@ -316,7 +316,7 @@ func (r *IntegrationDatabricksResource) Delete(ctx context.Context, req resource
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting Databricks Integration",
-			"Couldn't delete Databricks integration from your Infiscial project, unexpected error: "+err.Error(),
+			"Couldn't delete Databricks integration from your Infisical project, unexpected error: "+err.Error(),
 		)
 		return
 	}
