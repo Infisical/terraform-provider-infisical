@@ -3,12 +3,12 @@
 page_title: "infisical_project_user Data Source - terraform-provider-infisical"
 subcategory: "Projects"
 description: |-
-  Look up a project user membership by project ID and username. Returns null values if the membership does not exist. Only Machine Identity authentication is supported for this data source.
+  Look up a project user membership by project ID and user ID. Returns all roles assigned to the membership. Returns null values if the membership does not exist. Only Machine Identity authentication is supported for this data source.
 ---
 
 # infisical_project_user (Data Source)
 
-Look up a project user membership by project ID and username. Returns null values if the membership does not exist. Only Machine Identity authentication is supported for this data source.
+Look up a project user membership by project ID and user ID. Returns all roles assigned to the membership. Returns null values if the membership does not exist. Only Machine Identity authentication is supported for this data source.
 
 ## Example Usage
 
@@ -34,15 +34,23 @@ provider "infisical" {
 
 data "infisical_project_user" "example" {
   project_id = "<project-id>"
-  username   = "<username-or-email>"
+  user_id    = "<user-id>"
 }
 
 output "membership-id" {
   value = data.infisical_project_user.example.membership_id
 }
 
-output "user-id" {
-  value = data.infisical_project_user.example.user_id
+output "username" {
+  value = data.infisical_project_user.example.username
+}
+
+output "user" {
+  value = data.infisical_project_user.example.user
+}
+
+output "roles" {
+  value = data.infisical_project_user.example.roles
 }
 ```
 
@@ -52,9 +60,36 @@ output "user-id" {
 ### Required
 
 - `project_id` (String) The ID of the project
-- `username` (String) The username of the user (by default the email address)
+- `user_id` (String) The user's Infisical UUID
 
 ### Read-Only
 
 - `membership_id` (String) The membership UUID. Null if the membership does not exist.
-- `user_id` (String) The user's Infisical UUID. Null if the membership does not exist.
+- `roles` (Attributes List) The roles assigned to the project user. Null if the membership does not exist. (see [below for nested schema](#nestedatt--roles))
+- `user` (Attributes) The user personal details. Null if the membership does not exist. (see [below for nested schema](#nestedatt--user))
+- `username` (String) The username of the user (by default the email address). Null if the membership does not exist.
+
+<a id="nestedatt--roles"></a>
+### Nested Schema for `roles`
+
+Read-Only:
+
+- `custom_role_id` (String) The ID of the custom role, if applicable.
+- `id` (String) The ID of the project user role.
+- `is_temporary` (Boolean) Flag to indicate whether the assigned role is temporary.
+- `role_slug` (String) The slug of the role.
+- `temporary_access_end_time` (String) ISO time at which temporary access ends. Null for permanent roles.
+- `temporary_access_start_time` (String) ISO time at which temporary access begins. Null for permanent roles.
+- `temporary_mode` (String) Type of temporary access given. Null for permanent roles.
+- `temporary_range` (String) TTL for the temporary access. Null for permanent roles.
+
+
+<a id="nestedatt--user"></a>
+### Nested Schema for `user`
+
+Read-Only:
+
+- `email` (String) The email of the user
+- `first_name` (String) The first name of the user
+- `id` (String) The id of the user
+- `last_name` (String) The last name of the user
