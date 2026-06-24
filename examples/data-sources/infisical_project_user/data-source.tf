@@ -19,13 +19,21 @@ provider "infisical" {
 
 data "infisical_project_user" "example" {
   project_id = "<project-id>"
-  username   = "<username-or-email>"
+  user_id    = "<user-id>"
 }
 
 output "membership-id" {
   value = data.infisical_project_user.example.membership_id
 }
 
-output "user-id" {
-  value = data.infisical_project_user.example.user_id
+output "username" {
+  value = data.infisical_project_user.example.username
+}
+
+output "user" {
+  value = data.infisical_project_user.example.user
+}
+
+output "roles" {
+  value = data.infisical_project_user.example.roles
 }
