@@ -14,6 +14,7 @@ const (
 	operationUpdateProjectAuditLogRetention = "CallUpdateProjectAuditLogRetention"
 	operationGetProjectById                 = "CallGetProjectById"
 	operationGetProjectsBySlugs             = "CallGetProjectsBySlugs"
+	operationGetProjectEnvironmentBySlug    = "CallGetProjectEnvironmentBySlug"
 )
 
 func (client Client) CreateProject(request CreateProjectRequest) (CreateProjectResponse, error) {
@@ -166,4 +167,26 @@ func (client Client) GetProjectsBySlugs(request GetProjectsBySlugsRequest) (GetP
 	}
 
 	return projectsResponse, nil
+}
+
+func (client Client) GetProjectEnvironmentBySlug(request GetProjectEnvironmentBySlugRequest) (ProjectEnvironmentWithPosition, error) {
+	var environment ProjectEnvironmentWithPosition
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&environment).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/projects/%s/environments/slug/%s", request.ProjectID, request.EnvironmentSlug))
+
+	if err != nil {
+		return ProjectEnvironmentWithPosition{}, errors.NewGenericRequestError(operationGetProjectEnvironmentBySlug, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return ProjectEnvironmentWithPosition{}, ErrNotFound
+		}
+		return ProjectEnvironmentWithPosition{}, errors.NewAPIErrorWithResponse(operationGetProjectEnvironmentBySlug, response, nil)
+	}
+
+	return environment, nil
 }

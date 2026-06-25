@@ -243,6 +243,10 @@ func (r *ProjectGroupResource) Read(ctx context.Context, req resource.ReadReques
 			RoleSlug: el.Role,
 		}
 
+		if el.Role == "custom" && el.CustomRoleSlug != "" {
+			val.RoleSlug = el.CustomRoleSlug
+		}
+
 		planRoles = append(planRoles, val)
 	}
 
