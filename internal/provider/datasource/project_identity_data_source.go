@@ -190,7 +190,7 @@ func (d *ProjectIdentityDataSource) Read(ctx context.Context, req datasource.Rea
 		val := ProjectIdentityDataSourceRole{
 			ID:                       types.StringValue(el.ID),
 			RoleSlug:                 types.StringValue(el.Role),
-			CustomRoleID:             types.StringValue(el.CustomRoleId),
+			CustomRoleID:             types.StringNull(),
 			IsTemporary:              types.BoolValue(el.IsTemporary),
 			TemporaryMode:            types.StringValue(el.TemporaryMode),
 			TemporaryRange:           types.StringValue(el.TemporaryRange),
@@ -199,6 +199,7 @@ func (d *ProjectIdentityDataSource) Read(ctx context.Context, req datasource.Rea
 		}
 		if el.CustomRoleId != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+			val.CustomRoleID = types.StringValue(el.CustomRoleId)
 		}
 		if !el.IsTemporary {
 			val.TemporaryMode = types.StringNull()
@@ -209,9 +210,12 @@ func (d *ProjectIdentityDataSource) Read(ctx context.Context, req datasource.Rea
 		roles = append(roles, val)
 	}
 
-	// Sort roles alphabetically by slug for deterministic output.
-	sort.Slice(roles, func(i, j int) bool {
-		return roles[i].RoleSlug.ValueString() < roles[j].RoleSlug.ValueString()
+	// Sort roles by slug, then id, for deterministic output even when slugs collide.
+	sort.SliceStable(roles, func(i, j int) bool {
+		if roles[i].RoleSlug.ValueString() != roles[j].RoleSlug.ValueString() {
+			return roles[i].RoleSlug.ValueString() < roles[j].RoleSlug.ValueString()
+		}
+		return roles[i].ID.ValueString() < roles[j].ID.ValueString()
 	})
 
 	roleList, diags := types.ListValueFrom(ctx, roleObjectType, roles)
