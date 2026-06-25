@@ -347,6 +347,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 	return []func() datasource.DataSource{
 		infisicalDatasource.NewSecretDataSource,
 		infisicalDatasource.NewProjectDataSource,
+		infisicalDatasource.NewProjectsDataSource,
 		infisicalDatasource.NewSecretTagDataSource,
 		infisicalDatasource.NewSecretFolderDataSource,
 		infisicalDatasource.NewGroupsDataSource,

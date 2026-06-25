@@ -1,0 +1,226 @@
+package datasource
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	infisical "terraform-provider-infisical/internal/client"
+
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+// Ensure provider defined types fully satisfy framework interfaces.
+var _ datasource.DataSource = &ProjectsDataSource{}
+
+func NewProjectsDataSource() datasource.DataSource {
+	return &ProjectsDataSource{}
+}
+
+// ProjectsDataSource defines the data source implementation.
+type ProjectsDataSource struct {
+	client *infisical.Client
+}
+
+// ProjectsDataSourceModel describes the data source data model.
+type ProjectsDataSourceModel struct {
+	Slugs    types.List                `tfsdk:"slugs"`
+	Projects map[string]ProjectDetails `tfsdk:"projects"`
+}
+
+// ProjectDetails describes a single project within the projects map.
+type ProjectDetails struct {
+	ID                 types.String                         `tfsdk:"id"`
+	Name               types.String                         `tfsdk:"name"`
+	Slug               types.String                         `tfsdk:"slug"`
+	Type               types.String                         `tfsdk:"type"`
+	AutoCapitalization types.Bool                           `tfsdk:"auto_capitalization"`
+	OrgID              types.String                         `tfsdk:"org_id"`
+	CreatedAt          types.String                         `tfsdk:"created_at"`
+	UpdatedAt          types.String                         `tfsdk:"updated_at"`
+	Version            types.Int64                          `tfsdk:"version"`
+	UpgradeStatus      types.String                         `tfsdk:"upgrade_status"`
+	Environments       map[string]ProjectEnvironmentDetails `tfsdk:"environments"`
+}
+
+func (d *ProjectsDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_projects"
+}
+
+func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Fetch multiple Infisical projects by their slugs. Only Machine Identity authentication is supported for this data source. Slugs that do not match an existing project are omitted from the result.",
+
+		Attributes: map[string]schema.Attribute{
+			"slugs": schema.ListAttribute{
+				ElementType: types.StringType,
+				Required:    true,
+				Description: "The slugs of the projects to fetch",
+			},
+
+			"projects": schema.MapNestedAttribute{
+				Computed:    true,
+				Description: "The fetched projects, keyed by project slug. Slugs that do not match an existing project are omitted.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Description: "The ID of the project",
+							Computed:    true,
+						},
+						"name": schema.StringAttribute{
+							Description: "The name of the project",
+							Computed:    true,
+						},
+						"slug": schema.StringAttribute{
+							Description: "The slug of the project",
+							Computed:    true,
+						},
+						"type": schema.StringAttribute{
+							Description: "The type of the project ('secret-manager' or 'kms')",
+							Computed:    true,
+						},
+						"auto_capitalization": schema.BoolAttribute{
+							Description: "The auto capitalization status of the project",
+							Computed:    true,
+						},
+						"org_id": schema.StringAttribute{
+							Description: "The ID of the organization to which the project belongs",
+							Computed:    true,
+						},
+						"created_at": schema.StringAttribute{
+							Description: "The creation date of the project",
+							Computed:    true,
+						},
+						"updated_at": schema.StringAttribute{
+							Description: "The last update date of the project",
+							Computed:    true,
+						},
+						"version": schema.Int64Attribute{
+							Description: "The version of the project",
+							Computed:    true,
+						},
+						"upgrade_status": schema.StringAttribute{
+							Description: "The upgrade status of the project",
+							Computed:    true,
+						},
+						"environments": schema.MapNestedAttribute{
+							Computed: true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"name": schema.StringAttribute{
+										Description: "The name of the environment",
+										Computed:    true,
+									},
+									"slug": schema.StringAttribute{
+										Description: "The slug of the environment",
+										Computed:    true,
+									},
+									"id": schema.StringAttribute{
+										Description: "The ID of the environment",
+										Computed:    true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (d *ProjectsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*infisical.Client)
+
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+
+		return
+	}
+
+	d.client = client
+}
+
+func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+
+	if !d.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to fetch projects",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	var data ProjectsDataSourceModel
+
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var slugs []string
+	resp.Diagnostics.Append(data.Slugs.ElementsAs(ctx, &slugs, false)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectsResponse, err := d.client.GetProjectsBySlugs(infisical.GetProjectsBySlugsRequest{
+		Slugs: slugs,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Something went wrong while fetching the projects",
+			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
+				"Infisical Client Error: "+err.Error(),
+		)
+		return
+	}
+
+	data.Projects = make(map[string]ProjectDetails)
+
+	for _, project := range projectsResponse.Projects {
+		// Requested slugs with no matching project come back as null entries.
+		if project == nil {
+			continue
+		}
+
+		environments := make(map[string]ProjectEnvironmentDetails)
+		for _, env := range project.Environments {
+			environments[env.Slug] = ProjectEnvironmentDetails{
+				Name: types.StringValue(env.Name),
+				Slug: types.StringValue(env.Slug),
+				ID:   types.StringValue(env.ID),
+			}
+		}
+
+		data.Projects[project.Slug] = ProjectDetails{
+			ID:                 types.StringValue(project.ID),
+			Name:               types.StringValue(project.Name),
+			Slug:               types.StringValue(project.Slug),
+			Type:               types.StringValue(project.Type),
+			AutoCapitalization: types.BoolValue(project.AutoCapitalization),
+			OrgID:              types.StringValue(project.OrgID),
+			CreatedAt:          types.StringValue(project.CreatedAt.Format(time.RFC3339Nano)),
+			UpdatedAt:          types.StringValue(project.UpdatedAt.Format(time.RFC3339Nano)),
+			Version:            types.Int64Value(project.Version),
+			UpgradeStatus:      types.StringValue(project.UpgradeStatus),
+			Environments:       environments,
+		}
+	}
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}

@@ -13,6 +13,7 @@ const (
 	operationUpdateProject                  = "CallUpdateProject"
 	operationUpdateProjectAuditLogRetention = "CallUpdateProjectAuditLogRetention"
 	operationGetProjectById                 = "CallGetProjectById"
+	operationGetProjectsBySlugs             = "CallGetProjectsBySlugs"
 )
 
 func (client Client) CreateProject(request CreateProjectRequest) (CreateProjectResponse, error) {
@@ -145,4 +146,24 @@ func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithE
 	}
 
 	return projectResponse.Workspace, nil
+}
+
+func (client Client) GetProjectsBySlugs(request GetProjectsBySlugsRequest) (GetProjectsBySlugsResponse, error) {
+	var projectsResponse GetProjectsBySlugsResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&projectsResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post("api/v1/projects/slugs")
+
+	if err != nil {
+		return GetProjectsBySlugsResponse{}, errors.NewGenericRequestError(operationGetProjectsBySlugs, err)
+	}
+
+	if response.IsError() {
+		return GetProjectsBySlugsResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectsBySlugs, response, nil)
+	}
+
+	return projectsResponse, nil
 }

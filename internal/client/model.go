@@ -322,6 +322,16 @@ type GetProjectByIdResponse struct {
 	Workspace ProjectWithEnvironments `json:"workspace"`
 }
 
+type GetProjectsBySlugsRequest struct {
+	Slugs []string `json:"slugs"`
+}
+
+type GetProjectsBySlugsResponse struct {
+	// Projects uses pointer elements so a JSON `null` (a requested slug with no
+	// matching project) unmarshals to nil rather than a zero-value project.
+	Projects []*ProjectWithEnvironments `json:"projects"`
+}
+
 type ProjectMemberships struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`

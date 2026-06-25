@@ -114,7 +114,7 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
             update_subcategory "$file" "Groups";;
         
         # Projects
-        projects)
+        project|projects)
             update_subcategory "$file" "Projects";;
         
         # Identities
