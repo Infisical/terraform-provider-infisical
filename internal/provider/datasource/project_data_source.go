@@ -13,18 +13,18 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &ProjectsDataSource{}
+var _ datasource.DataSource = &ProjectDataSource{}
 
 func NewProjectDataSource() datasource.DataSource {
-	return &ProjectsDataSource{}
+	return &ProjectDataSource{}
 }
 
-// SecretDataSource defines the data source implementation.
-type ProjectsDataSource struct {
+// ProjectDataSource defines the data source implementation.
+type ProjectDataSource struct {
 	client *infisical.Client
 }
 
-// ExampleDataSourceModel describes the data source data model.
+// ProjectDataSourceModel describes the data source data model.
 type ProjectDataSourceModel struct {
 	ID                 types.String                         `tfsdk:"id"`
 	Name               types.String                         `tfsdk:"name"`
@@ -45,11 +45,11 @@ type ProjectEnvironmentDetails struct {
 	ID   types.String `tfsdk:"id"`
 }
 
-func (d *ProjectsDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_projects"
+func (d *ProjectDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_project"
 }
 
-func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Interact with Infisical projects. Only Machine Identity authentication is supported for this data source.",
 
@@ -127,7 +127,7 @@ func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 	}
 }
 
-func (d *ProjectsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *ProjectDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
@@ -147,7 +147,7 @@ func (d *ProjectsDataSource) Configure(ctx context.Context, req datasource.Confi
 	d.client = client
 }
 
-func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 
 	if !d.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -175,6 +175,7 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
 				"Infisical Client Error: "+err.Error(),
 		)
+		return
 	}
 
 	data = ProjectDataSourceModel{

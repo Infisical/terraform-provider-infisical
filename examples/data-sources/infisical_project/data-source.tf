@@ -17,16 +17,16 @@ provider "infisical" {
   }
 }
 
-data "infisical_projects" "test-project" {
+data "infisical_project" "test-project" {
   slug = "<project-slug>"
 }
 
 // Get the value of the "dev" environment
 output "dev-environment" {
-  value = data.infisical_projects.test-project.environments["dev"]
+  value = data.infisical_project.test-project.environments["dev"]
 }
 
 // Get the entire project
 output "entire-project" {
-  value = data.infisical_projects.test-project
+  value = data.infisical_project.test-project
 }
