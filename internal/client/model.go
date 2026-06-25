@@ -322,6 +322,10 @@ type GetProjectByIdResponse struct {
 	Workspace ProjectWithEnvironments `json:"workspace"`
 }
 
+type GetProjectsResponse struct {
+	Projects []ProjectWithEnvironments `json:"projects"`
+}
+
 type ProjectMemberships struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`

@@ -10,6 +10,7 @@ const (
 	operationCreateProject                  = "CallCreateProject"
 	operationDeleteProject                  = "CallDeleteProject"
 	operationGetProject                     = "CallGetProject"
+	operationGetProjects                    = "CallGetProjects"
 	operationUpdateProject                  = "CallUpdateProject"
 	operationUpdateProjectAuditLogRetention = "CallUpdateProjectAuditLogRetention"
 	operationGetProjectById                 = "CallGetProjectById"
@@ -84,6 +85,25 @@ func (client Client) GetProject(request GetProjectRequest) (ProjectWithEnvironme
 	}
 
 	return projectResponse, nil
+}
+
+func (client Client) GetProjects() (GetProjectsResponse, error) {
+	var body GetProjectsResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		Get("api/v1/projects")
+
+	if err != nil {
+		return GetProjectsResponse{}, errors.NewGenericRequestError(operationGetProjects, err)
+	}
+
+	if response.IsError() {
+		return GetProjectsResponse{}, errors.NewAPIErrorWithResponse(operationGetProjects, response, nil)
+	}
+
+	return body, nil
 }
 
 func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectResponse, error) {
