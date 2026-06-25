@@ -687,6 +687,11 @@ type GetProjectByIdRequest struct {
 	ID string `json:"id"`
 }
 
+type GetProjectEnvironmentBySlugRequest struct {
+	ProjectID       string `json:"projectId"`
+	EnvironmentSlug string `json:"environmentSlug"`
+}
+
 type UpdateProjectRequest struct {
 	ProjectId           string `json:"projectId"`
 	ProjectSlug         string `json:"slug"`

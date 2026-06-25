@@ -353,6 +353,10 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewIdentityDetailsDataSource,
 		infisicalDatasource.NewKMSKeyDataSource,
 		infisicalDatasource.NewSecretMetadataDataSource,
+		infisicalDatasource.NewProjectIdentityDataSource,
+		infisicalDatasource.NewProjectRoleDataSource,
+		infisicalDatasource.NewProjectEnvironmentDataSource,
+		infisicalDatasource.NewProjectUserDataSource,
 	}
 }
 
