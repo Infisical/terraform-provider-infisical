@@ -140,10 +140,6 @@ func (d *ProjectsListDataSource) Schema(ctx context.Context, req datasource.Sche
 							Description: "The version of the project",
 							Computed:    true,
 						},
-						"upgrade_status": schema.StringAttribute{
-							Description: "The upgrade status of the project",
-							Computed:    true,
-						},
 						"environments": schema.ListNestedAttribute{
 							Description: "The environments of the project",
 							Computed:    true,
@@ -272,7 +268,6 @@ func (d *ProjectsListDataSource) Read(ctx context.Context, req datasource.ReadRe
 			CreatedAt:          types.StringValue(project.CreatedAt.Format(time.RFC3339Nano)),
 			UpdatedAt:          types.StringValue(project.UpdatedAt.Format(time.RFC3339Nano)),
 			Version:            types.Int64Value(project.Version),
-			UpgradeStatus:      types.StringValue(project.UpgradeStatus),
 			Environments:       environmentList,
 		})
 	}
