@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -344,6 +345,18 @@ func (r *IdentityUniversalAuthResource) Update(ctx context.Context, req resource
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+func (r *IdentityUniversalAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity universal auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	resource.ImportStatePassthroughID(ctx, path.Root("identity_id"), req, resp)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
