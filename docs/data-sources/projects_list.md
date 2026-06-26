@@ -94,7 +94,6 @@ Read-Only:
 - `slug` (String) The slug of the project
 - `type` (String) The type of the project ('secret-manager' or 'kms')
 - `updated_at` (String) The last update date of the project
-- `upgrade_status` (String) The upgrade status of the project
 - `version` (Number) The version of the project
 
 <a id="nestedatt--projects--environments"></a>

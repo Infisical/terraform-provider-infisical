@@ -44,7 +44,6 @@ type ProjectsListItemModel struct {
 	CreatedAt          types.String `tfsdk:"created_at"`
 	UpdatedAt          types.String `tfsdk:"updated_at"`
 	Version            types.Int64  `tfsdk:"version"`
-	UpgradeStatus      types.String `tfsdk:"upgrade_status"`
 	Environments       types.List   `tfsdk:"environments"`
 }
 
@@ -78,7 +77,6 @@ var projectsListProjectAttrTypes = map[string]attr.Type{
 	"created_at":          types.StringType,
 	"updated_at":          types.StringType,
 	"version":             types.Int64Type,
-	"upgrade_status":      types.StringType,
 	"environments":        types.ListType{ElemType: types.ObjectType{AttrTypes: projectsListEnvironmentAttrTypes}},
 }
 
