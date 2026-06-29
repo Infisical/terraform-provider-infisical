@@ -29,10 +29,7 @@ func configureRetries(c *resty.Client) {
 			return false
 		}
 		switch r.StatusCode() {
-		case http.StatusTooManyRequests,
-			http.StatusBadGateway,
-			http.StatusServiceUnavailable,
-			http.StatusGatewayTimeout:
+		case http.StatusTooManyRequests:
 			return true
 		}
 		return false
@@ -60,17 +57,11 @@ func parseRetryAfter(v string) (time.Duration, bool) {
 		return 0, false
 	}
 	if secs, err := strconv.Atoi(v); err == nil {
-		if secs < 0 {
-			secs = 0
-		}
-		return time.Duration(secs) * time.Second, true
+		return time.Duration(max(secs, 0)) * time.Second, true
 	}
 	if t, err := http.ParseTime(v); err == nil {
 		d := time.Until(t)
-		if d < 0 {
-			d = 0
-		}
-		return d, true
+		return max(d, 0), true
 	}
 	return 0, false
 }
@@ -95,10 +86,7 @@ func parseRateLimitReset(v string) (time.Duration, bool) {
 	const absoluteTimestampThreshold = 1_000_000_000
 	if n >= absoluteTimestampThreshold {
 		d := time.Until(time.Unix(n, 0))
-		if d < 0 {
-			d = 0
-		}
-		return d, true
+		return max(d, 0), true
 	}
 	return time.Duration(n) * time.Second, true
 }
