@@ -3394,9 +3394,9 @@ type GetOrgRoleByIdResponse struct {
 	Role OrgRole `json:"role"`
 }
 
-// ProjectLevelIdentity
+// ProjectScopedIdentity
 
-type ProjectLevelIdentity struct {
+type ProjectScopedIdentity struct {
 	ID                  string      `json:"id"`
 	Name                string      `json:"name"`
 	OrgID               string      `json:"orgId"`
@@ -3408,27 +3408,28 @@ type ProjectLevelIdentity struct {
 	Metadata            []MetaEntry `json:"metadata"`
 }
 
-type CreateProjectLevelIdentityRequest struct {
-	ProjectID           string            `json:"-"`
-	Name                string            `json:"name"`
-	HasDeleteProtection bool              `json:"hasDeleteProtection"`
-	Metadata            []CreateMetaEntry `json:"metadata,omitempty"`
+type CreateProjectScopedIdentityRequest struct {
+	ProjectID           string                              `json:"-"`
+	Name                string                              `json:"name"`
+	HasDeleteProtection bool                                `json:"hasDeleteProtection"`
+	Metadata            []CreateMetaEntry                   `json:"metadata,omitempty"`
+	Roles               []CreateProjectIdentityRequestRoles `json:"roles,omitempty"`
 }
 
-type CreateProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type CreateProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
 }
 
-type GetProjectLevelIdentityRequest struct {
+type GetProjectScopedIdentityRequest struct {
 	ProjectID  string
 	IdentityID string
 }
 
-type GetProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type GetProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
 }
 
-type UpdateProjectLevelIdentityRequest struct {
+type UpdateProjectScopedIdentityRequest struct {
 	ProjectID           string            `json:"-"`
 	IdentityID          string            `json:"-"`
 	Name                string            `json:"name,omitempty"`
@@ -3436,17 +3437,23 @@ type UpdateProjectLevelIdentityRequest struct {
 	Metadata            []CreateMetaEntry `json:"metadata"`
 }
 
-type UpdateProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type UpdateProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
 }
 
-type DeleteProjectLevelIdentityRequest struct {
+type DeleteProjectScopedIdentityRequest struct {
 	ProjectID  string
 	IdentityID string
 }
 
-type DeleteProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type DeleteProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
+}
+
+type UpdateProjectScopedIdentityRolesRequest struct {
+	ProjectID  string                              `json:"-"`
+	IdentityID string                              `json:"-"`
+	Roles      []CreateProjectIdentityRequestRoles `json:"roles"`
 }
 
 type PkiApplication struct {
