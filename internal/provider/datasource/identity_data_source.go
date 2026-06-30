@@ -169,15 +169,11 @@ func (d *IdentityDataSource) Read(ctx context.Context, req datasource.ReadReques
 	data.HasDeleteProtection = types.BoolValue(orgIdentity.Identity.HasDeleteProtection)
 	data.OrgID = types.StringValue(orgIdentity.OrgID)
 
-	if len(orgIdentity.Identity.AuthMethods) > 0 {
-		elements := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
-		for i, method := range orgIdentity.Identity.AuthMethods {
-			elements[i] = types.StringValue(method)
-		}
-		data.AuthModes = types.ListValueMust(types.StringType, elements)
-	} else {
-		data.AuthModes = types.ListNull(types.StringType)
+	authModes := make([]attr.Value, len(orgIdentity.Identity.AuthMethods))
+	for i, method := range orgIdentity.Identity.AuthMethods {
+		authModes[i] = types.StringValue(method)
 	}
+	data.AuthModes = types.ListValueMust(types.StringType, authModes)
 
 	if orgIdentity.CustomRole != nil {
 		data.Role = types.StringValue(orgIdentity.CustomRole.Slug)
