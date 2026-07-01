@@ -66,7 +66,7 @@ func (r *ProjectIdentityResource) Metadata(_ context.Context, req resource.Metad
 // Schema defines the schema for the resource.
 func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create project identities & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "Assign an existing organization-level machine identity to a project & save to Infisical. This resource does not create a new identity; it manages the project membership and role(s) of an identity that already exists at the organization level. To create an identity that lives inside a single project, use the infisical_project_scoped_identity resource instead. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Description: "The id of the project",
