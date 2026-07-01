@@ -4032,3 +4032,46 @@ type RemoveCertManagerIdentityRequest struct {
 type RemoveCertManagerIdentityResponse struct {
 	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
 }
+
+// Sub-organization
+
+type SubOrganization struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	ParentOrgID string `json:"parentOrgId"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type CreateSubOrganizationRequest struct {
+	Name string `json:"name"`
+	Slug string `json:"slug,omitempty"`
+}
+
+type CreateSubOrganizationResponse struct {
+	Organization SubOrganization `json:"organization"`
+}
+
+type ListSubOrganizationsResponse struct {
+	Organizations []SubOrganization `json:"organizations"`
+	TotalCount    int               `json:"totalCount"`
+}
+
+type UpdateSubOrganizationRequest struct {
+	SubOrgID string `json:"-"`
+	Name     string `json:"name,omitempty"`
+	Slug     string `json:"slug,omitempty"`
+}
+
+type UpdateSubOrganizationResponse struct {
+	Organization SubOrganization `json:"organization"`
+}
+
+type DeleteSubOrganizationRequest struct {
+	SubOrgID string
+}
+
+type DeleteSubOrganizationResponse struct {
+	Organization SubOrganization `json:"organization"`
+}
