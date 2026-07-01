@@ -243,6 +243,9 @@ func (r *subOrganizationResource) Delete(ctx context.Context, req resource.Delet
 		SubOrgID: state.ID.ValueString(),
 	})
 	if err != nil {
+		if _, getErr := r.client.GetSubOrganizationById(state.ID.ValueString()); getErr == infisical.ErrNotFound {
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error deleting sub-organization",
 			"Couldn't delete sub-organization from Infisical, unexpected error: "+err.Error(),
