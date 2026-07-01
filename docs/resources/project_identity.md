@@ -3,12 +3,12 @@
 page_title: "infisical_project_identity Resource - terraform-provider-infisical"
 subcategory: "Projects"
 description: |-
-  Create project identities & save to Infisical. Only Machine Identity authentication is supported for this data source
+  Assign an existing identity to a project and save to Infisical.
 ---
 
 # infisical_project_identity (Resource)
 
-Create project identities & save to Infisical. Only Machine Identity authentication is supported for this data source
+Assign an existing identity to a project and save to Infisical.
 
 ## Example Usage
 
