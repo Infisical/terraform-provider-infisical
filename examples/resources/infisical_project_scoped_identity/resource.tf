@@ -22,10 +22,16 @@ resource "infisical_project" "example" {
   slug = "example"
 }
 
-resource "infisical_project_identity_provisioning" "example" {
+resource "infisical_project_scoped_identity" "example" {
   project_id            = infisical_project.example.id
   name                  = "my-project-identity"
   has_delete_protection = false
+
+  roles = [
+    {
+      role_slug = "admin"
+    }
+  ]
 
   metadata = [
     {
