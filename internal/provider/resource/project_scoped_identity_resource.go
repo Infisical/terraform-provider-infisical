@@ -277,6 +277,10 @@ func (r *ProjectScopedIdentityResource) Read(ctx context.Context, req resource.R
 		IdentityID: state.ID.ValueString(),
 	})
 	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading project-scoped identity roles",
 			"Couldn't read the project-scoped identity roles from Infisical, unexpected error: "+err.Error(),
@@ -346,6 +350,21 @@ func (r *ProjectScopedIdentityResource) Update(ctx context.Context, req resource
 		IdentityID: state.ID.ValueString(),
 		Roles:      roles,
 	}); err != nil {
+		plan.ID = state.ID
+		plan.HasDeleteProtection = types.BoolValue(identity.HasDeleteProtection)
+		plan.AuthMethods = buildAuthMethodsList(identity.AuthMethods)
+		if plan.Metadata != nil {
+			plan.Metadata = metadataFromAPI(identity.Metadata)
+		}
+		if current, readErr := r.client.GetProjectScopedIdentityMembership(infisical.GetProjectIdentityByIDRequest{
+			ProjectID:  state.ProjectID.ValueString(),
+			IdentityID: state.ID.ValueString(),
+		}); readErr == nil {
+			plan.Roles = orderAPIIdentityRolesByPlan(state.Roles, mapAPIRolesToIdentityModel(current.Membership.Roles))
+		} else {
+			plan.Roles = state.Roles
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error assigning roles to project-scoped identity",
 			"Couldn't update the project-scoped identity roles in Infisical, unexpected error: "+err.Error(),

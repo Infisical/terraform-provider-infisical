@@ -269,10 +269,9 @@ func mapAPIRolesToIdentityModel(apiRoles []infisical.ProjectMemberRole) []Projec
 			IsTemporary:             types.BoolValue(el.IsTemporary),
 			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
 		}
-		// A custom role is identified by customRoleId on the v2 membership API and by
-		// customRoleSlug on the v1 API (which omits customRoleId); handle both so the
-		// role_slug round-trips to the custom slug rather than the literal "custom".
-		if el.CustomRoleId != "" || el.CustomRoleSlug != "" {
+		// For a custom role the API returns role = "custom" and the real slug in
+		// customRoleSlug (v1 omits customRoleId entirely, v2 includes it).
+		if el.CustomRoleSlug != "" {
 			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
 		}
 		if !el.IsTemporary {
