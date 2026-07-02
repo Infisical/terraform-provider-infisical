@@ -66,7 +66,7 @@ func (r *ProjectIdentityResource) Metadata(_ context.Context, req resource.Metad
 // Schema defines the schema for the resource.
 func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create project identities & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "Assign an existing organization-level machine identity to a project & save to Infisical. This resource does not create a new identity; it manages the project membership and role(s) of an identity that already exists at the organization level. To create an identity that lives inside a single project, use the infisical_project_scoped_identity resource instead. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Description: "The id of the project",
@@ -188,6 +188,103 @@ func orderAPIIdentityRolesByPlan(planRoles []ProjectIdentityRole, apiRoles []Pro
 	return ordered
 }
 
+// buildProjectIdentityRequestRoles converts the roles declared in a Terraform plan into the
+// API request representation. It applies the defaults used across the provider for temporary
+// roles (relative mode, 1h range) and validates the role list: at least one permanent role is
+// required, role slugs must be unique, temporary-only fields may not be set on permanent roles,
+// and temporary_access_start_time must be in canonical RFC3339 UTC form.
+func buildProjectIdentityRequestRoles(planRoles []ProjectIdentityRole) ([]infisical.CreateProjectIdentityRequestRoles, error) {
+	var roles []infisical.CreateProjectIdentityRequestRoles
+	var hasAtleastOnePermanentRole bool
+	seenSlugs := make(map[string]bool, len(planRoles))
+	for _, el := range planRoles {
+		slug := el.RoleSlug.ValueString()
+		if seenSlugs[slug] {
+			return nil, fmt.Errorf("duplicate role_slug %q: each role may only appear once", slug)
+		}
+		seenSlugs[slug] = true
+
+		isTemporary := el.IsTemporary.ValueBool()
+		temporaryMode := el.TemporaryMode.ValueString()
+		temporaryRange := el.TemporaryRange.ValueString()
+		temporaryAccesStartTime := time.Now().UTC()
+
+		if !isTemporary {
+			hasAtleastOnePermanentRole = true
+			if temporaryMode != "" || temporaryRange != "" || el.TemporaryAccesStartTime.ValueString() != "" {
+				return nil, fmt.Errorf("role %q is permanent (is_temporary = false) but sets temporary_mode/temporary_range/temporary_access_start_time; set is_temporary = true or remove those fields", slug)
+			}
+		}
+
+		if el.TemporaryAccesStartTime.ValueString() != "" {
+			raw := el.TemporaryAccesStartTime.ValueString()
+			parsed, err := time.Parse(time.RFC3339, raw)
+			if err != nil {
+				return nil, fmt.Errorf("must provide valid ISO timestamp for field temporary_access_start_time %q, role %q", raw, slug)
+			}
+			// The value is stored back from the API in canonical UTC RFC3339 (…Z). Require that
+			// form on input so the planned value matches the applied value.
+			if canonical := parsed.UTC().Format(time.RFC3339); canonical != raw {
+				return nil, fmt.Errorf("temporary_access_start_time %q for role %q must be in canonical RFC3339 UTC format (e.g. %q)", raw, slug, canonical)
+			}
+			temporaryAccesStartTime = parsed
+		}
+
+		// default values
+		if isTemporary && temporaryMode == "" {
+			temporaryMode = TEMPORARY_MODE_RELATIVE
+		}
+		if isTemporary && temporaryRange == "" {
+			temporaryRange = "1h"
+		}
+
+		roles = append(roles, infisical.CreateProjectIdentityRequestRoles{
+			Role:                     slug,
+			IsTemporary:              isTemporary,
+			TemporaryMode:            temporaryMode,
+			TemporaryRange:           temporaryRange,
+			TemporaryAccessStartTime: temporaryAccesStartTime,
+		})
+	}
+
+	if !hasAtleastOnePermanentRole {
+		return nil, fmt.Errorf("must have atleast one permanent role")
+	}
+
+	return roles, nil
+}
+
+// mapAPIRolesToIdentityModel converts API project member roles into the Terraform model
+// representation, resolving custom role slugs and nulling temporary-only fields for permanent roles.
+func mapAPIRolesToIdentityModel(apiRoles []infisical.ProjectMemberRole) []ProjectIdentityRole {
+	result := make([]ProjectIdentityRole, 0, len(apiRoles))
+	for _, el := range apiRoles {
+		val := ProjectIdentityRole{
+			ID:                      types.StringValue(el.ID),
+			RoleSlug:                types.StringValue(el.Role),
+			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
+			TemporaryRange:          types.StringValue(el.TemporaryRange),
+			TemporaryMode:           types.StringValue(el.TemporaryMode),
+			CustomRoleID:            types.StringValue(el.CustomRoleId),
+			IsTemporary:             types.BoolValue(el.IsTemporary),
+			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
+		}
+		// For a custom role the API returns role = "custom" and the real slug in
+		// customRoleSlug (v1 omits customRoleId entirely, v2 includes it).
+		if el.CustomRoleSlug != "" {
+			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
+		}
+		if !el.IsTemporary {
+			val.TemporaryMode = types.StringNull()
+			val.TemporaryRange = types.StringNull()
+			val.TemporaryAccesStartTime = types.StringNull()
+			val.TemporaryAccessEndTime = types.StringNull()
+		}
+		result = append(result, val)
+	}
+	return result
+}
+
 // Configure adds the provider configured client to the resource.
 func (r *ProjectIdentityResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -226,52 +323,13 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	var roles []infisical.CreateProjectIdentityRequestRoles
-	var hasAtleastOnePermanentRole bool
-	for _, el := range plan.Roles {
-		isTemporary := el.IsTemporary.ValueBool()
-		temporaryMode := el.TemporaryMode.ValueString()
-		temporaryRange := el.TemporaryRange.ValueString()
-		temporaryAccesStartTime := time.Now().UTC()
-
-		if !isTemporary {
-			hasAtleastOnePermanentRole = true
-		}
-
-		if el.TemporaryAccesStartTime.ValueString() != "" {
-			var err error
-			temporaryAccesStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccesStartTime.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field temporaryAccesStartTime %s, role %s", el.TemporaryAccesStartTime.ValueString(), el.RoleSlug.ValueString()),
-				)
-				return
-			}
-		}
-
-		// default values
-		if isTemporary && temporaryMode == "" {
-			temporaryMode = TEMPORARY_MODE_RELATIVE
-		}
-		if isTemporary && temporaryRange == "" {
-			temporaryRange = "1h"
-		}
-
-		roles = append(roles, infisical.CreateProjectIdentityRequestRoles{
-			Role:                     el.RoleSlug.ValueString(),
-			IsTemporary:              isTemporary,
-			TemporaryMode:            temporaryMode,
-			TemporaryRange:           temporaryRange,
-			TemporaryAccessStartTime: temporaryAccesStartTime,
-		})
-	}
-	if !hasAtleastOnePermanentRole {
-		resp.Diagnostics.AddError("Error assigning role to identity", "Must have atleast one permanent role")
+	roles, err := buildProjectIdentityRequestRoles(plan.Roles)
+	if err != nil {
+		resp.Diagnostics.AddError("Error assigning role to identity", err.Error())
 		return
 	}
 
-	_, err := r.client.CreateProjectIdentity(infisical.CreateProjectIdentityRequest{
+	_, err = r.client.CreateProjectIdentity(infisical.CreateProjectIdentityRequest{
 		ProjectID:  plan.ProjectID.ValueString(),
 		IdentityID: plan.IdentityID.ValueString(),
 		Roles:      roles,
@@ -296,30 +354,7 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	apiRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
-	for _, el := range projectIdentityDetails.Membership.Roles {
-		val := ProjectIdentityRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		apiRoles = append(apiRoles, val)
-	}
+	apiRoles := mapAPIRolesToIdentityModel(projectIdentityDetails.Membership.Roles)
 	plan.Roles = orderAPIIdentityRolesByPlan(plan.Roles, apiRoles)
 	plan.MembershipId = types.StringValue(projectIdentityDetails.Membership.ID)
 	diags = resp.State.Set(ctx, plan)
@@ -388,30 +423,7 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	apiRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
-	for _, el := range projectIdentityDetails.Membership.Roles {
-		val := ProjectIdentityRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		apiRoles = append(apiRoles, val)
-	}
-
+	apiRoles := mapAPIRolesToIdentityModel(projectIdentityDetails.Membership.Roles)
 	state.Roles = orderAPIIdentityRolesByPlan(state.Roles, apiRoles)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -471,53 +483,18 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	var roles []infisical.UpdateProjectIdentityRequestRoles
-	var hasAtleastOnePermanentRole bool
-	for _, el := range plan.Roles {
-		isTemporary := el.IsTemporary.ValueBool()
-		temporaryMode := el.TemporaryMode.ValueString()
-		temporaryRange := el.TemporaryRange.ValueString()
-		temporaryAccesStartTime := time.Now().UTC()
-
-		if !isTemporary {
-			hasAtleastOnePermanentRole = true
-		}
-
-		if el.TemporaryAccesStartTime.ValueString() != "" {
-			var err error
-			temporaryAccesStartTime, err = time.Parse(time.RFC3339, el.TemporaryAccesStartTime.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error parsing field TemporaryAccessStartTime",
-					fmt.Sprintf("Must provider valid ISO timestamp for field temporaryAccesStartTime %s, role %s", el.TemporaryAccesStartTime.ValueString(), el.RoleSlug.ValueString()),
-				)
-				return
-			}
-		}
-
-		// default values
-		if isTemporary && temporaryMode == "" {
-			temporaryMode = TEMPORARY_MODE_RELATIVE
-		}
-		if isTemporary && temporaryRange == "" {
-			temporaryRange = "1h"
-		}
-
-		roles = append(roles, infisical.UpdateProjectIdentityRequestRoles{
-			Role:                     el.RoleSlug.ValueString(),
-			IsTemporary:              isTemporary,
-			TemporaryMode:            temporaryMode,
-			TemporaryRange:           temporaryRange,
-			TemporaryAccessStartTime: temporaryAccesStartTime,
-		})
-	}
-
-	if !hasAtleastOnePermanentRole {
-		resp.Diagnostics.AddError("Error assigning role to identity", "Must have atleast one permanent role")
+	requestRoles, err := buildProjectIdentityRequestRoles(plan.Roles)
+	if err != nil {
+		resp.Diagnostics.AddError("Error assigning role to identity", err.Error())
 		return
 	}
 
-	_, err := r.client.UpdateProjectIdentity(infisical.UpdateProjectIdentityRequest{
+	roles := make([]infisical.UpdateProjectIdentityRequestRoles, len(requestRoles))
+	for i, role := range requestRoles {
+		roles[i] = infisical.UpdateProjectIdentityRequestRoles(role)
+	}
+
+	_, err = r.client.UpdateProjectIdentity(infisical.UpdateProjectIdentityRequest{
 		ProjectID:  plan.ProjectID.ValueString(),
 		IdentityID: plan.IdentityID.ValueString(),
 		Roles:      roles,
@@ -542,31 +519,7 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	apiRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
-	for _, el := range projectIdentityDetails.Membership.Roles {
-		val := ProjectIdentityRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		apiRoles = append(apiRoles, val)
-	}
+	apiRoles := mapAPIRolesToIdentityModel(projectIdentityDetails.Membership.Roles)
 	plan.Roles = orderAPIIdentityRolesByPlan(plan.Roles, apiRoles)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -644,29 +597,7 @@ func (r *ProjectIdentityResource) ImportState(ctx context.Context, req resource.
 	}
 	identityDetails.AuthMethods = types.ListValueMust(types.StringType, authMethods)
 
-	planRoles := make([]ProjectIdentityRole, 0, len(projectIdentityDetails.Membership.Roles))
-	for _, el := range projectIdentityDetails.Membership.Roles {
-		val := ProjectIdentityRole{
-			ID:                      types.StringValue(el.ID),
-			RoleSlug:                types.StringValue(el.Role),
-			TemporaryAccessEndTime:  types.StringValue(el.TemporaryAccessEndTime.Format(time.RFC3339)),
-			TemporaryRange:          types.StringValue(el.TemporaryRange),
-			TemporaryMode:           types.StringValue(el.TemporaryMode),
-			CustomRoleID:            types.StringValue(el.CustomRoleId),
-			IsTemporary:             types.BoolValue(el.IsTemporary),
-			TemporaryAccesStartTime: types.StringValue(el.TemporaryAccessStartTime.Format(time.RFC3339)),
-		}
-		if el.CustomRoleId != "" {
-			val.RoleSlug = types.StringValue(el.CustomRoleSlug)
-		}
-		if !el.IsTemporary {
-			val.TemporaryMode = types.StringNull()
-			val.TemporaryRange = types.StringNull()
-			val.TemporaryAccesStartTime = types.StringNull()
-			val.TemporaryAccessEndTime = types.StringNull()
-		}
-		planRoles = append(planRoles, val)
-	}
+	planRoles := mapAPIRolesToIdentityModel(projectIdentityDetails.Membership.Roles)
 
 	// Sort roles alphabetically by slug for deterministic state after import
 	sort.Slice(planRoles, func(i, j int) bool {
