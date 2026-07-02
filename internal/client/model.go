@@ -3058,19 +3058,19 @@ type CertificatePolicyBasicConstraints struct {
 }
 
 type CertificatePolicy struct {
-	Id                string                               `json:"id"`
-	ProjectId         string                               `json:"projectId"`
-	Name              string                               `json:"name"`
-	Description       string                               `json:"description,omitempty"`
-	Subject           []CertificatePolicySubject           `json:"subject,omitempty"`
-	Sans              []CertificatePolicySAN               `json:"sans,omitempty"`
-	KeyUsages         *CertificatePolicyKeyUsages          `json:"keyUsages,omitempty"`
-	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages  `json:"extendedKeyUsages,omitempty"`
-	Algorithms        *CertificatePolicyAlgorithms         `json:"algorithms,omitempty"`
-	Validity          *CertificatePolicyValidity           `json:"validity,omitempty"`
-	BasicConstraints  *CertificatePolicyBasicConstraints   `json:"basicConstraints,omitempty"`
-	CreatedAt         string                               `json:"createdAt"`
-	UpdatedAt         string                               `json:"updatedAt"`
+	Id                string                              `json:"id"`
+	ProjectId         string                              `json:"projectId"`
+	Name              string                              `json:"name"`
+	Description       string                              `json:"description,omitempty"`
+	Subject           []CertificatePolicySubject          `json:"subject,omitempty"`
+	Sans              []CertificatePolicySAN              `json:"sans,omitempty"`
+	KeyUsages         *CertificatePolicyKeyUsages         `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
+	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
+	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
+	CreatedAt         string                              `json:"createdAt"`
+	UpdatedAt         string                              `json:"updatedAt"`
 }
 
 type CreateCertificatePolicyRequest struct {

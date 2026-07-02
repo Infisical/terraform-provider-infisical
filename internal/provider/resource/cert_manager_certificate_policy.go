@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	SUPPORTED_SUBJECT_TYPES = []string{"common_name", "organization", "country", "state", "locality", "organizational_unit"}
+	SUPPORTED_SUBJECT_TYPES   = []string{"common_name", "organization", "country", "state", "locality", "organizational_unit"}
 	SUPPORTED_SAN_TYPES       = []string{"dns_name", "ip_address", "email", "uri"}
 	SUPPORTED_CERT_KEY_USAGES = []string{
 		"digital_signature", "key_encipherment", "non_repudiation",
