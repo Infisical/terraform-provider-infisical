@@ -243,13 +243,16 @@ func (r *subOrganizationResource) Delete(ctx context.Context, req resource.Delet
 		SubOrgID: state.ID.ValueString(),
 	})
 	if err != nil {
-		if _, getErr := r.client.GetSubOrganizationById(state.ID.ValueString()); getErr == infisical.ErrNotFound {
+		_, getErr := r.client.GetSubOrganizationById(state.ID.ValueString())
+		if getErr == infisical.ErrNotFound {
 			return
 		}
-		resp.Diagnostics.AddError(
-			"Error deleting sub-organization",
-			"Couldn't delete sub-organization from Infisical, unexpected error: "+err.Error(),
-		)
+
+		errMsg := "Couldn't delete sub-organization from Infisical, unexpected error: " + err.Error()
+		if getErr != nil {
+			errMsg += "\nAdditionally, verifying whether the sub-organization still exists failed: " + getErr.Error()
+		}
+		resp.Diagnostics.AddError("Error deleting sub-organization", errMsg)
 		return
 	}
 }
@@ -263,24 +266,5 @@ func (r *subOrganizationResource) ImportState(ctx context.Context, req resource.
 		return
 	}
 
-	subOrg, err := r.client.GetSubOrganizationById(req.ID)
-	if err != nil {
-		if err == infisical.ErrNotFound {
-			resp.Diagnostics.AddError(
-				"Sub-organization not found",
-				"The sub-organization with the given ID was not found",
-			)
-		} else {
-			resp.Diagnostics.AddError(
-				"Error fetching sub-organization",
-				"Couldn't fetch sub-organization from Infisical, unexpected error: "+err.Error(),
-			)
-		}
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), subOrg.ID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), subOrg.Name)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("slug"), subOrg.Slug)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("parent_org_id"), subOrg.ParentOrgID)...)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
