@@ -6,6 +6,7 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -18,7 +19,7 @@ import (
 )
 
 var (
-	SUPPORTED_SUBJECT_TYPES   = []string{"common_name", "organization", "country"}
+	SUPPORTED_SUBJECT_TYPES = []string{"common_name", "organization", "country", "state", "locality", "organizational_unit"}
 	SUPPORTED_SAN_TYPES       = []string{"dns_name", "ip_address", "email", "uri"}
 	SUPPORTED_CERT_KEY_USAGES = []string{
 		"digital_signature", "key_encipherment", "non_repudiation",
@@ -37,6 +38,7 @@ var (
 		"RSA-2048", "RSA-3072", "RSA-4096",
 		"ECDSA-P256", "ECDSA-P521", "ECDSA-P384",
 	}
+	SUPPORTED_CERT_POLICY_STATES = []string{"allowed", "required", "denied"}
 )
 
 var (
@@ -86,6 +88,11 @@ type certManagerCertificatePolicyValidityModel struct {
 	Max types.String `tfsdk:"max"`
 }
 
+type certManagerCertificatePolicyBasicConstraintsModel struct {
+	IsCA          types.String `tfsdk:"is_ca"`
+	MaxPathLength types.Int64  `tfsdk:"max_path_length"`
+}
+
 type certManagerCertificatePolicyResourceModel struct {
 	Id                types.String                                        `tfsdk:"id"`
 	Name              types.String                                        `tfsdk:"name"`
@@ -96,6 +103,7 @@ type certManagerCertificatePolicyResourceModel struct {
 	ExtendedKeyUsages *certManagerCertificatePolicyExtendedKeyUsagesModel `tfsdk:"extended_key_usages"`
 	Algorithms        *certManagerCertificatePolicyAlgorithmsModel        `tfsdk:"algorithms"`
 	Validity          *certManagerCertificatePolicyValidityModel          `tfsdk:"validity"`
+	BasicConstraints  *certManagerCertificatePolicyBasicConstraintsModel  `tfsdk:"basic_constraints"`
 }
 
 func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -271,6 +279,25 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 					},
 				},
 			},
+			"basic_constraints": schema.SingleNestedBlock{
+				Description: "Basic constraints for the certificate policy, controlling CA certificate issuance and path length",
+				Attributes: map[string]schema.Attribute{
+					"is_ca": schema.StringAttribute{
+						Description: "Whether CA certificate issuance is allowed, required, or denied. Possible values: " + strings.Join(SUPPORTED_CERT_POLICY_STATES, ", "),
+						Optional:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf(SUPPORTED_CERT_POLICY_STATES...),
+						},
+					},
+					"max_path_length": schema.Int64Attribute{
+						Description: "Maximum path length for CA certificates. Use -1 for unlimited, 0 or positive integers for specific limits.",
+						Optional:    true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(-1),
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -430,6 +457,19 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 	if plan.Validity != nil && !plan.Validity.Max.IsNull() {
 		createPolicyRequest.Validity = &infisical.CertificatePolicyValidity{
 			Max: plan.Validity.Max.ValueString(),
+		}
+	}
+
+	if plan.BasicConstraints != nil {
+		createPolicyRequest.BasicConstraints = &infisical.CertificatePolicyBasicConstraints{}
+
+		if !plan.BasicConstraints.IsCA.IsNull() {
+			createPolicyRequest.BasicConstraints.IsCA = plan.BasicConstraints.IsCA.ValueString()
+		}
+
+		if !plan.BasicConstraints.MaxPathLength.IsNull() {
+			maxPathLength := int(plan.BasicConstraints.MaxPathLength.ValueInt64())
+			createPolicyRequest.BasicConstraints.MaxPathLength = &maxPathLength
 		}
 	}
 
@@ -638,6 +678,22 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 		}
 	}
 
+	if policy.CertificatePolicy.BasicConstraints != nil {
+		state.BasicConstraints = &certManagerCertificatePolicyBasicConstraintsModel{}
+
+		if policy.CertificatePolicy.BasicConstraints.IsCA != "" {
+			state.BasicConstraints.IsCA = types.StringValue(policy.CertificatePolicy.BasicConstraints.IsCA)
+		} else {
+			state.BasicConstraints.IsCA = types.StringNull()
+		}
+
+		if policy.CertificatePolicy.BasicConstraints.MaxPathLength != nil {
+			state.BasicConstraints.MaxPathLength = types.Int64Value(int64(*policy.CertificatePolicy.BasicConstraints.MaxPathLength))
+		} else {
+			state.BasicConstraints.MaxPathLength = types.Int64Null()
+		}
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -780,6 +836,19 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 	if plan.Validity != nil && !plan.Validity.Max.IsNull() {
 		updatePolicyRequest.Validity = &infisical.CertificatePolicyValidity{
 			Max: plan.Validity.Max.ValueString(),
+		}
+	}
+
+	if plan.BasicConstraints != nil {
+		updatePolicyRequest.BasicConstraints = &infisical.CertificatePolicyBasicConstraints{}
+
+		if !plan.BasicConstraints.IsCA.IsNull() {
+			updatePolicyRequest.BasicConstraints.IsCA = plan.BasicConstraints.IsCA.ValueString()
+		}
+
+		if !plan.BasicConstraints.MaxPathLength.IsNull() {
+			maxPathLength := int(plan.BasicConstraints.MaxPathLength.ValueInt64())
+			updatePolicyRequest.BasicConstraints.MaxPathLength = &maxPathLength
 		}
 	}
 
