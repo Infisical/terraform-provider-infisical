@@ -25,17 +25,52 @@ resource "infisical_sub_organization" "example" {
   slug = "engineering" # Optional. If omitted, Infisical generates one from the name.
 }
 
-# To manage resources INSIDE the sub-organization (identities, groups, custom roles),
-# configure a second, aliased provider scoped to the sub-org via organization_slug:
+# ---------------------------------------------------------------------------
+# Managing resources INSIDE a sub-organization (identities, groups, roles)
+# ---------------------------------------------------------------------------
+# The provider authenticates at plan time (scoped by auth.organization_slug), so a
+# provider instance pointed at a sub-org can only be configured once that sub-org
+# already exists. You therefore CANNOT create a sub-org and provision resources
+# inside it in a single `terraform apply`. Use one of the two patterns below.
 #
-# provider "infisical" {
-#   alias = "suborg"
-#   host  = "http://app.infisical.com"
-#   auth = {
-#     organization_slug = infisical_sub_organization.example.slug
-#     universal = {
-#       client_id     = "<machine-identity-client-id>"
-#       client_secret = "<machine-identity-client-secret>"
+# RECOMMENDED: two separate configurations (one per organization), applied in order.
+# The root config creates the sub-org and exports its slug/id; the sub-org config
+# consumes them and scopes its provider to the sub-org. Credentials are supplied to
+# each config independently via environment variables (INFISICAL_UNIVERSAL_AUTH_CLIENT_ID,
+# INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET, INFISICAL_HOST), never shared through state.
+#
+#   # root-org/main.tf  (provider scoped to the ROOT org)
+#   resource "infisical_sub_organization" "this" {
+#     name = "engineering"
+#     slug = "engineering"
+#   }
+#   output "suborg_id"   { value = infisical_sub_organization.this.id }
+#   output "suborg_slug" { value = infisical_sub_organization.this.slug }
+#
+#   # sub-org/main.tf  (provider scoped to the SUB-ORG)
+#   variable "suborg_slug" { type = string }
+#   provider "infisical" {
+#     auth = {
+#       organization_slug = var.suborg_slug
+#       universal         = {} # client_id/secret read from environment variables
 #     }
 #   }
-# }
+#   resource "infisical_org_role" "deployer" {
+#     name        = "deployer"
+#     slug        = "deployer"
+#     permissions = [{ subject = "project", action = ["create"] }]
+#   }
+#
+#   # Apply the root org first, then the sub-org, passing the exported slug:
+#   #   cd root-org && terraform init && terraform apply
+#   #   cd ../sub-org && terraform init && \
+#   #     terraform apply -var="suborg_slug=$(terraform -chdir=../root-org output -raw suborg_slug)"
+#
+# To wire the two configs automatically (no -var), read the root state from the
+# sub-org config and reference its output for organization_slug:
+#
+#   data "terraform_remote_state" "root_org" {
+#     backend = "local"
+#     config  = { path = "../root-org/terraform.tfstate" }
+#   }
+#   # organization_slug = data.terraform_remote_state.root_org.outputs.suborg_slug
