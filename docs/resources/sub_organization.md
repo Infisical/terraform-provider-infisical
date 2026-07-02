@@ -100,7 +100,7 @@ resource "infisical_sub_organization" "example" {
 
 ### Optional
 
-- `slug` (String) The slug of the sub-organization. If omitted, Infisical generates one from the name. Changing this updates the sub-organization.
+- `slug` (String) The slug of the sub-organization. If omitted when the sub-organization is first created, Infisical generates one from the name. Changing this value updates the sub-organization. Once a slug is set, removing it from your configuration does not regenerate it; the existing value is retained.
 
 ### Read-Only
 

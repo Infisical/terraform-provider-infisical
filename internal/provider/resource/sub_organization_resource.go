@@ -60,7 +60,7 @@ func (r *subOrganizationResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required:    true,
 			},
 			"slug": schema.StringAttribute{
-				Description:   "The slug of the sub-organization. If omitted, Infisical generates one from the name. Changing this updates the sub-organization.",
+				Description:   "The slug of the sub-organization. If omitted when the sub-organization is first created, Infisical generates one from the name. Changing this value updates the sub-organization. Once a slug is set, removing it from your configuration does not regenerate it; the existing value is retained.",
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
