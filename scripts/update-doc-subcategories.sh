@@ -60,7 +60,7 @@ for file in "$DOCS_DIR/resources/"*.md; do
             update_subcategory "$file" "Identities";;
 						
         # Organization
-        org|org_*)
+        org|org_*|sub_organization)
             update_subcategory "$file" "Organization";;
         
         # Projects

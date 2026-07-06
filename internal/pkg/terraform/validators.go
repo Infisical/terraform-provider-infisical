@@ -7,7 +7,7 @@ import (
 )
 
 var SlugRegexValidator = stringvalidator.RegexMatches(
-	regexp.MustCompile(`^[a-z0-9_-]*$`),
+	regexp.MustCompile(`^[a-z0-9-]+$`),
 	"invalid slug, slugs must be lowercase alphanumeric characters and hyphens only (example-slug-1)",
 )
 
