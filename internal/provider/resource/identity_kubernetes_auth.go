@@ -252,7 +252,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if plan.CaCertificate.ValueString() != "" {
+		if strings.TrimSpace(plan.CaCertificate.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set CA certificate",
 				"CA certificate is not allowed when token reviewer mode is gateway. Please remove the CA certificate.",
@@ -260,7 +260,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if plan.KubernetesHost.ValueString() != "" {
+		if strings.TrimSpace(plan.KubernetesHost.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set Kubernetes host",
 				"Kubernetes host is not allowed when token reviewer mode is gateway. Please remove the Kubernetes host.",
@@ -268,7 +268,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if plan.TokenReviewerJWT.ValueString() != "" {
+		if strings.TrimSpace(plan.TokenReviewerJWT.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set Token reviewer JWT",
 				"Token reviewer JWT is not allowed when token reviewer mode is gateway. Please remove the Token reviewer JWT.",
@@ -278,7 +278,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 	} else if tokenReviewerMode == TOKEN_REVIEWER_MODE_API {
 		// plan.TokenReviewerJWT is optional. if set to nothing, the auth method will act as self-reviewer.
 
-		if plan.KubernetesHost.ValueString() == "" {
+		if strings.TrimSpace(plan.KubernetesHost.ValueString()) == "" {
 			diagnose.AddError(
 				"Kubernetes host is required",
 				"Kubernetes host is required when token reviewer mode is api. Please provide a valid Kubernetes host.",
