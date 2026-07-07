@@ -79,6 +79,65 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
     signature     = ["SHA256-RSA", "SHA256-ECDSA", "SHA384-ECDSA"]
     key_algorithm = ["RSA-2048", "RSA-3072", "ECDSA-P256", "ECDSA-P384"]
   }
+
+  # Leaf certificates must not be CA certificates
+  basic_constraints {
+    is_ca = "denied"
+  }
+}
+
+resource "infisical_cert_manager_certificate_policy" "intermediate_ca" {
+  name        = "intermediate-ca-policy"
+  description = "Policy for intermediate CA certificates"
+
+  subject {
+    type     = "common_name"
+    required = ["Example Corp Intermediate CA"]
+  }
+
+  subject {
+    type     = "organization"
+    required = ["Example Corp"]
+  }
+
+  subject {
+    type    = "organizational_unit"
+    allowed = ["PKI", "Security"]
+  }
+
+  subject {
+    type     = "country"
+    required = ["US"]
+  }
+
+  subject {
+    type    = "state"
+    allowed = ["California"]
+  }
+
+  subject {
+    type    = "locality"
+    allowed = ["San Francisco"]
+  }
+
+  key_usages {
+    required = ["key_cert_sign", "crl_sign"]
+  }
+
+  validity {
+    max = "5y"
+  }
+
+  algorithms {
+    signature     = ["SHA256-RSA", "SHA384-ECDSA"]
+    key_algorithm = ["RSA-4096", "ECDSA-P384"]
+  }
+
+  # Issued certificates must be CA certificates, limited to one further level of subordinate CAs
+  basic_constraints {
+    is_ca           = "required"
+    max_path_length = 1
+  }
 }
 
 resource "infisical_cert_manager_certificate_policy" "code_signing" {
@@ -130,11 +189,12 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
 ### Optional
 
 - `algorithms` (Block, Optional) Algorithm constraints for the certificate policy. At least one signature algorithm and one key algorithm must be specified. (see [below for nested schema](#nestedblock--algorithms))
+- `basic_constraints` (Block, Optional) Basic constraints policy for the certificate policy, controlling whether issued certificates may act as certificate authorities. (see [below for nested schema](#nestedblock--basic_constraints))
 - `description` (String) The description of the certificate policy
 - `extended_key_usages` (Block, Optional) Extended key usage policies for the certificate policy (see [below for nested schema](#nestedblock--extended_key_usages))
 - `key_usages` (Block, Optional) Key usage policies for the certificate policy (see [below for nested schema](#nestedblock--key_usages))
 - `sans` (Block List) Subject alternative name (SAN) policies for the certificate policy (see [below for nested schema](#nestedblock--sans))
-- `subject` (Block List) Subject attribute policies for the certificate policy (see [below for nested schema](#nestedblock--subject))
+- `subject` (Block List) Subject attribute policies for the certificate policy. Each block constrains a single subject DN attribute (e.g. common_name, organization). Values are matched against the corresponding attribute parsed from the CSR; the '*' wildcard matches any sequence of characters (including dots). (see [below for nested schema](#nestedblock--subject))
 - `validity` (Block, Optional) Validity constraints for the certificate policy (see [below for nested schema](#nestedblock--validity))
 
 ### Read-Only
@@ -148,6 +208,15 @@ Required:
 
 - `key_algorithm` (List of String) List of allowed key algorithms (at least one required). Supported values: RSA-2048, RSA-3072, RSA-4096, ECDSA-P256, ECDSA-P521, ECDSA-P384
 - `signature` (List of String) List of allowed signature algorithms (at least one required). Supported values: SHA256-RSA, SHA512-RSA, SHA384-ECDSA, SHA384-RSA, SHA256-ECDSA, SHA512-ECDSA
+
+
+<a id="nestedblock--basic_constraints"></a>
+### Nested Schema for `basic_constraints`
+
+Optional:
+
+- `is_ca` (String) Policy for the CA flag (basic constraints CA:TRUE) on issued certificates. Possible values: allowed, required, denied
+- `max_path_length` (Number) Maximum path length constraint for CA certificates. Use -1 for unlimited, or a non-negative integer to cap how many intermediate CAs may appear below a certificate issued under this policy. Only applies when is_ca is allowed or required; it is ignored when is_ca is denied.
 
 
 <a id="nestedblock--extended_key_usages"></a>
@@ -189,13 +258,13 @@ Optional:
 
 Required:
 
-- `type` (String) The subject attribute type. Possible values: common_name, organization, country
+- `type` (String) The subject attribute type. Possible values: common_name, organization, organizational_unit, country, state, locality
 
 Optional:
 
-- `allowed` (List of String) List of allowed values for this subject attribute
-- `denied` (List of String) List of denied values for this subject attribute
-- `required` (List of String) List of required values for this subject attribute
+- `allowed` (List of String) List of allowed values for this subject attribute. Supports the '*' wildcard.
+- `denied` (List of String) List of denied values for this subject attribute. Supports the '*' wildcard.
+- `required` (List of String) List of required values for this subject attribute. Supports the '*' wildcard.
 
 
 <a id="nestedblock--validity"></a>
