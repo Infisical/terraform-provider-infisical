@@ -42,7 +42,8 @@ var (
 )
 
 var (
-	_ resource.Resource = &certManagerCertificatePolicyResource{}
+	_ resource.Resource                   = &certManagerCertificatePolicyResource{}
+	_ resource.ResourceWithValidateConfig = &certManagerCertificatePolicyResource{}
 )
 
 func NewCertManagerCertificatePolicyResource() resource.Resource {
@@ -108,6 +109,25 @@ type certManagerCertificatePolicyResourceModel struct {
 
 func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_cert_manager_certificate_policy"
+}
+
+func (r *certManagerCertificatePolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config certManagerCertificatePolicyResourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if config.BasicConstraints != nil &&
+		config.BasicConstraints.IsCa.ValueString() == "denied" &&
+		!config.BasicConstraints.MaxPathLength.IsNull() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("basic_constraints").AtName("max_path_length"),
+			"Invalid basic_constraints configuration",
+			"max_path_length cannot be set when is_ca is \"denied\". Remove max_path_length or set is_ca to \"allowed\" or \"required\".",
+		)
+	}
 }
 
 func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -460,7 +480,7 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 		}
 	}
 
-	if plan.BasicConstraints != nil {
+	if plan.BasicConstraints != nil && (!plan.BasicConstraints.IsCa.IsNull() || !plan.BasicConstraints.MaxPathLength.IsNull()) {
 		createPolicyRequest.BasicConstraints = &infisical.CertificatePolicyBasicConstraints{}
 
 		if !plan.BasicConstraints.IsCa.IsNull() {
@@ -839,7 +859,7 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 		}
 	}
 
-	if plan.BasicConstraints != nil {
+	if plan.BasicConstraints != nil && (!plan.BasicConstraints.IsCa.IsNull() || !plan.BasicConstraints.MaxPathLength.IsNull()) {
 		updatePolicyRequest.BasicConstraints = &infisical.CertificatePolicyBasicConstraints{}
 
 		if !plan.BasicConstraints.IsCa.IsNull() {

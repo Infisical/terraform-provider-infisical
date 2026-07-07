@@ -194,7 +194,7 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
 - `extended_key_usages` (Block, Optional) Extended key usage policies for the certificate policy (see [below for nested schema](#nestedblock--extended_key_usages))
 - `key_usages` (Block, Optional) Key usage policies for the certificate policy (see [below for nested schema](#nestedblock--key_usages))
 - `sans` (Block List) Subject alternative name (SAN) policies for the certificate policy (see [below for nested schema](#nestedblock--sans))
-- `subject` (Block List) Subject attribute policies for the certificate policy. Each block constrains a single subject DN attribute (e.g. common_name, organization). Values are matched against the corresponding attribute parsed from the CSR; the '*' wildcard matches any sequence of characters (including dots). (see [below for nested schema](#nestedblock--subject))
+- `subject` (Block List) Subject attribute policies for the certificate policy. Each block constrains a single subject DN attribute (e.g. common_name, organization). Values are matched against the corresponding attribute parsed from the CSR; the '*' wildcard matches any sequence of characters (including dots). For common_name, matching uses the CN attribute only, so domainComponent (DC) attributes are ignored. (see [below for nested schema](#nestedblock--subject))
 - `validity` (Block, Optional) Validity constraints for the certificate policy (see [below for nested schema](#nestedblock--validity))
 
 ### Read-Only
