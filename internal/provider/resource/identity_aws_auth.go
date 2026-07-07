@@ -205,9 +205,9 @@ func (r *IdentityAwsAuthResource) Create(ctx context.Context, req resource.Creat
 
 	newIdentityAwsAuth, err := r.client.CreateIdentityAwsAuth(infisical.CreateIdentityAwsAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+		AccessTokenTTL:          infisicaltf.Int64PtrIfKnown(plan.AccessTokenTTL),
+		AccessTokenMaxTTL:       infisicaltf.Int64PtrIfKnown(plan.AccessTokenMaxTTL),
+		AccessTokenNumUsesLimit: infisicaltf.Int64PtrIfKnown(plan.AccessTokenNumUsesLimit),
 		StsEndpoint:             plan.StsEndpoint.ValueString(),
 		AllowedAccountIDS:       strings.Join(allowedAccoundIds, ","),
 		AllowedPrincipalArns:    strings.Join(allowedPrincipalArns, ","),
@@ -308,9 +308,9 @@ func (r *IdentityAwsAuthResource) Update(ctx context.Context, req resource.Updat
 	updatedIdentityAwsAuth, err := r.client.UpdateIdentityAwsAuth(infisical.UpdateIdentityAwsAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+		AccessTokenTTL:          infisicaltf.Int64PtrIfKnown(plan.AccessTokenTTL),
+		AccessTokenMaxTTL:       infisicaltf.Int64PtrIfKnown(plan.AccessTokenMaxTTL),
+		AccessTokenNumUsesLimit: infisicaltf.Int64PtrIfKnown(plan.AccessTokenNumUsesLimit),
 		StsEndpoint:             plan.StsEndpoint.ValueString(),
 		AllowedAccountIDS:       strings.Join(allowedAccoundIds, ","),
 		AllowedPrincipalArns:    strings.Join(allowedPrincipalArns, ","),
