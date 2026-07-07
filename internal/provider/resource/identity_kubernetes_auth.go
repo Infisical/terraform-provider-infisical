@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -34,18 +35,18 @@ type IdentityKubernetesAuthResource struct {
 
 // IdentityKubernetesAuthResourceSourceModel describes the data source data model.
 type IdentityKubernetesAuthResourceModel struct {
-	ID                         types.String `tfsdk:"id"`
-	IdentityID                 types.String `tfsdk:"identity_id"`
-	KubernetesHost             types.String `tfsdk:"kubernetes_host"`
-	CaCertificate              types.String `tfsdk:"kubernetes_ca_certificate"`
-	TokenReviewerJWT           types.String `tfsdk:"token_reviewer_jwt"`
-	AllowedServiceAccountNames types.List   `tfsdk:"allowed_service_account_names"`
-	AllowedAudience            types.String `tfsdk:"allowed_audience"`
-	AllowedNamespaces          types.List   `tfsdk:"allowed_namespaces"`
-	AccessTokenTTL             types.Int64  `tfsdk:"access_token_ttl"`
-	AccessTokenMaxTTL          types.Int64  `tfsdk:"access_token_max_ttl"`
-	AccessTokenNumUsesLimit    types.Int64  `tfsdk:"access_token_num_uses_limit"`
-	AccessTokenTrustedIps      types.List   `tfsdk:"access_token_trusted_ips"`
+	ID                         types.String                   `tfsdk:"id"`
+	IdentityID                 types.String                   `tfsdk:"identity_id"`
+	KubernetesHost             types.String                   `tfsdk:"kubernetes_host"`
+	CaCertificate              customtypes.TrimmedStringValue `tfsdk:"kubernetes_ca_certificate"`
+	TokenReviewerJWT           types.String                   `tfsdk:"token_reviewer_jwt"`
+	AllowedServiceAccountNames types.List                     `tfsdk:"allowed_service_account_names"`
+	AllowedAudience            types.String                   `tfsdk:"allowed_audience"`
+	AllowedNamespaces          types.List                     `tfsdk:"allowed_namespaces"`
+	AccessTokenTTL             types.Int64                    `tfsdk:"access_token_ttl"`
+	AccessTokenMaxTTL          types.Int64                    `tfsdk:"access_token_max_ttl"`
+	AccessTokenNumUsesLimit    types.Int64                    `tfsdk:"access_token_num_uses_limit"`
+	AccessTokenTrustedIps      types.List                     `tfsdk:"access_token_trusted_ips"`
 
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	TokenReviewerMode types.String `tfsdk:"token_reviewer_mode"` // api|gateway (default is api)
@@ -105,6 +106,7 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 
 			"kubernetes_ca_certificate": schema.StringAttribute{
+				CustomType:          customtypes.TrimmedStringType{},
 				Description:         "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
 				MarkdownDescription: "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
 				Optional:            true,
@@ -184,7 +186,7 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenTTL = types.Int64Value(newIdentityKubernetesAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityKubernetesAuth.AccessTokenNumUsesLimit)
 	plan.AllowedAudience = types.StringValue(newIdentityKubernetesAuth.AllowedAudience)
-	plan.CaCertificate = types.StringValue(newIdentityKubernetesAuth.CACERT)
+	plan.CaCertificate = customtypes.NewTrimmedStringValue(newIdentityKubernetesAuth.CACERT)
 	plan.TokenReviewerMode = types.StringValue(newIdentityKubernetesAuth.TokenReviewerMode)
 
 	if newIdentityKubernetesAuth.GatewayID != "" {
