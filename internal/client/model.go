@@ -3052,6 +3052,11 @@ type CertificatePolicyValidity struct {
 	Max string `json:"max,omitempty"`
 }
 
+type CertificatePolicyBasicConstraints struct {
+	IsCA          string `json:"isCA,omitempty"`
+	MaxPathLength *int64 `json:"maxPathLength,omitempty"`
+}
+
 type CertificatePolicy struct {
 	Id                string                              `json:"id"`
 	ProjectId         string                              `json:"projectId"`
@@ -3063,6 +3068,7 @@ type CertificatePolicy struct {
 	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
 	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
 	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
 	CreatedAt         string                              `json:"createdAt"`
 	UpdatedAt         string                              `json:"updatedAt"`
 }
@@ -3076,6 +3082,7 @@ type CreateCertificatePolicyRequest struct {
 	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
 	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
 	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
 }
 
 type CreateCertificatePolicyResponse struct {
@@ -3100,6 +3107,7 @@ type UpdateCertificatePolicyRequest struct {
 	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
 	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
 	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
 }
 
 type UpdateCertificatePolicyResponse struct {

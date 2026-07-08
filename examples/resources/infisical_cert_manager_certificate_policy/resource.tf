@@ -64,6 +64,65 @@ resource "infisical_cert_manager_certificate_policy" "web_server" {
     signature     = ["SHA256-RSA", "SHA256-ECDSA", "SHA384-ECDSA"]
     key_algorithm = ["RSA-2048", "RSA-3072", "ECDSA-P256", "ECDSA-P384"]
   }
+
+  # Leaf certificates must not be CA certificates
+  basic_constraints {
+    is_ca = "denied"
+  }
+}
+
+resource "infisical_cert_manager_certificate_policy" "intermediate_ca" {
+  name        = "intermediate-ca-policy"
+  description = "Policy for intermediate CA certificates"
+
+  subject {
+    type     = "common_name"
+    required = ["Example Corp Intermediate CA"]
+  }
+
+  subject {
+    type     = "organization"
+    required = ["Example Corp"]
+  }
+
+  subject {
+    type    = "organizational_unit"
+    allowed = ["PKI", "Security"]
+  }
+
+  subject {
+    type     = "country"
+    required = ["US"]
+  }
+
+  subject {
+    type    = "state"
+    allowed = ["California"]
+  }
+
+  subject {
+    type    = "locality"
+    allowed = ["San Francisco"]
+  }
+
+  key_usages {
+    required = ["key_cert_sign", "crl_sign"]
+  }
+
+  validity {
+    max = "5y"
+  }
+
+  algorithms {
+    signature     = ["SHA256-RSA", "SHA384-ECDSA"]
+    key_algorithm = ["RSA-4096", "ECDSA-P384"]
+  }
+
+  # Issued certificates must be CA certificates, limited to one further level of subordinate CAs
+  basic_constraints {
+    is_ca           = "required"
+    max_path_length = 1
+  }
 }
 
 resource "infisical_cert_manager_certificate_policy" "code_signing" {
