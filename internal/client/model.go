@@ -1590,9 +1590,9 @@ type CreateIdentityAwsAuthRequest struct {
 	AllowedPrincipalArns    string                         `json:"allowedPrincipalArns,omitempty"`
 	AllowedAccountIDS       string                         `json:"allowedAccountIds,omitempty"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
-	AccessTokenTTL          int64                          `json:"accessTokenTTL"`
-	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL"`
-	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit"`
+	AccessTokenTTL          *int64                         `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       *int64                         `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit *int64                         `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type CreateIdentityAwsAuthResponse struct {
@@ -1605,9 +1605,9 @@ type UpdateIdentityAwsAuthRequest struct {
 	AllowedPrincipalArns    string                         `json:"allowedPrincipalArns,omitempty"`
 	AllowedAccountIDS       string                         `json:"allowedAccountIds,omitempty"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
-	AccessTokenTTL          int64                          `json:"accessTokenTTL"`
-	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL"`
-	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit"`
+	AccessTokenTTL          *int64                         `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       *int64                         `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit *int64                         `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type UpdateIdentityAwsAuthResponse struct {
