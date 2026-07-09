@@ -37,6 +37,7 @@ const (
 	AppConnectionAppLdap                  AppConnectionApp = "ldap"
 	AppConnectionAppGitlab                AppConnectionApp = "gitlab"
 	AppConnectionAppHashicorpVault        AppConnectionApp = "hashicorp-vault"
+	AppConnectionAppDatadog               AppConnectionApp = "datadog"
 )
 
 const (

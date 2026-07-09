@@ -421,6 +421,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionGitlabResource,
 		appConnectionResource.NewAppConnectionGithubResource,
 		appConnectionResource.NewAppConnectionHashicorpVaultResource,
+		appConnectionResource.NewAppConnectionDatadogResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
