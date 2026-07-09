@@ -3,11 +3,13 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -30,6 +32,9 @@ func NewAppConnectionDatadogResource() resource.Resource {
 			"url": schema.StringAttribute{
 				Required:    true,
 				Description: "The Datadog API URL for your site (e.g. https://api.datadoghq.com). For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/datadog",
+				Validators: []validator.String{
+					infisicaltf.HttpsUrlValidator,
+				},
 			},
 			"api_key": schema.StringAttribute{
 				Required:    true,

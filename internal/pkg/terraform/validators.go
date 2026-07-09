@@ -15,3 +15,8 @@ var JsonStringValidator = stringvalidator.RegexMatches(
 	regexp.MustCompile(`^[\[{].*[\]}]$`),
 	"must be a valid JSON string",
 )
+
+var HttpsUrlValidator = stringvalidator.RegexMatches(
+	regexp.MustCompile(`^https://\S+$`),
+	"must be a valid URL starting with https:// (example: https://example.com)",
+)
