@@ -630,10 +630,13 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 
 	if cert.SubjectDomainComponents != "" {
 		dcs := strings.Split(cert.SubjectDomainComponents, ",")
+		for i := range dcs {
+			dcs[i] = strings.TrimSpace(dcs[i])
+		}
 		if list, diags := types.ListValueFrom(ctx, types.StringType, dcs); !diags.HasError() {
 			plan.DomainComponents = list
 		}
-	} else if plan.DomainComponents.IsUnknown() {
+	} else {
 		plan.DomainComponents = types.ListNull(types.StringType)
 	}
 
@@ -986,10 +989,13 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 
 	if cert.SubjectDomainComponents != "" {
 		dcs := strings.Split(cert.SubjectDomainComponents, ",")
+		for i := range dcs {
+			dcs[i] = strings.TrimSpace(dcs[i])
+		}
 		if list, diags := types.ListValueFrom(ctx, types.StringType, dcs); !diags.HasError() {
 			state.DomainComponents = list
 		}
-	} else if state.DomainComponents.IsUnknown() {
+	} else {
 		state.DomainComponents = types.ListNull(types.StringType)
 	}
 
