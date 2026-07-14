@@ -47,6 +47,7 @@ type certManagerCertificateProfileDefaultsModel struct {
 	Country            types.String `tfsdk:"country"`
 	State              types.String `tfsdk:"state"`
 	Locality           types.String `tfsdk:"locality"`
+	DomainComponents   types.List   `tfsdk:"domain_components"`
 }
 
 type certManagerCertificateProfileResourceModel struct {
@@ -168,6 +169,11 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 						Description: "Default locality (L)",
 						Optional:    true,
 					},
+					"domain_components": schema.ListAttribute{
+						Description: "Default domain components (DC). Multi-valued; each entry becomes a DC attribute in the certificate subject.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
 				},
 			},
 		},
@@ -236,6 +242,11 @@ func (r *certManagerCertificateProfileResource) buildDefaults(ctx context.Contex
 	}
 	if !d.Locality.IsNull() && !d.Locality.IsUnknown() {
 		result.Locality = d.Locality.ValueString()
+	}
+	if !d.DomainComponents.IsNull() && !d.DomainComponents.IsUnknown() {
+		values := make([]string, 0, len(d.DomainComponents.Elements()))
+		diags.Append(d.DomainComponents.ElementsAs(ctx, &values, false)...)
+		result.DomainComponents = values
 	}
 
 	return result
@@ -337,6 +348,14 @@ func (r *certManagerCertificateProfileResource) defaultsToState(ctx context.Cont
 		out.ExtendedKeyUsages = l
 	} else {
 		out.ExtendedKeyUsages = types.ListNull(types.StringType)
+	}
+
+	if len(src.DomainComponents) > 0 {
+		l, d := types.ListValueFrom(ctx, types.StringType, src.DomainComponents)
+		diags.Append(d...)
+		out.DomainComponents = l
+	} else {
+		out.DomainComponents = types.ListNull(types.StringType)
 	}
 
 	return out

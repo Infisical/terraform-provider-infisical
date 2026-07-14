@@ -3139,6 +3139,7 @@ type CertificateProfileDefaults struct {
 	Country            string   `json:"country,omitempty"`
 	State              string   `json:"state,omitempty"`
 	Locality           string   `json:"locality,omitempty"`
+	DomainComponents   []string `json:"domainComponents,omitempty"`
 }
 
 type CertificateProfile struct {
@@ -3273,6 +3274,7 @@ type Certificate struct {
 	SubjectCountry            string                       `json:"subjectCountry,omitempty"`
 	SubjectState              string                       `json:"subjectState,omitempty"`
 	SubjectLocality           string                       `json:"subjectLocality,omitempty"`
+	SubjectDomainComponents   string                       `json:"subjectDomainComponents,omitempty"`
 	BasicConstraints          *CertificateBasicConstraints `json:"basicConstraints,omitempty"`
 	CreatedAt                 string                       `json:"createdAt"`
 	UpdatedAt                 string                       `json:"updatedAt"`
@@ -3291,6 +3293,7 @@ type CertificateAttributes struct {
 	Country            string               `json:"country,omitempty"`
 	Province           string               `json:"province,omitempty"`
 	Locality           string               `json:"locality,omitempty"`
+	DomainComponents   []string             `json:"domainComponents,omitempty"`
 	KeyUsages          []string             `json:"keyUsages,omitempty"`
 	ExtendedKeyUsages  []string             `json:"extendedKeyUsages,omitempty"`
 	AltNames           []CertificateAltName `json:"altNames,omitempty"`

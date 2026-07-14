@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	SUPPORTED_SUBJECT_TYPES   = []string{"common_name", "organization", "organizational_unit", "country", "state", "locality"}
+	SUPPORTED_SUBJECT_TYPES   = []string{"common_name", "organization", "organizational_unit", "country", "state", "locality", "domain_component"}
 	SUPPORTED_SAN_TYPES       = []string{"dns_name", "ip_address", "email", "uri"}
 	SUPPORTED_POLICY_STATES   = []string{"allowed", "required", "denied"}
 	SUPPORTED_CERT_KEY_USAGES = []string{
@@ -152,7 +152,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 		},
 		Blocks: map[string]schema.Block{
 			"subject": schema.ListNestedBlock{
-				Description: "Subject attribute policies for the certificate policy. Each block constrains a single subject DN attribute (e.g. common_name, organization). Values are matched against the corresponding attribute parsed from the CSR; the '*' wildcard matches any sequence of characters (including dots). For common_name, matching uses the CN attribute only, so domainComponent (DC) attributes are ignored.",
+				Description: "Subject attribute policies for the certificate policy. Each block constrains a single subject DN attribute (e.g. common_name, organization). Values are matched against the corresponding attribute parsed from the CSR; the '*' wildcard matches any sequence of characters (including dots). common_name matches the CN attribute only. domain_component (DC) is an independent attribute matched separately from common_name: a certificate may carry multiple DC values, and each is matched individually against this block.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
