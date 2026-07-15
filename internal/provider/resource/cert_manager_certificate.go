@@ -636,7 +636,7 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 		if list, diags := types.ListValueFrom(ctx, types.StringType, dcs); !diags.HasError() {
 			plan.DomainComponents = list
 		}
-	} else {
+	} else if plan.DomainComponents.IsUnknown() {
 		plan.DomainComponents = types.ListNull(types.StringType)
 	}
 
@@ -995,7 +995,7 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 		if list, diags := types.ListValueFrom(ctx, types.StringType, dcs); !diags.HasError() {
 			state.DomainComponents = list
 		}
-	} else {
+	} else if state.DomainComponents.IsNull() || len(state.DomainComponents.Elements()) > 0 {
 		state.DomainComponents = types.ListNull(types.StringType)
 	}
 
