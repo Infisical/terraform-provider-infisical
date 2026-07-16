@@ -2149,10 +2149,11 @@ type DeleteSecretApprovalPolicyResponse struct {
 }
 
 type AccessApprovalPolicyApprover struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Sequence int64  `json:"sequence"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Type              string `json:"type"`
+	Sequence          int64  `json:"sequence"`
+	ApprovalsRequired int64  `json:"approvalsRequired"`
 }
 
 type AccessApprovalPolicyBypasser struct {
@@ -2182,7 +2183,6 @@ type AccessApprovalPolicy struct {
 	RequiredApprovals     int64                                   `json:"approvals"`
 	EnforcementLevel      string                                  `json:"enforcementLevel"`
 	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
-	ApprovalsRequired     []AccessApprovalPolicyApprovalsRequired `json:"approvalsRequired"`
 	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
 	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
 }

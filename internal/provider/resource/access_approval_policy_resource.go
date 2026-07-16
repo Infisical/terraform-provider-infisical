@@ -27,9 +27,10 @@ type accessApprovalPolicyResource struct {
 }
 
 type AccessApprover struct {
-	Type types.String `tfsdk:"type"`
-	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"username"`
+	Type     types.String `tfsdk:"type"`
+	ID       types.String `tfsdk:"id"`
+	Name     types.String `tfsdk:"username"`
+	Sequence types.Int64  `tfsdk:"step"`
 }
 
 type AccessBypasser struct {
@@ -100,7 +101,7 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Description: "The secret path to apply the access approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.SetNestedAttribute{
+			"approvers": schema.ListNestedAttribute{
 				Required:    true,
 				Description: "The required approvers",
 				NestedObject: schema.NestedAttributeObject{
@@ -116,6 +117,11 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 						"username": schema.StringAttribute{
 							Description: "The username of the approver. By default, this is the email",
 							Optional:    true,
+						},
+						"step": schema.Int64Attribute{
+							Description: "The step number of the approver",
+							Optional:    true,
+							Computed:    true,
 						},
 					},
 				},
@@ -271,9 +277,10 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		}
 
 		approvers = append(approvers, infisical.CreateAccessApprovalPolicyApprover{
-			ID:   el.ID.ValueString(),
-			Name: el.Name.ValueString(),
-			Type: el.Type.ValueString(),
+			ID:       el.ID.ValueString(),
+			Name:     el.Name.ValueString(),
+			Type:     el.Type.ValueString(),
+			Sequence: el.Sequence.ValueInt64(),
 		})
 	}
 	var bypassers []infisical.CreateAccessApprovalPolicyBypasser
@@ -460,13 +467,15 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	for i, el := range accessApprovalPolicy.AccessApprovalPolicy.Approvers {
 		if el.Type == "user" {
 			approvers[i] = AccessApprover{
-				Name: types.StringValue(el.Name),
-				Type: types.StringValue(el.Type),
+				Name:     types.StringValue(el.Name),
+				Type:     types.StringValue(el.Type),
+				Sequence: types.Int64Value(el.Sequence),
 			}
 		} else {
 			approvers[i] = AccessApprover{
-				ID:   types.StringValue(el.ID),
-				Type: types.StringValue(el.Type),
+				ID:       types.StringValue(el.ID),
+				Type:     types.StringValue(el.Type),
+				Sequence: types.Int64Value(el.Sequence),
 			}
 		}
 	}
@@ -494,13 +503,19 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		state.Bypassers = nil
 	}
 
-	if len(accessApprovalPolicy.AccessApprovalPolicy.ApprovalsRequired) > 0 {
-		readApprovalsRequired := make([]AccessApprovalsRequired, len(accessApprovalPolicy.AccessApprovalPolicy.ApprovalsRequired))
-		for i, ar := range accessApprovalPolicy.AccessApprovalPolicy.ApprovalsRequired {
-			readApprovalsRequired[i] = AccessApprovalsRequired{
-				NumberOfApprovals: types.Int64Value(ar.NumberOfApprovals),
-				StepNumber:        types.Int64Value(ar.StepNumber),
-			}
+	approvalsRequiredMap := make(map[int64]int64)
+	for _, approver := range accessApprovalPolicy.AccessApprovalPolicy.Approvers {
+		if approver.ApprovalsRequired > 0 {
+			approvalsRequiredMap[approver.Sequence] = approver.ApprovalsRequired
+		}
+	}
+	if len(approvalsRequiredMap) > 0 {
+		readApprovalsRequired := make([]AccessApprovalsRequired, 0, len(approvalsRequiredMap))
+		for stepNumber, numberOfApprovals := range approvalsRequiredMap {
+			readApprovalsRequired = append(readApprovalsRequired, AccessApprovalsRequired{
+				NumberOfApprovals: types.Int64Value(numberOfApprovals),
+				StepNumber:        types.Int64Value(stepNumber),
+			})
 		}
 		state.ApprovalsRequired = readApprovalsRequired
 	} else {
@@ -612,9 +627,10 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		}
 
 		approvers = append(approvers, infisical.UpdateAccessApprovalPolicyApprover{
-			ID:   el.ID.ValueString(),
-			Name: el.Name.ValueString(),
-			Type: el.Type.ValueString(),
+			ID:       el.ID.ValueString(),
+			Name:     el.Name.ValueString(),
+			Type:     el.Type.ValueString(),
+			Sequence: el.Sequence.ValueInt64(),
 		})
 	}
 
