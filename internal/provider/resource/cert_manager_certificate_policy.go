@@ -112,16 +112,16 @@ func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req r
 }
 
 func (r *certManagerCertificatePolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var config certManagerCertificatePolicyResourceModel
+	var basicConstraints *certManagerCertificatePolicyBasicConstraintsModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("basic_constraints"), &basicConstraints)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if config.BasicConstraints != nil &&
-		config.BasicConstraints.IsCa.ValueString() == "denied" &&
-		!config.BasicConstraints.MaxPathLength.IsNull() {
+	if basicConstraints != nil &&
+		basicConstraints.IsCa.ValueString() == "denied" &&
+		!basicConstraints.MaxPathLength.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("basic_constraints").AtName("max_path_length"),
 			"Invalid basic_constraints configuration",
