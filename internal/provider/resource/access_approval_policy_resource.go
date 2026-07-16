@@ -7,6 +7,7 @@ import (
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -240,110 +241,31 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
+	validatedApprovers, ok := validateAndMapApproversFromPlan(plan.Approvers, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+
 	var approvers []infisical.CreateAccessApprovalPolicyApprover
-	for _, el := range plan.Approvers {
-		if el.Type.ValueString() == "user" {
-			if el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username is required for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-			if !el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID cannot be used for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-		}
-
-		if el.Type.ValueString() == "group" {
-			if el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID is required for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-			if !el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username cannot be used for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-		}
-
+	for _, a := range validatedApprovers {
 		approvers = append(approvers, infisical.CreateAccessApprovalPolicyApprover{
-			ID:       el.ID.ValueString(),
-			Name:     el.Name.ValueString(),
-			Type:     el.Type.ValueString(),
-			Sequence: el.Sequence.ValueInt64(),
+			ID: a.ID, Name: a.Name, Type: a.Type, Sequence: a.Sequence,
 		})
+	}
+
+	bypasserInputs := make([]infisicaltf.BypasserInput, len(plan.Bypassers))
+	for i, el := range plan.Bypassers {
+		bypasserInputs[i] = infisicaltf.BypasserInput{Type: el.Type, ID: el.ID, Name: el.Name}
+	}
+	validatedBypassers, ok := infisicaltf.ValidateAndMapBypassers(bypasserInputs, &resp.Diagnostics)
+	if !ok {
+		return
 	}
 	var bypassers []infisical.CreateAccessApprovalPolicyBypasser
-	for _, el := range plan.Bypassers {
-		if el.Type.ValueString() == "user" {
-			if el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username is required for user bypassers",
-					"Must provide username for user bypassers. By default, this is the email",
-				)
-				return
-			}
-			if !el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID cannot be used for user bypassers",
-					"Must provide username for user bypassers. By default, this is the email",
-				)
-				return
-			}
-		}
-
-		if el.Type.ValueString() == "group" {
-			if el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID is required for group bypassers",
-					"Must provide ID for group bypassers",
-				)
-				return
-			}
-			if !el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username cannot be used for group bypassers",
-					"Must provide ID for group bypassers",
-				)
-				return
-			}
-		}
-
+	for _, b := range validatedBypassers {
 		bypassers = append(bypassers, infisical.CreateAccessApprovalPolicyBypasser{
-			ID:   el.ID.ValueString(),
-			Name: el.Name.ValueString(),
-			Type: el.Type.ValueString(),
+			ID: b.ID, Name: b.Name, Type: b.Type,
 		})
-	}
-
-	var approvalsRequired []infisical.AccessApprovalPolicyApprovalsRequired
-	for _, ar := range plan.ApprovalsRequired {
-		approvalsRequired = append(approvalsRequired, infisical.AccessApprovalPolicyApprovalsRequired{
-			NumberOfApprovals: ar.NumberOfApprovals.ValueInt64(),
-			StepNumber:        ar.StepNumber.ValueInt64(),
-		})
-	}
-
-	var maxTimePeriod *string
-	if !plan.MaxTimePeriod.IsNull() && !plan.MaxTimePeriod.IsUnknown() {
-		v := plan.MaxTimePeriod.ValueString()
-		maxTimePeriod = &v
-	}
-
-	var requestExpirationTime *string
-	if !plan.RequestExpirationTime.IsNull() && !plan.RequestExpirationTime.IsUnknown() {
-		v := plan.RequestExpirationTime.ValueString()
-		requestExpirationTime = &v
 	}
 
 	if plan.EnvironmentSlugs.IsNull() && plan.EnvironmentSlug.IsNull() {
@@ -387,9 +309,9 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		RequiredApprovals:     plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:      plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals:  plan.AllowSelfApproval.ValueBool(),
-		ApprovalsRequired:     approvalsRequired,
-		MaxTimePeriod:         maxTimePeriod,
-		RequestExpirationTime: requestExpirationTime,
+		ApprovalsRequired:     mapApprovalsRequiredFromPlan(plan.ApprovalsRequired),
+		MaxTimePeriod:         infisicaltf.OptionalStringPointer(plan.MaxTimePeriod),
+		RequestExpirationTime: infisicaltf.OptionalStringPointer(plan.RequestExpirationTime),
 	})
 
 	if err != nil {
@@ -445,91 +367,25 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 	}
 
-	state.Name = types.StringValue(accessApprovalPolicy.AccessApprovalPolicy.Name)
-	state.SecretPath = types.StringValue(accessApprovalPolicy.AccessApprovalPolicy.SecretPath)
-	state.RequiredApprovals = types.Int64Value(accessApprovalPolicy.AccessApprovalPolicy.RequiredApprovals)
-	state.EnforcementLevel = types.StringValue(accessApprovalPolicy.AccessApprovalPolicy.EnforcementLevel)
-	state.AllowSelfApproval = types.BoolValue(accessApprovalPolicy.AccessApprovalPolicy.AllowedSelfApprovals)
+	policy := accessApprovalPolicy.AccessApprovalPolicy
 
-	if accessApprovalPolicy.AccessApprovalPolicy.MaxTimePeriod != nil {
-		state.MaxTimePeriod = types.StringValue(*accessApprovalPolicy.AccessApprovalPolicy.MaxTimePeriod)
-	} else {
-		state.MaxTimePeriod = types.StringNull()
-	}
+	state.Name = types.StringValue(policy.Name)
+	state.SecretPath = types.StringValue(policy.SecretPath)
+	state.RequiredApprovals = types.Int64Value(policy.RequiredApprovals)
+	state.EnforcementLevel = types.StringValue(policy.EnforcementLevel)
+	state.AllowSelfApproval = types.BoolValue(policy.AllowedSelfApprovals)
+	state.MaxTimePeriod = infisicaltf.StringPointerToTypesString(policy.MaxTimePeriod)
+	state.RequestExpirationTime = infisicaltf.StringPointerToTypesString(policy.RequestExpirationTime)
+	state.Approvers = mapApproversFromAPI(policy.Approvers)
+	state.Bypassers = mapBypassersFromAPI(policy.Bypassers)
+	state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
 
-	if accessApprovalPolicy.AccessApprovalPolicy.RequestExpirationTime != nil {
-		state.RequestExpirationTime = types.StringValue(*accessApprovalPolicy.AccessApprovalPolicy.RequestExpirationTime)
-	} else {
-		state.RequestExpirationTime = types.StringNull()
-	}
-
-	approvers := make([]AccessApprover, len(accessApprovalPolicy.AccessApprovalPolicy.Approvers))
-	for i, el := range accessApprovalPolicy.AccessApprovalPolicy.Approvers {
-		if el.Type == "user" {
-			approvers[i] = AccessApprover{
-				Name:     types.StringValue(el.Name),
-				Type:     types.StringValue(el.Type),
-				Sequence: types.Int64Value(el.Sequence),
-			}
-		} else {
-			approvers[i] = AccessApprover{
-				ID:       types.StringValue(el.ID),
-				Type:     types.StringValue(el.Type),
-				Sequence: types.Int64Value(el.Sequence),
-			}
-		}
-	}
-
-	state.Approvers = approvers
-
-	readBypassers := make([]AccessBypasser, len(accessApprovalPolicy.AccessApprovalPolicy.Bypassers))
-	for i, el := range accessApprovalPolicy.AccessApprovalPolicy.Bypassers {
-		if el.Type == "user" {
-			readBypassers[i] = AccessBypasser{
-				Name: types.StringValue(el.Name),
-				Type: types.StringValue(el.Type),
-			}
-		} else {
-			readBypassers[i] = AccessBypasser{
-				ID:   types.StringValue(el.ID),
-				Type: types.StringValue(el.Type),
-			}
-		}
-	}
-
-	if len(readBypassers) > 0 {
-		state.Bypassers = readBypassers
-	} else {
-		state.Bypassers = nil
-	}
-
-	approvalsRequiredMap := make(map[int64]int64)
-	for _, approver := range accessApprovalPolicy.AccessApprovalPolicy.Approvers {
-		if approver.ApprovalsRequired > 0 {
-			approvalsRequiredMap[approver.Sequence] = approver.ApprovalsRequired
-		}
-	}
-	if len(approvalsRequiredMap) > 0 {
-		readApprovalsRequired := make([]AccessApprovalsRequired, 0, len(approvalsRequiredMap))
-		for stepNumber, numberOfApprovals := range approvalsRequiredMap {
-			readApprovalsRequired = append(readApprovalsRequired, AccessApprovalsRequired{
-				NumberOfApprovals: types.Int64Value(numberOfApprovals),
-				StepNumber:        types.Int64Value(stepNumber),
-			})
-		}
-		state.ApprovalsRequired = readApprovalsRequired
-	} else {
-		state.ApprovalsRequired = nil
-	}
-
-	if len(accessApprovalPolicy.AccessApprovalPolicy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
-		// Extract environment slugs from the environment objects
+	if len(policy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
 		var environmentSlugs []string
-		for _, env := range accessApprovalPolicy.AccessApprovalPolicy.Environments {
+		for _, env := range policy.Environments {
 			environmentSlugs = append(environmentSlugs, env.Slug)
 		}
 
-		// Always set the new environment_slugs field
 		environmentSlugsList, diags := types.ListValueFrom(ctx, types.StringType, environmentSlugs)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -537,7 +393,6 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 		state.EnvironmentSlugs = environmentSlugsList
 
-		// For backward compatibility, set environment_slug if there's exactly one environment
 		if len(environmentSlugs) == 1 && !state.EnvironmentSlug.IsNull() {
 			state.EnvironmentSlug = types.StringValue(environmentSlugs[0])
 		}
@@ -590,111 +445,31 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
+	validatedApprovers, ok := validateAndMapApproversFromPlan(plan.Approvers, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+
 	var approvers []infisical.UpdateAccessApprovalPolicyApprover
-	for _, el := range plan.Approvers {
-		if el.Type.ValueString() == "user" {
-			if el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username is required for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-			if !el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID cannot be used for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return
-			}
-		}
-
-		if el.Type.ValueString() == "group" {
-			if el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID is required for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-			if !el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username cannot be used for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return
-			}
-		}
-
+	for _, a := range validatedApprovers {
 		approvers = append(approvers, infisical.UpdateAccessApprovalPolicyApprover{
-			ID:       el.ID.ValueString(),
-			Name:     el.Name.ValueString(),
-			Type:     el.Type.ValueString(),
-			Sequence: el.Sequence.ValueInt64(),
+			ID: a.ID, Name: a.Name, Type: a.Type, Sequence: a.Sequence,
 		})
 	}
 
+	bypasserInputs := make([]infisicaltf.BypasserInput, len(plan.Bypassers))
+	for i, el := range plan.Bypassers {
+		bypasserInputs[i] = infisicaltf.BypasserInput{Type: el.Type, ID: el.ID, Name: el.Name}
+	}
+	validatedBypassers, ok := infisicaltf.ValidateAndMapBypassers(bypasserInputs, &resp.Diagnostics)
+	if !ok {
+		return
+	}
 	var updateBypassers []infisical.UpdateAccessApprovalPolicyBypasser
-	for _, el := range plan.Bypassers {
-		if el.Type.ValueString() == "user" {
-			if el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username is required for user bypassers",
-					"Must provide username for user bypassers. By default, this is the email",
-				)
-				return
-			}
-			if !el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID cannot be used for user bypassers",
-					"Must provide username for user bypassers. By default, this is the email",
-				)
-				return
-			}
-		}
-
-		if el.Type.ValueString() == "group" {
-			if el.ID.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field ID is required for group bypassers",
-					"Must provide ID for group bypassers",
-				)
-				return
-			}
-			if !el.Name.IsNull() {
-				resp.Diagnostics.AddError(
-					"Field username cannot be used for group bypassers",
-					"Must provide ID for group bypassers",
-				)
-				return
-			}
-		}
-
+	for _, b := range validatedBypassers {
 		updateBypassers = append(updateBypassers, infisical.UpdateAccessApprovalPolicyBypasser{
-			ID:   el.ID.ValueString(),
-			Name: el.Name.ValueString(),
-			Type: el.Type.ValueString(),
+			ID: b.ID, Name: b.Name, Type: b.Type,
 		})
-	}
-
-	var updateApprovalsRequired []infisical.AccessApprovalPolicyApprovalsRequired
-	for _, ar := range plan.ApprovalsRequired {
-		updateApprovalsRequired = append(updateApprovalsRequired, infisical.AccessApprovalPolicyApprovalsRequired{
-			NumberOfApprovals: ar.NumberOfApprovals.ValueInt64(),
-			StepNumber:        ar.StepNumber.ValueInt64(),
-		})
-	}
-
-	var updateMaxTimePeriod *string
-	if !plan.MaxTimePeriod.IsNull() && !plan.MaxTimePeriod.IsUnknown() {
-		v := plan.MaxTimePeriod.ValueString()
-		updateMaxTimePeriod = &v
-	}
-
-	var updateRequestExpirationTime *string
-	if !plan.RequestExpirationTime.IsNull() && !plan.RequestExpirationTime.IsUnknown() {
-		v := plan.RequestExpirationTime.ValueString()
-		updateRequestExpirationTime = &v
 	}
 
 	var environments []string
@@ -713,9 +488,9 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:     plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:      plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals:  plan.AllowSelfApproval.ValueBool(),
-		ApprovalsRequired:     updateApprovalsRequired,
-		MaxTimePeriod:         updateMaxTimePeriod,
-		RequestExpirationTime: updateRequestExpirationTime,
+		ApprovalsRequired:     mapApprovalsRequiredFromPlan(plan.ApprovalsRequired),
+		MaxTimePeriod:         infisicaltf.OptionalStringPointer(plan.MaxTimePeriod),
+		RequestExpirationTime: infisicaltf.OptionalStringPointer(plan.RequestExpirationTime),
 		Environments:          environments,
 	})
 
@@ -762,4 +537,84 @@ func (r *accessApprovalPolicyResource) Delete(ctx context.Context, req resource.
 		)
 		return
 	}
+}
+
+func validateAndMapApproversFromPlan(planApprovers []AccessApprover, diagnostics *diag.Diagnostics) ([]infisicaltf.AccessApproverOutput, bool) {
+	inputs := make([]infisicaltf.AccessApproverInput, len(planApprovers))
+	for i, el := range planApprovers {
+		inputs[i] = infisicaltf.AccessApproverInput{Type: el.Type, ID: el.ID, Name: el.Name, Sequence: el.Sequence}
+	}
+	return infisicaltf.ValidateAndMapApprovers(inputs, diagnostics)
+}
+
+func mapApproversFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) []AccessApprover {
+	approvers := make([]AccessApprover, len(apiApprovers))
+	for i, el := range apiApprovers {
+		if el.Type == "user" {
+			approvers[i] = AccessApprover{
+				Name:     types.StringValue(el.Name),
+				Type:     types.StringValue(el.Type),
+				Sequence: types.Int64Value(el.Sequence),
+			}
+		} else {
+			approvers[i] = AccessApprover{
+				ID:       types.StringValue(el.ID),
+				Type:     types.StringValue(el.Type),
+				Sequence: types.Int64Value(el.Sequence),
+			}
+		}
+	}
+	return approvers
+}
+
+func mapBypassersFromAPI(apiBypassers []infisical.AccessApprovalPolicyBypasser) []AccessBypasser {
+	if len(apiBypassers) == 0 {
+		return nil
+	}
+	bypassers := make([]AccessBypasser, len(apiBypassers))
+	for i, el := range apiBypassers {
+		if el.Type == "user" {
+			bypassers[i] = AccessBypasser{
+				Name: types.StringValue(el.Name),
+				Type: types.StringValue(el.Type),
+			}
+		} else {
+			bypassers[i] = AccessBypasser{
+				ID:   types.StringValue(el.ID),
+				Type: types.StringValue(el.Type),
+			}
+		}
+	}
+	return bypassers
+}
+
+func mapApprovalsRequiredFromPlan(planApprovalsRequired []AccessApprovalsRequired) []infisical.AccessApprovalPolicyApprovalsRequired {
+	var result []infisical.AccessApprovalPolicyApprovalsRequired
+	for _, ar := range planApprovalsRequired {
+		result = append(result, infisical.AccessApprovalPolicyApprovalsRequired{
+			NumberOfApprovals: ar.NumberOfApprovals.ValueInt64(),
+			StepNumber:        ar.StepNumber.ValueInt64(),
+		})
+	}
+	return result
+}
+
+func mapApprovalsRequiredFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) []AccessApprovalsRequired {
+	approvalsRequiredMap := make(map[int64]int64)
+	for _, approver := range apiApprovers {
+		if approver.ApprovalsRequired > 0 {
+			approvalsRequiredMap[approver.Sequence] = approver.ApprovalsRequired
+		}
+	}
+	if len(approvalsRequiredMap) == 0 {
+		return nil
+	}
+	result := make([]AccessApprovalsRequired, 0, len(approvalsRequiredMap))
+	for stepNumber, numberOfApprovals := range approvalsRequiredMap {
+		result = append(result, AccessApprovalsRequired{
+			NumberOfApprovals: types.Int64Value(numberOfApprovals),
+			StepNumber:        types.Int64Value(stepNumber),
+		})
+	}
+	return result
 }
