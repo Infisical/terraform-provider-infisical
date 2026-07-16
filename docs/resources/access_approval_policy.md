@@ -51,8 +51,26 @@ resource "infisical_access_approval_policy" "prod-policy" {
       type     = "user"
       username = "name@infisical.com"
   }]
-  required_approvals = 1
-  enforcement_level  = "soft"
+  bypassers = [
+    {
+      type = "group"
+      id   = "70782603-18bd-4f83-a312-6a9c501f4914"
+    },
+    {
+      type     = "user"
+      username = "admin@infisical.com"
+  }]
+  required_approvals  = 1
+  enforcement_level   = "soft"
+  allow_self_approval = false
+
+  approvals_required {
+    number_of_approvals = 2
+    step_number         = 1
+  }
+
+  max_time_period         = "24h"
+  request_expiration_time = "72h"
 }
 ```
 
@@ -68,10 +86,15 @@ resource "infisical_access_approval_policy" "prod-policy" {
 
 ### Optional
 
+- `allow_self_approval` (Boolean) Whether to allow approvers to approve their own requests
+- `approvals_required` (Attributes List) The number of approvals required per step for multi-step approval policies (see [below for nested schema](#nestedatt--approvals_required))
+- `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to
 - `environment_slugs` (List of String) The environments to apply the access approval policy to
+- `max_time_period` (String) The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). Use 'permanent' or leave empty for no limit.
 - `name` (String) The name of the access approval policy
+- `request_expiration_time` (String) The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. Use 'never' or leave empty for no expiration.
 
 ### Read-Only
 
@@ -88,3 +111,25 @@ Optional:
 
 - `id` (String) The ID of the approver
 - `username` (String) The username of the approver. By default, this is the email
+
+
+<a id="nestedatt--approvals_required"></a>
+### Nested Schema for `approvals_required`
+
+Required:
+
+- `number_of_approvals` (Number) The number of approvals required for this step
+- `step_number` (Number) The step number this approval count applies to
+
+
+<a id="nestedatt--bypassers"></a>
+### Nested Schema for `bypassers`
+
+Required:
+
+- `type` (String) The type of bypasser. Either group or user
+
+Optional:
+
+- `id` (String) The ID of the bypasser
+- `username` (String) The username of the bypasser. By default, this is the email

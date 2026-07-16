@@ -25,16 +25,20 @@ resource "infisical_access_approval_policy" "prod-policy" {
   secret_path       = "/"
 
   group_approvers = [
+    // array of group IDs
     "60782603-18bd-4f83-a312-6a9c501f4914",
   ]
   user_approvers = [
+    // array of usernames
     "vlad@infisical.com",
   ]
 
   group_bypassers = [
+    // array of group IDs
     "70782603-18bd-4f83-a312-6a9c501f4914",
   ]
   user_bypassers = [
+    // array of usernames
     "admin@infisical.com",
   ]
 
