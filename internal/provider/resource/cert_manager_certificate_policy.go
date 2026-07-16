@@ -121,7 +121,8 @@ func (r *certManagerCertificatePolicyResource) ValidateConfig(ctx context.Contex
 
 	if basicConstraints != nil &&
 		basicConstraints.IsCa.ValueString() == "denied" &&
-		!basicConstraints.MaxPathLength.IsNull() {
+		!basicConstraints.MaxPathLength.IsNull() &&
+		!basicConstraints.MaxPathLength.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("basic_constraints").AtName("max_path_length"),
 			"Invalid basic_constraints configuration",
