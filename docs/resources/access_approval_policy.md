@@ -23,51 +23,56 @@ terraform {
 }
 
 provider "infisical" {
-  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
+  host = "http://localhost:8080" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {
     universal = {
-      client_id     = "<machine-identity-client-id>"
-      client_secret = "<machine-identity-client-secret>"
+      client_id     = "ca7a1793-85ba-44d5-b416-28cd849b62d1"
+      client_secret = "d957b3ed592f0f51f5453ea3bba047070572389910f8b2b61ea98a424934193f"
     }
   }
 }
 
-resource "infisical_project" "example" {
-  name = "example"
-  slug = "example"
-}
-
 resource "infisical_access_approval_policy" "prod-policy" {
-  project_id        = infisical_project.example.id
+  project_id        = "b394bb99-3ee4-4fc6-8adf-dae14c59ce9a"
   name              = "my-approval-policy"
   environment_slugs = ["prod"]
   secret_path       = "/"
   approvers = [
     {
       type = "group"
-      id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
+      step = 1
+    },
+    {
+      type = "group"
+      id   = "83d5cf3b-3580-4aaf-872e-564a8ccaaf86"
+      step = 2
     },
     {
       type     = "user"
-      username = "name@infisical.com"
+      username = "matheus2@infisical.com"
+      step     = 1
   }]
   bypassers = [
     {
       type = "group"
-      id   = "70782603-18bd-4f83-a312-6a9c501f4914"
-    },
-    {
-      type     = "user"
-      username = "admin@infisical.com"
-  }]
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
+    }
+  ]
   required_approvals  = 1
   enforcement_level   = "soft"
-  allow_self_approval = false
+  allow_self_approval = true
 
-  approvals_required {
-    number_of_approvals = 2
-    step_number         = 1
-  }
+  approvals_required = [
+    {
+      number_of_approvals = 2
+      step_number         = 1
+    },
+    {
+      number_of_approvals = 1
+      step_number         = 2
+    }
+  ]
 
   max_time_period         = "24h"
   request_expiration_time = "72h"
@@ -79,7 +84,8 @@ resource "infisical_access_approval_policy" "prod-policy" {
 
 ### Required
 
-- `approvers` (Attributes Set) The required approvers (see [below for nested schema](#nestedatt--approvers))
+- `approvers` (Attributes List) The required approvers (see [below for nested schema](#nestedatt--approvers))
+- `environment_slugs` (List of String) The environments to apply the access approval policy to
 - `project_id` (String) The ID of the project to add the access approval policy
 - `required_approvals` (Number) The number of required approvers
 - `secret_path` (String) The secret path to apply the access approval policy to
@@ -88,13 +94,12 @@ resource "infisical_access_approval_policy" "prod-policy" {
 
 - `allow_self_approval` (Boolean) Whether to allow approvers to approve their own requests
 - `approvals_required` (Attributes List) The number of approvals required per step for multi-step approval policies (see [below for nested schema](#nestedatt--approvals_required))
-- `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
-- `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to
-- `environment_slugs` (List of String) The environments to apply the access approval policy to
+- `group_bypassers` (List of String) Array of group IDs belonging to the groups to assign as bypassers
 - `max_time_period` (String) The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). Use 'permanent' or leave empty for no limit.
 - `name` (String) The name of the access approval policy
 - `request_expiration_time` (String) The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. Use 'never' or leave empty for no expiration.
+- `user_bypassers` (List of String) Array of usernames belonging to the users to assign as bypassers
 
 ### Read-Only
 
@@ -110,6 +115,7 @@ Required:
 Optional:
 
 - `id` (String) The ID of the approver
+- `step` (Number) The step number of the approver
 - `username` (String) The username of the approver. By default, this is the email
 
 
@@ -120,16 +126,3 @@ Required:
 
 - `number_of_approvals` (Number) The number of approvals required for this step
 - `step_number` (Number) The step number this approval count applies to
-
-
-<a id="nestedatt--bypassers"></a>
-### Nested Schema for `bypassers`
-
-Required:
-
-- `type` (String) The type of bypasser. Either group or user
-
-Optional:
-
-- `id` (String) The ID of the bypasser
-- `username` (String) The username of the bypasser. By default, this is the email

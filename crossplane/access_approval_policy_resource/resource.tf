@@ -24,32 +24,38 @@ resource "infisical_access_approval_policy" "prod-policy" {
   environment_slugs = ["prod"]
   secret_path       = "/"
 
-  group_approvers = [
-    // array of group IDs
-    "60782603-18bd-4f83-a312-6a9c501f4914",
-  ]
-  user_approvers = [
-    // array of usernames
-    "vlad@infisical.com",
-  ]
-
-  group_bypassers = [
-    // array of group IDs
-    "70782603-18bd-4f83-a312-6a9c501f4914",
-  ]
-  user_bypassers = [
-    // array of usernames
-    "admin@infisical.com",
+  approvers = [
+    {
+      type = "group"
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
+      step = 1
+    },
+    {
+      type     = "user"
+      username = "admin@infisical.com"
+      step     = 2
+    },
+    {
+      type = "group"
+      id   = "83d5cf3b-3580-4aaf-872e-564a8ccaaf86"
+      step = 2
+    },
   ]
 
   required_approvals = 1
   enforcement_level  = "soft"
   allow_self_approval = false
 
-  approvals_required {
-    number_of_approvals = 2
-    step_number         = 1
-  }
+  approvals_required = [
+    {
+      number_of_approvals = 2
+      step_number         = 1
+    },
+     {
+      number_of_approvals = 2
+      step_number         = 2
+    }
+  ]
 
   max_time_period           = "24h"
   request_expiration_time   = "72h"
