@@ -99,6 +99,7 @@ type certManagerCertificateResourceModel struct {
 	Country              types.String `tfsdk:"country"`
 	Province             types.String `tfsdk:"province"`
 	Locality             types.String `tfsdk:"locality"`
+	DomainComponents     types.List   `tfsdk:"domain_components"`
 	KeyAlgorithm         types.String `tfsdk:"key_algorithm"`
 	SignatureAlgorithm   types.String `tfsdk:"signature_algorithm"`
 	KeyUsages            types.List   `tfsdk:"key_usages"`
@@ -212,6 +213,16 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"domain_components": schema.ListAttribute{
+				Description: "Domain components (DC) for the certificate. Multi-valued; each entry becomes a DC attribute in the subject.",
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
+					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
@@ -429,6 +440,18 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 		hasAttributes = true
 	}
 
+	if !plan.DomainComponents.IsNull() && !plan.DomainComponents.IsUnknown() {
+		domainComponents := make([]string, 0, len(plan.DomainComponents.Elements()))
+		resp.Diagnostics.Append(plan.DomainComponents.ElementsAs(ctx, &domainComponents, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if len(domainComponents) > 0 {
+			attributes.DomainComponents = domainComponents
+			hasAttributes = true
+		}
+	}
+
 	if !plan.AltNames.IsNull() && !plan.AltNames.IsUnknown() {
 		altNamesStr := make([]string, 0)
 		resp.Diagnostics.Append(plan.AltNames.ElementsAs(ctx, &altNamesStr, false)...)
@@ -603,6 +626,18 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 		plan.Locality = types.StringValue(cert.SubjectLocality)
 	} else if plan.Locality.IsUnknown() {
 		plan.Locality = types.StringNull()
+	}
+
+	if cert.SubjectDomainComponents != "" {
+		dcs := strings.Split(cert.SubjectDomainComponents, ",")
+		for i := range dcs {
+			dcs[i] = strings.TrimSpace(dcs[i])
+		}
+		if list, diags := types.ListValueFrom(ctx, types.StringType, dcs); !diags.HasError() {
+			plan.DomainComponents = list
+		}
+	} else if plan.DomainComponents.IsUnknown() {
+		plan.DomainComponents = types.ListNull(types.StringType)
 	}
 
 	if len(cert.KeyUsages) > 0 {
@@ -950,6 +985,18 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 		state.Locality = types.StringValue(cert.SubjectLocality)
 	} else if state.Locality.IsUnknown() {
 		state.Locality = types.StringNull()
+	}
+
+	if cert.SubjectDomainComponents != "" {
+		dcs := strings.Split(cert.SubjectDomainComponents, ",")
+		for i := range dcs {
+			dcs[i] = strings.TrimSpace(dcs[i])
+		}
+		if list, diags := types.ListValueFrom(ctx, types.StringType, dcs); !diags.HasError() {
+			state.DomainComponents = list
+		}
+	} else if state.DomainComponents.IsNull() || len(state.DomainComponents.Elements()) > 0 {
+		state.DomainComponents = types.ListNull(types.StringType)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
