@@ -2,8 +2,10 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -19,7 +22,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &ProjectIdentityResource{}
+	_ resource.Resource                = &ProjectIdentityResource{}
+	_ resource.ResourceWithImportState = &ProjectIdentityResource{}
 )
 
 // NewProjectResource is a helper function to simplify the provider implementation.
@@ -34,11 +38,12 @@ type ProjectIdentityResource struct {
 
 // projectResourceSourceModel describes the data source data model.
 type ProjectIdentityResourceModel struct {
-	ProjectID    types.String          `tfsdk:"project_id"`
-	IdentityID   types.String          `tfsdk:"identity_id"`
-	Identity     types.Object          `tfsdk:"identity"`
-	Roles        []ProjectIdentityRole `tfsdk:"roles"`
-	MembershipId types.String          `tfsdk:"membership_id"`
+	ProjectID     types.String          `tfsdk:"project_id"`
+	IdentityID    types.String          `tfsdk:"identity_id"`
+	Identity      types.Object          `tfsdk:"identity"`
+	Roles         []ProjectIdentityRole `tfsdk:"roles"`
+	MembershipId  types.String          `tfsdk:"membership_id"`
+	AdoptExisting types.Bool            `tfsdk:"adopt_existing"`
 }
 
 type ProjectIdentityDetails struct {
@@ -80,6 +85,13 @@ func (r *ProjectIdentityResource) Schema(_ context.Context, _ resource.SchemaReq
 				Description:   "The membership Id of the project identity",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"adopt_existing": schema.BoolAttribute{
+				Description:   "When true, if the identity is already a member of the project (e.g. auto-added by Infisical when the project was created by this identity), the existing membership is adopted and its roles are updated to match the desired state instead of returning an error. Defaults to false.",
+				Optional:      true,
+				Computed:      true,
+				Default:       booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"identity": schema.SingleNestedAttribute{
 				Computed:    true,
@@ -329,17 +341,75 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	_, err = r.client.CreateProjectIdentity(infisical.CreateProjectIdentityRequest{
-		ProjectID:  plan.ProjectID.ValueString(),
-		IdentityID: plan.IdentityID.ValueString(),
-		Roles:      roles,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error attaching identity to project",
-			"Couldn't create project identity to Infisical, unexpected error: "+err.Error(),
+	alreadyMember := false
+	var existing infisical.GetProjectIdentityByIDResponse
+	if plan.AdoptExisting.ValueBool() {
+		var getErr error
+		existing, getErr = r.client.GetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
+			ProjectID:  plan.ProjectID.ValueString(),
+			IdentityID: plan.IdentityID.ValueString(),
+		})
+		switch {
+		case getErr == nil:
+			alreadyMember = true
+		case errors.Is(getErr, infisical.ErrNotFound):
+			alreadyMember = false
+		default:
+			resp.Diagnostics.AddError(
+				"Error checking project identity membership",
+				"Couldn't check existing membership, unexpected error: "+getErr.Error(),
+			)
+			return
+		}
+	}
+
+	if alreadyMember {
+		prevSlugs := make([]string, 0, len(existing.Membership.Roles))
+		for _, role := range existing.Membership.Roles {
+			slug := role.Role
+			if role.CustomRoleSlug != "" {
+				slug = role.CustomRoleSlug
+			}
+			prevSlugs = append(prevSlugs, slug)
+		}
+		previousRoles := strings.Join(prevSlugs, ", ")
+		if previousRoles == "" {
+			previousRoles = "(none)"
+		}
+		resp.Diagnostics.AddWarning(
+			"Adopted existing project identity membership",
+			fmt.Sprintf("Identity %s was already a member of project %s (membership %s); the existing membership will be adopted into Terraform state and its roles updated to match the configuration (previous roles: %s).",
+				plan.IdentityID.ValueString(), plan.ProjectID.ValueString(), existing.Membership.ID, previousRoles),
 		)
-		return
+		updateRoles := make([]infisical.UpdateProjectIdentityRequestRoles, len(roles))
+		for i, role := range roles {
+			updateRoles[i] = infisical.UpdateProjectIdentityRequestRoles(role)
+		}
+		_, err = r.client.UpdateProjectIdentity(infisical.UpdateProjectIdentityRequest{
+			ProjectID:  plan.ProjectID.ValueString(),
+			IdentityID: plan.IdentityID.ValueString(),
+			Roles:      updateRoles,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating existing project identity membership",
+				"Couldn't update roles for existing membership, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	} else {
+		_, err = r.client.CreateProjectIdentity(infisical.CreateProjectIdentityRequest{
+			ProjectID:  plan.ProjectID.ValueString(),
+			IdentityID: plan.IdentityID.ValueString(),
+			Roles:      roles,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error attaching identity to project",
+				"Couldn't create project identity to Infisical, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	projectIdentityDetails, err := r.client.GetProjectIdentityByID(infisical.GetProjectIdentityByIDRequest{
@@ -367,7 +437,6 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
 		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
 	}
-
 	elements := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
 	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
 		elements[i] = types.StringValue(method)
@@ -376,10 +445,6 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 
 	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -411,11 +476,10 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 	})
 
 	if err != nil {
-		if err == infisical.ErrNotFound {
+		if errors.Is(err, infisical.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-
 		resp.Diagnostics.AddError(
 			"Error fetching identity",
 			"Couldn't find identity in project, unexpected error: "+err.Error(),
@@ -435,7 +499,6 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
 		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
 	}
-
 	elements := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
 	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
 		elements[i] = types.StringValue(method)
@@ -444,10 +507,6 @@ func (r *ProjectIdentityResource) Read(ctx context.Context, req resource.ReadReq
 
 	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -531,7 +590,6 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 		ID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
 		Name: types.StringValue(projectIdentityDetails.Membership.Identity.Name),
 	}
-
 	elements := make([]attr.Value, len(projectIdentityDetails.Membership.Identity.AuthMethods))
 	for i, method := range projectIdentityDetails.Membership.Identity.AuthMethods {
 		elements[i] = types.StringValue(method)
@@ -540,9 +598,6 @@ func (r *ProjectIdentityResource) Update(ctx context.Context, req resource.Updat
 
 	diags = resp.State.SetAttribute(ctx, path.Root("identity"), identityDetails)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -620,11 +675,12 @@ func (r *ProjectIdentityResource) ImportState(ctx context.Context, req resource.
 	}
 
 	plan := ProjectIdentityResourceModel{
-		ProjectID:    types.StringValue(projectIdentityDetails.Membership.Project.ID),
-		IdentityID:   types.StringValue(projectIdentityDetails.Membership.Identity.Id),
-		MembershipId: types.StringValue(projectIdentityDetails.Membership.ID),
-		Roles:        planRoles,
-		Identity:     identityObj,
+		ProjectID:     types.StringValue(projectIdentityDetails.Membership.Project.ID),
+		IdentityID:    types.StringValue(projectIdentityDetails.Membership.Identity.Id),
+		MembershipId:  types.StringValue(projectIdentityDetails.Membership.ID),
+		Roles:         planRoles,
+		Identity:      identityObj,
+		AdoptExisting: types.BoolValue(false),
 	}
 
 	// Set the state with the imported data
