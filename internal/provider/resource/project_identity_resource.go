@@ -372,10 +372,14 @@ func (r *ProjectIdentityResource) Create(ctx context.Context, req resource.Creat
 			}
 			prevSlugs = append(prevSlugs, slug)
 		}
+		previousRoles := strings.Join(prevSlugs, ", ")
+		if previousRoles == "" {
+			previousRoles = "(none)"
+		}
 		resp.Diagnostics.AddWarning(
 			"Adopted existing project identity membership",
 			fmt.Sprintf("Identity %s was already a member of project %s (membership %s); the existing membership was adopted into Terraform state and its roles were updated to match the configuration (previous roles: %s).",
-				plan.IdentityID.ValueString(), plan.ProjectID.ValueString(), existing.Membership.ID, strings.Join(prevSlugs, ", ")),
+				plan.IdentityID.ValueString(), plan.ProjectID.ValueString(), existing.Membership.ID, previousRoles),
 		)
 		updateRoles := make([]infisical.UpdateProjectIdentityRequestRoles, len(roles))
 		for i, role := range roles {
