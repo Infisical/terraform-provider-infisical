@@ -40,17 +40,17 @@ type SecretBypasser struct {
 
 // secretApprovalPolicyResourceModel describes the data source data model.
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String      `tfsdk:"id"`
-	ProjectID         types.String      `tfsdk:"project_id"`
-	Name              types.String      `tfsdk:"name"`
-	EnvironmentSlug   types.String      `tfsdk:"environment_slug"`
-	EnvironmentSlugs  types.List        `tfsdk:"environment_slugs"`
-	SecretPath        types.String      `tfsdk:"secret_path"`
-	Approvers         []SecretApprover  `tfsdk:"approvers"`
-	Bypassers         []SecretBypasser  `tfsdk:"bypassers"`
-	RequiredApprovals types.Int64       `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String      `tfsdk:"enforcement_level"`
-	AllowSelfApproval types.Bool        `tfsdk:"allow_self_approval"`
+	ID                types.String     `tfsdk:"id"`
+	ProjectID         types.String     `tfsdk:"project_id"`
+	Name              types.String     `tfsdk:"name"`
+	EnvironmentSlug   types.String     `tfsdk:"environment_slug"`
+	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
+	SecretPath        types.String     `tfsdk:"secret_path"`
+	Approvers         []SecretApprover `tfsdk:"approvers"`
+	Bypassers         []SecretBypasser `tfsdk:"bypassers"`
+	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
+	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
+	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
 }
 
 // Metadata returns the resource type name.

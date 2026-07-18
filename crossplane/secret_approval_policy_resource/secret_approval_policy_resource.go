@@ -38,16 +38,16 @@ type SecretBypasser struct {
 }
 
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String      `tfsdk:"id"`
-	ProjectID         types.String      `tfsdk:"project_id"`
-	Name              types.String      `tfsdk:"name"`
-	EnvironmentSlugs  types.List        `tfsdk:"environment_slugs"`
-	SecretPath        types.String      `tfsdk:"secret_path"`
-	Approvers         []SecretApprover  `tfsdk:"approvers"`
-	Bypassers         []SecretBypasser  `tfsdk:"bypassers"`
-	RequiredApprovals types.Int64       `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String      `tfsdk:"enforcement_level"`
-	AllowSelfApproval types.Bool        `tfsdk:"allow_self_approval"`
+	ID                types.String     `tfsdk:"id"`
+	ProjectID         types.String     `tfsdk:"project_id"`
+	Name              types.String     `tfsdk:"name"`
+	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
+	SecretPath        types.String     `tfsdk:"secret_path"`
+	Approvers         []SecretApprover `tfsdk:"approvers"`
+	Bypassers         []SecretBypasser `tfsdk:"bypassers"`
+	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
+	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
+	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
 }
 
 func (r *secretApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
