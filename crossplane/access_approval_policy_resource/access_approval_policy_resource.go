@@ -400,14 +400,14 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 	}
 
-	if len(groupBypassers) > 0 {
+	if !state.GroupBypassers.IsNull() {
 		state.GroupBypassers, diags = types.ListValueFrom(ctx, types.StringType, groupBypassers)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
-	if len(userBypassers) > 0 {
+	if !state.UserBypassers.IsNull() {
 		state.UserBypassers, diags = types.ListValueFrom(ctx, types.StringType, userBypassers)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
