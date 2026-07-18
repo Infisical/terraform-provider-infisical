@@ -386,7 +386,9 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequestExpirationTime = infisicaltf.StringPointerToTypesString(policy.RequestExpirationTime)
 	state.Approvers = mapApproversFromAPI(policy.Approvers)
 	state.Bypassers = mapBypassersFromAPI(policy.Bypassers)
-	state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
+	if state.ApprovalsRequired != nil {
+		state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
+	}
 
 	if len(policy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
 		var environmentSlugs []string
