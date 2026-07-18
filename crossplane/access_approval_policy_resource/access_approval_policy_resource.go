@@ -47,6 +47,8 @@ type accessApprovalPolicyResourceModel struct {
 	EnvironmentSlugs      types.List                              `tfsdk:"environment_slugs"`
 	SecretPath            types.String                            `tfsdk:"secret_path"`
 	Approvers             []AccessApprover                        `tfsdk:"approvers"`
+	GroupApprovers        types.List                              `tfsdk:"group_approvers"`
+	UserApprovers         types.List                              `tfsdk:"user_approvers"`
 	GroupBypassers        types.List                              `tfsdk:"group_bypassers"`
 	UserBypassers         types.List                              `tfsdk:"user_bypassers"`
 	RequiredApprovals     types.Int64                             `tfsdk:"required_approvals"`
@@ -93,7 +95,7 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Required:    true,
 			},
 			"approvers": schema.ListNestedAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The required approvers",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -116,6 +118,18 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 						},
 					},
 				},
+			},
+			"group_approvers": schema.ListAttribute{
+				Description:   "(DEPRECATED, use approvers instead) Array of group IDs to assign as approvers. Uses step 1 by default.",
+				Optional:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
+			},
+			"user_approvers": schema.ListAttribute{
+				Description:   "(DEPRECATED, use approvers instead) Array of usernames to assign as approvers. Uses step 1 by default.",
+				Optional:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"group_bypassers": schema.ListAttribute{
 				Optional:      true,
@@ -223,7 +237,12 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	validatedApprovers, ok := validateAndMapApproversFromPlan(plan.Approvers, &resp.Diagnostics)
+	allApprovers, ok := mergeDeprecatedApprovers(ctx, &resp.Diagnostics, plan.Approvers, plan.GroupApprovers, plan.UserApprovers)
+	if !ok {
+		return
+	}
+
+	validatedApprovers, ok := validateAndMapApproversFromPlan(allApprovers, &resp.Diagnostics)
 	if !ok {
 		return
 	}
@@ -333,6 +352,34 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.Approvers = mapApproversFromAPI(policy.Approvers)
 	state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
 
+	if !state.GroupApprovers.IsNull() {
+		groupApproverIDs := make([]string, 0)
+		for _, el := range policy.Approvers {
+			if el.Type == "group" {
+				groupApproverIDs = append(groupApproverIDs, el.ID)
+			}
+		}
+		state.GroupApprovers, diags = types.ListValueFrom(ctx, types.StringType, groupApproverIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if !state.UserApprovers.IsNull() {
+		userApproverNames := make([]string, 0)
+		for _, el := range policy.Approvers {
+			if el.Type == "user" {
+				userApproverNames = append(userApproverNames, el.Name)
+			}
+		}
+		state.UserApprovers, diags = types.ListValueFrom(ctx, types.StringType, userApproverNames)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	groupBypassers := make([]string, 0)
 	userBypassers := make([]string, 0)
 	for _, el := range policy.Bypassers {
@@ -419,7 +466,12 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	validatedApprovers, ok := validateAndMapApproversFromPlan(plan.Approvers, &resp.Diagnostics)
+	allApprovers, ok := mergeDeprecatedApprovers(ctx, &resp.Diagnostics, plan.Approvers, plan.GroupApprovers, plan.UserApprovers)
+	if !ok {
+		return
+	}
+
+	validatedApprovers, ok := validateAndMapApproversFromPlan(allApprovers, &resp.Diagnostics)
 	if !ok {
 		return
 	}
@@ -562,6 +614,47 @@ func mapApproversFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) 
 		}
 	}
 	return approvers
+}
+
+func mergeDeprecatedApprovers(ctx context.Context, diagnostics *diag.Diagnostics, planApprovers []AccessApprover, groupApprovers, userApprovers types.List) ([]AccessApprover, bool) {
+	hasNewFormat := len(planApprovers) > 0
+	hasOldFormat := !groupApprovers.IsNull() || !userApprovers.IsNull()
+
+	if hasNewFormat && hasOldFormat {
+		diagnostics.AddError(
+			"Conflicting approver configuration",
+			"Cannot use both 'approvers' and the deprecated 'group_approvers'/'user_approvers' fields. Use 'approvers' for new configurations.",
+		)
+		return nil, false
+	}
+
+	if hasNewFormat {
+		return planApprovers, true
+	}
+
+	result := make([]AccessApprover, 0)
+
+	if groupIDs := infisicaltf.StringListToGoStringSlice(ctx, *diagnostics, groupApprovers); groupIDs != nil {
+		for _, id := range groupIDs {
+			result = append(result, AccessApprover{
+				Type:     types.StringValue("group"),
+				ID:       types.StringValue(id),
+				Sequence: types.Int64Value(1),
+			})
+		}
+	}
+
+	if usernames := infisicaltf.StringListToGoStringSlice(ctx, *diagnostics, userApprovers); usernames != nil {
+		for _, username := range usernames {
+			result = append(result, AccessApprover{
+				Type:     types.StringValue("user"),
+				Name:     types.StringValue(username),
+				Sequence: types.Int64Value(1),
+			})
+		}
+	}
+
+	return result, true
 }
 
 func mapApprovalsRequiredFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) []AccessApprovalPolicyApprovalsRequired {

@@ -24,6 +24,8 @@ resource "infisical_access_approval_policy" "prod-policy" {
   environment_slugs = ["prod"]
   secret_path       = "/"
 
+  # Option 1: Use the "approvers" attribute (recommended, supports multi-step approval)
+  # Only one format can be used at a time. Do not combine "approvers" with "group_approvers"/"user_approvers".
   approvers = [
     {
       type = "group"
@@ -41,6 +43,16 @@ resource "infisical_access_approval_policy" "prod-policy" {
       step = 2
     },
   ]
+
+  # Option 2 (DEPRECATED): Use "group_approvers" and "user_approvers" flat lists.
+  # All approvers will default to step 1. Cannot be combined with "approvers".
+  # group_approvers = [
+  #   "7c13f73b-c09b-4752-aea6-9b691ba3eb45",
+  #   "83d5cf3b-3580-4aaf-872e-564a8ccaaf86",
+  # ]
+  # user_approvers = [
+  #   "admin@infisical.com",
+  # ]
 
   required_approvals = 1
   enforcement_level  = "soft"
