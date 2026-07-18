@@ -342,6 +342,11 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 
 	policy := accessApprovalPolicy.AccessApprovalPolicy
 
+	if policy.DeletedAt != nil {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	state.Name = types.StringValue(policy.Name)
 	state.SecretPath = types.StringValue(policy.SecretPath)
 	state.RequiredApprovals = types.Int64Value(policy.RequiredApprovals)

@@ -2185,6 +2185,7 @@ type AccessApprovalPolicy struct {
 	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
 	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
 	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
+	DeletedAt             *string                                 `json:"deletedAt"`
 }
 
 type CreateAccessApprovalPolicyApprover struct {
