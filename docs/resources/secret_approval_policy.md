@@ -62,16 +62,17 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 ### Required
 
 - `approvers` (Attributes Set) The required approvers (see [below for nested schema](#nestedatt--approvers))
-- `environment_slugs` (List of String) The environments to apply the secret approval policy to
 - `project_id` (String) The ID of the project to add the secret approval policy
 - `required_approvals` (Number) The number of required approvers
 - `secret_path` (String) The secret path to apply the secret approval policy to
 
 ### Optional
 
-- `allow_self_approval` (Boolean) Whether to allow the approvers to approve their own changes
+- `allow_self_approval` (Boolean) Whether to allow the  approvers to approve their own changes
 - `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
+- `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the secret approval policy to
+- `environment_slugs` (List of String) The environments to apply the secret approval policy to
 - `name` (String) The name of the secret approval policy
 
 ### Read-Only
