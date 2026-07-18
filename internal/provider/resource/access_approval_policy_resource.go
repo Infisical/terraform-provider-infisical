@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"sort"
 	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
@@ -621,5 +622,8 @@ func mapApprovalsRequiredFromAPI(apiApprovers []infisical.AccessApprovalPolicyAp
 			StepNumber:        types.Int64Value(stepNumber),
 		})
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].StepNumber.ValueInt64() < result[j].StepNumber.ValueInt64()
+	})
 	return result
 }
