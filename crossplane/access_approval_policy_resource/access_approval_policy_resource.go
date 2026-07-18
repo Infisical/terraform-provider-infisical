@@ -357,8 +357,10 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.AllowSelfApproval = types.BoolValue(policy.AllowedSelfApprovals)
 	state.MaxTimePeriod = infisicaltf.StringPointerToTypesString(policy.MaxTimePeriod)
 	state.RequestExpirationTime = infisicaltf.StringPointerToTypesString(policy.RequestExpirationTime)
-	state.Approvers = mapApproversFromAPI(policy.Approvers)
-	state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
+	if state.Approvers != nil {
+		state.Approvers = mapApproversFromAPI(policy.Approvers)
+		state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
+	}
 
 	if !state.GroupApprovers.IsNull() {
 		groupApproverIDs := make([]string, 0)
