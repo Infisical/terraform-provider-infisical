@@ -2172,20 +2172,20 @@ type AccessApprovalPolicyEnvironment struct {
 }
 
 type AccessApprovalPolicy struct {
-	ID                    string                                  `json:"id"`
-	ProjectID             string                                  `json:"projectId"`
-	Name                  string                                  `json:"name"`
-	Environments          []AccessApprovalPolicyEnvironment       `json:"environments"`
-	Environment           AccessApprovalPolicyEnvironment         `json:"environment"`
-	SecretPath            string                                  `json:"secretPath"`
-	Approvers             []AccessApprovalPolicyApprover          `json:"approvers"`
-	Bypassers             []AccessApprovalPolicyBypasser          `json:"bypassers"`
-	RequiredApprovals     int64                                   `json:"approvals"`
-	EnforcementLevel      string                                  `json:"enforcementLevel"`
-	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
-	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
-	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
-	DeletedAt             *string                                 `json:"deletedAt"`
+	ID                    string                            `json:"id"`
+	ProjectID             string                            `json:"projectId"`
+	Name                  string                            `json:"name"`
+	Environments          []AccessApprovalPolicyEnvironment `json:"environments"`
+	Environment           AccessApprovalPolicyEnvironment   `json:"environment"`
+	SecretPath            string                            `json:"secretPath"`
+	Approvers             []AccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []AccessApprovalPolicyBypasser    `json:"bypassers"`
+	RequiredApprovals     int64                             `json:"approvals"`
+	EnforcementLevel      string                            `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                              `json:"allowedSelfApprovals"`
+	MaxTimePeriod         *string                           `json:"maxTimePeriod"`
+	RequestExpirationTime *string                           `json:"requestExpirationTime"`
+	DeletedAt             *string                           `json:"deletedAt"`
 }
 
 type CreateAccessApprovalPolicyApprover struct {
