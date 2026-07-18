@@ -2093,6 +2093,7 @@ type SecretApprovalPolicy struct {
 	RequiredApprovals    int64                             `json:"approvals"`
 	EnforcementLevel     string                            `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                              `json:"allowedSelfApprovals"`
+	DeletedAt            *string                           `json:"deletedAt"`
 }
 
 type CreateSecretApprovalPolicyApprover struct {

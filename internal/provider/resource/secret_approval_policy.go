@@ -323,6 +323,11 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 	}
 
+	if secretApprovalPolicy.SecretApprovalPolicy.DeletedAt != nil {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	state.Name = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.Name)
 	state.SecretPath = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.SecretPath)
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
