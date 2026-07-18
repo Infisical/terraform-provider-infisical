@@ -31,16 +31,23 @@ type SecretApprover struct {
 	Name types.String `tfsdk:"username"`
 }
 
+type SecretBypasser struct {
+	Type types.String `tfsdk:"type"`
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"username"`
+}
+
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String     `tfsdk:"id"`
-	ProjectID         types.String     `tfsdk:"project_id"`
-	Name              types.String     `tfsdk:"name"`
-	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
-	SecretPath        types.String     `tfsdk:"secret_path"`
-	Approvers         []SecretApprover `tfsdk:"approvers"`
-	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
-	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
+	ID                types.String      `tfsdk:"id"`
+	ProjectID         types.String      `tfsdk:"project_id"`
+	Name              types.String      `tfsdk:"name"`
+	EnvironmentSlugs  types.List        `tfsdk:"environment_slugs"`
+	SecretPath        types.String      `tfsdk:"secret_path"`
+	Approvers         []SecretApprover  `tfsdk:"approvers"`
+	Bypassers         []SecretBypasser  `tfsdk:"bypassers"`
+	RequiredApprovals types.Int64       `tfsdk:"required_approvals"`
+	EnforcementLevel  types.String      `tfsdk:"enforcement_level"`
+	AllowSelfApproval types.Bool        `tfsdk:"allow_self_approval"`
 }
 
 func (r *secretApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -76,7 +83,7 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Description: "The secret path to apply the secret approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.ListNestedAttribute{
+			"approvers": schema.SetNestedAttribute{
 				Required:    true,
 				Description: "The required approvers",
 				NestedObject: schema.NestedAttributeObject{
@@ -91,6 +98,26 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 						},
 						"username": schema.StringAttribute{
 							Description: "The username of the approver. By default, this is the email",
+							Optional:    true,
+						},
+					},
+				},
+			},
+			"bypassers": schema.SetNestedAttribute{
+				Optional:    true,
+				Description: "The bypassers who can bypass the approval policy",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{
+							Description: "The type of bypasser. Either group or user",
+							Required:    true,
+						},
+						"id": schema.StringAttribute{
+							Description: "The ID of the bypasser",
+							Optional:    true,
+						},
+						"username": schema.StringAttribute{
+							Description: "The username of the bypasser. By default, this is the email",
 							Optional:    true,
 						},
 					},
@@ -156,6 +183,21 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
+	bypasserInputs := make([]infisicaltf.BypasserInput, len(plan.Bypassers))
+	for i, el := range plan.Bypassers {
+		bypasserInputs[i] = infisicaltf.BypasserInput{Type: el.Type, ID: el.ID, Name: el.Name}
+	}
+	validatedBypassers, bypassersOk := infisicaltf.ValidateAndMapBypassers(bypasserInputs, &resp.Diagnostics)
+	if !bypassersOk {
+		return
+	}
+	var bypassers []infisical.CreateSecretApprovalPolicyBypasser
+	for _, b := range validatedBypassers {
+		bypassers = append(bypassers, infisical.CreateSecretApprovalPolicyBypasser{
+			ID: b.ID, Name: b.Name, Type: b.Type,
+		})
+	}
+
 	environments := make([]string, 0)
 	envSlugs := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
 	if envSlugs != nil {
@@ -168,6 +210,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		Environments:         environments,
 		SecretPath:           plan.SecretPath.ValueString(),
 		Approvers:            approvers,
+		Bypassers:            bypassers,
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
@@ -252,6 +295,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		}
 	}
 	state.Approvers = approvers
+	state.Bypassers = mapSecretBypassersFromAPI(policy.Bypassers)
 
 	if len(policy.Environments) > 0 {
 		var environmentSlugs []string
@@ -327,6 +371,21 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		})
 	}
 
+	bypasserInputs := make([]infisicaltf.BypasserInput, len(plan.Bypassers))
+	for i, el := range plan.Bypassers {
+		bypasserInputs[i] = infisicaltf.BypasserInput{Type: el.Type, ID: el.ID, Name: el.Name}
+	}
+	validatedBypassers, bypassersOk := infisicaltf.ValidateAndMapBypassers(bypasserInputs, &resp.Diagnostics)
+	if !bypassersOk {
+		return
+	}
+	var updateBypassers []infisical.UpdateSecretApprovalPolicyBypasser
+	for _, b := range validatedBypassers {
+		updateBypassers = append(updateBypassers, infisical.UpdateSecretApprovalPolicyBypasser{
+			ID: b.ID, Name: b.Name, Type: b.Type,
+		})
+	}
+
 	environments := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.EnvironmentSlugs)
 
 	_, err := r.client.UpdateSecretApprovalPolicy(infisical.UpdateSecretApprovalPolicyRequest{
@@ -334,6 +393,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		Name:                 plan.Name.ValueString(),
 		SecretPath:           plan.SecretPath.ValueString(),
 		Approvers:            updateApprovers,
+		Bypassers:            updateBypassers,
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
@@ -428,4 +488,25 @@ func validateAndMapApprovers(planApprovers []SecretApprover, diagnostics *diag.D
 		})
 	}
 	return approvers, true
+}
+
+func mapSecretBypassersFromAPI(apiBypassers []infisical.SecretApprovalPolicyBypasser) []SecretBypasser {
+	if len(apiBypassers) == 0 {
+		return nil
+	}
+	bypassers := make([]SecretBypasser, len(apiBypassers))
+	for i, el := range apiBypassers {
+		if el.Type == "user" {
+			bypassers[i] = SecretBypasser{
+				Name: types.StringValue(el.Name),
+				Type: types.StringValue(el.Type),
+			}
+		} else {
+			bypassers[i] = SecretBypasser{
+				ID:   types.StringValue(el.ID),
+				Type: types.StringValue(el.Type),
+			}
+		}
+	}
+	return bypassers
 }

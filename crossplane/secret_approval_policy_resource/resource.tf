@@ -35,6 +35,17 @@ resource "infisical_secret_approval_policy" "prod-policy" {
     },
   ]
 
+  bypassers = [
+    {
+      type     = "user"
+      username = "admin@infisical.com"
+    },
+    {
+      type = "group"
+      id   = "6629e33a-dc7c-4d0d-918b-62640e6988dc"
+    },
+  ]
+
   required_approvals  = 1
   enforcement_level   = "soft"
   allow_self_approval = false
