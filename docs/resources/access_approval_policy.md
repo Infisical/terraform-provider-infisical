@@ -84,7 +84,7 @@ resource "infisical_access_approval_policy" "prod-policy" {
 
 ### Required
 
-- `approvers` (Attributes List) The required approvers (see [below for nested schema](#nestedatt--approvers))
+- `approvers` (Attributes Set) The required approvers (see [below for nested schema](#nestedatt--approvers))
 - `project_id` (String) The ID of the project to add the access approval policy
 - `required_approvals` (Number) The number of required approvers
 - `secret_path` (String) The secret path to apply the access approval policy to
