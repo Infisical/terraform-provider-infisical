@@ -102,7 +102,7 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Description: "The secret path to apply the access approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.ListNestedAttribute{
+			"approvers": schema.SetNestedAttribute{
 				Required:    true,
 				Description: "The required approvers",
 				NestedObject: schema.NestedAttributeObject{
