@@ -17,14 +17,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// NewSecretApprovalPolicyResource is a helper function to simplify the provider implementation.
 func NewSecretApprovalPolicyResource() resource.Resource {
 	return &secretApprovalPolicyResource{}
 }
 
+// secretApprovalPolicyResource is the resource implementation.
 type secretApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
+// secretApprovalPolicyResourceModel describes the data source data model.
 type secretApprovalPolicyResourceModel struct {
 	ID                types.String `tfsdk:"id"`
 	ProjectID         types.String `tfsdk:"project_id"`
@@ -40,10 +43,12 @@ type secretApprovalPolicyResourceModel struct {
 	AllowSelfApproval types.Bool   `tfsdk:"allow_self_approval"`
 }
 
+// Metadata returns the resource type name.
 func (r *secretApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_secret_approval_policy"
 }
 
+// Schema defines the schema for the resource.
 func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Create secret approval policy for your projects",
@@ -117,6 +122,7 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 	}
 }
 
+// Configure adds the provider configured client to the resource.
 func (r *secretApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -136,6 +142,7 @@ func (r *secretApprovalPolicyResource) Configure(_ context.Context, req resource
 	r.client = client
 }
 
+// Create creates the resource and sets the initial Terraform state.
 func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -204,6 +211,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 }
 
+// Read refreshes the Terraform state with the latest data.
 func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -329,6 +337,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	}
 }
 
+// Update updates the resource and sets the updated Terraform state on success.
 func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -413,6 +422,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 	}
 }
 
+// Delete deletes the resource and removes the Terraform state on success.
 func (r *secretApprovalPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(

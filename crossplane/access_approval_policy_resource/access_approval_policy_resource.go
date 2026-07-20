@@ -17,14 +17,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// NewAccessApprovalPolicyResource is a helper function to simplify the provider implementation.
 func NewAccessApprovalPolicyResource() resource.Resource {
 	return &accessApprovalPolicyResource{}
 }
 
+// accessApprovalPolicyResource is the resource implementation.
 type accessApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
+// accessApprovalPolicyResourceModel describes the data source data model.
 type accessApprovalPolicyResourceModel struct {
 	ID                    types.String `tfsdk:"id"`
 	ProjectID             types.String `tfsdk:"project_id"`
@@ -42,10 +45,12 @@ type accessApprovalPolicyResourceModel struct {
 	RequestExpirationTime types.String `tfsdk:"request_expiration_time"`
 }
 
+// Metadata returns the resource type name.
 func (r *accessApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_access_approval_policy"
 }
 
+// Schema defines the schema for the resource.
 func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Create access approval policy for your projects",
@@ -127,6 +132,7 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 	}
 }
 
+// Configure adds the provider configured client to the resource.
 func (r *accessApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -146,6 +152,7 @@ func (r *accessApprovalPolicyResource) Configure(_ context.Context, req resource
 	r.client = client
 }
 
+// Create creates the resource and sets the initial Terraform state.
 func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -228,6 +235,7 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 }
 
+// Read refreshes the Terraform state with the latest data.
 func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -362,6 +370,7 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	}
 }
 
+// Update updates the resource and sets the updated Terraform state on success.
 func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -448,6 +457,7 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 	}
 }
 
+// Delete deletes the resource and removes the Terraform state on success.
 func (r *accessApprovalPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
