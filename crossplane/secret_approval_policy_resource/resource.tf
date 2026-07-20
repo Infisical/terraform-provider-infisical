@@ -28,7 +28,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
     "6629e33a-ab1d-4d0d-958b-63640e7988db",
   ]
   user_approvers = [
-    "matheus@infisical.com",
+    "admin@infisical.com",
   ]
 
   group_bypassers = [

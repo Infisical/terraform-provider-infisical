@@ -6,17 +6,15 @@ import (
 )
 
 type AccessApproverInput struct {
-	Type     types.String
-	ID       types.String
-	Name     types.String
-	Sequence types.Int64
+	Type types.String
+	ID   types.String
+	Name types.String
 }
 
 type AccessApproverOutput struct {
-	Type     string
-	ID       string
-	Name     string
-	Sequence int64
+	Type string
+	ID   string
+	Name string
 }
 
 func ValidateAndMapApprovers(approvers []AccessApproverInput, diagnostics *diag.Diagnostics) ([]AccessApproverOutput, bool) {
@@ -57,10 +55,9 @@ func ValidateAndMapApprovers(approvers []AccessApproverInput, diagnostics *diag.
 		}
 
 		result = append(result, AccessApproverOutput{
-			ID:       el.ID.ValueString(),
-			Name:     el.Name.ValueString(),
-			Type:     el.Type.ValueString(),
-			Sequence: el.Sequence.ValueInt64(),
+			ID:   el.ID.ValueString(),
+			Name: el.Name.ValueString(),
+			Type: el.Type.ValueString(),
 		})
 	}
 
