@@ -92,7 +92,6 @@ resource "infisical_access_approval_policy" "prod-policy" {
 ### Optional
 
 - `allow_self_approval` (Boolean) Whether to allow approvers to approve their own requests
-- `approvals_required` (Attributes List) The number of approvals required per step for multi-step approval policies (see [below for nested schema](#nestedatt--approvals_required))
 - `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to
@@ -115,17 +114,7 @@ Required:
 Optional:
 
 - `id` (String) The ID of the approver
-- `step` (Number) The step number of the approver
 - `username` (String) The username of the approver. By default, this is the email
-
-
-<a id="nestedatt--approvals_required"></a>
-### Nested Schema for `approvals_required`
-
-Required:
-
-- `number_of_approvals` (Number) The number of approvals required for this step
-- `step_number` (Number) The step number this approval count applies to
 
 
 <a id="nestedatt--bypassers"></a>
