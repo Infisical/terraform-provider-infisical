@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"sort"
 	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
@@ -12,61 +11,41 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// NewAccessApprovalPolicyResource is a helper function to simplify the provider implementation.
 func NewAccessApprovalPolicyResource() resource.Resource {
 	return &accessApprovalPolicyResource{}
 }
 
-// accessApprovalPolicyResource is the resource implementation.
 type accessApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
-type AccessApprover struct {
-	Type     types.String `tfsdk:"type"`
-	ID       types.String `tfsdk:"id"`
-	Name     types.String `tfsdk:"username"`
-	Sequence types.Int64  `tfsdk:"step"`
-}
-
-type AccessApprovalPolicyApprovalsRequired struct {
-	NumberOfApprovals types.Int64 `tfsdk:"number_of_approvals"`
-	StepNumber        types.Int64 `tfsdk:"step_number"`
-}
-
-// accessApprovalPolicyResourceModel describes the data source data model.
 type accessApprovalPolicyResourceModel struct {
-	ID                    types.String                            `tfsdk:"id"`
-	ProjectID             types.String                            `tfsdk:"project_id"`
-	Name                  types.String                            `tfsdk:"name"`
-	EnvironmentSlugs      types.List                              `tfsdk:"environment_slugs"`
-	SecretPath            types.String                            `tfsdk:"secret_path"`
-	Approvers             []AccessApprover                        `tfsdk:"approvers"`
-	GroupApprovers        types.List                              `tfsdk:"group_approvers"`
-	UserApprovers         types.List                              `tfsdk:"user_approvers"`
-	GroupBypassers        types.List                              `tfsdk:"group_bypassers"`
-	UserBypassers         types.List                              `tfsdk:"user_bypassers"`
-	RequiredApprovals     types.Int64                             `tfsdk:"required_approvals"`
-	EnforcementLevel      types.String                            `tfsdk:"enforcement_level"`
-	AllowSelfApproval     types.Bool                              `tfsdk:"allow_self_approval"`
-	ApprovalsRequired     []AccessApprovalPolicyApprovalsRequired `tfsdk:"approvals_required"`
-	MaxTimePeriod         types.String                            `tfsdk:"max_time_period"`
-	RequestExpirationTime types.String                            `tfsdk:"request_expiration_time"`
+	ID                    types.String `tfsdk:"id"`
+	ProjectID             types.String `tfsdk:"project_id"`
+	Name                  types.String `tfsdk:"name"`
+	EnvironmentSlugs      types.List   `tfsdk:"environment_slugs"`
+	SecretPath            types.String `tfsdk:"secret_path"`
+	GroupApprovers        types.List   `tfsdk:"group_approvers"`
+	UserApprovers         types.List   `tfsdk:"user_approvers"`
+	GroupBypassers        types.List   `tfsdk:"group_bypassers"`
+	UserBypassers         types.List   `tfsdk:"user_bypassers"`
+	RequiredApprovals     types.Int64  `tfsdk:"required_approvals"`
+	EnforcementLevel      types.String `tfsdk:"enforcement_level"`
+	AllowSelfApproval     types.Bool   `tfsdk:"allow_self_approval"`
+	MaxTimePeriod         types.String `tfsdk:"max_time_period"`
+	RequestExpirationTime types.String `tfsdk:"request_expiration_time"`
 }
 
-// Metadata returns the resource type name.
 func (r *accessApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_access_approval_policy"
 }
 
-// Schema defines the schema for the resource.
 func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Create access approval policy for your projects",
@@ -96,40 +75,14 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Description: "The secret path to apply the access approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.ListNestedAttribute{
-				Optional:    true,
-				Description: "The required approvers",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Description: "The type of approver. Either group or user",
-							Required:    true,
-						},
-						"id": schema.StringAttribute{
-							Description: "The ID of the approver",
-							Optional:    true,
-						},
-						"username": schema.StringAttribute{
-							Description: "The username of the approver. By default, this is the email",
-							Optional:    true,
-						},
-						"step": schema.Int64Attribute{
-							Description: "The step number of the approver",
-							Optional:    true,
-							Computed:    true,
-							Default:     int64default.StaticInt64(1),
-						},
-					},
-				},
-			},
 			"group_approvers": schema.ListAttribute{
-				Description:   "(DEPRECATED, use approvers instead) Array of group IDs to assign as approvers. Uses step 1 by default.",
+				Description:   "Array of group IDs to assign as approvers",
 				Optional:      true,
 				ElementType:   types.StringType,
 				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"user_approvers": schema.ListAttribute{
-				Description:   "(DEPRECATED, use approvers instead) Array of usernames to assign as approvers. Uses step 1 by default.",
+				Description:   "Array of usernames to assign as approvers",
 				Optional:      true,
 				ElementType:   types.StringType,
 				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
@@ -162,22 +115,6 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
-			"approvals_required": schema.ListNestedAttribute{
-				Optional:    true,
-				Description: "The number of approvals required per step for multi-step approval policies",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"number_of_approvals": schema.Int64Attribute{
-							Description: "The number of approvals required for this step",
-							Required:    true,
-						},
-						"step_number": schema.Int64Attribute{
-							Description: "The step number this approval count applies to",
-							Required:    true,
-						},
-					},
-				},
-			},
 			"max_time_period": schema.StringAttribute{
 				Description: "The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). Use 'permanent' or leave empty for no limit.",
 				Optional:    true,
@@ -190,7 +127,6 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 	}
 }
 
-// Configure adds the provider configured client to the resource.
 func (r *accessApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -210,7 +146,6 @@ func (r *accessApprovalPolicyResource) Configure(_ context.Context, req resource
 	r.client = client
 }
 
-// Create creates the resource and sets the initial Terraform state.
 func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -220,7 +155,6 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	// Retrieve values from plan
 	var plan accessApprovalPolicyResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -240,20 +174,11 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	allApprovers, ok := mergeDeprecatedApprovers(ctx, &resp.Diagnostics, plan.Approvers, plan.GroupApprovers, plan.UserApprovers)
-	if !ok {
-		return
-	}
-
-	validatedApprovers, ok := validateAndMapApproversFromPlan(allApprovers, &resp.Diagnostics)
-	if !ok {
-		return
-	}
-
-	var approvers []infisical.CreateAccessApprovalPolicyApprover
-	for _, a := range validatedApprovers {
-		approvers = append(approvers, infisical.CreateAccessApprovalPolicyApprover{
-			ID: a.ID, Name: a.Name, Type: a.Type, Sequence: a.Sequence,
+	approvers := buildApproversFromLists(ctx, resp.Diagnostics, plan.GroupApprovers, plan.UserApprovers)
+	var createApprovers []infisical.CreateAccessApprovalPolicyApprover
+	for _, a := range approvers {
+		createApprovers = append(createApprovers, infisical.CreateAccessApprovalPolicyApprover{
+			ID: a.ID, Name: a.Name, Type: a.Type,
 		})
 	}
 
@@ -276,12 +201,11 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 		ProjectSlug:           projectDetail.Slug,
 		Environments:          environments,
 		SecretPath:            plan.SecretPath.ValueString(),
-		Approvers:             approvers,
+		Approvers:             createApprovers,
 		Bypassers:             bypassers,
 		RequiredApprovals:     plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:      plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals:  plan.AllowSelfApproval.ValueBool(),
-		ApprovalsRequired:     mapApprovalsRequiredFromPlan(plan.ApprovalsRequired),
 		MaxTimePeriod:         infisicaltf.OptionalStringPointer(plan.MaxTimePeriod),
 		RequestExpirationTime: infisicaltf.OptionalStringPointer(plan.RequestExpirationTime),
 	})
@@ -304,7 +228,6 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 }
 
-// Read refreshes the Terraform state with the latest data.
 func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -352,15 +275,18 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 
 	state.Name = types.StringValue(policy.Name)
 	state.SecretPath = types.StringValue(policy.SecretPath)
-	state.RequiredApprovals = types.Int64Value(policy.RequiredApprovals)
+	for _, approver := range policy.Approvers {
+		// The number of required approvers per step is returned in the API inside
+		// each approver.
+		if approver.Sequence == 1 {
+			state.RequiredApprovals = types.Int64Value(approver.ApprovalsRequired)
+			break
+		}
+	}
 	state.EnforcementLevel = types.StringValue(policy.EnforcementLevel)
 	state.AllowSelfApproval = types.BoolValue(policy.AllowedSelfApprovals)
 	state.MaxTimePeriod = infisicaltf.StringPointerToTypesString(policy.MaxTimePeriod)
 	state.RequestExpirationTime = infisicaltf.StringPointerToTypesString(policy.RequestExpirationTime)
-	if state.Approvers != nil {
-		state.Approvers = mapApproversFromAPI(policy.Approvers)
-		state.ApprovalsRequired = mapApprovalsRequiredFromAPI(policy.Approvers)
-	}
 
 	if !state.GroupApprovers.IsNull() {
 		groupApproverIDs := make([]string, 0)
@@ -436,7 +362,6 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	}
 }
 
-// Update updates the resource and sets the updated Terraform state on success.
 func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -476,20 +401,11 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	allApprovers, ok := mergeDeprecatedApprovers(ctx, &resp.Diagnostics, plan.Approvers, plan.GroupApprovers, plan.UserApprovers)
-	if !ok {
-		return
-	}
-
-	validatedApprovers, ok := validateAndMapApproversFromPlan(allApprovers, &resp.Diagnostics)
-	if !ok {
-		return
-	}
-
+	approverOutputs := buildApproversFromLists(ctx, resp.Diagnostics, plan.GroupApprovers, plan.UserApprovers)
 	var approvers []infisical.UpdateAccessApprovalPolicyApprover
-	for _, a := range validatedApprovers {
+	for _, a := range approverOutputs {
 		approvers = append(approvers, infisical.UpdateAccessApprovalPolicyApprover{
-			ID: a.ID, Name: a.Name, Type: a.Type, Sequence: a.Sequence,
+			ID: a.ID, Name: a.Name, Type: a.Type,
 		})
 	}
 
@@ -512,7 +428,6 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:     plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:      plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals:  plan.AllowSelfApproval.ValueBool(),
-		ApprovalsRequired:     mapApprovalsRequiredFromPlan(plan.ApprovalsRequired),
 		MaxTimePeriod:         infisicaltf.OptionalStringPointer(plan.MaxTimePeriod),
 		RequestExpirationTime: infisicaltf.OptionalStringPointer(plan.RequestExpirationTime),
 		Environments:          environments,
@@ -533,7 +448,6 @@ func (r *accessApprovalPolicyResource) Update(ctx context.Context, req resource.
 	}
 }
 
-// Delete deletes the resource and removes the Terraform state on success.
 func (r *accessApprovalPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -563,12 +477,28 @@ func (r *accessApprovalPolicyResource) Delete(ctx context.Context, req resource.
 	}
 }
 
-func validateAndMapApproversFromPlan(planApprovers []AccessApprover, diagnostics *diag.Diagnostics) ([]infisicaltf.AccessApproverOutput, bool) {
-	inputs := make([]infisicaltf.AccessApproverInput, len(planApprovers))
-	for i, el := range planApprovers {
-		inputs[i] = infisicaltf.AccessApproverInput{Type: el.Type, ID: el.ID, Name: el.Name, Sequence: el.Sequence}
+type approverOutput struct {
+	Type string
+	ID   string
+	Name string
+}
+
+func buildApproversFromLists(ctx context.Context, diagnostics diag.Diagnostics, groupApproversList, userApproversList types.List) []approverOutput {
+	var result []approverOutput
+
+	if userApprovers := infisicaltf.StringListToGoStringSlice(ctx, diagnostics, userApproversList); userApprovers != nil {
+		for _, username := range userApprovers {
+			result = append(result, approverOutput{Name: username, Type: "user"})
+		}
 	}
-	return infisicaltf.ValidateAndMapApprovers(inputs, diagnostics)
+
+	if groupApprovers := infisicaltf.StringListToGoStringSlice(ctx, diagnostics, groupApproversList); groupApprovers != nil {
+		for _, groupId := range groupApprovers {
+			result = append(result, approverOutput{ID: groupId, Type: "group"})
+		}
+	}
+
+	return result
 }
 
 type bypasserOutput struct {
@@ -592,100 +522,5 @@ func buildBypassersFromLists(ctx context.Context, diagnostics diag.Diagnostics, 
 		}
 	}
 
-	return result
-}
-
-func mapApprovalsRequiredFromPlan(planApprovalsRequired []AccessApprovalPolicyApprovalsRequired) []infisical.AccessApprovalPolicyApprovalsRequired {
-	var result []infisical.AccessApprovalPolicyApprovalsRequired
-	for _, ar := range planApprovalsRequired {
-		result = append(result, infisical.AccessApprovalPolicyApprovalsRequired{
-			NumberOfApprovals: ar.NumberOfApprovals.ValueInt64(),
-			StepNumber:        ar.StepNumber.ValueInt64(),
-		})
-	}
-	return result
-}
-
-func mapApproversFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) []AccessApprover {
-	approvers := make([]AccessApprover, len(apiApprovers))
-	for i, el := range apiApprovers {
-		if el.Type == "user" {
-			approvers[i] = AccessApprover{
-				Name:     types.StringValue(el.Name),
-				Type:     types.StringValue(el.Type),
-				Sequence: types.Int64Value(el.Sequence),
-			}
-		} else {
-			approvers[i] = AccessApprover{
-				ID:       types.StringValue(el.ID),
-				Type:     types.StringValue(el.Type),
-				Sequence: types.Int64Value(el.Sequence),
-			}
-		}
-	}
-	return approvers
-}
-
-func mergeDeprecatedApprovers(ctx context.Context, diagnostics *diag.Diagnostics, planApprovers []AccessApprover, groupApprovers, userApprovers types.List) ([]AccessApprover, bool) {
-	hasNewFormat := len(planApprovers) > 0
-	hasOldFormat := !groupApprovers.IsNull() || !userApprovers.IsNull()
-
-	if hasNewFormat && hasOldFormat {
-		diagnostics.AddError(
-			"Conflicting approver configuration",
-			"Cannot use both 'approvers' and the deprecated 'group_approvers'/'user_approvers' fields. Use 'approvers' for new configurations.",
-		)
-		return nil, false
-	}
-
-	if hasNewFormat {
-		return planApprovers, true
-	}
-
-	result := make([]AccessApprover, 0)
-
-	if groupIDs := infisicaltf.StringListToGoStringSlice(ctx, *diagnostics, groupApprovers); groupIDs != nil {
-		for _, id := range groupIDs {
-			result = append(result, AccessApprover{
-				Type:     types.StringValue("group"),
-				ID:       types.StringValue(id),
-				Sequence: types.Int64Value(1),
-			})
-		}
-	}
-
-	if usernames := infisicaltf.StringListToGoStringSlice(ctx, *diagnostics, userApprovers); usernames != nil {
-		for _, username := range usernames {
-			result = append(result, AccessApprover{
-				Type:     types.StringValue("user"),
-				Name:     types.StringValue(username),
-				Sequence: types.Int64Value(1),
-			})
-		}
-	}
-
-	return result, true
-}
-
-func mapApprovalsRequiredFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) []AccessApprovalPolicyApprovalsRequired {
-	approvalsRequiredMap := make(map[int64]int64)
-	for _, approver := range apiApprovers {
-		if approver.ApprovalsRequired > 0 {
-			approvalsRequiredMap[approver.Sequence] = approver.ApprovalsRequired
-		}
-	}
-	if len(approvalsRequiredMap) == 0 {
-		return nil
-	}
-	result := make([]AccessApprovalPolicyApprovalsRequired, 0, len(approvalsRequiredMap))
-	for stepNumber, numberOfApprovals := range approvalsRequiredMap {
-		result = append(result, AccessApprovalPolicyApprovalsRequired{
-			NumberOfApprovals: types.Int64Value(numberOfApprovals),
-			StepNumber:        types.Int64Value(stepNumber),
-		})
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].StepNumber.ValueInt64() < result[j].StepNumber.ValueInt64()
-	})
 	return result
 }

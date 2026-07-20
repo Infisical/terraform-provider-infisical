@@ -19,34 +19,26 @@ provider "infisical" {
 
 
 resource "infisical_secret_approval_policy" "prod-policy" {
-  project_id        = "5156a345-e460-416b-84fc-b14b426b1cb3"
+  project_id        = "c9a38c17-0cea-4130-9b7a-059f9f1c8fbd"
   name              = "my-secret-approval-policy"
   environment_slugs = ["prod"]
   secret_path       = "/"
 
-  approvers = [
-    {
-      type = "group"
-      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
-    },
-    {
-      type     = "user"
-      username = "admin@infisical.com"
-    },
+  group_approvers = [
+    "6629e33a-ab1d-4d0d-958b-63640e7988db",
+  ]
+  user_approvers = [
+    "matheus@infisical.com",
   ]
 
-  bypassers = [
-    {
-      type     = "user"
-      username = "admin@infisical.com"
-    },
-    {
-      type = "group"
-      id   = "6629e33a-dc7c-4d0d-918b-62640e6988dc"
-    },
+  group_bypassers = [
+    "6629e33a-ab1d-4d0d-958b-63640e7988db",
+  ]
+  user_bypassers = [
+    "admin@infisical.com",
   ]
 
-  required_approvals  = 1
+  required_approvals  = 2
   enforcement_level   = "soft"
   allow_self_approval = false
 }

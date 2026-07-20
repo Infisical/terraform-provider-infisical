@@ -25,29 +25,19 @@ type secretApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
-type SecretApprover struct {
-	Type types.String `tfsdk:"type"`
-	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"username"`
-}
-
-type SecretBypasser struct {
-	Type types.String `tfsdk:"type"`
-	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"username"`
-}
-
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String     `tfsdk:"id"`
-	ProjectID         types.String     `tfsdk:"project_id"`
-	Name              types.String     `tfsdk:"name"`
-	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
-	SecretPath        types.String     `tfsdk:"secret_path"`
-	Approvers         []SecretApprover `tfsdk:"approvers"`
-	Bypassers         []SecretBypasser `tfsdk:"bypassers"`
-	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
-	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
+	ID                types.String `tfsdk:"id"`
+	ProjectID         types.String `tfsdk:"project_id"`
+	Name              types.String `tfsdk:"name"`
+	EnvironmentSlugs  types.List   `tfsdk:"environment_slugs"`
+	SecretPath        types.String `tfsdk:"secret_path"`
+	GroupApprovers    types.List   `tfsdk:"group_approvers"`
+	UserApprovers     types.List   `tfsdk:"user_approvers"`
+	GroupBypassers    types.List   `tfsdk:"group_bypassers"`
+	UserBypassers     types.List   `tfsdk:"user_bypassers"`
+	RequiredApprovals types.Int64  `tfsdk:"required_approvals"`
+	EnforcementLevel  types.String `tfsdk:"enforcement_level"`
+	AllowSelfApproval types.Bool   `tfsdk:"allow_self_approval"`
 }
 
 func (r *secretApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -83,45 +73,29 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Description: "The secret path to apply the secret approval policy to",
 				Required:    true,
 			},
-			"approvers": schema.SetNestedAttribute{
-				Required:    true,
-				Description: "The required approvers",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Description: "The type of approver. Either group or user",
-							Required:    true,
-						},
-						"id": schema.StringAttribute{
-							Description: "The ID of the approver",
-							Optional:    true,
-						},
-						"username": schema.StringAttribute{
-							Description: "The username of the approver. By default, this is the email",
-							Optional:    true,
-						},
-					},
-				},
+			"group_approvers": schema.ListAttribute{
+				Description:   "Array of group IDs to assign as approvers",
+				Optional:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
-			"bypassers": schema.SetNestedAttribute{
-				Optional:    true,
-				Description: "The bypassers who can bypass the approval policy",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Description: "The type of bypasser. Either group or user",
-							Required:    true,
-						},
-						"id": schema.StringAttribute{
-							Description: "The ID of the bypasser",
-							Optional:    true,
-						},
-						"username": schema.StringAttribute{
-							Description: "The username of the bypasser. By default, this is the email",
-							Optional:    true,
-						},
-					},
-				},
+			"user_approvers": schema.ListAttribute{
+				Description:   "Array of usernames to assign as approvers",
+				Optional:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
+			},
+			"group_bypassers": schema.ListAttribute{
+				Optional:      true,
+				Description:   "Array of group IDs belonging to the groups to assign as bypassers",
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
+			},
+			"user_bypassers": schema.ListAttribute{
+				Optional:      true,
+				Description:   "Array of usernames belonging to the users to assign as bypassers",
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{pkg.UnorderedList()},
 			},
 			"required_approvals": schema.Int64Attribute{
 				Description: "The number of required approvers",
@@ -178,21 +152,17 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	approvers, ok := validateAndMapApprovers(plan.Approvers, &resp.Diagnostics)
-	if !ok {
-		return
+	approverOutputs := buildSecretApproversFromLists(ctx, resp.Diagnostics, plan.GroupApprovers, plan.UserApprovers)
+	var approvers []infisical.CreateSecretApprovalPolicyApprover
+	for _, a := range approverOutputs {
+		approvers = append(approvers, infisical.CreateSecretApprovalPolicyApprover{
+			ID: a.ID, Name: a.Name, Type: a.Type,
+		})
 	}
 
-	bypasserInputs := make([]infisicaltf.BypasserInput, len(plan.Bypassers))
-	for i, el := range plan.Bypassers {
-		bypasserInputs[i] = infisicaltf.BypasserInput{Type: el.Type, ID: el.ID, Name: el.Name}
-	}
-	validatedBypassers, bypassersOk := infisicaltf.ValidateAndMapBypassers(bypasserInputs, &resp.Diagnostics)
-	if !bypassersOk {
-		return
-	}
+	bypasserOutputs := buildSecretBypassersFromLists(ctx, resp.Diagnostics, plan.GroupBypassers, plan.UserBypassers)
 	var bypassers []infisical.CreateSecretApprovalPolicyBypasser
-	for _, b := range validatedBypassers {
+	for _, b := range bypasserOutputs {
 		bypassers = append(bypassers, infisical.CreateSecretApprovalPolicyBypasser{
 			ID: b.ID, Name: b.Name, Type: b.Type,
 		})
@@ -285,22 +255,58 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.EnforcementLevel = types.StringValue(policy.EnforcementLevel)
 	state.AllowSelfApproval = types.BoolValue(policy.AllowedSelfApprovals)
 
-	approvers := make([]SecretApprover, len(policy.Approvers))
-	for i, el := range policy.Approvers {
-		if el.Type == "user" {
-			approvers[i] = SecretApprover{
-				Name: types.StringValue(el.Name),
-				Type: types.StringValue(el.Type),
-			}
-		} else {
-			approvers[i] = SecretApprover{
-				ID:   types.StringValue(el.ID),
-				Type: types.StringValue(el.Type),
+	if !state.GroupApprovers.IsNull() {
+		groupApproverIDs := make([]string, 0)
+		for _, el := range policy.Approvers {
+			if el.Type == "group" {
+				groupApproverIDs = append(groupApproverIDs, el.ID)
 			}
 		}
+		state.GroupApprovers, diags = types.ListValueFrom(ctx, types.StringType, groupApproverIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
-	state.Approvers = approvers
-	state.Bypassers = mapSecretBypassersFromAPI(policy.Bypassers)
+
+	if !state.UserApprovers.IsNull() {
+		userApproverNames := make([]string, 0)
+		for _, el := range policy.Approvers {
+			if el.Type == "user" {
+				userApproverNames = append(userApproverNames, el.Name)
+			}
+		}
+		state.UserApprovers, diags = types.ListValueFrom(ctx, types.StringType, userApproverNames)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	groupBypassers := make([]string, 0)
+	userBypassers := make([]string, 0)
+	for _, el := range policy.Bypassers {
+		if el.Type == "user" {
+			userBypassers = append(userBypassers, el.Name)
+		} else {
+			groupBypassers = append(groupBypassers, el.ID)
+		}
+	}
+
+	if !state.GroupBypassers.IsNull() {
+		state.GroupBypassers, diags = types.ListValueFrom(ctx, types.StringType, groupBypassers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+	if !state.UserBypassers.IsNull() {
+		state.UserBypassers, diags = types.ListValueFrom(ctx, types.StringType, userBypassers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 
 	if len(policy.Environments) > 0 {
 		var environmentSlugs []string
@@ -362,30 +368,17 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	approvers, ok := validateAndMapApprovers(plan.Approvers, &resp.Diagnostics)
-	if !ok {
-		return
-	}
-
+	approverOutputs := buildSecretApproversFromLists(ctx, resp.Diagnostics, plan.GroupApprovers, plan.UserApprovers)
 	var updateApprovers []infisical.UpdateSecretApprovalPolicyApprover
-	for _, a := range approvers {
+	for _, a := range approverOutputs {
 		updateApprovers = append(updateApprovers, infisical.UpdateSecretApprovalPolicyApprover{
-			ID:   a.ID,
-			Name: a.Name,
-			Type: a.Type,
+			ID: a.ID, Name: a.Name, Type: a.Type,
 		})
 	}
 
-	bypasserInputs := make([]infisicaltf.BypasserInput, len(plan.Bypassers))
-	for i, el := range plan.Bypassers {
-		bypasserInputs[i] = infisicaltf.BypasserInput{Type: el.Type, ID: el.ID, Name: el.Name}
-	}
-	validatedBypassers, bypassersOk := infisicaltf.ValidateAndMapBypassers(bypasserInputs, &resp.Diagnostics)
-	if !bypassersOk {
-		return
-	}
+	bypasserOutputs := buildSecretBypassersFromLists(ctx, resp.Diagnostics, plan.GroupBypassers, plan.UserBypassers)
 	var updateBypassers []infisical.UpdateSecretApprovalPolicyBypasser
-	for _, b := range validatedBypassers {
+	for _, b := range bypasserOutputs {
 		updateBypassers = append(updateBypassers, infisical.UpdateSecretApprovalPolicyBypasser{
 			ID: b.ID, Name: b.Name, Type: b.Type,
 		})
@@ -449,69 +442,50 @@ func (r *secretApprovalPolicyResource) Delete(ctx context.Context, req resource.
 	}
 }
 
-func validateAndMapApprovers(planApprovers []SecretApprover, diagnostics *diag.Diagnostics) ([]infisical.CreateSecretApprovalPolicyApprover, bool) {
-	var approvers []infisical.CreateSecretApprovalPolicyApprover
-	for _, el := range planApprovers {
-		if el.Type.ValueString() == "user" {
-			if el.Name.IsNull() {
-				diagnostics.AddError(
-					"Field username is required for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return nil, false
-			}
-			if !el.ID.IsNull() {
-				diagnostics.AddError(
-					"Field ID cannot be used for user approvers",
-					"Must provide username for user approvers. By default, this is the email",
-				)
-				return nil, false
-			}
-		}
-
-		if el.Type.ValueString() == "group" {
-			if el.ID.IsNull() {
-				diagnostics.AddError(
-					"Field ID is required for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return nil, false
-			}
-			if !el.Name.IsNull() {
-				diagnostics.AddError(
-					"Field name cannot be used for group approvers",
-					"Must provide ID for group approvers",
-				)
-				return nil, false
-			}
-		}
-
-		approvers = append(approvers, infisical.CreateSecretApprovalPolicyApprover{
-			ID:   el.ID.ValueString(),
-			Name: el.Name.ValueString(),
-			Type: el.Type.ValueString(),
-		})
-	}
-	return approvers, true
+type secretApproverOutput struct {
+	Type string
+	ID   string
+	Name string
 }
 
-func mapSecretBypassersFromAPI(apiBypassers []infisical.SecretApprovalPolicyBypasser) []SecretBypasser {
-	if len(apiBypassers) == 0 {
-		return nil
-	}
-	bypassers := make([]SecretBypasser, len(apiBypassers))
-	for i, el := range apiBypassers {
-		if el.Type == "user" {
-			bypassers[i] = SecretBypasser{
-				Name: types.StringValue(el.Name),
-				Type: types.StringValue(el.Type),
-			}
-		} else {
-			bypassers[i] = SecretBypasser{
-				ID:   types.StringValue(el.ID),
-				Type: types.StringValue(el.Type),
-			}
+func buildSecretApproversFromLists(ctx context.Context, diagnostics diag.Diagnostics, groupApproversList, userApproversList types.List) []secretApproverOutput {
+	var result []secretApproverOutput
+
+	if userApprovers := infisicaltf.StringListToGoStringSlice(ctx, diagnostics, userApproversList); userApprovers != nil {
+		for _, username := range userApprovers {
+			result = append(result, secretApproverOutput{Name: username, Type: "user"})
 		}
 	}
-	return bypassers
+
+	if groupApprovers := infisicaltf.StringListToGoStringSlice(ctx, diagnostics, groupApproversList); groupApprovers != nil {
+		for _, groupId := range groupApprovers {
+			result = append(result, secretApproverOutput{ID: groupId, Type: "group"})
+		}
+	}
+
+	return result
+}
+
+type secretBypasserOutput struct {
+	Type string
+	ID   string
+	Name string
+}
+
+func buildSecretBypassersFromLists(ctx context.Context, diagnostics diag.Diagnostics, groupBypassersList, userBypassersList types.List) []secretBypasserOutput {
+	var result []secretBypasserOutput
+
+	if userBypassers := infisicaltf.StringListToGoStringSlice(ctx, diagnostics, userBypassersList); userBypassers != nil {
+		for _, username := range userBypassers {
+			result = append(result, secretBypasserOutput{Name: username, Type: "user"})
+		}
+	}
+
+	if groupBypassers := infisicaltf.StringListToGoStringSlice(ctx, diagnostics, groupBypassersList); groupBypassers != nil {
+		for _, groupId := range groupBypassers {
+			result = append(result, secretBypasserOutput{ID: groupId, Type: "group"})
+		}
+	}
+
+	return result
 }
