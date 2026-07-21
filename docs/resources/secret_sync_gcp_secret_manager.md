@@ -53,10 +53,10 @@ resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_test" {
     initial_sync_behavior = "import-prioritize-destination"
   }
   destination_config = {
-    project_id                = "my-duplicate-project"
-    scope                     = "global"
-    user_replica_location_ids = ["us-east1", "us-west5"] # Optional: only applicable when scope is "global". Replicate secrets to specific GCP regions. When not defined, it will use the automatic replication policy 
-    location_id               = "us-east1"               # Optional: only applicable when scope is "region". The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.
+    project_id = "my-duplicate-project"
+    scope      = "global"
+    # user_replica_location_ids = ["us-east1", "us-west4"] # Optional: only applicable when scope is "global". Replicate secrets to specific GCP regions. When not defined, it will use the automatic replication policy 
+    # location_id               = "us-east1"               # Optional: only applicable when scope is "region". The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.
   }
 }
 ```
