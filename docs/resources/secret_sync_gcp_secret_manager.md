@@ -42,7 +42,7 @@ resource "infisical_app_connection_gcp" "app-connection-gcp" {
 }
 
 resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_test" {
-  name          = "gcp-sync-tests"
+  name          = "gcp-sync-tests-automatic"
   description   = "I am a test secret sync"
   project_id    = "f4517f4c-8b61-4727-8aef-5ae2807126fb"
   environment   = "prod"
@@ -53,7 +53,10 @@ resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_test" {
     initial_sync_behavior = "import-prioritize-destination"
   }
   destination_config = {
-    project_id = "my-duplicate-project"
+    project_id                = "my-duplicate-project"
+    scope                     = "global"
+    user_replica_location_ids = ["us-east1", "us-west5"] # Optional: only applicable when scope is "global". Replicate secrets to specific GCP regions. When not defined, it will use the automatic replication policy 
+    location_id               = "us-east1"               # Optional: only applicable when scope is "region". The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.
   }
 }
 ```
@@ -91,6 +94,7 @@ Optional:
 
 - `location_id` (String) The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.
 - `scope` (String) The scope of the sync with GCP Secret Manager. Supported options: global, region
+- `user_replica_location_ids` (List of String) The GCP regions to replicate secrets to (e.g. us-east1). Only applicable when scope is 'global'. When not defined, it will use the automatic replication policy
 
 
 <a id="nestedatt--sync_options"></a>
