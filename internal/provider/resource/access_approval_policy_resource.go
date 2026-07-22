@@ -152,11 +152,11 @@ func (r *accessApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Default:     booldefault.StaticBool(true),
 			},
 			"max_time_period": schema.StringAttribute{
-				Description: "The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). Use 'permanent' or leave empty for no limit.",
+				Description: "The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). If omitted, the default behavior is 'permanent'.",
 				Optional:    true,
 			},
 			"request_expiration_time": schema.StringAttribute{
-				Description: "The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. Use 'never' or leave empty for no expiration.",
+				Description: "The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. If omitted, the default behavior is 'never'.",
 				Optional:    true,
 			},
 		},

@@ -87,9 +87,9 @@ resource "infisical_access_approval_policy" "prod-policy" {
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to
 - `environment_slugs` (List of String) The environments to apply the access approval policy to
-- `max_time_period` (String) The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). Use 'permanent' or leave empty for no limit.
+- `max_time_period` (String) The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). If omitted, the default behavior is 'permanent'.
 - `name` (String) The name of the access approval policy
-- `request_expiration_time` (String) The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. Use 'never' or leave empty for no expiration.
+- `request_expiration_time` (String) The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. If omitted, the default behavior is 'never'.
 
 ### Read-Only
 
