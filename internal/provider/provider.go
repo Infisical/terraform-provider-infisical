@@ -392,6 +392,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewIdentityOidcAuthTemplateDataSource,
 		infisicalDatasource.NewProjectUsersListDataSource,
 		infisicalDatasource.NewSecretValidationRulesDataSource,
+		infisicalDatasource.NewProjectScopedIdentitiesListDataSource,
 	}
 }
 
