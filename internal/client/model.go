@@ -2075,6 +2075,12 @@ type SecretApprovalPolicyApprover struct {
 	Type string `json:"type"`
 }
 
+type SecretApprovalPolicyBypasser struct {
+	ID   string `json:"id"`
+	Name string `json:"username"`
+	Type string `json:"type"`
+}
+
 type SecretApprovalPolicy struct {
 	ID                   string                            `json:"id"`
 	ProjectID            string                            `json:"projectId"`
@@ -2083,15 +2089,23 @@ type SecretApprovalPolicy struct {
 	Environments         []SecretApprovalPolicyEnvironment `json:"environments"`
 	SecretPath           string                            `json:"secretPath"`
 	Approvers            []SecretApprovalPolicyApprover    `json:"approvers"`
+	Bypassers            []SecretApprovalPolicyBypasser    `json:"bypassers"`
 	RequiredApprovals    int64                             `json:"approvals"`
 	EnforcementLevel     string                            `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                              `json:"allowedSelfApprovals"`
+	DeletedAt            *string                           `json:"deletedAt"`
 }
 
 type CreateSecretApprovalPolicyApprover struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
 	Name string `json:"username"`
+}
+
+type CreateSecretApprovalPolicyBypasser struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
 }
 
 type CreateSecretApprovalPolicyRequest struct {
@@ -2101,6 +2115,7 @@ type CreateSecretApprovalPolicyRequest struct {
 	Environment          string                               `json:"environment"`
 	SecretPath           string                               `json:"secretPath"`
 	Approvers            []CreateSecretApprovalPolicyApprover `json:"approvers"`
+	Bypassers            []CreateSecretApprovalPolicyBypasser `json:"bypassers,omitempty"`
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
@@ -2125,11 +2140,18 @@ type UpdateSecretApprovalPolicyApprover struct {
 	Environments []string `json:"environments"`
 }
 
+type UpdateSecretApprovalPolicyBypasser struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
+}
+
 type UpdateSecretApprovalPolicyRequest struct {
 	ID                   string
 	Name                 string                               `json:"name"`
 	SecretPath           string                               `json:"secretPath"`
 	Approvers            []UpdateSecretApprovalPolicyApprover `json:"approvers"`
+	Bypassers            []UpdateSecretApprovalPolicyBypasser `json:"bypassers,omitempty"`
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
@@ -2149,9 +2171,22 @@ type DeleteSecretApprovalPolicyResponse struct {
 }
 
 type AccessApprovalPolicyApprover struct {
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Type              string `json:"type"`
+	Sequence          int64  `json:"sequence"`
+	ApprovalsRequired int64  `json:"approvalsRequired"`
+}
+
+type AccessApprovalPolicyBypasser struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+}
+
+type AccessApprovalPolicyApprovalsRequired struct {
+	NumberOfApprovals int64 `json:"numberOfApprovals"`
+	StepNumber        int64 `json:"stepNumber"`
 }
 
 type AccessApprovalPolicyEnvironment struct {
@@ -2159,32 +2194,49 @@ type AccessApprovalPolicyEnvironment struct {
 }
 
 type AccessApprovalPolicy struct {
-	ID                string                            `json:"id"`
-	ProjectID         string                            `json:"projectId"`
-	Name              string                            `json:"name"`
-	Environments      []AccessApprovalPolicyEnvironment `json:"environments"`
-	Environment       AccessApprovalPolicyEnvironment   `json:"environment"`
-	SecretPath        string                            `json:"secretPath"`
-	Approvers         []AccessApprovalPolicyApprover    `json:"approvers"`
-	RequiredApprovals int64                             `json:"approvals"`
-	EnforcementLevel  string                            `json:"enforcementLevel"`
+	ID                    string                            `json:"id"`
+	ProjectID             string                            `json:"projectId"`
+	Name                  string                            `json:"name"`
+	Environments          []AccessApprovalPolicyEnvironment `json:"environments"`
+	Environment           AccessApprovalPolicyEnvironment   `json:"environment"`
+	SecretPath            string                            `json:"secretPath"`
+	Approvers             []AccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []AccessApprovalPolicyBypasser    `json:"bypassers"`
+	RequiredApprovals     int64                             `json:"approvals"`
+	EnforcementLevel      string                            `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                              `json:"allowedSelfApprovals"`
+	MaxTimePeriod         *string                           `json:"maxTimePeriod"`
+	RequestExpirationTime *string                           `json:"requestExpirationTime"`
+	DeletedAt             *string                           `json:"deletedAt"`
 }
 
 type CreateAccessApprovalPolicyApprover struct {
+	Type     string `json:"type"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"username,omitempty"`
+	Sequence int64  `json:"sequence"`
+}
+
+type CreateAccessApprovalPolicyBypasser struct {
 	Type string `json:"type"`
-	ID   string `json:"id"`
-	Name string `json:"username"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
 }
 
 type CreateAccessApprovalPolicyRequest struct {
-	ProjectSlug       string                               `json:"projectSlug"`
-	Name              string                               `json:"name,omitempty"`
-	Environments      []string                             `json:"environments"`
-	Environment       string                               `json:"environment"`
-	SecretPath        string                               `json:"secretPath"`
-	Approvers         []CreateAccessApprovalPolicyApprover `json:"approvers"`
-	RequiredApprovals int64                                `json:"approvals"`
-	EnforcementLevel  string                               `json:"enforcementLevel"`
+	ProjectSlug           string                                  `json:"projectSlug"`
+	Name                  string                                  `json:"name,omitempty"`
+	Environments          []string                                `json:"environments"`
+	Environment           string                                  `json:"environment"`
+	SecretPath            string                                  `json:"secretPath"`
+	Approvers             []CreateAccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []CreateAccessApprovalPolicyBypasser    `json:"bypassers,omitempty"`
+	RequiredApprovals     int64                                   `json:"approvals"`
+	EnforcementLevel      string                                  `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
+	ApprovalsRequired     []AccessApprovalPolicyApprovalsRequired `json:"approvalsRequired,omitempty"`
+	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
+	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
 }
 
 type CreateAccessApprovalPolicyResponse struct {
@@ -2200,19 +2252,31 @@ type GetAccessApprovalPolicyByIDResponse struct {
 }
 
 type UpdateAccessApprovalPolicyApprover struct {
+	Type     string `json:"type"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"username,omitempty"`
+	Sequence int64  `json:"sequence"`
+}
+
+type UpdateAccessApprovalPolicyBypasser struct {
 	Type string `json:"type"`
-	ID   string `json:"id"`
-	Name string `json:"username"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
 }
 
 type UpdateAccessApprovalPolicyRequest struct {
-	ID                string
-	Name              string                               `json:"name"`
-	SecretPath        string                               `json:"secretPath"`
-	Environments      []string                             `json:"environments"`
-	Approvers         []UpdateAccessApprovalPolicyApprover `json:"approvers"`
-	RequiredApprovals int64                                `json:"approvals"`
-	EnforcementLevel  string                               `json:"enforcementLevel"`
+	ID                    string
+	Name                  string                                  `json:"name"`
+	SecretPath            string                                  `json:"secretPath"`
+	Environments          []string                                `json:"environments"`
+	Approvers             []UpdateAccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []UpdateAccessApprovalPolicyBypasser    `json:"bypassers,omitempty"`
+	RequiredApprovals     int64                                   `json:"approvals"`
+	EnforcementLevel      string                                  `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
+	ApprovalsRequired     []AccessApprovalPolicyApprovalsRequired `json:"approvalsRequired,omitempty"`
+	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
+	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
 }
 
 type UpdateAccessApprovalPolicyResponse struct {

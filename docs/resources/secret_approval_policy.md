@@ -69,6 +69,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 ### Optional
 
 - `allow_self_approval` (Boolean) Whether to allow the  approvers to approve their own changes
+- `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the secret approval policy to
 - `environment_slugs` (List of String) The environments to apply the secret approval policy to
@@ -89,3 +90,16 @@ Optional:
 
 - `id` (String) The ID of the approver
 - `username` (String) The username of the approver. By default, this is the email
+
+
+<a id="nestedatt--bypassers"></a>
+### Nested Schema for `bypassers`
+
+Required:
+
+- `type` (String) The type of bypasser. Either group or user
+
+Optional:
+
+- `id` (String) The ID of the bypasser
+- `username` (String) The username of the bypasser. By default, this is the email

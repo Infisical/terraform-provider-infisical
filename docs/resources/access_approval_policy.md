@@ -45,14 +45,28 @@ resource "infisical_access_approval_policy" "prod-policy" {
   approvers = [
     {
       type = "group"
-      id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
     },
     {
       type     = "user"
-      username = "name@infisical.com"
+      username = "admin@infisical.com"
   }]
-  required_approvals = 1
-  enforcement_level  = "soft"
+  bypassers = [
+    {
+      type = "group"
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
+    },
+    {
+      type = "user"
+      id   = "admin@infisical.com"
+    },
+  ]
+  required_approvals  = 1
+  enforcement_level   = "soft"
+  allow_self_approval = true
+
+  max_time_period         = "24h"
+  request_expiration_time = "72h"
 }
 ```
 
@@ -68,10 +82,14 @@ resource "infisical_access_approval_policy" "prod-policy" {
 
 ### Optional
 
+- `allow_self_approval` (Boolean) Whether to allow approvers to approve their own requests
+- `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the access approval policy to
 - `environment_slugs` (List of String) The environments to apply the access approval policy to
+- `max_time_period` (String) The maximum time period for the access approval, specified as a duration string (e.g. '1h', '30m', '2d'). If omitted, the default behavior is 'permanent'.
 - `name` (String) The name of the access approval policy
+- `request_expiration_time` (String) The time after which the access request expires, specified as a duration string (e.g. '1h', '3d', '72h'). Must be between 1 minute and 1 year. If omitted, the default behavior is 'never'.
 
 ### Read-Only
 
@@ -88,3 +106,16 @@ Optional:
 
 - `id` (String) The ID of the approver
 - `username` (String) The username of the approver. By default, this is the email
+
+
+<a id="nestedatt--bypassers"></a>
+### Nested Schema for `bypassers`
+
+Required:
+
+- `type` (String) The type of bypasser. Either group or user
+
+Optional:
+
+- `id` (String) The ID of the bypasser
+- `username` (String) The username of the bypasser. By default, this is the email
