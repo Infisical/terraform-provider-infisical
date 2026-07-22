@@ -93,7 +93,7 @@ func (client Client) ListProjectScopedIdentities(request ListProjectScopedIdenti
 
 		all = append(all, page.Identities...)
 
-		if len(all) >= page.TotalCount {
+		if len(page.Identities) == 0 || len(all) >= page.TotalCount {
 			break
 		}
 		offset += pageSize
