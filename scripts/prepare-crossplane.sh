@@ -51,7 +51,7 @@ fi
 if [ -d "$SOURCE_DIR/secret_approval_policy_resource" ]; then
   echo "Replacing secret_approval_policy_resource"
   cp -f "$SOURCE_DIR/secret_approval_policy_resource/secret_approval_policy_resource.go" "$DESTINATION_DIR/secret_approval_policy.go"
-  cp -f "$SOURCE_DIR/secret_approval_policy_resource/resource.tf" "$EXAMPLES_DIR/infisical_project_template/"
+  cp -f "$SOURCE_DIR/secret_approval_policy_resource/resource.tf" "$EXAMPLES_DIR/infisical_secret_approval_policy/"
 fi
 
 
