@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	tfpkg "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -35,13 +36,13 @@ type ProjectScopedIdentityResource struct {
 
 // ProjectScopedIdentityResourceModel describes the resource data model.
 type ProjectScopedIdentityResourceModel struct {
-	ID                  types.String          `tfsdk:"id"`
-	ProjectID           types.String          `tfsdk:"project_id"`
-	Name                types.String          `tfsdk:"name"`
-	HasDeleteProtection types.Bool            `tfsdk:"has_delete_protection"`
-	AuthMethods         types.List            `tfsdk:"auth_methods"`
-	Metadata            []MetaEntry           `tfsdk:"metadata"`
-	Roles               []ProjectIdentityRole `tfsdk:"roles"`
+	ID                  types.String         `tfsdk:"id"`
+	ProjectID           types.String         `tfsdk:"project_id"`
+	Name                types.String         `tfsdk:"name"`
+	HasDeleteProtection types.Bool           `tfsdk:"has_delete_protection"`
+	AuthMethods         types.List           `tfsdk:"auth_methods"`
+	Metadata            []MetaEntry          `tfsdk:"metadata"`
+	Roles               []tfpkg.IdentityRole `tfsdk:"roles"`
 }
 
 // Metadata returns the resource type name.
@@ -185,7 +186,7 @@ func (r *ProjectScopedIdentityResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	roles, err := buildProjectIdentityRequestRoles(plan.Roles)
+	roles, err := tfpkg.BuildIdentityRequestRoles(plan.Roles)
 	if err != nil {
 		resp.Diagnostics.AddError("Error assigning role to identity", err.Error())
 		return
@@ -228,7 +229,7 @@ func (r *ProjectScopedIdentityResource) Create(ctx context.Context, req resource
 	if plan.Metadata != nil {
 		plan.Metadata = metadataFromAPI(identity.Metadata)
 	}
-	plan.Roles = orderAPIIdentityRolesByPlan(plan.Roles, mapAPIRolesToIdentityModel(membership.Membership.Roles))
+	plan.Roles = tfpkg.OrderAPIRolesByPlan(plan.Roles, tfpkg.MapAPIRolesToIdentityModel(membership.Membership.Roles))
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -294,7 +295,7 @@ func (r *ProjectScopedIdentityResource) Read(ctx context.Context, req resource.R
 	if state.Metadata != nil {
 		state.Metadata = metadataFromAPI(identity.Metadata)
 	}
-	state.Roles = orderAPIIdentityRolesByPlan(state.Roles, mapAPIRolesToIdentityModel(membership.Membership.Roles))
+	state.Roles = tfpkg.OrderAPIRolesByPlan(state.Roles, tfpkg.MapAPIRolesToIdentityModel(membership.Membership.Roles))
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -324,7 +325,7 @@ func (r *ProjectScopedIdentityResource) Update(ctx context.Context, req resource
 		return
 	}
 
-	roles, err := buildProjectIdentityRequestRoles(plan.Roles)
+	roles, err := tfpkg.BuildIdentityRequestRoles(plan.Roles)
 	if err != nil {
 		resp.Diagnostics.AddError("Error assigning role to identity", err.Error())
 		return
@@ -360,7 +361,7 @@ func (r *ProjectScopedIdentityResource) Update(ctx context.Context, req resource
 			ProjectID:  state.ProjectID.ValueString(),
 			IdentityID: state.ID.ValueString(),
 		}); readErr == nil {
-			plan.Roles = orderAPIIdentityRolesByPlan(state.Roles, mapAPIRolesToIdentityModel(current.Membership.Roles))
+			plan.Roles = tfpkg.OrderAPIRolesByPlan(state.Roles, tfpkg.MapAPIRolesToIdentityModel(current.Membership.Roles))
 		} else {
 			plan.Roles = state.Roles
 		}
@@ -390,7 +391,7 @@ func (r *ProjectScopedIdentityResource) Update(ctx context.Context, req resource
 	if plan.Metadata != nil {
 		plan.Metadata = metadataFromAPI(identity.Metadata)
 	}
-	plan.Roles = orderAPIIdentityRolesByPlan(plan.Roles, mapAPIRolesToIdentityModel(membership.Membership.Roles))
+	plan.Roles = tfpkg.OrderAPIRolesByPlan(plan.Roles, tfpkg.MapAPIRolesToIdentityModel(membership.Membership.Roles))
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -490,7 +491,7 @@ func (r *ProjectScopedIdentityResource) ImportState(ctx context.Context, req res
 
 	// Sort roles by slug for a deterministic order on import (there is no plan to align
 	// against), matching the behaviour of the infisical_project_identity resource.
-	roles := mapAPIRolesToIdentityModel(membership.Membership.Roles)
+	roles := tfpkg.MapAPIRolesToIdentityModel(membership.Membership.Roles)
 	sort.Slice(roles, func(i, j int) bool {
 		return roles[i].RoleSlug.ValueString() < roles[j].RoleSlug.ValueString()
 	})
