@@ -10,6 +10,7 @@ import (
 const (
 	operationCreateProjectScopedIdentity        = "CallCreateProjectScopedIdentity"
 	operationGetProjectScopedIdentity           = "CallGetProjectScopedIdentity"
+	operationListProjectScopedIdentities        = "CallListProjectScopedIdentities"
 	operationUpdateProjectScopedIdentity        = "CallUpdateProjectScopedIdentity"
 	operationDeleteProjectScopedIdentity        = "CallDeleteProjectScopedIdentity"
 	operationUpdateProjectScopedIdentityRoles   = "CallUpdateProjectScopedIdentityRoles"
@@ -59,6 +60,46 @@ func (client Client) GetProjectScopedIdentityByID(request GetProjectScopedIdenti
 	}
 
 	return response.Identity, nil
+}
+
+// ListProjectScopedIdentities fetches all project-scoped machine identities for a project.
+// The backend returns a maximum of 1000 entries per request, so pagination is used to ensure all identities are retrieved.
+func (client Client) ListProjectScopedIdentities(request ListProjectScopedIdentitiesRequest) ([]ProjectScopedIdentity, error) {
+	const pageSize = 1000
+	var all []ProjectScopedIdentity
+	offset := 0
+
+	for {
+		var page ListProjectScopedIdentitiesResponse
+		r := client.Config.HttpClient.
+			R().
+			SetResult(&page).
+			SetHeader("User-Agent", USER_AGENT).
+			SetQueryParam("limit", fmt.Sprintf("%d", pageSize)).
+			SetQueryParam("offset", fmt.Sprintf("%d", offset))
+
+		if request.Search != "" {
+			r = r.SetQueryParam("search", request.Search)
+		}
+
+		httpResponse, err := r.Get(fmt.Sprintf("api/v1/projects/%s/identities", url.PathEscape(request.ProjectID)))
+		if err != nil {
+			return nil, errors.NewGenericRequestError(operationListProjectScopedIdentities, err)
+		}
+
+		if httpResponse.IsError() {
+			return nil, errors.NewAPIErrorWithResponse(operationListProjectScopedIdentities, httpResponse, nil)
+		}
+
+		all = append(all, page.Identities...)
+
+		if len(all) >= page.TotalCount {
+			break
+		}
+		offset += pageSize
+	}
+
+	return all, nil
 }
 
 // UpdateProjectScopedIdentity updates a project-scoped machine identity.

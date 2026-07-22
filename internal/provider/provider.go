@@ -387,6 +387,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectUserDataSource,
 		infisicalDatasource.NewOrganizationDataSource,
 		infisicalDatasource.NewGatewayDataSource,
+		infisicalDatasource.NewProjectScopedIdentitiesListDataSource,
 	}
 }
 

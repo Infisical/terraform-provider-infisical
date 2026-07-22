@@ -3644,6 +3644,16 @@ type ProjectScopedIdentity struct {
 	Metadata            []MetaEntry `json:"metadata"`
 }
 
+type ListProjectScopedIdentitiesRequest struct {
+	ProjectID string
+	Search    string
+}
+
+type ListProjectScopedIdentitiesResponse struct {
+	Identities []ProjectScopedIdentity `json:"identities"`
+	TotalCount int                     `json:"totalCount"`
+}
+
 type CreateProjectScopedIdentityRequest struct {
 	ProjectID           string                              `json:"-"`
 	Name                string                              `json:"name"`
