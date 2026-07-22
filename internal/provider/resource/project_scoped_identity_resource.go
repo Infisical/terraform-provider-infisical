@@ -45,7 +45,7 @@ type ProjectScopedIdentityResourceModel struct {
 	Roles               []ProjectScopedIdentityRole `tfsdk:"roles"`
 }
 
-// ProjectScopedIdentityRole describes a role of a Project Scoped Identity
+// ProjectScopedIdentityRole describes a role of a Project Scoped Identity.
 type ProjectScopedIdentityRole struct {
 	ID                      types.String `tfsdk:"id"`
 	RoleSlug                types.String `tfsdk:"role_slug"`
