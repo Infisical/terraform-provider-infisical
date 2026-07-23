@@ -22,9 +22,10 @@ const (
 
 // SecretSyncGcpResourceModel describes the data source data model.
 type SecretSyncGcpSecretManagerDestinationConfigModel struct {
-	ProjectID  types.String `tfsdk:"project_id"`
-	Scope      types.String `tfsdk:"scope"`
-	LocationID types.String `tfsdk:"location_id"`
+	ProjectID              types.String `tfsdk:"project_id"`
+	Scope                  types.String `tfsdk:"scope"`
+	LocationID             types.String `tfsdk:"location_id"`
+	UserReplicaLocationIds types.List   `tfsdk:"user_replica_location_ids"`
 }
 
 type SecretSyncGcpSecretManagerSyncOptionsModel struct {
@@ -35,27 +36,41 @@ type SecretSyncGcpSecretManagerSyncOptionsModel struct {
 
 // populateGcpSecretManagerDestinationConfig validates the scope/location_id
 // combination and writes the resulting fields into destinationConfig.
-func populateGcpSecretManagerDestinationConfig(destinationConfig map[string]interface{}, gcpConfig SecretSyncGcpSecretManagerDestinationConfigModel) error {
+func populateGcpSecretManagerDestinationConfig(destinationConfig map[string]any, gcpConfig SecretSyncGcpSecretManagerDestinationConfigModel) error {
 	scope := gcpConfig.Scope.ValueString()
 	locationId := gcpConfig.LocationID.ValueString()
 	hasLocationId := !gcpConfig.LocationID.IsNull() && locationId != ""
+	hasUserReplicaLocationIds := !gcpConfig.UserReplicaLocationIds.IsNull() && len(gcpConfig.UserReplicaLocationIds.Elements()) > 0
+
+	destinationConfig["scope"] = scope
+	destinationConfig["projectId"] = gcpConfig.ProjectID.ValueString()
 
 	switch scope {
 	case gcpSecretManagerScopeGlobal:
 		if hasLocationId {
 			return fmt.Errorf("location_id must not be set when scope is 'global'")
 		}
+
+		userReplicaLocationIds := make([]string, 0, len(gcpConfig.UserReplicaLocationIds.Elements()))
+		for _, loc := range gcpConfig.UserReplicaLocationIds.Elements() {
+			strVal, ok := loc.(types.String)
+			if !ok {
+				return fmt.Errorf("user_replica_location_ids must be a list of strings")
+			}
+			userReplicaLocationIds = append(userReplicaLocationIds, strVal.ValueString())
+		}
+		destinationConfig["userReplicaLocationIds"] = userReplicaLocationIds
 	case gcpSecretManagerScopeRegion:
 		if !hasLocationId {
 			return fmt.Errorf("location_id is required when scope is 'region'")
+		}
+		if hasUserReplicaLocationIds {
+			return fmt.Errorf("user_replica_location_ids must not be set when scope is 'region'")
 		}
 		destinationConfig["locationId"] = locationId
 	default:
 		return fmt.Errorf("invalid value for scope field. Possible values are: global, region")
 	}
-
-	destinationConfig["scope"] = scope
-	destinationConfig["projectId"] = gcpConfig.ProjectID.ValueString()
 
 	return nil
 }
@@ -97,6 +112,11 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 			"location_id": schema.StringAttribute{
 				Optional:    true,
 				Description: "The GCP region to sync secrets to (e.g. us-east1). Required when scope is 'region' and must not be set when scope is 'global'.",
+			},
+			"user_replica_location_ids": schema.ListAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "The GCP regions to replicate secrets to (e.g. us-east1). Only applicable when scope is 'global'. When not defined, it will use the automatic replication policy",
 			},
 		},
 
@@ -227,10 +247,29 @@ func NewSecretSyncGcpSecretManagerResource() resource.Resource {
 				destinationConfig["location_id"] = types.StringValue(locationIdVal)
 			}
 
+			userReplicaRaw, ok := secretSync.DestinationConfig["userReplicaLocationIds"].([]any)
+			if !ok || len(userReplicaRaw) == 0 {
+				destinationConfig["user_replica_location_ids"] = types.ListNull(types.StringType)
+			} else {
+				locations := make([]string, 0, len(userReplicaRaw))
+				for _, loc := range userReplicaRaw {
+					if s, ok := loc.(string); ok {
+						locations = append(locations, s)
+					}
+				}
+				listVal, d := types.ListValueFrom(ctx, types.StringType, locations)
+				diags.Append(d...)
+				if diags.HasError() {
+					return types.ObjectNull(map[string]attr.Type{}), diags
+				}
+				destinationConfig["user_replica_location_ids"] = listVal
+			}
+
 			return types.ObjectValue(map[string]attr.Type{
-				"scope":       types.StringType,
-				"project_id":  types.StringType,
-				"location_id": types.StringType,
+				"scope":                     types.StringType,
+				"project_id":                types.StringType,
+				"user_replica_location_ids": types.ListType{ElemType: types.StringType},
+				"location_id":               types.StringType,
 			}, destinationConfig)
 		},
 	}
