@@ -776,6 +776,31 @@ type UpdateProjectUserResponse struct {
 	} `json:"roles"`
 }
 
+type GetProjectMembershipsRequest struct {
+	ProjectID string `json:"projectId"`
+}
+
+type ProjectMembershipUser struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	PublicKey string `json:"publicKey"`
+}
+
+type ProjectMembershipItem struct {
+	ID        string                `json:"id"`
+	UserID    string                `json:"userId"`
+	ProjectID string                `json:"projectId"`
+	User      ProjectMembershipUser `json:"user"`
+	Roles     []ProjectMemberRole   `json:"roles"`
+}
+
+type GetProjectMembershipsResponse struct {
+	Memberships []ProjectMembershipItem `json:"memberships"`
+}
+
 type DeleteProjectUserRequest struct {
 	ProjectID string   `json:"projectId"`
 	Username  []string `json:"usernames"`
