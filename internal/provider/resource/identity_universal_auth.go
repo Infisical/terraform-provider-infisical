@@ -346,6 +346,40 @@ func (r *IdentityUniversalAuthResource) Update(ctx context.Context, req resource
 	}
 }
 
+func (r *IdentityUniversalAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity universal auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	identityUniversalAuth, err := r.client.GetIdentityUniversalAuth(infisical.GetIdentityUniversalAuthRequest{
+		IdentityID: req.ID,
+	})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity universal auth not found",
+				"The identity with the given ID does not have universal auth configured",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity universal auth",
+				"Couldn't read identity universal auth from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	var state IdentityUniversalAuthResourceModel
+	state.ID = types.StringValue(identityUniversalAuth.ID)
+	state.IdentityID = types.StringValue(req.ID)
+	updateUniversalAuthStateByApi(ctx, resp.Diagnostics, &state, &identityUniversalAuth)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *IdentityUniversalAuthResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
