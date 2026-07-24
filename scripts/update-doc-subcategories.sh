@@ -38,7 +38,11 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Secret Syncs
         secret_sync_*)
             update_subcategory "$file" "Secret Syncs";;
-        
+
+        # PKI Syncs
+        pki_sync_*)
+            update_subcategory "$file" "PKI Syncs";;
+
         # Secret Rotations
         secret_rotation_*)
             update_subcategory "$file" "Secret Rotations";;
