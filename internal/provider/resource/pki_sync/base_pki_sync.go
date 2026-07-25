@@ -74,7 +74,7 @@ func (r *PkiSyncBaseResource) Metadata(_ context.Context, req resource.MetadataR
 	resp.TypeName = req.ProviderTypeName + r.ResourceTypeName
 }
 
-// ImportState imports an existing PKI sync by its ID. Read then populates every attribute
+// ImportState imports an existing PKI sync by its ID. Read then populates every attribute.
 func (r *PkiSyncBaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if _, err := uuid.Parse(req.ID); err != nil {
 		resp.Diagnostics.AddError(
