@@ -6,6 +6,7 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -46,6 +47,15 @@ func (r *PkiSyncCertificateResource) ImportState(ctx context.Context, req resour
 			"Invalid import ID",
 			"Expected import ID in the format \"<pki_sync_id>:<certificate_id>\", got: "+req.ID,
 		)
+		return
+	}
+
+	if _, err := uuid.Parse(parts[0]); err != nil {
+		resp.Diagnostics.AddError("Invalid import ID", "Expected the PKI sync ID to be a valid UUID, got: "+parts[0])
+		return
+	}
+	if _, err := uuid.Parse(parts[1]); err != nil {
+		resp.Diagnostics.AddError("Invalid import ID", "Expected the certificate ID to be a valid UUID, got: "+parts[1])
 		return
 	}
 
@@ -148,14 +158,31 @@ func (r *PkiSyncCertificateResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	// The add response returns the created association; use its ID. If it is somehow absent,
-	// leave the ID empty and let the next Read resolve it (Read looks the association up).
+	// The add response should echo the created association. If it does not, resolve the ID via
+	// a lookup so a successful create never persists an empty computed ID.
 	associationID := ""
 	for _, cert := range added {
 		if cert.CertificateID == plan.CertificateID.ValueString() {
 			associationID = cert.ID
 			break
 		}
+	}
+	if associationID == "" {
+		associationID, err = r.findAssociation(plan.PkiSyncID.ValueString(), plan.CertificateID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error resolving certificate association",
+				"Couldn't resolve the certificate association after adding it, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+	if associationID == "" {
+		resp.Diagnostics.AddError(
+			"Error adding certificate to PKI sync",
+			"The certificate was added but its association could not be found.",
+		)
+		return
 	}
 
 	plan.ID = types.StringValue(associationID)

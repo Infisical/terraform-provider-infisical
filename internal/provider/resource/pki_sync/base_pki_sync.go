@@ -5,6 +5,7 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -73,8 +74,15 @@ func (r *PkiSyncBaseResource) Metadata(_ context.Context, req resource.MetadataR
 	resp.TypeName = req.ProviderTypeName + r.ResourceTypeName
 }
 
-// ImportState imports an existing PKI sync by its ID. Read populates every attribute
+// ImportState imports an existing PKI sync by its ID. Read then populates every attribute
 func (r *PkiSyncBaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.Parse(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Expected the PKI sync ID to be a valid UUID, got: "+req.ID,
+		)
+		return
+	}
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
@@ -188,7 +196,60 @@ func (r *PkiSyncBaseResource) Create(ctx context.Context, req resource.CreateReq
 
 	plan.ID = types.StringValue(pkiSync.ID)
 
+	found, diags := r.hydrateStateFromApi(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError(
+			"Error creating PKI sync",
+			"The PKI sync was created but could not be read back from Infisical.",
+		)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
+
+// hydrateStateFromApi refreshes model in place from the API's current view of the sync, keyed
+// by model.ID. Create and Update call it so state reflects any server-side normalization
+// (e.g. trimmed name/schema) instead of the raw plan. It returns false when the sync no longer
+// exists.
+func (r *PkiSyncBaseResource) hydrateStateFromApi(ctx context.Context, model *PkiSyncBaseResourceModel) (bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	pkiSync, err := r.client.GetPkiSyncById(infisical.GetPkiSyncByIdRequest{ID: model.ID.ValueString()})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			return false, diags
+		}
+		diags.AddError(
+			"Error reading PKI sync",
+			"Couldn't read PKI sync, unexpected error: "+err.Error(),
+		)
+		return false, diags
+	}
+
+	model.ConnectionID = types.StringValue(pkiSync.ConnectionID)
+	model.Name = types.StringValue(pkiSync.Name)
+	model.ApplicationID = types.StringValue(pkiSync.ApplicationID)
+	model.AutoSyncEnabled = types.BoolValue(pkiSync.IsAutoSyncEnabled)
+
+	// Keep an unset optional description null instead of flipping it to "" on every read.
+	if !(model.Description.IsNull() && pkiSync.Description == "") {
+		model.Description = types.StringValue(pkiSync.Description)
+	}
+
+	syncOptions, d := r.ReadSyncOptionsFromApi(ctx, pkiSync)
+	diags.Append(d...)
+	model.SyncOptions = syncOptions
+
+	destinationConfig, d := r.ReadDestinationConfigFromApi(ctx, pkiSync)
+	diags.Append(d...)
+	model.DestinationConfig = destinationConfig
+
+	return true, diags
 }
 
 func (r *PkiSyncBaseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -206,41 +267,13 @@ func (r *PkiSyncBaseResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	pkiSync, err := r.client.GetPkiSyncById(infisical.GetPkiSyncByIdRequest{
-		ID: state.ID.ValueString(),
-	})
-	if err != nil {
-		if err == infisical.ErrNotFound {
-			resp.State.RemoveResource(ctx)
-			return
-		}
-		resp.Diagnostics.AddError(
-			"Error reading PKI sync",
-			"Couldn't read PKI sync, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	state.ConnectionID = types.StringValue(pkiSync.ConnectionID)
-	state.Name = types.StringValue(pkiSync.Name)
-	state.ApplicationID = types.StringValue(pkiSync.ApplicationID)
-	state.AutoSyncEnabled = types.BoolValue(pkiSync.IsAutoSyncEnabled)
-
-	// Keep an unset optional description null instead of flipping it to "" on every read.
-	if !(state.Description.IsNull() && pkiSync.Description == "") {
-		state.Description = types.StringValue(pkiSync.Description)
-	}
-
-	var diags diag.Diagnostics
-	state.SyncOptions, diags = r.ReadSyncOptionsFromApi(ctx, pkiSync)
+	found, diags := r.hydrateStateFromApi(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	state.DestinationConfig, diags = r.ReadDestinationConfigFromApi(ctx, pkiSync)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if !found {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -299,6 +332,19 @@ func (r *PkiSyncBaseResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	plan.ID = state.ID
+
+	found, diags := r.hydrateStateFromApi(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError(
+			"Error updating PKI sync",
+			"The PKI sync was updated but could not be read back from Infisical.",
+		)
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

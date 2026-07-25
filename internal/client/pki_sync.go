@@ -3,6 +3,7 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"terraform-provider-infisical/internal/errors"
 )
 
@@ -54,7 +55,7 @@ func (client Client) UpdatePkiSync(request UpdatePkiSyncRequest) (PkiSync, error
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch(fmt.Sprintf("%s/%s", pkiSyncBaseURL(request.App), request.ID))
+		Patch(fmt.Sprintf("%s/%s", pkiSyncBaseURL(request.App), url.PathEscape(request.ID)))
 
 	if err != nil {
 		return PkiSync{}, errors.NewGenericRequestError(operationUpdatePkiSync, err)
@@ -73,7 +74,7 @@ func (client Client) GetPkiSyncById(request GetPkiSyncByIdRequest) (PkiSync, err
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v1/cert-manager/syncs/%s", request.ID))
+		Get(fmt.Sprintf("api/v1/cert-manager/syncs/%s", url.PathEscape(request.ID)))
 
 	if err != nil {
 		return PkiSync{}, errors.NewGenericRequestError(operationGetPkiSyncById, err)
@@ -96,10 +97,14 @@ func (client Client) DeletePkiSync(request DeletePkiSyncRequest) (PkiSync, error
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
-		Delete(fmt.Sprintf("%s/%s", pkiSyncBaseURL(request.App), request.ID))
+		Delete(fmt.Sprintf("%s/%s", pkiSyncBaseURL(request.App), url.PathEscape(request.ID)))
 
 	if err != nil {
 		return PkiSync{}, errors.NewGenericRequestError(operationDeletePkiSync, err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return PkiSync{}, nil
 	}
 
 	if response.IsError() {
@@ -112,7 +117,7 @@ func (client Client) DeletePkiSync(request DeletePkiSyncRequest) (PkiSync, error
 // Certificate association endpoints live on the shared sync router, so they are keyed by
 // sync ID only (destination-agnostic): api/v1/cert-manager/syncs/:pkiSyncId/certificates.
 func pkiSyncCertificatesURL(pkiSyncID string) string {
-	return fmt.Sprintf("api/v1/cert-manager/syncs/%s/certificates", pkiSyncID)
+	return fmt.Sprintf("api/v1/cert-manager/syncs/%s/certificates", url.PathEscape(pkiSyncID))
 }
 
 func (client Client) AddPkiSyncCertificates(request AddPkiSyncCertificatesRequest) ([]PkiSyncCertificate, error) {
@@ -171,6 +176,10 @@ func (client Client) RemovePkiSyncCertificates(request RemovePkiSyncCertificates
 
 	if err != nil {
 		return errors.NewGenericRequestError(operationRemovePkiSyncCertificate, err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return nil
 	}
 
 	if response.IsError() {
