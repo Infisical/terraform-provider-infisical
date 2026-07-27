@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	infisical "terraform-provider-infisical/internal/client"
@@ -13,11 +14,13 @@ import (
 	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -51,7 +54,17 @@ type infisicalProviderModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 
-	Auth *authModel `tfsdk:"auth"`
+	Auth       *authModel   `tfsdk:"auth"`
+	AuthMethod types.String `tfsdk:"auth_method"`
+}
+
+// authMethodToStrategy maps user-facing auth_method values to their auth strategy.
+var authMethodToStrategy = map[string]infisical.AuthStrategyType{
+	"token":      infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY,
+	"universal":  infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY,
+	"oidc":       infisical.AuthStrategy.OIDC_MACHINE_IDENTITY,
+	"kubernetes": infisical.AuthStrategy.KUBERNETES_MACHINE_IDENTITY,
+	"aws_iam":    infisical.AuthStrategy.AWS_IAM_MACHINE_IDENTITY,
 }
 
 type authModel struct {
@@ -192,6 +205,13 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 					},
 				},
 			},
+			"auth_method": schema.StringAttribute{
+				Optional:    true,
+				Description: "The authentication method to use. Valid values are `token`, `universal`, `oidc`, `kubernetes` and `aws_iam`. The credentials for the selected method are read from their corresponding environment variables. This attribute can also be set using the `INFISICAL_AUTH_METHOD_NAME` environment variable. Cannot be used together with the `auth` attribute.",
+				Validators: []validator.String{
+					stringvalidator.OneOf("token", "universal", "oidc", "kubernetes", "aws_iam"),
+				},
+			},
 		},
 	}
 }
@@ -204,6 +224,16 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if config.Auth != nil && !config.AuthMethod.IsNull() {
+		resp.Diagnostics.AddError(
+			"Conflicting authentication configuration",
+			"Both the `auth` block and the `auth_method` attribute are set. "+
+				"Use only one: set `auth_method` (with credentials supplied via environment variables) "+
+				"or configure the `auth` block, but not both.",
+		)
 		return
 	}
 
@@ -225,6 +255,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	serviceAccountToken := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_NAME)
 	serviceAccountTokenPath := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH_NAME)
 	organizationSlug := os.Getenv(infisical.INFISICAL_AUTH_ORGANIZATION_SLUG_ENV_NAME)
+	authMethodName := os.Getenv(infisical.INFISICAL_AUTH_METHOD_NAME)
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -299,16 +330,31 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		}
 	}
 
-	// strict env vars check:
+	// if auth method is set in the config, it takes precedence over the environment variable
+	if !config.AuthMethod.IsNull() {
+		authMethodName = config.AuthMethod.ValueString()
+	}
+
+	if authStrategy == "" && authMethodName != "" {
+		strategy, ok := authMethodToStrategy[authMethodName]
+		if !ok {
+			resp.Diagnostics.AddError(
+				"Invalid auth method",
+				fmt.Sprintf("%q is not a valid authentication method. Valid values are: token, universal, oidc, kubernetes, aws_iam.", authMethodName),
+			)
+			return
+		}
+		authStrategy = strategy
+	}
+
+	// Legacy fallback: when no auth method is specified anywhere, fall back to token auth
+	// if INFISICAL_TOKEN is set. Otherwise leave the strategy empty so the client can still
+	// detect universal auth from its client id/secret.
 	if authStrategy == "" {
-		// ? note(daniel): this fix only works for token auth.
-		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
-		// ? We should have a field for specifying the target auth strategy, like we do for the CLI (--method=aws-auth as an example)
 		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
 			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
 			token = envVarToken
 		}
-
 	}
 
 	client, err := infisical.NewClient(infisical.Config{
