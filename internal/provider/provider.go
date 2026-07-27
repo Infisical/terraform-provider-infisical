@@ -227,7 +227,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	if config.Auth != nil && !config.AuthMethod.IsNull() {
+	if config.Auth != nil && !config.AuthMethod.IsNull() && !config.AuthMethod.IsUnknown() {
 		resp.Diagnostics.AddError(
 			"Conflicting authentication configuration",
 			"Both the `auth` block and the `auth_method` attribute are set. "+
