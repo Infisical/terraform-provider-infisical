@@ -207,7 +207,7 @@ func (p *infisicalProvider) Schema(ctx context.Context, _ provider.SchemaRequest
 			},
 			"auth_method": schema.StringAttribute{
 				Optional:    true,
-				Description: "The authentication method to use. Valid values are `token`, `universal`, `oidc`, `kubernetes` and `aws_iam`. The credentials for the selected method are read from their corresponding environment variables. This attribute can also be set using the `INFISICAL_AUTH_METHOD_NAME` environment variable. Cannot be used together with the `auth` attribute.",
+				Description: "The authentication method to use. Valid values are `token`, `universal`, `oidc`, `kubernetes` and `aws_iam`. The credentials for the selected method are read from their corresponding environment variables. This attribute can also be set using the `INFISICAL_AUTH_METHOD` environment variable. Cannot be used together with the `auth` attribute.",
 				Validators: []validator.String{
 					stringvalidator.OneOf("token", "universal", "oidc", "kubernetes", "aws_iam"),
 				},

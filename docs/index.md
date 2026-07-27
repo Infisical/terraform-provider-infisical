@@ -39,7 +39,7 @@ provider "infisical" {
 #   auth_method = "universal" # token | universal | oidc | kubernetes | aws_iam
 # }
 #
-# export INFISICAL_AUTH_METHOD_NAME="universal"  # or set auth_method as above
+# export INFISICAL_AUTH_METHOD="universal"  # or set auth_method as above
 # export INFISICAL_UNIVERSAL_AUTH_CLIENT_ID="<machine-identity-client-id>"
 # export INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET="<machine-identity-client-secret>"
 ```
@@ -50,7 +50,7 @@ provider "infisical" {
 ### Optional
 
 - `auth` (Attributes) The configuration values for authentication (see [below for nested schema](#nestedatt--auth))
-- `auth_method` (String) The authentication method to use. Valid values are `token`, `universal`, `oidc`, `kubernetes` and `aws_iam`. The credentials for the selected method are read from their corresponding environment variables. This attribute can also be set using the `INFISICAL_AUTH_METHOD_NAME` environment variable. Cannot be used together with the `auth` attribute.
+- `auth_method` (String) The authentication method to use. Valid values are `token`, `universal`, `oidc`, `kubernetes` and `aws_iam`. The credentials for the selected method are read from their corresponding environment variables. This attribute can also be set using the `INFISICAL_AUTH_METHOD` environment variable. Cannot be used together with the `auth` attribute.
 - `client_id` (String, Sensitive) (DEPRECATED, Use the `auth` attribute), Machine identity client ID. Used to fetch/modify secrets for a given project.
 - `client_secret` (String, Sensitive) (DEPRECATED, use `auth` attribute), Machine identity client secret. Used to fetch/modify secrets for a given project
 - `host` (String) Used to point the client to fetch secrets from your self hosted instance of Infisical. If not host is provided, https://app.infisical.com is the default host. This attribute can also be set using the `INFISICAL_HOST` environment variable
