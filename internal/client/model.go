@@ -4157,3 +4157,74 @@ type DeleteSubOrganizationRequest struct {
 type DeleteSubOrganizationResponse struct {
 	Organization SubOrganization `json:"organization"`
 }
+
+type ProxiedServiceCredential struct {
+	SecretKey            *string  `json:"secretKey,omitempty"`
+	DynamicSecretName    *string  `json:"dynamicSecretName,omitempty"`
+	DynamicSecretField   *string  `json:"dynamicSecretField,omitempty"`
+	Role                 string   `json:"role"`
+	HeaderName           *string  `json:"headerName,omitempty"`
+	HeaderPrefix         *string  `json:"headerPrefix,omitempty"`
+	HeaderPurpose        *string  `json:"headerPurpose,omitempty"`
+	PlaceholderKey       *string  `json:"placeholderKey,omitempty"`
+	PlaceholderValue     *string  `json:"placeholderValue,omitempty"`
+	SubstitutionSurfaces []string `json:"substitutionSurfaces,omitempty"`
+}
+
+type ProxiedService struct {
+	Id          string                     `json:"id"`
+	Name        string                     `json:"name"`
+	HostPattern string                     `json:"hostPattern"`
+	IsEnabled   bool                       `json:"isEnabled"`
+	FolderId    string                     `json:"folderId"`
+	Credentials []ProxiedServiceCredential `json:"credentials"`
+}
+
+type CreateProxiedServiceRequest struct {
+	ProjectId   string                     `json:"projectId"`
+	Environment string                     `json:"environment"`
+	SecretPath  string                     `json:"secretPath"`
+	Name        string                     `json:"name"`
+	HostPattern string                     `json:"hostPattern"`
+	IsEnabled   *bool                      `json:"isEnabled,omitempty"`
+	Credentials []ProxiedServiceCredential `json:"credentials"`
+}
+
+type CreateProxiedServiceResponse struct {
+	Service ProxiedService `json:"service"`
+}
+
+type GetProxiedServiceRequest struct {
+	ServiceId string
+}
+
+type GetProxiedServiceByNameRequest struct {
+	Name        string
+	ProjectId   string
+	Environment string
+	SecretPath  string
+}
+
+type GetProxiedServiceResponse struct {
+	Service ProxiedService `json:"service"`
+}
+
+type UpdateProxiedServiceRequest struct {
+	ServiceId   string                     `json:"-"`
+	Name        string                     `json:"name"`
+	HostPattern string                     `json:"hostPattern"`
+	IsEnabled   *bool                      `json:"isEnabled,omitempty"`
+	Credentials []ProxiedServiceCredential `json:"credentials"`
+}
+
+type UpdateProxiedServiceResponse struct {
+	Service ProxiedService `json:"service"`
+}
+
+type DeleteProxiedServiceRequest struct {
+	ServiceId string
+}
+
+type DeleteProxiedServiceResponse struct {
+	Service ProxiedService `json:"service"`
+}
