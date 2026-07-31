@@ -94,6 +94,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Certificate Management
         cert_manager_*)
             update_subcategory "$file" "Certificate Management";;
+
+        # Alerts
+        alert_*)
+            update_subcategory "$file" "Alerts";;
     esac
 done
 
