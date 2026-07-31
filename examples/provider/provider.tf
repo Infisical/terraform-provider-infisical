@@ -18,12 +18,16 @@ provider "infisical" {
   }
 }
 
-# Alternatively, select the auth method and supply its credentials via environment variables:
+# Authenticate via environment variables instead of the auth block:
 #
-# provider "infisical" {
-#   auth_method = "universal" # token | universal | oidc | kubernetes | aws_iam
-# }
+# provider "infisical" {}
 #
-# export INFISICAL_AUTH_METHOD="universal"  # or set auth_method as above
+# export INFISICAL_AUTH_METHOD="universal"  # token | universal | oidc | kubernetes | aws_iam
 # export INFISICAL_UNIVERSAL_AUTH_CLIENT_ID="<machine-identity-client-id>"
 # export INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET="<machine-identity-client-secret>"
+#
+# Other methods (set INFISICAL_AUTH_METHOD accordingly):
+#   token:      INFISICAL_TOKEN
+#   oidc:       INFISICAL_MACHINE_IDENTITY_ID (+ JWT in INFISICAL_AUTH_JWT by default)
+#   kubernetes: INFISICAL_MACHINE_IDENTITY_ID (+ service account token env/path)
+#   aws_iam:    INFISICAL_MACHINE_IDENTITY_ID
