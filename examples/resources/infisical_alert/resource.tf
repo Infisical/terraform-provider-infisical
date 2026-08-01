@@ -19,11 +19,16 @@ provider "infisical" {
 
 # Email the security team 30 days before an organization level machine identity's
 # authentication credentials expire
-resource "infisical_alert_identity_authentication_expiry" "ci_identity" {
-  identity_id       = "<your-machine-identity-id>"
-  name              = "CI identity credentials expiring"
-  description       = "Rotate the CI machine identity client secret before it expires"
-  alert_before_days = 30
+resource "infisical_alert" "ci_identity" {
+  resource_type = "identity.authentication"
+  resource_id   = "<your-machine-identity-id>" # A machine identity, for this resource type
+  name          = "CI identity credentials expiring"
+  description   = "Rotate the CI machine identity client secret before it expires"
+
+  # The condition block is what the alert fires on, and every alert carries exactly one.
+  authentication_expiry = {
+    alert_before_days = 30
+  }
 
   # Each channel is keyed by its name, and the block it carries is what gives it its type.
   # Renaming a channel deletes it and creates a new one, so the new channel notifies about
@@ -48,12 +53,16 @@ resource "infisical_alert_identity_authentication_expiry" "ci_identity" {
 
 # Remind a project level machine identity's owners every day for the last week, over
 # Slack, a signed webhook and PagerDuty
-resource "infisical_alert_identity_authentication_expiry" "deploy_identity" {
-  identity_id       = "<your-machine-identity-id>"
-  project_id        = "<your-project-id>" # Required for identities that belong to a project
-  name              = "Deploy identity credentials expiring"
-  alert_before_days = 7
-  daily_reminder    = true
+resource "infisical_alert" "deploy_identity" {
+  resource_type = "identity.authentication"
+  resource_id   = "<your-machine-identity-id>"
+  project_id    = "<your-project-id>" # Required for resources that belong to a project
+  name          = "Deploy identity credentials expiring"
+
+  authentication_expiry = {
+    alert_before_days = 7
+    daily_reminder    = true
+  }
 
   channels = {
     "Platform Slack" = {

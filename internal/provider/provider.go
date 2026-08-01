@@ -470,7 +470,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerGroupResource,
 		infisicalResource.NewCertManagerIdentityResource,
 		externalKmsResource.NewExternalKmsAwsResource,
-		alertResource.NewAlertIdentityAuthenticationExpiryResource,
+		alertResource.NewAlertResource,
 	}
 }
 

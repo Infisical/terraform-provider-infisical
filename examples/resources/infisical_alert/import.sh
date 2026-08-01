@@ -1,4 +1,4 @@
-terraform import infisical_alert_identity_authentication_expiry.example <alert_id>
+terraform import infisical_alert.example <alert_id>
 
 # An imported alert keys each of its channels by the name it has in Infisical, so write the
 # channels in your configuration under those same names. Keying them differently renames the
