@@ -3164,14 +3164,14 @@ type GetCertificatePolicyResponse struct {
 type UpdateCertificatePolicyRequest struct {
 	PolicyId          string                              `json:"-"`
 	Name              string                              `json:"name,omitempty"`
-	Description       string                              `json:"description,omitempty"`
-	Subject           []CertificatePolicySubject          `json:"subject,omitempty"`
-	Sans              []CertificatePolicySAN              `json:"sans,omitempty"`
-	KeyUsages         *CertificatePolicyKeyUsages         `json:"keyUsages,omitempty"`
-	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
-	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
-	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
-	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
+	Description       string                              `json:"description"`
+	Subject           []CertificatePolicySubject          `json:"subject"`
+	Sans              []CertificatePolicySAN              `json:"sans"`
+	KeyUsages         *CertificatePolicyKeyUsages         `json:"keyUsages"`
+	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages"`
+	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms"`
+	Validity          *CertificatePolicyValidity          `json:"validity"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints"`
 }
 
 type UpdateCertificatePolicyResponse struct {

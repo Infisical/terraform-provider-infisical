@@ -184,13 +184,13 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
 
 ### Required
 
-- `name` (String) The name of the certificate policy
+- `name` (String) The name of the certificate policy. Must be in slug format: lowercase letters and numbers, separated by single hyphens (e.g. 'web-server-policy').
 
 ### Optional
 
 - `algorithms` (Block, Optional) Algorithm constraints for the certificate policy. At least one signature algorithm and one key algorithm must be specified. (see [below for nested schema](#nestedblock--algorithms))
 - `basic_constraints` (Block, Optional) Basic constraints policy for the certificate policy, controlling whether issued certificates may act as certificate authorities. (see [below for nested schema](#nestedblock--basic_constraints))
-- `description` (String) The description of the certificate policy
+- `description` (String) The description of the certificate policy (max 255 characters). Omit the attribute instead of passing an empty string.
 - `extended_key_usages` (Block, Optional) Extended key usage policies for the certificate policy (see [below for nested schema](#nestedblock--extended_key_usages))
 - `key_usages` (Block, Optional) Key usage policies for the certificate policy (see [below for nested schema](#nestedblock--key_usages))
 - `sans` (Block List) Subject alternative name (SAN) policies for the certificate policy (see [below for nested schema](#nestedblock--sans))

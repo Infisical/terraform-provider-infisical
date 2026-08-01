@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -39,6 +40,7 @@ var (
 		"RSA-2048", "RSA-3072", "RSA-4096",
 		"ECDSA-P256", "ECDSA-P521", "ECDSA-P384",
 	}
+	POLICY_NAME_SLUG_REGEX = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 )
 
 var (
@@ -143,12 +145,19 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the certificate policy",
+				Description: "The name of the certificate policy. Must be in slug format: lowercase letters and numbers, separated by single hyphens (e.g. 'web-server-policy').",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(255),
+					stringvalidator.RegexMatches(POLICY_NAME_SLUG_REGEX, "must be lowercase letters and numbers separated by single hyphens (e.g. 'web-server-policy')"),
+				},
 			},
 			"description": schema.StringAttribute{
-				Description: "The description of the certificate policy",
+				Description: "The description of the certificate policy (max 255 characters). Omit the attribute instead of passing an empty string.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 255),
+				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -167,16 +176,25 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 							Description: "List of allowed values for this subject attribute. Supports the '*' wildcard.",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"required": schema.ListAttribute{
 							Description: "List of required values for this subject attribute. Supports the '*' wildcard.",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"denied": schema.ListAttribute{
 							Description: "List of denied values for this subject attribute. Supports the '*' wildcard.",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 					},
 				},
@@ -196,16 +214,25 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 							Description: "List of allowed values for this SAN type",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"required": schema.ListAttribute{
 							Description: "List of required values for this SAN type",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"denied": schema.ListAttribute{
 							Description: "List of denied values for this SAN type",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 					},
 				},
@@ -218,6 +245,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
 							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_KEY_USAGES...)),
 						},
 					},
@@ -226,6 +254,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
 							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_KEY_USAGES...)),
 						},
 					},
@@ -234,6 +263,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
 							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_KEY_USAGES...)),
 						},
 					},
@@ -247,6 +277,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
 							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_EXT_KEY_USAGES...)),
 						},
 					},
@@ -255,6 +286,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
 							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_EXT_KEY_USAGES...)),
 						},
 					},
@@ -263,6 +295,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
 							listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_EXT_KEY_USAGES...)),
 						},
 					},
@@ -507,6 +540,14 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 	plan.Id = types.StringValue(policy.CertificatePolicy.Id)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+
+	if policy.CertificatePolicy.Name != plan.Name.ValueString() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("name"),
+			"Certificate policy name already in use",
+			fmt.Sprintf("A certificate policy named '%s' already exists in the project, so the server created this one as '%s'. Choose a unique name; the resource will be replaced on the next apply.", plan.Name.ValueString(), policy.CertificatePolicy.Name),
+		)
+	}
 }
 
 func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -567,11 +608,7 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 				resp.Diagnostics.Append(diags...)
 				state.Subject[i].Required = requiredList
 			} else {
-				if len(currentState.Subject) > i && !currentState.Subject[i].Required.IsNull() {
-					state.Subject[i].Required = currentState.Subject[i].Required
-				} else {
-					state.Subject[i].Required = types.ListNull(types.StringType)
-				}
+				state.Subject[i].Required = types.ListNull(types.StringType)
 			}
 
 			if len(subj.Denied) > 0 {
@@ -877,9 +914,18 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 		return
 	}
 
-	_, err := r.client.UpdateCertificatePolicy(updatePolicyRequest)
+	updatedPolicy, err := r.client.UpdateCertificatePolicy(updatePolicyRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating certificate policy", err.Error())
+		return
+	}
+
+	if updatedPolicy.CertificatePolicy.Name != plan.Name.ValueString() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("name"),
+			"Certificate policy name already in use",
+			fmt.Sprintf("A certificate policy named '%s' already exists in the project, so the server renamed this one to '%s'. Choose a unique name.", plan.Name.ValueString(), updatedPolicy.CertificatePolicy.Name),
+		)
 		return
 	}
 
