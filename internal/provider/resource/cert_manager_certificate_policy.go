@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var (
@@ -113,10 +114,55 @@ func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req r
 	resp.TypeName = req.ProviderTypeName + "_cert_manager_certificate_policy"
 }
 
+type certManagerCertificatePolicyConfigModel struct {
+	Id                types.String `tfsdk:"id"`
+	Name              types.String `tfsdk:"name"`
+	Description       types.String `tfsdk:"description"`
+	Subject           types.List   `tfsdk:"subject"`
+	Sans              types.List   `tfsdk:"sans"`
+	KeyUsages         types.Object `tfsdk:"key_usages"`
+	ExtendedKeyUsages types.Object `tfsdk:"extended_key_usages"`
+	Algorithms        types.Object `tfsdk:"algorithms"`
+	Validity          types.Object `tfsdk:"validity"`
+	BasicConstraints  types.Object `tfsdk:"basic_constraints"`
+}
+
 func (r *certManagerCertificatePolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var rawConfig certManagerCertificatePolicyConfigModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &rawConfig)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	var config certManagerCertificatePolicyResourceModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if !rawConfig.Subject.IsNull() && !rawConfig.Subject.IsUnknown() {
+		resp.Diagnostics.Append(rawConfig.Subject.ElementsAs(ctx, &config.Subject, false)...)
+	}
+	if !rawConfig.Sans.IsNull() && !rawConfig.Sans.IsUnknown() {
+		resp.Diagnostics.Append(rawConfig.Sans.ElementsAs(ctx, &config.Sans, false)...)
+	}
+	if !rawConfig.KeyUsages.IsNull() && !rawConfig.KeyUsages.IsUnknown() {
+		config.KeyUsages = &certManagerCertificatePolicyKeyUsagesModel{}
+		resp.Diagnostics.Append(rawConfig.KeyUsages.As(ctx, config.KeyUsages, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.ExtendedKeyUsages.IsNull() && !rawConfig.ExtendedKeyUsages.IsUnknown() {
+		config.ExtendedKeyUsages = &certManagerCertificatePolicyExtendedKeyUsagesModel{}
+		resp.Diagnostics.Append(rawConfig.ExtendedKeyUsages.As(ctx, config.ExtendedKeyUsages, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.Algorithms.IsNull() && !rawConfig.Algorithms.IsUnknown() {
+		config.Algorithms = &certManagerCertificatePolicyAlgorithmsModel{}
+		resp.Diagnostics.Append(rawConfig.Algorithms.As(ctx, config.Algorithms, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.Validity.IsNull() && !rawConfig.Validity.IsUnknown() {
+		config.Validity = &certManagerCertificatePolicyValidityModel{}
+		resp.Diagnostics.Append(rawConfig.Validity.As(ctx, config.Validity, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.BasicConstraints.IsNull() && !rawConfig.BasicConstraints.IsUnknown() {
+		config.BasicConstraints = &certManagerCertificatePolicyBasicConstraintsModel{}
+		resp.Diagnostics.Append(rawConfig.BasicConstraints.As(ctx, config.BasicConstraints, basetypes.ObjectAsOptions{})...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -975,10 +1021,13 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 	}
 
 	if updatedPolicy.CertificatePolicy.Name != plan.Name.ValueString() {
+		requestedName := plan.Name.ValueString()
+		plan.Name = types.StringValue(updatedPolicy.CertificatePolicy.Name)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddAttributeError(
 			path.Root("name"),
 			"Certificate policy name already in use",
-			fmt.Sprintf("A certificate policy named '%s' already exists in the project, so the server renamed this one to '%s'. Choose a unique name.", plan.Name.ValueString(), updatedPolicy.CertificatePolicy.Name),
+			fmt.Sprintf("A certificate policy named '%s' already exists in the project, so the server renamed this one to '%s'. Choose a unique name.", requestedName, updatedPolicy.CertificatePolicy.Name),
 		)
 		return
 	}
