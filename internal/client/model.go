@@ -3096,15 +3096,15 @@ type CertificatePolicySAN struct {
 }
 
 type CertificatePolicyKeyUsages struct {
-	Allowed  []string `json:"allowed,omitempty"`
-	Required []string `json:"required,omitempty"`
-	Denied   []string `json:"denied,omitempty"`
+	Allowed  *[]string `json:"allowed,omitempty"`
+	Required *[]string `json:"required,omitempty"`
+	Denied   *[]string `json:"denied,omitempty"`
 }
 
 type CertificatePolicyExtendedKeyUsages struct {
-	Allowed  []string `json:"allowed,omitempty"`
-	Required []string `json:"required,omitempty"`
-	Denied   []string `json:"denied,omitempty"`
+	Allowed  *[]string `json:"allowed,omitempty"`
+	Required *[]string `json:"required,omitempty"`
+	Denied   *[]string `json:"denied,omitempty"`
 }
 
 type CertificatePolicyAlgorithms struct {
