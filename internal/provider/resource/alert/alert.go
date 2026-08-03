@@ -89,6 +89,9 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"project_id": schema.StringAttribute{
 				Description: "The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -135,6 +138,11 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 		return
 	}
 
+	accepted := alertBlocksForResourceType(resourceType.ValueString())
+	if len(accepted) == 0 {
+		return
+	}
+
 	for _, event := range alertEvents {
 		var block types.Object
 		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(event.block), &block)...)
@@ -145,7 +153,6 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 			continue
 		}
 
-		accepted := alertBlocksForResourceType(resourceType.ValueString())
 		resp.Diagnostics.AddAttributeError(
 			path.Root(event.block),
 			"Unexpected alert condition",

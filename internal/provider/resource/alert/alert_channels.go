@@ -253,7 +253,7 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 							Sensitive:   true,
 							Description: "The secret used to sign the payload so the receiver can verify it. Write-only: it is never returned by the API, so an imported channel keeps the secret it was created with until one is set here.",
 							Validators: []validator.String{
-								stringvalidator.LengthAtMost(256),
+								stringvalidator.LengthBetween(1, 256),
 							},
 						},
 					},

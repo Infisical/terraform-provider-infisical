@@ -7,6 +7,9 @@ import (
 
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -516,6 +519,37 @@ func TestAlertChannelsFromAPIImport(t *testing.T) {
 	if !channel.Slack.WebhookURL.IsNull() {
 		t.Errorf("webhook url = %v, want null since the API never returns it", channel.Slack.WebhookURL)
 	}
+}
+
+// An empty secret is the wire value that clears a stored one, so it cannot also be a configured one:
+// Infisical reports a cleared channel as having no secret, so every plan would diff the empty string
+// in the configuration against the null that comes back.
+func TestWebhookSigningSecretRejectsEmptyValues(t *testing.T) {
+	ctx := context.Background()
+
+	signingSecretPath := path.Root("channels").AtMapKey("Internal automation").AtName("webhook").AtName("signing_secret")
+	attribute, diags := alertSchema(t).AttributeAtPath(ctx, signingSecretPath)
+	if diags.HasError() {
+		t.Fatalf("reading the signing_secret attribute: %v", diags)
+	}
+
+	signingSecret, ok := attribute.(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("signing_secret is a %T, want a string attribute", attribute)
+	}
+
+	for _, stringValidator := range signingSecret.Validators {
+		resp := &validator.StringResponse{}
+		stringValidator.ValidateString(ctx, validator.StringRequest{
+			Path:        signingSecretPath,
+			ConfigValue: types.StringValue(""),
+		}, resp)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	t.Error("an empty signing secret passed validation, want it rejected")
 }
 
 func TestSortedChannelNames(t *testing.T) {
