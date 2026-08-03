@@ -4157,3 +4157,66 @@ type DeleteSubOrganizationRequest struct {
 type DeleteSubOrganizationResponse struct {
 	Organization SubOrganization `json:"organization"`
 }
+
+type IdentityTlsCertAuth struct {
+	ID                           string                  `json:"id"`
+	AccessTokenTTL               int64                   `json:"accessTokenTTL"`
+	AccessTokenMaxTTL            int64                   `json:"accessTokenMaxTTL"`
+	AccessTokenNumUsesLimit      int64                   `json:"accessTokenNumUsesLimit"`
+	AccessTokenTrustedIPS        []IdentityAuthTrustedIp `json:"accessTokenTrustedIps"`
+	CreatedAt                    string                  `json:"createdAt"`
+	UpdatedAt                    string                  `json:"updatedAt"`
+	IdentityID                   string                  `json:"identityId"`
+	AllowedCommonNames           *string                 `json:"allowedCommonNames"`
+	AllowedSubjectAltNames       []string                `json:"allowedSubjectAltNames"`
+	VerifyClientCertificateChain bool                    `json:"verifyClientCertificateChain"`
+	CaCertificate                string                  `json:"caCertificate"`
+}
+
+type CreateIdentityTlsCertAuthRequest struct {
+	IdentityID                   string                         `json:"-"`
+	CaCertificate                string                         `json:"caCertificate"`
+	AllowedCommonNames           *string                        `json:"allowedCommonNames"`
+	AllowedSubjectAltNames       []string                       `json:"allowedSubjectAltNames"`
+	VerifyClientCertificateChain *bool                          `json:"verifyClientCertificateChain,omitempty"`
+	AccessTokenTrustedIPS        []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL               *int64                         `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL            *int64                         `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit      *int64                         `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type CreateIdentityTlsCertAuthResponse struct {
+	IdentityTlsCertAuth IdentityTlsCertAuth `json:"identityTlsCertAuth"`
+}
+
+type UpdateIdentityTlsCertAuthRequest struct {
+	IdentityID                   string                         `json:"-"`
+	CaCertificate                string                         `json:"caCertificate,omitempty"`
+	AllowedCommonNames           *string                        `json:"allowedCommonNames"`
+	AllowedSubjectAltNames       []string                       `json:"allowedSubjectAltNames"`
+	VerifyClientCertificateChain *bool                          `json:"verifyClientCertificateChain,omitempty"`
+	AccessTokenTrustedIPS        []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL               *int64                         `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL            *int64                         `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit      *int64                         `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityTlsCertAuthResponse struct {
+	IdentityTlsCertAuth IdentityTlsCertAuth `json:"identityTlsCertAuth"`
+}
+
+type GetIdentityTlsCertAuthRequest struct {
+	IdentityID string `json:"-"`
+}
+
+type GetIdentityTlsCertAuthResponse struct {
+	IdentityTlsCertAuth IdentityTlsCertAuth `json:"identityTlsCertAuth"`
+}
+
+type RevokeIdentityTlsCertAuthRequest struct {
+	IdentityID string `json:"-"`
+}
+
+type RevokeIdentityTlsCertAuthResponse struct {
+	IdentityTlsCertAuth IdentityTlsCertAuth `json:"identityTlsCertAuth"`
+}
