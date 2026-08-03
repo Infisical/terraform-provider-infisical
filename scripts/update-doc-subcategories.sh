@@ -116,7 +116,7 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
             update_subcategory "$file" "Projects";;
 
         # Identities
-        identity|identity_details)
+        identity|identity_details|identities_search)
             update_subcategory "$file" "Identities";;
         
         # KMS
