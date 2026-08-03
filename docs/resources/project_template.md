@@ -66,6 +66,21 @@ resource "infisical_project_template" "example-project-template" {
       },
     ]
   }]
+
+  identities = [{
+    identity_id = "<machine-identity-id>"
+    roles       = ["test", "admin"]
+  }]
+
+  users = [{
+    username = "user@example.com"
+    roles    = ["test"]
+  }]
+
+  groups = [{
+    group_slug = "engineering"
+    roles      = ["member"]
+  }]
 }
 ```
 
@@ -81,7 +96,10 @@ resource "infisical_project_template" "example-project-template" {
 
 - `description` (String) The description of the project template
 - `environments` (Attributes List) The environments for the project template (see [below for nested schema](#nestedatt--environments))
+- `groups` (Attributes Set) The groups assigned to projects created from this template (see [below for nested schema](#nestedatt--groups))
+- `identities` (Attributes Set) The identities assigned to projects created from this template (see [below for nested schema](#nestedatt--identities))
 - `roles` (Attributes List) The roles for the project template (see [below for nested schema](#nestedatt--roles))
+- `users` (Attributes Set) The users assigned to projects created from this template (see [below for nested schema](#nestedatt--users))
 
 ### Read-Only
 
@@ -95,6 +113,24 @@ Required:
 - `name` (String) The name of the environment
 - `position` (Number) The position of the environment
 - `slug` (String) The slug of the environment
+
+
+<a id="nestedatt--groups"></a>
+### Nested Schema for `groups`
+
+Required:
+
+- `group_slug` (String) The slug of the group
+- `roles` (Set of String) The role slugs to assign to the group. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).
+
+
+<a id="nestedatt--identities"></a>
+### Nested Schema for `identities`
+
+Required:
+
+- `identity_id` (String) The ID of the identity
+- `roles` (Set of String) The role slugs to assign to the identity. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).
 
 
 <a id="nestedatt--roles"></a>
@@ -121,3 +157,13 @@ Optional:
 
 - `conditions` (String) When specified, only matching conditions will be allowed to access given resource. Refer to the documentation in https://infisical.com/docs/internals/permissions#conditions for the complete list of supported properties and operators.
 - `inverted` (Boolean) Whether rule forbids. Set this to true if permission forbids.
+
+
+
+<a id="nestedatt--users"></a>
+### Nested Schema for `users`
+
+Required:
+
+- `roles` (Set of String) The role slugs to assign to the user. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).
+- `username` (String) The username of the user

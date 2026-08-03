@@ -51,4 +51,19 @@ resource "infisical_project_template" "example-project-template" {
       },
     ]
   }]
+
+  identities = [{
+    identity_id = "<machine-identity-id>"
+    roles       = ["test", "admin"]
+  }]
+
+  users = [{
+    username = "user@example.com"
+    roles    = ["test"]
+  }]
+
+  groups = [{
+    group_slug = "engineering"
+    roles      = ["member"]
+  }]
 }
