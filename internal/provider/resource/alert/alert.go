@@ -26,6 +26,7 @@ var (
 	_ resource.ResourceWithImportState      = &alertResource{}
 	_ resource.ResourceWithConfigValidators = &alertResource{}
 	_ resource.ResourceWithValidateConfig   = &alertResource{}
+	_ resource.ResourceWithModifyPlan       = &alertResource{}
 )
 
 func NewAlertResource() resource.Resource {
@@ -126,7 +127,8 @@ func (r *alertResource) ConfigValidators(_ context.Context) []resource.ConfigVal
 
 func (r *alertResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var resourceType types.String
-	if diags := req.Config.GetAttribute(ctx, path.Root("resource_type"), &resourceType); diags.HasError() {
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 	if resourceType.IsNull() || resourceType.IsUnknown() {
@@ -135,8 +137,9 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 
 	for _, event := range alertEvents {
 		var block types.Object
-		if diags := req.Config.GetAttribute(ctx, path.Root(event.block), &block); diags.HasError() {
-			continue
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(event.block), &block)...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
 		if block.IsNull() || event.resourceType == resourceType.ValueString() {
 			continue
@@ -151,6 +154,60 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 				event.block, event.resourceType, resourceType.ValueString(), strings.Join(accepted, ", "),
 			),
 		)
+	}
+}
+
+func (r *alertResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		return
+	}
+
+	plannedEvent, plannedEventKnown, plannedDiags := alertEventFromBlocks(ctx, req.Plan)
+	storedEvent, storedEventKnown, storedDiags := alertEventFromBlocks(ctx, req.State)
+	resp.Diagnostics.Append(plannedDiags...)
+	resp.Diagnostics.Append(storedDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if plannedEventKnown && storedEventKnown && plannedEvent.eventType != storedEvent.eventType {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root(plannedEvent.block))
+	}
+
+	channelsPath := path.Root("channels")
+
+	var planned, stored types.Map
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, channelsPath, &planned)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, channelsPath, &stored)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if planned.IsNull() || planned.IsUnknown() || stored.IsNull() || stored.IsUnknown() {
+		return
+	}
+
+	storedChannels := stored.Elements()
+	for name, element := range planned.Elements() {
+		channel, ok := element.(types.Object)
+		if !ok || channel.IsNull() || channel.IsUnknown() {
+			continue
+		}
+		if id, ok := channel.Attributes()["id"]; ok && id != nil && id.IsUnknown() {
+			continue
+		}
+
+		storedChannel, ok := storedChannels[name].(types.Object)
+		if !ok {
+			continue
+		}
+
+		if channelKeepsStoredID(channel, storedChannel) {
+			continue
+		}
+
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, channelsPath.AtMapKey(name).AtName("id"), types.StringUnknown())...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 }
 
@@ -221,14 +278,11 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	plan.ID = types.StringValue(alert.Alert.ID)
 
-	channelsWithIDs, diags := alertChannelIDsFromAPI(plan.Channels, alert.Alert.Channels)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(channelDiags...)
 }
 
 func (r *alertResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -304,14 +358,11 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	channelsWithIDs, diags := alertChannelIDsFromAPI(plan.Channels, alert.Alert.Channels)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(channelDiags...)
 }
 
 func (r *alertResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -358,6 +409,8 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 
 	if alert.ResourceID != nil {
 		state.ResourceID = types.StringValue(*alert.ResourceID)
+	} else {
+		state.ResourceID = types.StringNull()
 	}
 
 	if alert.ProjectID != nil {

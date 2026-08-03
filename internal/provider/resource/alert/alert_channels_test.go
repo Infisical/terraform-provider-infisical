@@ -282,8 +282,33 @@ func TestAlertChannelIDsFromAPI(t *testing.T) {
 		t.Errorf("Security team ID = %q, want channel-2", got)
 	}
 
-	if _, diags := alertChannelIDsFromAPI(channels, apiChannels[:1]); !diags.HasError() {
+}
+
+// The alert has already been written by the time the IDs are read back, so a channel missing from the
+// response is still recorded, without an ID, rather than costing the caller the whole alert.
+func TestAlertChannelIDsFromAPIWithAChannelMissing(t *testing.T) {
+	channels := map[string]alertChannelModel{
+		"Platform Slack": {Slack: &alertSlackChannelModel{}},
+		"Security team":  {Email: emailChannel(t)},
+	}
+
+	apiChannels := []infisical.AlertChannel{
+		{ID: "channel-2", Name: "Security team", ChannelType: AlertChannelTypeEmail},
+	}
+
+	withIDs, diags := alertChannelIDsFromAPI(channels, apiChannels)
+	if !diags.HasError() {
 		t.Error("alertChannelIDsFromAPI() with a channel missing from the response: no error, want one")
+	}
+
+	if len(withIDs) != 2 {
+		t.Fatalf("alertChannelIDsFromAPI() returned %d channels, want both so the alert is still recorded", len(withIDs))
+	}
+	if !withIDs["Platform Slack"].ID.IsNull() {
+		t.Errorf("missing channel ID = %v, want null", withIDs["Platform Slack"].ID)
+	}
+	if got := withIDs["Security team"].ID.ValueString(); got != "channel-2" {
+		t.Errorf("channel that was returned has ID %q, want channel-2", got)
 	}
 }
 
@@ -430,6 +455,22 @@ func TestAlertChannelsFromAPIKeysCollidingChannelByID(t *testing.T) {
 	}
 	if _, ok := refreshed["channel-2"]; !ok {
 		t.Errorf("colliding channel is missing, got keys %v", refreshed)
+	}
+}
+
+// A channel type the provider does not know cannot be put into state as a channel with no type at
+// all, so it is reported the way an unknown event type is.
+func TestAlertChannelsFromAPIRejectsUnknownChannelTypes(t *testing.T) {
+	apiChannels := []infisical.AlertChannel{{
+		ID:          "channel-1",
+		Name:        "Teams",
+		ChannelType: "microsoft-teams",
+		Enabled:     true,
+		Config:      map[string]any{},
+	}}
+
+	if _, diags := alertChannelsFromAPI(context.Background(), apiChannels, nil); !diags.HasError() {
+		t.Error("alertChannelsFromAPI() with an unknown channel type: no error, want one")
 	}
 }
 

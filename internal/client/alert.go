@@ -46,7 +46,7 @@ func (client Client) GetAlertByID(request GetAlertByIDRequest) (GetAlertByIDResp
 	}
 
 	if response.IsError() {
-		if response.StatusCode() == http.StatusNotFound {
+		if response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusUnprocessableEntity {
 			return GetAlertByIDResponse{}, ErrNotFound
 		}
 		return GetAlertByIDResponse{}, errors.NewAPIErrorWithResponse(operationGetAlertByID, response, nil)
@@ -88,7 +88,7 @@ func (client Client) DeleteAlert(request DeleteAlertRequest) (DeleteAlertRespons
 	}
 
 	if response.IsError() {
-		if response.StatusCode() == http.StatusNotFound {
+		if response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusUnprocessableEntity {
 			return DeleteAlertResponse{}, ErrNotFound
 		}
 		return DeleteAlertResponse{}, errors.NewAPIErrorWithResponse(operationDeleteAlert, response, nil)

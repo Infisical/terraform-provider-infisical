@@ -31,6 +31,13 @@ const (
 	AlertChannelTypePagerDuty = "pagerduty"
 )
 
+var alertChannelTypes = []string{
+	AlertChannelTypeEmail,
+	AlertChannelTypeSlack,
+	AlertChannelTypeWebhook,
+	AlertChannelTypePagerDuty,
+}
+
 const (
 	AlertRecipientTypeUser  = "user"
 	AlertRecipientTypeGroup = "group"
@@ -102,6 +109,14 @@ type alertChannelModel struct {
 	PagerDuty *alertPagerDutyChannelModel `tfsdk:"pagerduty"`
 }
 
+func alertChannelTypePaths() []path.Expression {
+	paths := make([]path.Expression, 0, len(alertChannelTypes))
+	for _, channelType := range alertChannelTypes {
+		paths = append(paths, path.MatchRelative().AtName(channelType))
+	}
+	return paths
+}
+
 func (c alertChannelModel) channelType() string {
 	switch {
 	case c.Email != nil:
@@ -115,6 +130,38 @@ func (c alertChannelModel) channelType() string {
 	default:
 		return ""
 	}
+}
+
+func channelTypeFromObject(channel types.Object) (string, bool) {
+	attributes := channel.Attributes()
+
+	channelType := ""
+	for _, name := range alertChannelTypes {
+		block, ok := attributes[name]
+		if !ok || block == nil {
+			continue
+		}
+		if block.IsUnknown() {
+			return "", false
+		}
+		if !block.IsNull() {
+			channelType = name
+		}
+	}
+
+	return channelType, true
+}
+
+func channelKeepsStoredID(planned, stored types.Object) bool {
+	storedID, ok := stored.Attributes()["id"]
+	if !ok || storedID == nil || storedID.IsNull() || storedID.IsUnknown() {
+		return false
+	}
+
+	plannedType, plannedKnown := channelTypeFromObject(planned)
+	storedType, storedKnown := channelTypeFromObject(stored)
+
+	return plannedKnown && storedKnown && plannedType == storedType
 }
 
 func alertChannelsSchema() schema.MapNestedAttribute {
@@ -131,12 +178,7 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 		},
 		NestedObject: schema.NestedAttributeObject{
 			Validators: []validator.Object{
-				objectvalidator.ExactlyOneOf(
-					path.MatchRelative().AtName(AlertChannelTypeEmail),
-					path.MatchRelative().AtName(AlertChannelTypeSlack),
-					path.MatchRelative().AtName(AlertChannelTypeWebhook),
-					path.MatchRelative().AtName(AlertChannelTypePagerDuty),
-				),
+				objectvalidator.ExactlyOneOf(alertChannelTypePaths()...),
 			},
 			Attributes: map[string]schema.Attribute{
 				"id": schema.StringAttribute{
@@ -331,12 +373,14 @@ func alertChannelIDsFromAPI(channels map[string]alertChannelModel, apiChannels [
 
 		id, ok := idsByName[name]
 		if !ok {
+			channel.ID = types.StringNull()
+			withIDs[name] = channel
 			diags.AddAttributeError(
 				path.Root("channels").AtMapKey(name),
 				"Missing channel in Infisical's response",
-				fmt.Sprintf("Infisical did not return a channel named %q after writing the alert, so Terraform cannot record that channel's ID. Please report this issue to the provider developers.", name),
+				fmt.Sprintf("Infisical did not return a channel named %q after writing the alert, so Terraform cannot record that channel's ID and will replace the channel on the next apply. Please report this issue to the provider developers.", name),
 			)
-			return nil, diags
+			continue
 		}
 
 		channel.ID = types.StringValue(id)
@@ -441,6 +485,14 @@ func alertChannelFromAPI(ctx context.Context, apiChannel infisical.AlertChannel,
 				return types.StringNull()
 			}),
 		}
+	default:
+		diags.AddError(
+			"Unsupported alert channel",
+			fmt.Sprintf(
+				"Alert channel %q delivers over %q, which this provider does not know how to manage. Please upgrade the provider.",
+				apiChannel.Name, apiChannel.ChannelType,
+			),
+		)
 	}
 
 	return channel, diags

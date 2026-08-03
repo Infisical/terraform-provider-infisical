@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -58,6 +59,30 @@ func alertEventForEventType(eventType string) (alertEvent, bool) {
 		}
 	}
 	return alertEvent{}, false
+}
+
+type alertConditionSource interface {
+	GetAttribute(ctx context.Context, p path.Path, target any) diag.Diagnostics
+}
+
+func alertEventFromBlocks(ctx context.Context, source alertConditionSource) (alertEvent, bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	for _, event := range alertEvents {
+		var block types.Object
+		diags.Append(source.GetAttribute(ctx, path.Root(event.block), &block)...)
+		if diags.HasError() {
+			return alertEvent{}, false, diags
+		}
+		if block.IsUnknown() {
+			return alertEvent{}, false, diags
+		}
+		if !block.IsNull() {
+			return event, true, diags
+		}
+	}
+
+	return alertEvent{}, false, diags
 }
 
 func supportedAlertResourceTypes() []string {
