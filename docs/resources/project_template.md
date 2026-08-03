@@ -166,4 +166,4 @@ Optional:
 Required:
 
 - `roles` (Set of String) The role slugs to assign to the user. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).
-- `username` (String) The username of the user
+- `username` (String) The username of the user.
