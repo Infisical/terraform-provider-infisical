@@ -316,7 +316,7 @@ func (r *IntegrationCircleCIResource) Delete(ctx context.Context, req resource.D
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting CircleCI Integration",
-			"Couldn't delete CircleCI integration from your Infiscial project, unexpected error: "+err.Error(),
+			"Couldn't delete CircleCI integration from your Infisical project, unexpected error: "+err.Error(),
 		)
 		return
 	}

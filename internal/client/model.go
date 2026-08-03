@@ -71,6 +71,7 @@ type ProjectUser struct {
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
 		PublicKey string `json:"publicKey"`
+		Username  string `json:"username"`
 	} `json:"user"`
 	Roles []ProjectMemberRole
 }
@@ -293,6 +294,8 @@ type ProjectRole struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Slug        string `json:"slug"`
+	ProjectID   string `json:"projectId"`
 	// because permission can have multiple structure.
 	Permissions []map[string]any
 }
@@ -317,6 +320,10 @@ type ProjectWithEnvironments struct {
 
 type GetProjectByIdResponse struct {
 	Workspace ProjectWithEnvironments `json:"workspace"`
+}
+
+type GetProjectsResponse struct {
+	Projects []ProjectWithEnvironments `json:"projects"`
 }
 
 type ProjectMemberships struct {
@@ -684,6 +691,11 @@ type GetProjectByIdRequest struct {
 	ID string `json:"id"`
 }
 
+type GetProjectEnvironmentBySlugRequest struct {
+	ProjectID       string `json:"projectId"`
+	EnvironmentSlug string `json:"environmentSlug"`
+}
+
 type UpdateProjectRequest struct {
 	ProjectId           string `json:"projectId"`
 	ProjectSlug         string `json:"slug"`
@@ -723,6 +735,11 @@ type CreateProjectUserResponseMembers struct {
 type GetProjectUserByUserNameRequest struct {
 	ProjectID string `json:"projectId"`
 	Username  string `json:"username"`
+}
+
+type GetProjectMembershipByUserIDRequest struct {
+	ProjectID string `json:"projectId"`
+	UserID    string `json:"userId"`
 }
 
 type GetProjectUserByUserNameResponse struct {
@@ -934,6 +951,10 @@ type GetProjectRoleBySlugResponse struct {
 type GetProjectRoleBySlugV2Request struct {
 	ProjectId string
 	RoleSlug  string
+}
+
+type GetProjectRoleByIdRequest struct {
+	RoleId string
 }
 
 type GetProjectRoleBySlugV2Response struct {
@@ -1569,9 +1590,9 @@ type CreateIdentityAwsAuthRequest struct {
 	AllowedPrincipalArns    string                         `json:"allowedPrincipalArns,omitempty"`
 	AllowedAccountIDS       string                         `json:"allowedAccountIds,omitempty"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
-	AccessTokenTTL          int64                          `json:"accessTokenTTL"`
-	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL"`
-	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit"`
+	AccessTokenTTL          *int64                         `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       *int64                         `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit *int64                         `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type CreateIdentityAwsAuthResponse struct {
@@ -1584,9 +1605,9 @@ type UpdateIdentityAwsAuthRequest struct {
 	AllowedPrincipalArns    string                         `json:"allowedPrincipalArns,omitempty"`
 	AllowedAccountIDS       string                         `json:"allowedAccountIds,omitempty"`
 	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
-	AccessTokenTTL          int64                          `json:"accessTokenTTL"`
-	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL"`
-	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit"`
+	AccessTokenTTL          *int64                         `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       *int64                         `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit *int64                         `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type UpdateIdentityAwsAuthResponse struct {
@@ -2054,6 +2075,12 @@ type SecretApprovalPolicyApprover struct {
 	Type string `json:"type"`
 }
 
+type SecretApprovalPolicyBypasser struct {
+	ID   string `json:"id"`
+	Name string `json:"username"`
+	Type string `json:"type"`
+}
+
 type SecretApprovalPolicy struct {
 	ID                   string                            `json:"id"`
 	ProjectID            string                            `json:"projectId"`
@@ -2062,15 +2089,23 @@ type SecretApprovalPolicy struct {
 	Environments         []SecretApprovalPolicyEnvironment `json:"environments"`
 	SecretPath           string                            `json:"secretPath"`
 	Approvers            []SecretApprovalPolicyApprover    `json:"approvers"`
+	Bypassers            []SecretApprovalPolicyBypasser    `json:"bypassers"`
 	RequiredApprovals    int64                             `json:"approvals"`
 	EnforcementLevel     string                            `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                              `json:"allowedSelfApprovals"`
+	DeletedAt            *string                           `json:"deletedAt"`
 }
 
 type CreateSecretApprovalPolicyApprover struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
 	Name string `json:"username"`
+}
+
+type CreateSecretApprovalPolicyBypasser struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
 }
 
 type CreateSecretApprovalPolicyRequest struct {
@@ -2080,6 +2115,7 @@ type CreateSecretApprovalPolicyRequest struct {
 	Environment          string                               `json:"environment"`
 	SecretPath           string                               `json:"secretPath"`
 	Approvers            []CreateSecretApprovalPolicyApprover `json:"approvers"`
+	Bypassers            []CreateSecretApprovalPolicyBypasser `json:"bypassers,omitempty"`
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
@@ -2104,11 +2140,18 @@ type UpdateSecretApprovalPolicyApprover struct {
 	Environments []string `json:"environments"`
 }
 
+type UpdateSecretApprovalPolicyBypasser struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
+}
+
 type UpdateSecretApprovalPolicyRequest struct {
 	ID                   string
 	Name                 string                               `json:"name"`
 	SecretPath           string                               `json:"secretPath"`
 	Approvers            []UpdateSecretApprovalPolicyApprover `json:"approvers"`
+	Bypassers            []UpdateSecretApprovalPolicyBypasser `json:"bypassers,omitempty"`
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
@@ -2128,9 +2171,22 @@ type DeleteSecretApprovalPolicyResponse struct {
 }
 
 type AccessApprovalPolicyApprover struct {
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Type              string `json:"type"`
+	Sequence          int64  `json:"sequence"`
+	ApprovalsRequired int64  `json:"approvalsRequired"`
+}
+
+type AccessApprovalPolicyBypasser struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+}
+
+type AccessApprovalPolicyApprovalsRequired struct {
+	NumberOfApprovals int64 `json:"numberOfApprovals"`
+	StepNumber        int64 `json:"stepNumber"`
 }
 
 type AccessApprovalPolicyEnvironment struct {
@@ -2138,32 +2194,49 @@ type AccessApprovalPolicyEnvironment struct {
 }
 
 type AccessApprovalPolicy struct {
-	ID                string                            `json:"id"`
-	ProjectID         string                            `json:"projectId"`
-	Name              string                            `json:"name"`
-	Environments      []AccessApprovalPolicyEnvironment `json:"environments"`
-	Environment       AccessApprovalPolicyEnvironment   `json:"environment"`
-	SecretPath        string                            `json:"secretPath"`
-	Approvers         []AccessApprovalPolicyApprover    `json:"approvers"`
-	RequiredApprovals int64                             `json:"approvals"`
-	EnforcementLevel  string                            `json:"enforcementLevel"`
+	ID                    string                            `json:"id"`
+	ProjectID             string                            `json:"projectId"`
+	Name                  string                            `json:"name"`
+	Environments          []AccessApprovalPolicyEnvironment `json:"environments"`
+	Environment           AccessApprovalPolicyEnvironment   `json:"environment"`
+	SecretPath            string                            `json:"secretPath"`
+	Approvers             []AccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []AccessApprovalPolicyBypasser    `json:"bypassers"`
+	RequiredApprovals     int64                             `json:"approvals"`
+	EnforcementLevel      string                            `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                              `json:"allowedSelfApprovals"`
+	MaxTimePeriod         *string                           `json:"maxTimePeriod"`
+	RequestExpirationTime *string                           `json:"requestExpirationTime"`
+	DeletedAt             *string                           `json:"deletedAt"`
 }
 
 type CreateAccessApprovalPolicyApprover struct {
+	Type     string `json:"type"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"username,omitempty"`
+	Sequence int64  `json:"sequence"`
+}
+
+type CreateAccessApprovalPolicyBypasser struct {
 	Type string `json:"type"`
-	ID   string `json:"id"`
-	Name string `json:"username"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
 }
 
 type CreateAccessApprovalPolicyRequest struct {
-	ProjectSlug       string                               `json:"projectSlug"`
-	Name              string                               `json:"name,omitempty"`
-	Environments      []string                             `json:"environments"`
-	Environment       string                               `json:"environment"`
-	SecretPath        string                               `json:"secretPath"`
-	Approvers         []CreateAccessApprovalPolicyApprover `json:"approvers"`
-	RequiredApprovals int64                                `json:"approvals"`
-	EnforcementLevel  string                               `json:"enforcementLevel"`
+	ProjectSlug           string                                  `json:"projectSlug"`
+	Name                  string                                  `json:"name,omitempty"`
+	Environments          []string                                `json:"environments"`
+	Environment           string                                  `json:"environment"`
+	SecretPath            string                                  `json:"secretPath"`
+	Approvers             []CreateAccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []CreateAccessApprovalPolicyBypasser    `json:"bypassers,omitempty"`
+	RequiredApprovals     int64                                   `json:"approvals"`
+	EnforcementLevel      string                                  `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
+	ApprovalsRequired     []AccessApprovalPolicyApprovalsRequired `json:"approvalsRequired,omitempty"`
+	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
+	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
 }
 
 type CreateAccessApprovalPolicyResponse struct {
@@ -2179,19 +2252,31 @@ type GetAccessApprovalPolicyByIDResponse struct {
 }
 
 type UpdateAccessApprovalPolicyApprover struct {
+	Type     string `json:"type"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"username,omitempty"`
+	Sequence int64  `json:"sequence"`
+}
+
+type UpdateAccessApprovalPolicyBypasser struct {
 	Type string `json:"type"`
-	ID   string `json:"id"`
-	Name string `json:"username"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"username,omitempty"`
 }
 
 type UpdateAccessApprovalPolicyRequest struct {
-	ID                string
-	Name              string                               `json:"name"`
-	SecretPath        string                               `json:"secretPath"`
-	Environments      []string                             `json:"environments"`
-	Approvers         []UpdateAccessApprovalPolicyApprover `json:"approvers"`
-	RequiredApprovals int64                                `json:"approvals"`
-	EnforcementLevel  string                               `json:"enforcementLevel"`
+	ID                    string
+	Name                  string                                  `json:"name"`
+	SecretPath            string                                  `json:"secretPath"`
+	Environments          []string                                `json:"environments"`
+	Approvers             []UpdateAccessApprovalPolicyApprover    `json:"approvers"`
+	Bypassers             []UpdateAccessApprovalPolicyBypasser    `json:"bypassers,omitempty"`
+	RequiredApprovals     int64                                   `json:"approvals"`
+	EnforcementLevel      string                                  `json:"enforcementLevel"`
+	AllowedSelfApprovals  bool                                    `json:"allowedSelfApprovals"`
+	ApprovalsRequired     []AccessApprovalPolicyApprovalsRequired `json:"approvalsRequired,omitempty"`
+	MaxTimePeriod         *string                                 `json:"maxTimePeriod"`
+	RequestExpirationTime *string                                 `json:"requestExpirationTime"`
 }
 
 type UpdateAccessApprovalPolicyResponse struct {
@@ -3031,6 +3116,11 @@ type CertificatePolicyValidity struct {
 	Max string `json:"max,omitempty"`
 }
 
+type CertificatePolicyBasicConstraints struct {
+	IsCA          string `json:"isCA,omitempty"`
+	MaxPathLength *int64 `json:"maxPathLength,omitempty"`
+}
+
 type CertificatePolicy struct {
 	Id                string                              `json:"id"`
 	ProjectId         string                              `json:"projectId"`
@@ -3042,6 +3132,7 @@ type CertificatePolicy struct {
 	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
 	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
 	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
 	CreatedAt         string                              `json:"createdAt"`
 	UpdatedAt         string                              `json:"updatedAt"`
 }
@@ -3055,6 +3146,7 @@ type CreateCertificatePolicyRequest struct {
 	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
 	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
 	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
 }
 
 type CreateCertificatePolicyResponse struct {
@@ -3079,6 +3171,7 @@ type UpdateCertificatePolicyRequest struct {
 	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
 	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
 	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
 }
 
 type UpdateCertificatePolicyResponse struct {
@@ -3110,6 +3203,7 @@ type CertificateProfileDefaults struct {
 	Country            string   `json:"country,omitempty"`
 	State              string   `json:"state,omitempty"`
 	Locality           string   `json:"locality,omitempty"`
+	DomainComponents   []string `json:"domainComponents,omitempty"`
 }
 
 type CertificateProfile struct {
@@ -3244,6 +3338,7 @@ type Certificate struct {
 	SubjectCountry            string                       `json:"subjectCountry,omitempty"`
 	SubjectState              string                       `json:"subjectState,omitempty"`
 	SubjectLocality           string                       `json:"subjectLocality,omitempty"`
+	SubjectDomainComponents   string                       `json:"subjectDomainComponents,omitempty"`
 	BasicConstraints          *CertificateBasicConstraints `json:"basicConstraints,omitempty"`
 	CreatedAt                 string                       `json:"createdAt"`
 	UpdatedAt                 string                       `json:"updatedAt"`
@@ -3262,6 +3357,7 @@ type CertificateAttributes struct {
 	Country            string               `json:"country,omitempty"`
 	Province           string               `json:"province,omitempty"`
 	Locality           string               `json:"locality,omitempty"`
+	DomainComponents   []string             `json:"domainComponents,omitempty"`
 	KeyUsages          []string             `json:"keyUsages,omitempty"`
 	ExtendedKeyUsages  []string             `json:"extendedKeyUsages,omitempty"`
 	AltNames           []CertificateAltName `json:"altNames,omitempty"`
@@ -3373,9 +3469,9 @@ type GetOrgRoleByIdResponse struct {
 	Role OrgRole `json:"role"`
 }
 
-// ProjectLevelIdentity
+// ProjectScopedIdentity
 
-type ProjectLevelIdentity struct {
+type ProjectScopedIdentity struct {
 	ID                  string      `json:"id"`
 	Name                string      `json:"name"`
 	OrgID               string      `json:"orgId"`
@@ -3387,27 +3483,28 @@ type ProjectLevelIdentity struct {
 	Metadata            []MetaEntry `json:"metadata"`
 }
 
-type CreateProjectLevelIdentityRequest struct {
-	ProjectID           string            `json:"-"`
-	Name                string            `json:"name"`
-	HasDeleteProtection bool              `json:"hasDeleteProtection"`
-	Metadata            []CreateMetaEntry `json:"metadata,omitempty"`
+type CreateProjectScopedIdentityRequest struct {
+	ProjectID           string                              `json:"-"`
+	Name                string                              `json:"name"`
+	HasDeleteProtection bool                                `json:"hasDeleteProtection"`
+	Metadata            []CreateMetaEntry                   `json:"metadata,omitempty"`
+	Roles               []CreateProjectIdentityRequestRoles `json:"roles,omitempty"`
 }
 
-type CreateProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type CreateProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
 }
 
-type GetProjectLevelIdentityRequest struct {
+type GetProjectScopedIdentityRequest struct {
 	ProjectID  string
 	IdentityID string
 }
 
-type GetProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type GetProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
 }
 
-type UpdateProjectLevelIdentityRequest struct {
+type UpdateProjectScopedIdentityRequest struct {
 	ProjectID           string            `json:"-"`
 	IdentityID          string            `json:"-"`
 	Name                string            `json:"name,omitempty"`
@@ -3415,17 +3512,23 @@ type UpdateProjectLevelIdentityRequest struct {
 	Metadata            []CreateMetaEntry `json:"metadata"`
 }
 
-type UpdateProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type UpdateProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
 }
 
-type DeleteProjectLevelIdentityRequest struct {
+type DeleteProjectScopedIdentityRequest struct {
 	ProjectID  string
 	IdentityID string
 }
 
-type DeleteProjectLevelIdentityResponse struct {
-	Identity ProjectLevelIdentity `json:"identity"`
+type DeleteProjectScopedIdentityResponse struct {
+	Identity ProjectScopedIdentity `json:"identity"`
+}
+
+type UpdateProjectScopedIdentityRolesRequest struct {
+	ProjectID  string                              `json:"-"`
+	IdentityID string                              `json:"-"`
+	Roles      []CreateProjectIdentityRequestRoles `json:"roles"`
 }
 
 type PkiApplication struct {
@@ -4010,4 +4113,47 @@ type RemoveCertManagerIdentityRequest struct {
 
 type RemoveCertManagerIdentityResponse struct {
 	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
+}
+
+// Sub-organization
+
+type SubOrganization struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	ParentOrgID string `json:"parentOrgId"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type CreateSubOrganizationRequest struct {
+	Name string `json:"name"`
+	Slug string `json:"slug,omitempty"`
+}
+
+type CreateSubOrganizationResponse struct {
+	Organization SubOrganization `json:"organization"`
+}
+
+type ListSubOrganizationsResponse struct {
+	Organizations []SubOrganization `json:"organizations"`
+	TotalCount    int               `json:"totalCount"`
+}
+
+type UpdateSubOrganizationRequest struct {
+	SubOrgID string `json:"-"`
+	Name     string `json:"name,omitempty"`
+	Slug     string `json:"slug,omitempty"`
+}
+
+type UpdateSubOrganizationResponse struct {
+	Organization SubOrganization `json:"organization"`
+}
+
+type DeleteSubOrganizationRequest struct {
+	SubOrgID string
+}
+
+type DeleteSubOrganizationResponse struct {
+	Organization SubOrganization `json:"organization"`
 }

@@ -142,7 +142,7 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project secret import",
-			"Couldn't save import to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save import to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -188,7 +188,7 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching secret imports from your project",
-				"Couldn't read project secret import from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read project secret import from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return
@@ -232,7 +232,7 @@ func (r *projectSecretImportResource) Update(ctx context.Context, req resource.U
 		} else {
 			resp.Diagnostics.AddError(
 				"Error updating secret import",
-				"Couldn't update secret import from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update secret import from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return
@@ -277,7 +277,7 @@ func (r *projectSecretImportResource) Delete(ctx context.Context, req resource.D
 		} else {
 			resp.Diagnostics.AddError(
 				"Error deleting secret import",
-				"Couldn't delete secret import from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't delete secret import from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return
@@ -299,7 +299,7 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 		} else {
 			resp.Diagnostics.AddError(
 				"Error fetching secret import",
-				"Couldn't fetch secret import from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't fetch secret import from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 		return

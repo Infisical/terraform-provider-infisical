@@ -226,7 +226,7 @@ func (r *ProjectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching group to project",
-			"Couldn't create project group to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create project group to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -464,7 +464,7 @@ func (r *ProjectGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project group",
-			"Couldn't delete project group from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project group from Infisical, unexpected error: "+err.Error(),
 		)
 	}
 }

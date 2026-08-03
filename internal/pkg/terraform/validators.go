@@ -7,11 +7,16 @@ import (
 )
 
 var SlugRegexValidator = stringvalidator.RegexMatches(
-	regexp.MustCompile(`^[a-z0-9_-]*$`),
+	regexp.MustCompile(`^[a-z0-9-]+$`),
 	"invalid slug, slugs must be lowercase alphanumeric characters and hyphens only (example-slug-1)",
 )
 
 var JsonStringValidator = stringvalidator.RegexMatches(
 	regexp.MustCompile(`^[\[{].*[\]}]$`),
 	"must be a valid JSON string",
+)
+
+var HttpsUrlValidator = stringvalidator.RegexMatches(
+	regexp.MustCompile(`^https://\S+$`),
+	"must be a valid URL starting with https:// (example: https://example.com)",
 )

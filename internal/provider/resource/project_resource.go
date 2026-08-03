@@ -193,7 +193,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project",
-			"Couldn't save project to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save project to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -207,7 +207,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project audit log retention",
-				"Couldn't update project audit log retention from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project audit log retention from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 	}
@@ -219,7 +219,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading project",
-			"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
 		)
 	}
 
@@ -273,7 +273,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 		resp.Diagnostics.AddError(
 			"Error reading project",
-			"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -373,7 +373,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating project",
-			"Couldn't update project from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update project from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -387,7 +387,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating project audit log retention",
-				"Couldn't update project audit log retention from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't update project audit log retention from Infisical, unexpected error: "+err.Error(),
 			)
 		}
 	}
@@ -399,7 +399,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading project",
-			"Couldn't read project from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't read project from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -448,7 +448,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting project",
-			"Couldn't delete project from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete project from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

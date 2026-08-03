@@ -16,6 +16,7 @@ import (
 // AppConnectionAwsCredentialsModel describes the data source data model.
 type AppConnectionAwsCredentialsModel struct {
 	RoleARN         types.String `tfsdk:"role_arn"`
+	StsEndpoint     types.String `tfsdk:"sts_endpoint"`
 	AccessKeyId     types.String `tfsdk:"access_key_id"`
 	SecretAccessKey types.String `tfsdk:"secret_access_key"`
 }
@@ -34,6 +35,10 @@ func NewAppConnectionAwsResource() resource.Resource {
 				Optional:    true,
 				Description: "The Amazon Resource Name (ARN) of the IAM role to assume for performing operations. Infisical will assume this role using AWS Security Token Service (STS). Required for assume-role access method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/aws#assume-role-recommended",
 				Sensitive:   true,
+			},
+			"sts_endpoint": schema.StringAttribute{
+				Optional:    true,
+				Description: "An optional custom endpoint URL for the AWS STS API (must start with https://). Only applicable to the assume-role method; when omitted, AWS's default STS endpoint resolution is used.",
 			},
 			"access_key_id": schema.StringAttribute{
 				Optional:    true,
@@ -65,6 +70,10 @@ func NewAppConnectionAwsResource() resource.Resource {
 				}
 
 				credentialsConfig["roleArn"] = credentials.RoleARN.ValueString()
+
+				if !credentials.StsEndpoint.IsNull() && credentials.StsEndpoint.ValueString() != "" {
+					credentialsConfig["stsEndpoint"] = credentials.StsEndpoint.ValueString()
+				}
 			} else {
 				if credentials.AccessKeyId.IsNull() || credentials.AccessKeyId.ValueString() == "" {
 					diags.AddError(
@@ -118,6 +127,14 @@ func NewAppConnectionAwsResource() resource.Resource {
 				}
 
 				credentialsConfig["roleArn"] = roleArn.ValueString()
+
+				stsEndpoint := credentialsFromPlan.StsEndpoint
+				if credentialsFromPlan.StsEndpoint.IsUnknown() {
+					stsEndpoint = credentialsFromState.StsEndpoint
+				}
+				if !stsEndpoint.IsNull() && stsEndpoint.ValueString() != "" {
+					credentialsConfig["stsEndpoint"] = stsEndpoint.ValueString()
+				}
 
 			} else {
 				accessKeyId := credentialsFromPlan.AccessKeyId
@@ -180,6 +197,7 @@ func NewAppConnectionAwsResource() resource.Resource {
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
 			credentialsConfig := map[string]attr.Value{
 				"role_arn":          types.StringNull(),
+				"sts_endpoint":      types.StringNull(),
 				"access_key_id":     types.StringNull(),
 				"secret_access_key": types.StringNull(),
 			}
@@ -187,6 +205,7 @@ func NewAppConnectionAwsResource() resource.Resource {
 			var diags diag.Diagnostics
 			state.Credentials, diags = types.ObjectValue(map[string]attr.Type{
 				"role_arn":          types.StringType,
+				"sts_endpoint":      types.StringType,
 				"access_key_id":     types.StringType,
 				"secret_access_key": types.StringType,
 			}, credentialsConfig)

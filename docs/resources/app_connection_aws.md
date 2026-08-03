@@ -37,6 +37,7 @@ resource "infisical_app_connection_aws" "app-connection-aws-assume-role" {
   method = "assume-role"
   credentials = {
     role_arn = "<assume role arn>"
+    # sts_endpoint = "https://sts.us-east-1.amazonaws.com" # Optional custom AWS STS endpoint
   }
   description = "I am a test app connection"
 }
@@ -79,3 +80,4 @@ Optional:
 - `access_key_id` (String, Sensitive) The AWS Access Key ID used to authenticate requests to AWS services. Required for access-key access method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/aws#access-key
 - `role_arn` (String, Sensitive) The Amazon Resource Name (ARN) of the IAM role to assume for performing operations. Infisical will assume this role using AWS Security Token Service (STS). Required for assume-role access method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/aws#assume-role-recommended
 - `secret_access_key` (String, Sensitive) The AWS Secret Access Key associated with the Access Key ID to authenticate requests to AWS services. Required for access-key access method. For more details, refer to the documentation here infisical.com/docs/integrations/app-connections/aws#access-key
+- `sts_endpoint` (String) An optional custom endpoint URL for the AWS STS API (must start with https://). Only applicable to the assume-role method; when omitted, AWS's default STS endpoint resolution is used.

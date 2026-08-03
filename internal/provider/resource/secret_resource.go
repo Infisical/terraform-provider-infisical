@@ -344,7 +344,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating secret",
-			"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save encrypted secrets to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -572,7 +572,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating secret",
-			"Couldn't save encrypted secrets to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save encrypted secrets to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

@@ -226,7 +226,7 @@ func (r *IdentityTokenAuthResource) Read(ctx context.Context, req resource.ReadR
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity token auth",
-				"Couldn't read identity token auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity token auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -278,7 +278,7 @@ func (r *IdentityTokenAuthResource) Update(ctx context.Context, req resource.Upd
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity token auth",
-			"Couldn't update identity token auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity token auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -317,7 +317,7 @@ func (r *IdentityTokenAuthResource) Delete(ctx context.Context, req resource.Del
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity token auth",
-			"Couldn't delete identity token auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity token auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

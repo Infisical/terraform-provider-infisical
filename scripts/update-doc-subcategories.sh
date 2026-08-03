@@ -22,9 +22,7 @@ update_subcategory() {
 }
 
 echo "Removing hidden resource docs..."
-HIDDEN_RESOURCES=(
-    "project_identity_provisioning"
-)
+HIDDEN_RESOURCES=()
 for resource in "${HIDDEN_RESOURCES[@]}"; do
     rm -f "$DOCS_DIR/resources/${resource}.md"
 done
@@ -62,7 +60,7 @@ for file in "$DOCS_DIR/resources/"*.md; do
             update_subcategory "$file" "Identities";;
 						
         # Organization
-        org|org_*)
+        org|org_*|sub_organization)
             update_subcategory "$file" "Organization";;
         
         # Projects
@@ -114,11 +112,11 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
             update_subcategory "$file" "Groups";;
         
         # Projects
-        projects)
+        project|project_*|projects|projects_*)
             update_subcategory "$file" "Projects";;
-        
+
         # Identities
-        identity_details|identities_search)
+        identity|identity_details|identities_search)
             update_subcategory "$file" "Identities";;
         
         # KMS

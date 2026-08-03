@@ -10,9 +10,11 @@ const (
 	operationCreateProject                  = "CallCreateProject"
 	operationDeleteProject                  = "CallDeleteProject"
 	operationGetProject                     = "CallGetProject"
+	operationGetProjects                    = "CallGetProjects"
 	operationUpdateProject                  = "CallUpdateProject"
 	operationUpdateProjectAuditLogRetention = "CallUpdateProjectAuditLogRetention"
 	operationGetProjectById                 = "CallGetProjectById"
+	operationGetProjectEnvironmentBySlug    = "CallGetProjectEnvironmentBySlug"
 )
 
 func (client Client) CreateProject(request CreateProjectRequest) (CreateProjectResponse, error) {
@@ -85,6 +87,25 @@ func (client Client) GetProject(request GetProjectRequest) (ProjectWithEnvironme
 	return projectResponse, nil
 }
 
+func (client Client) GetProjects() (GetProjectsResponse, error) {
+	var body GetProjectsResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		Get("api/v1/projects")
+
+	if err != nil {
+		return GetProjectsResponse{}, errors.NewGenericRequestError(operationGetProjects, err)
+	}
+
+	if response.IsError() {
+		return GetProjectsResponse{}, errors.NewAPIErrorWithResponse(operationGetProjects, response, nil)
+	}
+
+	return body, nil
+}
+
 func (client Client) UpdateProject(request UpdateProjectRequest) (UpdateProjectResponse, error) {
 	var projectResponse UpdateProjectResponse
 	response, err := client.Config.HttpClient.
@@ -145,4 +166,26 @@ func (client Client) GetProjectById(request GetProjectByIdRequest) (ProjectWithE
 	}
 
 	return projectResponse.Workspace, nil
+}
+
+func (client Client) GetProjectEnvironmentBySlug(request GetProjectEnvironmentBySlugRequest) (ProjectEnvironmentWithPosition, error) {
+	var environment ProjectEnvironmentWithPosition
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&environment).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/projects/%s/environments/slug/%s", request.ProjectID, request.EnvironmentSlug))
+
+	if err != nil {
+		return ProjectEnvironmentWithPosition{}, errors.NewGenericRequestError(operationGetProjectEnvironmentBySlug, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return ProjectEnvironmentWithPosition{}, ErrNotFound
+		}
+		return ProjectEnvironmentWithPosition{}, errors.NewAPIErrorWithResponse(operationGetProjectEnvironmentBySlug, response, nil)
+	}
+
+	return environment, nil
 }

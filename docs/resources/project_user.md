@@ -92,3 +92,11 @@ Read-Only:
 - `first_name` (String) The first name of the user
 - `id` (String) The id of the user
 - `last_name` (String) The last name of the user
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import infisical_project_user.example <project-id>,<user-id>
+```

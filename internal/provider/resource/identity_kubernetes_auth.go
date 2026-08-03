@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
@@ -34,18 +35,18 @@ type IdentityKubernetesAuthResource struct {
 
 // IdentityKubernetesAuthResourceSourceModel describes the data source data model.
 type IdentityKubernetesAuthResourceModel struct {
-	ID                         types.String `tfsdk:"id"`
-	IdentityID                 types.String `tfsdk:"identity_id"`
-	KubernetesHost             types.String `tfsdk:"kubernetes_host"`
-	CaCertificate              types.String `tfsdk:"kubernetes_ca_certificate"`
-	TokenReviewerJWT           types.String `tfsdk:"token_reviewer_jwt"`
-	AllowedServiceAccountNames types.List   `tfsdk:"allowed_service_account_names"`
-	AllowedAudience            types.String `tfsdk:"allowed_audience"`
-	AllowedNamespaces          types.List   `tfsdk:"allowed_namespaces"`
-	AccessTokenTTL             types.Int64  `tfsdk:"access_token_ttl"`
-	AccessTokenMaxTTL          types.Int64  `tfsdk:"access_token_max_ttl"`
-	AccessTokenNumUsesLimit    types.Int64  `tfsdk:"access_token_num_uses_limit"`
-	AccessTokenTrustedIps      types.List   `tfsdk:"access_token_trusted_ips"`
+	ID                         types.String                   `tfsdk:"id"`
+	IdentityID                 types.String                   `tfsdk:"identity_id"`
+	KubernetesHost             types.String                   `tfsdk:"kubernetes_host"`
+	CaCertificate              customtypes.TrimmedStringValue `tfsdk:"kubernetes_ca_certificate"`
+	TokenReviewerJWT           types.String                   `tfsdk:"token_reviewer_jwt"`
+	AllowedServiceAccountNames types.List                     `tfsdk:"allowed_service_account_names"`
+	AllowedAudience            types.String                   `tfsdk:"allowed_audience"`
+	AllowedNamespaces          types.List                     `tfsdk:"allowed_namespaces"`
+	AccessTokenTTL             types.Int64                    `tfsdk:"access_token_ttl"`
+	AccessTokenMaxTTL          types.Int64                    `tfsdk:"access_token_max_ttl"`
+	AccessTokenNumUsesLimit    types.Int64                    `tfsdk:"access_token_num_uses_limit"`
+	AccessTokenTrustedIps      types.List                     `tfsdk:"access_token_trusted_ips"`
 
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	TokenReviewerMode types.String `tfsdk:"token_reviewer_mode"` // api|gateway (default is api)
@@ -105,6 +106,7 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 
 			"kubernetes_ca_certificate": schema.StringAttribute{
+				CustomType:          customtypes.TrimmedStringType{},
 				Description:         "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
 				MarkdownDescription: "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
 				Optional:            true,
@@ -184,7 +186,7 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenTTL = types.Int64Value(newIdentityKubernetesAuth.AccessTokenTTL)
 	plan.AccessTokenNumUsesLimit = types.Int64Value(newIdentityKubernetesAuth.AccessTokenNumUsesLimit)
 	plan.AllowedAudience = types.StringValue(newIdentityKubernetesAuth.AllowedAudience)
-	plan.CaCertificate = types.StringValue(newIdentityKubernetesAuth.CACERT)
+	plan.CaCertificate = customtypes.NewTrimmedStringValue(newIdentityKubernetesAuth.CACERT)
 	plan.TokenReviewerMode = types.StringValue(newIdentityKubernetesAuth.TokenReviewerMode)
 
 	if newIdentityKubernetesAuth.GatewayID != "" {
@@ -250,7 +252,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if plan.CaCertificate.ValueString() != "" {
+		if strings.TrimSpace(plan.CaCertificate.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set CA certificate",
 				"CA certificate is not allowed when token reviewer mode is gateway. Please remove the CA certificate.",
@@ -258,7 +260,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if plan.KubernetesHost.ValueString() != "" {
+		if strings.TrimSpace(plan.KubernetesHost.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set Kubernetes host",
 				"Kubernetes host is not allowed when token reviewer mode is gateway. Please remove the Kubernetes host.",
@@ -266,7 +268,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if plan.TokenReviewerJWT.ValueString() != "" {
+		if strings.TrimSpace(plan.TokenReviewerJWT.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set Token reviewer JWT",
 				"Token reviewer JWT is not allowed when token reviewer mode is gateway. Please remove the Token reviewer JWT.",
@@ -276,7 +278,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 	} else if tokenReviewerMode == TOKEN_REVIEWER_MODE_API {
 		// plan.TokenReviewerJWT is optional. if set to nothing, the auth method will act as self-reviewer.
 
-		if plan.KubernetesHost.ValueString() == "" {
+		if strings.TrimSpace(plan.KubernetesHost.ValueString()) == "" {
 			diagnose.AddError(
 				"Kubernetes host is required",
 				"Kubernetes host is required when token reviewer mode is api. Please provide a valid Kubernetes host.",
@@ -349,7 +351,7 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity kubernetes auth",
-			"Couldn't save kubernetes auth to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save kubernetes auth to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -394,7 +396,7 @@ func (r *IdentityKubernetesAuthResource) Read(ctx context.Context, req resource.
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity kubernetes auth",
-				"Couldn't read identity kubernetes auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -479,7 +481,7 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity kubernetes auth",
-			"Couldn't update identity kubernetes auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -518,7 +520,7 @@ func (r *IdentityKubernetesAuthResource) Delete(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity kubernetes auth",
-			"Couldn't delete identity kubernetes auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

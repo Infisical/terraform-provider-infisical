@@ -231,7 +231,7 @@ func (r *IdentityGcpAuthResource) Create(ctx context.Context, req resource.Creat
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity gcp auth",
-			"Couldn't save gcp auth to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save gcp auth to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -276,7 +276,7 @@ func (r *IdentityGcpAuthResource) Read(ctx context.Context, req resource.ReadReq
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity gcp auth",
-				"Couldn't read identity gcp auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity gcp auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -334,7 +334,7 @@ func (r *IdentityGcpAuthResource) Update(ctx context.Context, req resource.Updat
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity gcp auth",
-			"Couldn't update identity gcp auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity gcp auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -373,7 +373,7 @@ func (r *IdentityGcpAuthResource) Delete(ctx context.Context, req resource.Delet
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity gcp auth",
-			"Couldn't delete identity gcp auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity gcp auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

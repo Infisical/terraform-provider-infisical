@@ -1,0 +1,27 @@
+terraform {
+  required_providers {
+    infisical = {
+      # version = <latest version>
+      source = "infisical/infisical"
+    }
+  }
+}
+
+provider "infisical" {
+  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
+  auth = {
+    universal = {
+      client_id     = "<machine-identity-client-id>"
+      client_secret = "<machine-identity-client-secret>"
+    }
+  }
+}
+
+data "infisical_project_environment" "example" {
+  project_id = "<project-id>"
+  slug       = "dev"
+}
+
+output "environment-id" {
+  value = data.infisical_project_environment.example.id
+}

@@ -112,7 +112,7 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating group",
-			"Couldn't create group in Infiscial, unexpected error: "+err.Error(),
+			"Couldn't create group in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -146,7 +146,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		}
 		resp.Diagnostics.AddError(
 			"Error reading group",
-			"Couldn't read group in Infiscial, unexpected error: "+err.Error(),
+			"Couldn't read group in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -190,7 +190,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating group",
-			"Couldn't update group in Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update group in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -219,7 +219,7 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting group",
-			"Couldn't delete group in Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete group in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -245,7 +245,7 @@ func (r *GroupResource) ImportState(ctx context.Context, req resource.ImportStat
 		} else {
 			resp.Diagnostics.AddError(
 				"Error importing group",
-				"Couldn't read group from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read group from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}

@@ -205,9 +205,9 @@ func (r *IdentityAwsAuthResource) Create(ctx context.Context, req resource.Creat
 
 	newIdentityAwsAuth, err := r.client.CreateIdentityAwsAuth(infisical.CreateIdentityAwsAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+		AccessTokenTTL:          infisicaltf.Int64PtrIfKnown(plan.AccessTokenTTL),
+		AccessTokenMaxTTL:       infisicaltf.Int64PtrIfKnown(plan.AccessTokenMaxTTL),
+		AccessTokenNumUsesLimit: infisicaltf.Int64PtrIfKnown(plan.AccessTokenNumUsesLimit),
 		StsEndpoint:             plan.StsEndpoint.ValueString(),
 		AllowedAccountIDS:       strings.Join(allowedAccoundIds, ","),
 		AllowedPrincipalArns:    strings.Join(allowedPrincipalArns, ","),
@@ -217,7 +217,7 @@ func (r *IdentityAwsAuthResource) Create(ctx context.Context, req resource.Creat
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating identity aws auth",
-			"Couldn't save tag to Infiscial, unexpected error: "+err.Error(),
+			"Couldn't save tag to Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -262,7 +262,7 @@ func (r *IdentityAwsAuthResource) Read(ctx context.Context, req resource.ReadReq
 		} else {
 			resp.Diagnostics.AddError(
 				"Error reading identity aws auth",
-				"Couldn't read identity aws auth from Infiscial, unexpected error: "+err.Error(),
+				"Couldn't read identity aws auth from Infisical, unexpected error: "+err.Error(),
 			)
 			return
 		}
@@ -308,9 +308,9 @@ func (r *IdentityAwsAuthResource) Update(ctx context.Context, req resource.Updat
 	updatedIdentityAwsAuth, err := r.client.UpdateIdentityAwsAuth(infisical.UpdateIdentityAwsAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+		AccessTokenTTL:          infisicaltf.Int64PtrIfKnown(plan.AccessTokenTTL),
+		AccessTokenMaxTTL:       infisicaltf.Int64PtrIfKnown(plan.AccessTokenMaxTTL),
+		AccessTokenNumUsesLimit: infisicaltf.Int64PtrIfKnown(plan.AccessTokenNumUsesLimit),
 		StsEndpoint:             plan.StsEndpoint.ValueString(),
 		AllowedAccountIDS:       strings.Join(allowedAccoundIds, ","),
 		AllowedPrincipalArns:    strings.Join(allowedPrincipalArns, ","),
@@ -319,7 +319,7 @@ func (r *IdentityAwsAuthResource) Update(ctx context.Context, req resource.Updat
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating identity aws auth",
-			"Couldn't update identity aws auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't update identity aws auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -358,7 +358,7 @@ func (r *IdentityAwsAuthResource) Delete(ctx context.Context, req resource.Delet
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting identity aws auth",
-			"Couldn't delete identity aws auth from Infiscial, unexpected error: "+err.Error(),
+			"Couldn't delete identity aws auth from Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}

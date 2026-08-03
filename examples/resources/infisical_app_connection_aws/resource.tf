@@ -22,6 +22,7 @@ resource "infisical_app_connection_aws" "app-connection-aws-assume-role" {
   method = "assume-role"
   credentials = {
     role_arn = "<assume role arn>"
+    # sts_endpoint = "https://sts.us-east-1.amazonaws.com" # Optional custom AWS STS endpoint
   }
   description = "I am a test app connection"
 }

@@ -15,6 +15,7 @@ const (
 	operationUpdateProjectRoleV2    = "CallUpdateProjectRoleV2"
 	operationDeleteProjectRoleV2    = "CallDeleteProjectRoleV2"
 	operationGetProjectRoleBySlugV2 = "CallGetProjectRoleBySlugV2"
+	operationGetProjectRoleById     = "CallGetProjectRoleById"
 )
 
 func (client Client) CreateProjectRole(request CreateProjectRoleRequest) (CreateProjectRoleResponse, error) {
@@ -174,6 +175,28 @@ func (client Client) GetProjectRoleBySlugV2(request GetProjectRoleBySlugV2Reques
 			return GetProjectRoleBySlugV2Response{}, ErrNotFound
 		}
 		return GetProjectRoleBySlugV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleBySlugV2, response, nil)
+	}
+
+	return responseData, nil
+}
+
+func (client Client) GetProjectRoleById(request GetProjectRoleByIdRequest) (GetProjectRoleBySlugV2Response, error) {
+	var responseData GetProjectRoleBySlugV2Response
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&responseData).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/projects/roles/%s", request.RoleId))
+
+	if err != nil {
+		return GetProjectRoleBySlugV2Response{}, errors.NewGenericRequestError(operationGetProjectRoleById, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectRoleBySlugV2Response{}, ErrNotFound
+		}
+		return GetProjectRoleBySlugV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleById, response, nil)
 	}
 
 	return responseData, nil

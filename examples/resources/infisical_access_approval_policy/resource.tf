@@ -30,12 +30,26 @@ resource "infisical_access_approval_policy" "prod-policy" {
   approvers = [
     {
       type = "group"
-      id   = "52c70c28-9504-4b88-b5af-ca2495dd277d"
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
     },
     {
       type     = "user"
-      username = "name@infisical.com"
+      username = "admin@infisical.com"
   }]
-  required_approvals = 1
-  enforcement_level  = "soft"
+  bypassers = [
+    {
+      type = "group"
+      id   = "7c13f73b-c09b-4752-aea6-9b691ba3eb45"
+    },
+    {
+      type = "user"
+      id   = "admin@infisical.com"
+    },
+  ]
+  required_approvals  = 1
+  enforcement_level   = "soft"
+  allow_self_approval = true
+
+  max_time_period         = "24h"
+  request_expiration_time = "72h"
 }

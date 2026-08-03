@@ -140,6 +140,7 @@ Optional:
 
 - `common_name` (String) Default common name
 - `country` (String) Default country (C)
+- `domain_components` (List of String) Default domain components (DC). Multi-valued; each entry becomes a DC attribute in the certificate subject.
 - `extended_key_usages` (List of String) Default extended key usages. Supported values: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 - `key_algorithm` (String) Default key algorithm. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `key_usages` (List of String) Default key usages. Supported values: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only

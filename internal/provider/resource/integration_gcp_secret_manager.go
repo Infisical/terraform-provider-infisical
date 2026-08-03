@@ -440,7 +440,7 @@ func (r *IntegrationGCPSecretManagerResource) Delete(ctx context.Context, req re
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting GCP Secret Manager Integration",
-			"Couldn't delete GCP Secret Manager integration from your Infiscial project, unexpected error: "+err.Error(),
+			"Couldn't delete GCP Secret Manager integration from your Infisical project, unexpected error: "+err.Error(),
 		)
 		return
 	}

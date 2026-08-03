@@ -1,0 +1,1 @@
+terraform import infisical_project_user.example <project-id>,<user-id>
