@@ -2820,12 +2820,30 @@ type Permission struct {
 	Inverted   bool           `json:"inverted"`
 }
 
+type ProjectTemplateIdentity struct {
+	IdentityID string   `json:"identityId"`
+	Roles      []string `json:"roles"`
+}
+
+type ProjectTemplateUser struct {
+	Username string   `json:"username"`
+	Roles    []string `json:"roles"`
+}
+
+type ProjectTemplateGroup struct {
+	GroupSlug string   `json:"groupSlug"`
+	Roles     []string `json:"roles"`
+}
+
 type CreateProjectTemplateRequest struct {
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Type         string        `json:"type"`
-	Roles        []Role        `json:"roles,omitempty"`
-	Environments []Environment `json:"environments"`
+	Name         string                    `json:"name"`
+	Description  string                    `json:"description"`
+	Type         string                    `json:"type"`
+	Roles        []Role                    `json:"roles,omitempty"`
+	Environments []Environment             `json:"environments"`
+	Identities   []ProjectTemplateIdentity `json:"identities"`
+	Users        []ProjectTemplateUser     `json:"users"`
+	Groups       []ProjectTemplateGroup    `json:"groups"`
 }
 
 type CreateProjectTemplateResponse struct {
