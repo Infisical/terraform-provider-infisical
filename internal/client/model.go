@@ -4278,19 +4278,20 @@ type GetSecretValidationRuleByIdRequest struct {
 	RuleID    string `json:"-"`
 }
 
-// UpdateSecretValidationRuleRequest describes the full desired state of a rule.
-// Description and EnvironmentSlug are intentionally not omitempty so that a nil
-// pointer clears them, which means every caller must populate the whole struct.
+// UpdateSecretValidationRuleRequest describes the full desired state of a rule. Although
+// the endpoint accepts partial updates, no field is omitempty here: a nil Description or
+// EnvironmentSlug clears the stored value, so a partially populated struct would silently
+// wipe them. Sending every field means an incomplete struct fails against the API instead.
 type UpdateSecretValidationRuleRequest struct {
 	ProjectID string `json:"-"`
 	RuleID    string `json:"-"`
 
-	Name            string                      `json:"name,omitempty"`
+	Name            string                      `json:"name"`
 	Description     *string                     `json:"description"`
 	EnvironmentSlug *string                     `json:"environmentSlug"`
-	SecretPath      string                      `json:"secretPath,omitempty"`
-	Rule            *SecretValidationRuleConfig `json:"rule,omitempty"`
-	IsActive        *bool                       `json:"isActive,omitempty"`
+	SecretPath      string                      `json:"secretPath"`
+	Rule            *SecretValidationRuleConfig `json:"rule"`
+	IsActive        *bool                       `json:"isActive"`
 }
 
 type UpdateSecretValidationRuleResponse struct {

@@ -133,21 +133,21 @@ resource "infisical_secret_validation_rule" "rotation_passwords" {
 
 Required:
 
-- `constraints` (Attributes List) The constraints enforced by this rule. At least one constraint is required. (see [below for nested schema](#nestedatt--rule--constraints))
+- `constraints` (Attributes Set) The constraints enforced by this rule. At least one constraint is required. Order is not significant. (see [below for nested schema](#nestedatt--rule--constraints))
 - `type` (String) The kind of secret the rule applies to. Possible values: static-secrets, dynamic-secrets, secret-rotations
 
 Optional:
 
-- `providers` (Set of String) The dynamic secret or secret rotation providers the rule applies to, e.g. "sql-database" or "postgres-credentials". Required when type is "dynamic-secrets" or "secret-rotations", and must not be set when type is "static-secrets".
+- `providers` (Set of String) The dynamic secret or secret rotation providers the rule applies to, e.g. "sql-database" or "postgres-credentials". Required when type is `dynamic-secrets` or `secret-rotations`
 
 <a id="nestedatt--rule--constraints"></a>
 ### Nested Schema for `rule.constraints`
 
 Required:
 
-- `applies_to` (String) What the constraint applies to. Possible values: key, value, password. Static secret rules support "key" and "value", while dynamic secret and secret rotation rules support "password" only.
+- `applies_to` (String) What the constraint applies to. Possible values: key, value, password. Static secret rules support `key` and `value`, while dynamic secret and secret rotation rules support `password` only.
 - `type` (String) The constraint type. Possible values: min-length, max-length, regex-pattern, required-prefix, required-suffix, prevent-value-reuse
-- `value` (String) The constraint value, always expressed as a string. For "min-length" and "max-length" this is a number, for "regex-pattern" a regular expression, and for "prevent-value-reuse" the number of previous versions to check (1-25).
+- `value` (String) The constraint value, always expressed as a string. For `min-length` and `max-length` this is a number, for `regex-pattern` a regular expression, and for `prevent-value-reuse` the number of previous versions to check.
 
 ## Import
 

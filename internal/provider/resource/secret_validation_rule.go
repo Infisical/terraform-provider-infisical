@@ -8,7 +8,6 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -38,7 +37,10 @@ const (
 	SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE    = "value"
 	SECRET_VALIDATION_CONSTRAINT_TARGET_PASSWORD = "password"
 
-	MAX_PREVENT_VALUE_REUSE_VERSIONS = 25
+	// SECRET_VALIDATION_MAX_PREVENT_VALUE_REUSE_VERSIONS mirrors Infisical's current cap. It
+	// drives a warning rather than an error so raising it server-side doesn't require a
+	// provider release.
+	SECRET_VALIDATION_MAX_PREVENT_VALUE_REUSE_VERSIONS = 25
 )
 
 var (
@@ -175,7 +177,7 @@ func (r *secretValidationRuleResource) Schema(_ context.Context, _ resource.Sche
 						},
 					},
 					"providers": schema.SetAttribute{
-						Description: fmt.Sprintf("The dynamic secret or secret rotation providers the rule applies to, e.g. \"sql-database\" or \"postgres-credentials\". Required when type is %q or %q", SECRET_VALIDATION_RULE_TYPE_DYNAMIC_SECRETS, SECRET_VALIDATION_RULE_TYPE_SECRET_ROTATIONS),
+						Description: "The dynamic secret or secret rotation providers the rule applies to, e.g. \"sql-database\" or \"postgres-credentials\". Required when type is `dynamic-secrets` or `secret-rotations`",
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.Set{
@@ -183,11 +185,11 @@ func (r *secretValidationRuleResource) Schema(_ context.Context, _ resource.Sche
 							setvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
 						},
 					},
-					"constraints": schema.ListNestedAttribute{
-						Description: "The constraints enforced by this rule. At least one constraint is required.",
+					"constraints": schema.SetNestedAttribute{
+						Description: "The constraints enforced by this rule. At least one constraint is required. Order is not significant.",
 						Required:    true,
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
+						Validators: []validator.Set{
+							setvalidator.SizeAtLeast(1),
 						},
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
@@ -199,14 +201,14 @@ func (r *secretValidationRuleResource) Schema(_ context.Context, _ resource.Sche
 									},
 								},
 								"applies_to": schema.StringAttribute{
-									Description: fmt.Sprintf("What the constraint applies to. Possible values: %s. Static secret rules support %q and %q, while dynamic secret and secret rotation rules support %q only.", strings.Join(SUPPORTED_SECRET_VALIDATION_CONSTRAINT_TARGETS, ", "), SECRET_VALIDATION_CONSTRAINT_TARGET_KEY, SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE, SECRET_VALIDATION_CONSTRAINT_TARGET_PASSWORD),
+									Description: "What the constraint applies to. Possible values: " + strings.Join(SUPPORTED_SECRET_VALIDATION_CONSTRAINT_TARGETS, ", ") + ". Static secret rules support `key` and `value`, while dynamic secret and secret rotation rules support `password` only.",
 									Required:    true,
 									Validators: []validator.String{
 										stringvalidator.OneOf(SUPPORTED_SECRET_VALIDATION_CONSTRAINT_TARGETS...),
 									},
 								},
 								"value": schema.StringAttribute{
-									Description: fmt.Sprintf("The constraint value, always expressed as a string. For %q and %q this is a number, for %q a regular expression, and for %q the number of previous versions to check (1-%d).", SECRET_VALIDATION_CONSTRAINT_TYPE_MIN_LENGTH, SECRET_VALIDATION_CONSTRAINT_TYPE_MAX_LENGTH, SECRET_VALIDATION_CONSTRAINT_TYPE_REGEX_PATTERN, SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, MAX_PREVENT_VALUE_REUSE_VERSIONS),
+									Description: "The constraint value, always expressed as a string. For `min-length` and `max-length` this is a number, for `regex-pattern` a regular expression, and for `prevent-value-reuse` the number of previous versions to check.",
 									Required:    true,
 									Validators: []validator.String{
 										stringvalidator.LengthAtLeast(1),
@@ -278,9 +280,11 @@ func (r *secretValidationRuleResource) ValidateConfig(ctx context.Context, req r
 		)
 	}
 
-	for i, constraint := range rule.Constraints {
-		constraintPath := rulePath.AtName("constraints").AtListIndex(i)
+	// Constraints are a set, so there is no stable index to point a diagnostic at. Errors are
+	// reported against the whole attribute and name the offending constraint instead.
+	constraintsPath := rulePath.AtName("constraints")
 
+	for _, constraint := range rule.Constraints {
 		if constraint.Type.IsNull() || constraint.Type.IsUnknown() ||
 			constraint.AppliesTo.IsNull() || constraint.AppliesTo.IsUnknown() {
 			continue
@@ -288,28 +292,36 @@ func (r *secretValidationRuleResource) ValidateConfig(ctx context.Context, req r
 
 		constraintType := constraint.Type.ValueString()
 		appliesTo := constraint.AppliesTo.ValueString()
+		constraintDescription := fmt.Sprintf("The constraint with type %q and applies_to %q", constraintType, appliesTo)
 
 		if isGeneratedCredential {
 			if appliesTo != SECRET_VALIDATION_CONSTRAINT_TARGET_PASSWORD {
 				resp.Diagnostics.AddAttributeError(
-					constraintPath.AtName("applies_to"),
+					constraintsPath,
 					"Unsupported constraint target",
-					fmt.Sprintf("%q rules only support constraints that apply to %q.", ruleType, SECRET_VALIDATION_CONSTRAINT_TARGET_PASSWORD),
+					fmt.Sprintf("%s is invalid: %q rules only support constraints that apply to %q.", constraintDescription, ruleType, SECRET_VALIDATION_CONSTRAINT_TARGET_PASSWORD),
 				)
 			}
 
 			if constraintType == SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE {
 				resp.Diagnostics.AddAttributeError(
-					constraintPath.AtName("type"),
+					constraintsPath,
 					"Unsupported constraint type",
-					fmt.Sprintf("The %q constraint is only supported for %q rules.", SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, SECRET_VALIDATION_RULE_TYPE_STATIC_SECRETS),
+					fmt.Sprintf("%s is invalid: the %q constraint is only supported for %q rules.", constraintDescription, SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, SECRET_VALIDATION_RULE_TYPE_STATIC_SECRETS),
 				)
 			}
 		} else if appliesTo == SECRET_VALIDATION_CONSTRAINT_TARGET_PASSWORD {
 			resp.Diagnostics.AddAttributeError(
-				constraintPath.AtName("applies_to"),
+				constraintsPath,
 				"Unsupported constraint target",
-				fmt.Sprintf("%q rules only support constraints that apply to %q or %q.", SECRET_VALIDATION_RULE_TYPE_STATIC_SECRETS, SECRET_VALIDATION_CONSTRAINT_TARGET_KEY, SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE),
+				fmt.Sprintf("%s is invalid: %q rules only support constraints that apply to %q or %q.", constraintDescription, SECRET_VALIDATION_RULE_TYPE_STATIC_SECRETS, SECRET_VALIDATION_CONSTRAINT_TARGET_KEY, SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE),
+			)
+		} else if constraintType == SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE &&
+			appliesTo != SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE {
+			resp.Diagnostics.AddAttributeError(
+				constraintsPath,
+				"Unsupported constraint target",
+				fmt.Sprintf("%s is invalid: the %q constraint can only apply to %q.", constraintDescription, SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE),
 			)
 		}
 
@@ -318,22 +330,24 @@ func (r *secretValidationRuleResource) ValidateConfig(ctx context.Context, req r
 		}
 		value := strings.TrimSpace(constraint.Value.ValueString())
 
+		// The remaining checks are about the format of the value, which Infisical stores as
+		// a string but interprets as a number for these constraint types.
 		switch constraintType {
 		case SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE:
-			if appliesTo != SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE {
-				resp.Diagnostics.AddAttributeError(
-					constraintPath.AtName("applies_to"),
-					"Unsupported constraint target",
-					fmt.Sprintf("The %q constraint can only apply to %q.", SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, SECRET_VALIDATION_CONSTRAINT_TARGET_VALUE),
-				)
-			}
-
 			versions, err := strconv.Atoi(value)
-			if err != nil || versions < 1 || versions > MAX_PREVENT_VALUE_REUSE_VERSIONS {
+			if err != nil || versions < 1 {
 				resp.Diagnostics.AddAttributeError(
-					constraintPath.AtName("value"),
+					constraintsPath,
 					"Invalid constraint value",
-					fmt.Sprintf("The %q constraint value must be an integer between 1 and %d.", SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, MAX_PREVENT_VALUE_REUSE_VERSIONS),
+					fmt.Sprintf("The %q constraint value must be a positive integer.", SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE),
+				)
+			} else if versions > SECRET_VALIDATION_MAX_PREVENT_VALUE_REUSE_VERSIONS {
+				// Infisical owns this cap and may raise it, so warn rather than hard-block a
+				// value that a newer backend would accept.
+				resp.Diagnostics.AddAttributeWarning(
+					constraintsPath,
+					"Constraint value may exceed the supported maximum",
+					fmt.Sprintf("Infisical currently caps the %q constraint at %d previous versions, so %q is likely to be rejected when the rule is applied.", SECRET_VALIDATION_CONSTRAINT_TYPE_PREVENT_VALUE_REUSE, SECRET_VALIDATION_MAX_PREVENT_VALUE_REUSE_VERSIONS, constraint.Value.ValueString()),
 				)
 			}
 		case SECRET_VALIDATION_CONSTRAINT_TYPE_MIN_LENGTH, SECRET_VALIDATION_CONSTRAINT_TYPE_MAX_LENGTH:
@@ -341,7 +355,7 @@ func (r *secretValidationRuleResource) ValidateConfig(ctx context.Context, req r
 			// is enforced, so a non-numeric value is a warning rather than an error.
 			if length, err := strconv.Atoi(value); err != nil || length < 0 {
 				resp.Diagnostics.AddAttributeWarning(
-					constraintPath.AtName("value"),
+					constraintsPath,
 					"Constraint value is not a number",
 					fmt.Sprintf("The %q constraint value is interpreted as a number when the rule is enforced. %q is not a non-negative integer, which leads to unpredictable enforcement.", constraintType, constraint.Value.ValueString()),
 				)
@@ -358,9 +372,7 @@ func buildSecretValidationRuleConfig(ctx context.Context, plan *secretValidation
 	}
 
 	if !plan.Rule.Providers.IsNull() && !plan.Rule.Providers.IsUnknown() {
-		providers := make([]string, 0, len(plan.Rule.Providers.Elements()))
-		diagnostics.Append(plan.Rule.Providers.ElementsAs(ctx, &providers, false)...)
-		config.Providers = providers
+		diagnostics.Append(plan.Rule.Providers.ElementsAs(ctx, &config.Providers, false)...)
 	}
 
 	for i, constraint := range plan.Rule.Constraints {
@@ -377,8 +389,7 @@ func buildSecretValidationRuleConfig(ctx context.Context, plan *secretValidation
 // buildUpdateSecretValidationRuleRequest describes the full desired state of a rule. Every
 // PATCH must go through this helper: description and environmentSlug are cleared when nil,
 // so a partially populated body would silently wipe them.
-func buildUpdateSecretValidationRuleRequest(ctx context.Context, plan *secretValidationRuleResourceModel, ruleID string, diagnostics *diag.Diagnostics) infisical.UpdateSecretValidationRuleRequest {
-	config := buildSecretValidationRuleConfig(ctx, plan, diagnostics)
+func buildUpdateSecretValidationRuleRequest(plan *secretValidationRuleResourceModel, ruleID string, config infisical.SecretValidationRuleConfig) infisical.UpdateSecretValidationRuleRequest {
 	isActive := plan.IsActive.ValueBool()
 
 	return infisical.UpdateSecretValidationRuleRequest{
@@ -435,21 +446,16 @@ func (r *secretValidationRuleResource) Create(ctx context.Context, req resource.
 	// Infisical only accepts isActive on update, so a rule that should start out disabled
 	// needs a follow-up request.
 	if !plan.IsActive.ValueBool() {
-		updateRequest := buildUpdateSecretValidationRuleRequest(ctx, &plan, rule.ID, &resp.Diagnostics)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+		updateRequest := buildUpdateSecretValidationRuleRequest(&plan, rule.ID, config)
 
 		if _, err := r.client.UpdateSecretValidationRule(updateRequest); err != nil {
-			// Persist the created rule before reporting the failure so it isn't orphaned
+			// Fall through to the state write below so the created rule isn't orphaned
 			// outside of Terraform state.
 			plan.IsActive = types.BoolValue(rule.IsActive)
-			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 			resp.Diagnostics.AddError(
 				"Error disabling secret validation rule",
 				"The secret validation rule was created but couldn't be disabled, unexpected error: "+err.Error(),
 			)
-			return
 		}
 	}
 
@@ -575,10 +581,12 @@ func (r *secretValidationRuleResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	updateRequest := buildUpdateSecretValidationRuleRequest(ctx, &plan, state.ID.ValueString(), &resp.Diagnostics)
+	config := buildSecretValidationRuleConfig(ctx, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	updateRequest := buildUpdateSecretValidationRuleRequest(&plan, state.ID.ValueString(), config)
 
 	if _, err := r.client.UpdateSecretValidationRule(updateRequest); err != nil {
 		resp.Diagnostics.AddError(
