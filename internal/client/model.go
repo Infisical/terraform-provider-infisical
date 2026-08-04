@@ -4220,3 +4220,88 @@ type RevokeIdentityTlsCertAuthRequest struct {
 type RevokeIdentityTlsCertAuthResponse struct {
 	IdentityTlsCertAuth IdentityTlsCertAuth `json:"identityTlsCertAuth"`
 }
+
+// Secret validation rules.
+
+type SecretValidationRuleConstraint struct {
+	Type      string `json:"type"`
+	AppliesTo string `json:"appliesTo"`
+	Value     string `json:"value"`
+}
+
+// SecretValidationRuleConfig is the type-discriminated rule payload. Providers only
+// apply to the dynamic-secrets and secret-rotations rule types.
+type SecretValidationRuleConfig struct {
+	Type        string                           `json:"type"`
+	Providers   []string                         `json:"providers,omitempty"`
+	Constraints []SecretValidationRuleConstraint `json:"constraints"`
+}
+
+// SecretValidationRule is a rule as returned by the API. The rule config fields are
+// flattened alongside the record fields rather than nested under a rule key, and the
+// API returns envId even though requests take environmentSlug.
+type SecretValidationRule struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	ProjectID   string  `json:"projectId"`
+	EnvID       *string `json:"envId"`
+	SecretPath  string  `json:"secretPath"`
+	IsActive    bool    `json:"isActive"`
+	SecretValidationRuleConfig
+}
+
+type CreateSecretValidationRuleRequest struct {
+	ProjectID string `json:"-"`
+
+	Name            string                     `json:"name"`
+	Description     *string                    `json:"description,omitempty"`
+	EnvironmentSlug *string                    `json:"environmentSlug,omitempty"`
+	SecretPath      string                     `json:"secretPath"`
+	Rule            SecretValidationRuleConfig `json:"rule"`
+}
+
+type CreateSecretValidationRuleResponse struct {
+	Rule SecretValidationRule `json:"rule"`
+}
+
+type ListSecretValidationRulesRequest struct {
+	ProjectID string `json:"-"`
+}
+
+type ListSecretValidationRulesResponse struct {
+	Rules []SecretValidationRule `json:"rules"`
+}
+
+type GetSecretValidationRuleByIdRequest struct {
+	ProjectID string `json:"-"`
+	RuleID    string `json:"-"`
+}
+
+// UpdateSecretValidationRuleRequest describes the full desired state of a rule.
+// Description and EnvironmentSlug are intentionally not omitempty so that a nil
+// pointer clears them, which means every caller must populate the whole struct.
+type UpdateSecretValidationRuleRequest struct {
+	ProjectID string `json:"-"`
+	RuleID    string `json:"-"`
+
+	Name            string                      `json:"name,omitempty"`
+	Description     *string                     `json:"description"`
+	EnvironmentSlug *string                     `json:"environmentSlug"`
+	SecretPath      string                      `json:"secretPath,omitempty"`
+	Rule            *SecretValidationRuleConfig `json:"rule,omitempty"`
+	IsActive        *bool                       `json:"isActive,omitempty"`
+}
+
+type UpdateSecretValidationRuleResponse struct {
+	Rule SecretValidationRule `json:"rule"`
+}
+
+type DeleteSecretValidationRuleRequest struct {
+	ProjectID string `json:"-"`
+	RuleID    string `json:"-"`
+}
+
+type DeleteSecretValidationRuleResponse struct {
+	Rule SecretValidationRule `json:"rule"`
+}
