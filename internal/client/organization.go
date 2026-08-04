@@ -1,38 +1,57 @@
 package infisicalclient
 
-// GetOrganizationBySlug resolves an organization by its slug. Infisical exposes no
-// lookup-by-slug endpoint that machine identities can call, so this checks the
-// organization the caller is authenticated to first and then falls back to scanning
-// the sub-organizations of the caller's root organization. It returns ErrNotFound
-// when no organization visible to the caller carries the given slug.
+import "fmt"
+
+// GetOrganizationBySlug resolves an organization by slug. It checks the identity's own org, then scans sub-orgs of its
+// root. ErrNotFound is returned only when both lookups succeed and neither matches.
+//
+// Both sources always target the identity's root org, even when the session is scoped
+// to a sub-org via auth.organization_slug. A Machine Identity created inside a sub-org has no root
+// membership, so both sources fail; either failure is surfaced rather than treated as
+// ErrNotFound, since an unavailable source cannot prove absence.
 func (client Client) GetOrganizationBySlug(slug string) (Organization, error) {
-	identityDetails, err := client.GetIdentityDetails()
-	if err != nil {
-		return Organization{}, err
-	}
-
-	currentOrg := identityDetails.IdentityDetails.Organization
-	if currentOrg.Slug == slug {
-		return Organization{
-			ID:   currentOrg.ID,
-			Name: currentOrg.Name,
-			Slug: currentOrg.Slug,
-		}, nil
-	}
-
-	subOrgs, err := client.ListSubOrganizations()
-	if err != nil {
-		return Organization{}, err
-	}
-
-	for _, subOrg := range subOrgs {
-		if subOrg.Slug == slug {
+	identityDetails, detailsErr := client.GetIdentityDetails()
+	if detailsErr == nil {
+		ownOrg := identityDetails.IdentityDetails.Organization
+		if ownOrg.Slug == slug {
 			return Organization{
-				ID:   subOrg.ID,
-				Name: subOrg.Name,
-				Slug: subOrg.Slug,
+				ID:   ownOrg.ID,
+				Name: ownOrg.Name,
+				Slug: ownOrg.Slug,
 			}, nil
 		}
+	}
+
+	subOrgs, listErr := client.ListSubOrganizations()
+	if listErr == nil {
+		for _, subOrg := range subOrgs {
+			if subOrg.Slug == slug {
+				return Organization{
+					ID:   subOrg.ID,
+					Name: subOrg.Name,
+					Slug: subOrg.Slug,
+				}, nil
+			}
+		}
+	}
+
+	switch {
+	case detailsErr != nil && listErr != nil:
+		return Organization{}, fmt.Errorf(
+			"neither organization lookup succeeded, so the slug %q could not be resolved. "+
+				"This is expected when the machine identity was created inside a sub-organization: "+
+				"organization lookups resolve against the root organization, which such an identity is not a member of. "+
+				"Use a machine identity that belongs to the root organization, or supply the organization ID directly.\n"+
+				"identity organization lookup: %s\nsub-organization lookup: %s",
+			slug, detailsErr, listErr)
+	case detailsErr != nil:
+		return Organization{}, fmt.Errorf(
+			"slug %q was not found in sub-organizations, and the identity's own organization lookup failed: %w",
+			slug, detailsErr)
+	case listErr != nil:
+		return Organization{}, fmt.Errorf(
+			"slug %q did not match the identity organization, and listing sub-organizations failed: %w",
+			slug, listErr)
 	}
 
 	return Organization{}, ErrNotFound

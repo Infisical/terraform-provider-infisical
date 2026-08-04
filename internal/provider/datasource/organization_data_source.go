@@ -37,7 +37,7 @@ func (d *OrganizationDataSource) Metadata(ctx context.Context, req datasource.Me
 
 func (d *OrganizationDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Look up an organization by slug to obtain its ID. The slug can be that of the organization the provider is authenticated to, or of any sub-organization under the caller's root organization. Only Machine Identity authentication is supported for this data source.",
+		Description: "Look up an organization by slug to obtain its ID. The slug can be that of the machine identity's root organization or of any sub-organization under it. Organizations outside that tree are not resolvable. The machine identity must belong to the root organization: an identity created inside a sub-organization cannot resolve organizations, since Infisical scopes organization lookups to the root. Only Machine Identity authentication is supported for this data source.",
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
 				Description: "The slug of the organization.",
@@ -99,7 +99,7 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 		if errors.Is(err, infisical.ErrNotFound) {
 			resp.Diagnostics.AddError(
 				"Organization not found",
-				fmt.Sprintf("No organization was found with slug %s. Only the organization the machine identity is authenticated to and sub-organizations under its root organization can be resolved.", data.Slug.ValueString()),
+				fmt.Sprintf("No organization was found with slug %s. Only the machine identity's root organization and the sub-organizations under it can be resolved.", data.Slug.ValueString()),
 			)
 			return
 		}

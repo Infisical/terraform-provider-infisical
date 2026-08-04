@@ -3,12 +3,12 @@
 page_title: "infisical_organization Data Source - terraform-provider-infisical"
 subcategory: "Organization"
 description: |-
-  Look up an organization by slug to obtain its ID. The slug can be that of the organization the provider is authenticated to, or of any sub-organization under the caller's root organization. Only Machine Identity authentication is supported for this data source.
+  Look up an organization by slug to obtain its ID. The slug can be that of the machine identity's root organization or of any sub-organization under it. Organizations outside that tree are not resolvable. The machine identity must belong to the root organization: an identity created inside a sub-organization cannot resolve organizations, since Infisical scopes organization lookups to the root. Only Machine Identity authentication is supported for this data source.
 ---
 
 # infisical_organization (Data Source)
 
-Look up an organization by slug to obtain its ID. The slug can be that of the organization the provider is authenticated to, or of any sub-organization under the caller's root organization. Only Machine Identity authentication is supported for this data source.
+Look up an organization by slug to obtain its ID. The slug can be that of the machine identity's root organization or of any sub-organization under it. Organizations outside that tree are not resolvable. The machine identity must belong to the root organization: an identity created inside a sub-organization cannot resolve organizations, since Infisical scopes organization lookups to the root. Only Machine Identity authentication is supported for this data source.
 
 ## Example Usage
 
