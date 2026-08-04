@@ -28,25 +28,6 @@ type ProjectTemplateResource struct {
 	client *infisical.Client
 }
 
-type PermissionModel struct {
-	Subject   types.String `tfsdk:"subject"`
-	Action    types.Set    `tfsdk:"action"`
-	Condition types.String `tfsdk:"condition"`
-	Inverted  types.Bool   `tfsdk:"inverted"`
-}
-
-type RoleModel struct {
-	Name        types.String `tfsdk:"name"`
-	Slug        types.String `tfsdk:"slug"`
-	Permissions types.List   `tfsdk:"permissions"`
-}
-
-type EnvironmentModel struct {
-	Name     types.String `tfsdk:"name"`
-	Slug     types.String `tfsdk:"slug"`
-	Position types.Int64  `tfsdk:"position"`
-}
-
 type ProjectTemplateResourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
@@ -54,6 +35,9 @@ type ProjectTemplateResourceModel struct {
 	Roles        types.List   `tfsdk:"roles"`
 	Environments types.List   `tfsdk:"environments"`
 	Type         types.String `tfsdk:"type"`
+	Identities   types.Set    `tfsdk:"identities"`
+	Users        types.Set    `tfsdk:"users"`
+	Groups       types.Set    `tfsdk:"groups"`
 }
 
 func NewProjectTemplateResource() resource.Resource {
@@ -160,6 +144,60 @@ func (r *ProjectTemplateResource) Schema(_ context.Context, _ resource.SchemaReq
 					},
 				},
 			},
+			"identities": schema.SetNestedAttribute{
+				Optional:    true,
+				Description: "The identities assigned to projects created from this template",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"identity_id": schema.StringAttribute{
+							Description: "The ID of the identity",
+							Required:    true,
+						},
+						"roles": schema.SetAttribute{
+							ElementType: types.StringType,
+							Description: "The role slugs to assign to the identity. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).",
+							Required:    true,
+						},
+					},
+				},
+			},
+			"users": schema.SetNestedAttribute{
+				Optional:    true,
+				Description: "The users assigned to projects created from this template",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"username": schema.StringAttribute{
+							Description: "The username of the user.",
+							Required:    true,
+						},
+						"roles": schema.SetAttribute{
+							ElementType: types.StringType,
+							Description: "The role slugs to assign to the user. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).",
+							Required:    true,
+						},
+					},
+				},
+			},
+			"groups": schema.SetNestedAttribute{
+				Optional:    true,
+				Description: "The groups assigned to projects created from this template",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"group_slug": schema.StringAttribute{
+							Description: "The slug of the group",
+							Required:    true,
+							Validators: []validator.String{
+								infisicaltf.SlugRegexValidator,
+							},
+						},
+						"roles": schema.SetAttribute{
+							ElementType: types.StringType,
+							Description: "The role slugs to assign to the group. Must reference roles defined in this template or predefined role slugs (admin, member, viewer, no-access).",
+							Required:    true,
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -226,12 +264,28 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 		}
 	}
 
+	identities, diags := r.unmarshalIdentities(plan.Identities)
+	resp.Diagnostics.Append(diags...)
+
+	users, diags := r.unmarshalUsers(plan.Users)
+	resp.Diagnostics.Append(diags...)
+
+	groups, diags := r.unmarshalGroups(plan.Groups)
+	resp.Diagnostics.Append(diags...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	res, err := r.client.CreateProjectTemplate(infisical.CreateProjectTemplateRequest{
 		Name:         plan.Name.ValueString(),
 		Description:  plan.Description.ValueString(),
 		Type:         plan.Type.ValueString(),
 		Environments: environments,
 		Roles:        roles,
+		Identities:   identities,
+		Users:        users,
+		Groups:       groups,
 	})
 
 	if err != nil {
@@ -256,6 +310,19 @@ func (r *ProjectTemplateResource) Create(ctx context.Context, req resource.Creat
 
 	plan.Environments, diags = r.marshalEnvironments(res.Environments)
 	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	plan.Identities, diags = r.marshalIdentities(res.Identities, plan.Identities)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Users, diags = r.marshalUsers(res.Users, plan.Users)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Groups, diags = r.marshalGroups(res.Groups, plan.Groups)
+	resp.Diagnostics.Append(diags...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -323,6 +390,19 @@ func (r *ProjectTemplateResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
+	plan.Identities, diags = r.marshalIdentities(template.Identities, plan.Identities)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Users, diags = r.marshalUsers(template.Users, plan.Users)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Groups, diags = r.marshalGroups(template.Groups, plan.Groups)
+	resp.Diagnostics.Append(diags...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 
@@ -376,6 +456,15 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 		environments = []infisical.Environment{}
 	}
 
+	identities, diags := r.unmarshalIdentities(plan.Identities)
+	resp.Diagnostics.Append(diags...)
+
+	users, diags := r.unmarshalUsers(plan.Users)
+	resp.Diagnostics.Append(diags...)
+
+	groups, diags := r.unmarshalGroups(plan.Groups)
+	resp.Diagnostics.Append(diags...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -387,6 +476,9 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 		Type:         plan.Type.ValueString(),
 		Roles:        roles,
 		Environments: environments,
+		Identities:   identities,
+		Users:        users,
+		Groups:       groups,
 	})
 
 	if err != nil {
@@ -405,6 +497,15 @@ func (r *ProjectTemplateResource) Update(ctx context.Context, req resource.Updat
 	resp.Diagnostics.Append(diags...)
 
 	plan.Environments, diags = r.marshalEnvironments(apiResp.Environments)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Identities, diags = r.marshalIdentities(apiResp.Identities, plan.Identities)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Users, diags = r.marshalUsers(apiResp.Users, plan.Users)
+	resp.Diagnostics.Append(diags...)
+
+	plan.Groups, diags = r.marshalGroups(apiResp.Groups, plan.Groups)
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
@@ -706,6 +807,151 @@ func (r ProjectTemplateResource) unmarshalEnvironments(tfList types.List) ([]inf
 	}
 
 	return envs, diags
+}
+
+// templateMembership is the common shape of the identities, users and groups
+// attributes: a single identifying key plus a set of role slugs.
+type templateMembership struct {
+	Key   string
+	Roles []string
+}
+
+func templateMembershipType(keyAttr string) types.ObjectType {
+	return types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			keyAttr: types.StringType,
+			"roles": types.SetType{ElemType: types.StringType},
+		},
+	}
+}
+
+// marshalTemplateMemberships converts API membership entries to a Terraform set.
+// When the API returns no entries and the prior value was null, it returns null
+// so an omitted config block does not drift to an empty set.
+func marshalTemplateMemberships(keyAttr string, items []templateMembership, prior types.Set) (types.Set, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	objType := templateMembershipType(keyAttr)
+
+	if len(items) == 0 && (prior.IsNull() || prior.IsUnknown()) {
+		return types.SetNull(objType), diags
+	}
+
+	values := make([]attr.Value, 0, len(items))
+	for _, item := range items {
+		roleValues := make([]attr.Value, 0, len(item.Roles))
+		for _, role := range item.Roles {
+			roleValues = append(roleValues, types.StringValue(role))
+		}
+
+		roles, roleDiags := types.SetValue(types.StringType, roleValues)
+		diags.Append(roleDiags...)
+
+		obj, objDiags := types.ObjectValue(objType.AttrTypes, map[string]attr.Value{
+			keyAttr: types.StringValue(item.Key),
+			"roles": roles,
+		})
+		diags.Append(objDiags...)
+
+		values = append(values, obj)
+	}
+
+	set, setDiags := types.SetValue(objType, values)
+	diags.Append(setDiags...)
+
+	return set, diags
+}
+
+// unmarshalTemplateMemberships converts a Terraform set to API membership entries.
+// A null or unknown set yields a non-nil empty slice: omitted from create requests
+// via omitempty, sent as an explicit [] on update requests to clear server-side.
+func unmarshalTemplateMemberships(keyAttr string, tfSet types.Set) ([]templateMembership, diag.Diagnostics) {
+	items := []templateMembership{}
+	var diags diag.Diagnostics
+
+	if tfSet.IsNull() || tfSet.IsUnknown() {
+		return items, diags
+	}
+
+	for _, elem := range tfSet.Elements() {
+		objVal, ok := elem.(types.Object)
+		if !ok {
+			diags.AddError(
+				"Invalid Membership Object",
+				"Expected a valid membership object, but got an invalid type.",
+			)
+			continue
+		}
+
+		attrs := objVal.Attributes()
+		item := templateMembership{}
+
+		if key, ok := attrs[keyAttr].(types.String); ok {
+			item.Key = key.ValueString()
+		}
+
+		if roleSet, ok := attrs["roles"].(types.Set); ok {
+			for _, roleVal := range roleSet.Elements() {
+				if roleStr, ok := roleVal.(types.String); ok {
+					item.Roles = append(item.Roles, roleStr.ValueString())
+				}
+			}
+		}
+
+		items = append(items, item)
+	}
+
+	return items, diags
+}
+
+func (r ProjectTemplateResource) marshalIdentities(identities []infisical.ProjectTemplateIdentity, prior types.Set) (types.Set, diag.Diagnostics) {
+	items := make([]templateMembership, 0, len(identities))
+	for _, identity := range identities {
+		items = append(items, templateMembership{Key: identity.IdentityID, Roles: identity.Roles})
+	}
+	return marshalTemplateMemberships("identity_id", items, prior)
+}
+
+func (r ProjectTemplateResource) unmarshalIdentities(tfList types.Set) ([]infisical.ProjectTemplateIdentity, diag.Diagnostics) {
+	items, diags := unmarshalTemplateMemberships("identity_id", tfList)
+	identities := make([]infisical.ProjectTemplateIdentity, 0, len(items))
+	for _, item := range items {
+		identities = append(identities, infisical.ProjectTemplateIdentity{IdentityID: item.Key, Roles: item.Roles})
+	}
+	return identities, diags
+}
+
+func (r ProjectTemplateResource) marshalUsers(users []infisical.ProjectTemplateUser, prior types.Set) (types.Set, diag.Diagnostics) {
+	items := make([]templateMembership, 0, len(users))
+	for _, user := range users {
+		items = append(items, templateMembership{Key: user.Username, Roles: user.Roles})
+	}
+	return marshalTemplateMemberships("username", items, prior)
+}
+
+func (r ProjectTemplateResource) unmarshalUsers(tfList types.Set) ([]infisical.ProjectTemplateUser, diag.Diagnostics) {
+	items, diags := unmarshalTemplateMemberships("username", tfList)
+	users := make([]infisical.ProjectTemplateUser, 0, len(items))
+	for _, item := range items {
+		users = append(users, infisical.ProjectTemplateUser{Username: item.Key, Roles: item.Roles})
+	}
+	return users, diags
+}
+
+func (r ProjectTemplateResource) marshalGroups(groups []infisical.ProjectTemplateGroup, prior types.Set) (types.Set, diag.Diagnostics) {
+	items := make([]templateMembership, 0, len(groups))
+	for _, group := range groups {
+		items = append(items, templateMembership{Key: group.GroupSlug, Roles: group.Roles})
+	}
+	return marshalTemplateMemberships("group_slug", items, prior)
+}
+
+func (r ProjectTemplateResource) unmarshalGroups(tfList types.Set) ([]infisical.ProjectTemplateGroup, diag.Diagnostics) {
+	items, diags := unmarshalTemplateMemberships("group_slug", tfList)
+	groups := make([]infisical.ProjectTemplateGroup, 0, len(items))
+	for _, item := range items {
+		groups = append(groups, infisical.ProjectTemplateGroup{GroupSlug: item.Key, Roles: item.Roles})
+	}
+	return groups, diags
 }
 
 func isDefaultRole(slug string) bool {
