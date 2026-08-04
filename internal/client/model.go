@@ -4115,6 +4115,16 @@ type RemoveCertManagerIdentityResponse struct {
 	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
 }
 
+// Organization
+
+// Organization holds the organization fields the provider can resolve for both the
+// organization the caller is authenticated to and its sub-organizations.
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 // Sub-organization
 
 type SubOrganization struct {
