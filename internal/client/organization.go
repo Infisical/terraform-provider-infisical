@@ -42,7 +42,7 @@ func (client Client) GetOrganizationBySlug(slug string) (Organization, error) {
 				"This is expected when the machine identity was created inside a sub-organization: "+
 				"organization lookups resolve against the root organization, which such an identity is not a member of. "+
 				"Use a machine identity that belongs to the root organization, or supply the organization ID directly.\n"+
-				"identity organization lookup: %s\nsub-organization lookup: %s",
+				"identity organization lookup: %w\nsub-organization lookup: %w",
 			slug, detailsErr, listErr)
 	case detailsErr != nil:
 		return Organization{}, fmt.Errorf(
