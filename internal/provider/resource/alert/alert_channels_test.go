@@ -678,6 +678,45 @@ func TestWebhookSigningSecretRejectsEmptyValues(t *testing.T) {
 	t.Error("an empty signing secret passed validation, want it rejected")
 }
 
+// A channel's configuration block is what gives it its type, so a channel that carries none or
+// several is rejected. The one that carries exactly one has to pass: the whole resource is unusable
+// otherwise, since every channel goes through this.
+func TestValidateChannelsHaveOneType(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	slack := alertChannelModel{
+		ID:      types.StringValue("channel-1"),
+		Name:    types.StringValue("Platform Slack"),
+		Enabled: types.BoolValue(true),
+		Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
+	}
+
+	one := alertModel(t, map[string]alertChannelModel{"platform_slack": slack})
+	if diags := validateChannelsHaveOneType(ctx, alertConfig(t, s, one)); diags.HasError() {
+		t.Errorf("validateChannelsHaveOneType() with one block: diagnostics = %v, want none", diags)
+	}
+
+	typeless := slack
+	typeless.Slack = nil
+	none := alertModel(t, map[string]alertChannelModel{"platform_slack": typeless})
+	diags := validateChannelsHaveOneType(ctx, alertConfig(t, s, none))
+	if !diags.HasError() {
+		t.Fatal("validateChannelsHaveOneType() with no block: no error, want one")
+	}
+	want := path.Root("channels").AtMapKey("platform_slack")
+	if got := diags.Errors()[0].(diag.DiagnosticWithPath).Path(); !got.Equal(want) {
+		t.Errorf("error path = %v, want %v", got, want)
+	}
+
+	ambiguous := slack
+	ambiguous.PagerDuty = &alertPagerDutyChannelModel{IntegrationKey: types.StringValue(strings.Repeat("a", 32))}
+	several := alertModel(t, map[string]alertChannelModel{"platform_slack": ambiguous})
+	if diags := validateChannelsHaveOneType(ctx, alertConfig(t, s, several)); !diags.HasError() {
+		t.Error("validateChannelsHaveOneType() with two blocks: no error, want one")
+	}
+}
+
 // A channel that was just created is recognized in Infisical's response by its name, so two channels
 // of one alert cannot share a name.
 func TestValidateChannelNamesAreUnique(t *testing.T) {

@@ -144,6 +144,7 @@ func (r *alertResource) ConfigValidators(_ context.Context) []resource.ConfigVal
 }
 
 func (r *alertResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	resp.Diagnostics.Append(validateChannelsHaveOneType(ctx, req.Config)...)
 	resp.Diagnostics.Append(validateChannelNamesAreUnique(ctx, req.Config)...)
 	resp.Diagnostics.Append(validateAlertConditionMatchesResourceType(ctx, req.Config)...)
 }

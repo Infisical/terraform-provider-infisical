@@ -11,7 +11,6 @@ import (
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -113,12 +112,24 @@ type alertChannelModel struct {
 	PagerDuty *alertPagerDutyChannelModel `tfsdk:"pagerduty"`
 }
 
-func alertChannelTypePaths() []path.Expression {
-	paths := make([]path.Expression, 0, len(alertChannelTypes))
-	for _, channelType := range alertChannelTypes {
-		paths = append(paths, path.MatchRelative().AtName(channelType))
+func setChannelTypes(channel types.Object) ([]string, bool) {
+	attributes := channel.Attributes()
+
+	set := make([]string, 0, len(alertChannelTypes))
+	for _, name := range alertChannelTypes {
+		block, ok := attributes[name]
+		if !ok || block == nil {
+			continue
+		}
+		if block.IsUnknown() {
+			return nil, false
+		}
+		if !block.IsNull() {
+			set = append(set, name)
+		}
 	}
-	return paths
+
+	return set, true
 }
 
 func (c alertChannelModel) channelType() string {
@@ -181,9 +192,6 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 			mapvalidator.KeysAre(stringvalidator.LengthBetween(1, maxChannelKeyLength)),
 		},
 		NestedObject: schema.NestedAttributeObject{
-			Validators: []validator.Object{
-				objectvalidator.ExactlyOneOf(alertChannelTypePaths()...),
-			},
 			Attributes: map[string]schema.Attribute{
 				"id": schema.StringAttribute{
 					Computed:    true,
@@ -297,6 +305,15 @@ func sortedChannelKeys(channels map[string]alertChannelModel) []string {
 	return keys
 }
 
+func sortedMapKeys(elements map[string]attr.Value) []string {
+	keys := make([]string, 0, len(elements))
+	for key := range elements {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func reusedChannelID(channel alertChannelModel, priorChannel alertChannelModel, hadPrior bool) string {
 	if !hadPrior || priorChannel.ID.IsNull() || priorChannel.ID.IsUnknown() {
 		return ""
@@ -305,6 +322,42 @@ func reusedChannelID(channel alertChannelModel, priorChannel alertChannelModel, 
 		return ""
 	}
 	return priorChannel.ID.ValueString()
+}
+
+func validateChannelsHaveOneType(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var channels types.Map
+	diags.Append(config.GetAttribute(ctx, path.Root("channels"), &channels)...)
+	if diags.HasError() || channels.IsNull() || channels.IsUnknown() {
+		return diags
+	}
+
+	elements := channels.Elements()
+	for _, key := range sortedMapKeys(elements) {
+		channel, ok := elements[key].(types.Object)
+		if !ok || channel.IsNull() || channel.IsUnknown() {
+			continue
+		}
+
+		set, known := setChannelTypes(channel)
+		if !known || len(set) == 1 {
+			continue
+		}
+
+		detail := fmt.Sprintf("Channel %q carries no configuration block, so it has no type.", key)
+		if len(set) > 1 {
+			detail = fmt.Sprintf("Channel %q carries %s blocks, so its type is ambiguous.", key, strings.Join(set, " and "))
+		}
+
+		diags.AddAttributeError(
+			path.Root("channels").AtMapKey(key),
+			"Invalid alert channel",
+			fmt.Sprintf("%s Give it exactly one of: %s.", detail, strings.Join(alertChannelTypes, ", ")),
+		)
+	}
+
+	return diags
 }
 
 func validateChannelNamesAreUnique(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
