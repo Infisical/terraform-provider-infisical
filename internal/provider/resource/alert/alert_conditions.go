@@ -22,7 +22,7 @@ const (
 	alertEventTypeIdentityAuthenticationExpiry = "identity.authentication.expiry"
 )
 
-const alertBlockAuthenticationExpiry = "authentication_expiry"
+const alertBlockExpiry = "expiry"
 
 const (
 	minAlertBeforeDays = 1
@@ -39,13 +39,13 @@ var alertEvents = []alertEvent{
 	{
 		resourceType: alertResourceTypeIdentityAuthentication,
 		eventType:    alertEventTypeIdentityAuthenticationExpiry,
-		block:        alertBlockAuthenticationExpiry,
+		block:        alertBlockExpiry,
 	},
 }
 
-func alertEventForBlock(block string) (alertEvent, bool) {
+func alertEventFor(resourceType, block string) (alertEvent, bool) {
 	for _, event := range alertEvents {
-		if event.block == block {
+		if event.resourceType == resourceType && event.block == block {
 			return event, true
 		}
 	}
@@ -65,77 +65,131 @@ type alertConditionSource interface {
 	GetAttribute(ctx context.Context, p path.Path, target any) diag.Diagnostics
 }
 
-func alertEventFromBlocks(ctx context.Context, source alertConditionSource) (alertEvent, bool, diag.Diagnostics) {
+func alertConditionBlockSet(ctx context.Context, source alertConditionSource) (string, bool, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	for _, event := range alertEvents {
-		var block types.Object
-		diags.Append(source.GetAttribute(ctx, path.Root(event.block), &block)...)
+	for _, block := range alertConditionBlockNames() {
+		var value types.Object
+		diags.Append(source.GetAttribute(ctx, path.Root(block), &value)...)
 		if diags.HasError() {
-			return alertEvent{}, false, diags
+			return "", false, diags
 		}
-		if block.IsUnknown() {
-			return alertEvent{}, false, diags
+		if value.IsUnknown() {
+			return "", false, diags
 		}
-		if !block.IsNull() {
-			return event, true, diags
+		if !value.IsNull() {
+			return block, true, diags
 		}
 	}
 
-	return alertEvent{}, false, diags
+	return "", false, diags
+}
+
+func alertEventFromBlocks(ctx context.Context, source alertConditionSource) (alertEvent, bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	block, ok, blockDiags := alertConditionBlockSet(ctx, source)
+	diags.Append(blockDiags...)
+	if diags.HasError() || !ok {
+		return alertEvent{}, false, diags
+	}
+
+	var resourceType types.String
+	diags.Append(source.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	if diags.HasError() || resourceType.IsNull() || resourceType.IsUnknown() {
+		return alertEvent{}, false, diags
+	}
+
+	event, ok := alertEventFor(resourceType.ValueString(), block)
+	return event, ok, diags
 }
 
 func supportedAlertResourceTypes() []string {
 	seen := make(map[string]bool, len(alertEvents))
-	types := make([]string, 0, len(alertEvents))
+	resourceTypes := make([]string, 0, len(alertEvents))
 	for _, event := range alertEvents {
 		if seen[event.resourceType] {
 			continue
 		}
 		seen[event.resourceType] = true
-		types = append(types, event.resourceType)
+		resourceTypes = append(resourceTypes, event.resourceType)
 	}
-	sort.Strings(types)
-	return types
+	sort.Strings(resourceTypes)
+	return resourceTypes
 }
 
-func alertConditionBlockPaths() []path.Expression {
-	paths := make([]path.Expression, 0, len(alertEvents))
-	for _, event := range alertEvents {
-		paths = append(paths, path.MatchRoot(event.block))
-	}
-	return paths
-}
-
-func alertBlocksForResourceType(resourceType string) []string {
+func alertConditionBlockNames() []string {
+	seen := make(map[string]bool, len(alertEvents))
 	blocks := make([]string, 0, len(alertEvents))
 	for _, event := range alertEvents {
-		if event.resourceType == resourceType {
-			blocks = append(blocks, event.block)
+		if seen[event.block] {
+			continue
 		}
+		seen[event.block] = true
+		blocks = append(blocks, event.block)
 	}
 	sort.Strings(blocks)
 	return blocks
 }
 
-type authenticationExpiryConditionModel struct {
+func alertConditionBlockPaths() []path.Expression {
+	blocks := alertConditionBlockNames()
+	paths := make([]path.Expression, 0, len(blocks))
+	for _, block := range blocks {
+		paths = append(paths, path.MatchRoot(block))
+	}
+	return paths
+}
+
+func alertBlocksForResourceType(resourceType string) []string {
+	seen := make(map[string]bool, len(alertEvents))
+	blocks := make([]string, 0, len(alertEvents))
+	for _, event := range alertEvents {
+		if event.resourceType != resourceType || seen[event.block] {
+			continue
+		}
+		seen[event.block] = true
+		blocks = append(blocks, event.block)
+	}
+	sort.Strings(blocks)
+	return blocks
+}
+
+func alertResourceTypesForBlock(block string) []string {
+	seen := make(map[string]bool, len(alertEvents))
+	resourceTypes := make([]string, 0, len(alertEvents))
+	for _, event := range alertEvents {
+		if event.block != block || seen[event.resourceType] {
+			continue
+		}
+		seen[event.resourceType] = true
+		resourceTypes = append(resourceTypes, event.resourceType)
+	}
+	sort.Strings(resourceTypes)
+	return resourceTypes
+}
+
+type expiryConditionModel struct {
 	AlertBeforeDays types.Int64 `tfsdk:"alert_before_days"`
 	DailyReminder   types.Bool  `tfsdk:"daily_reminder"`
 }
 
-type authenticationExpiryCondition struct {
+type expiryCondition struct {
 	AlertBefore   string `json:"alertBefore"`
 	DailyReminder bool   `json:"dailyReminder"`
 }
 
-func authenticationExpiryConditionSchema() schema.SingleNestedAttribute {
+func expiryConditionSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Optional:    true,
-		Description: fmt.Sprintf("Fires before a machine identity's authentication credentials expire. Only for alerts on the %s resource type.", alertResourceTypeIdentityAuthentication),
+		Optional: true,
+		Description: fmt.Sprintf(
+			"Fires before the watched resource expires. Only for alerts on these resource types: %s.",
+			strings.Join(alertResourceTypesForBlock(alertBlockExpiry), ", "),
+		),
 		Attributes: map[string]schema.Attribute{
 			"alert_before_days": schema.Int64Attribute{
 				Required:    true,
-				Description: fmt.Sprintf("How many days before an authentication credential expires the alert fires. Must be between %d and %d.", minAlertBeforeDays, maxAlertBeforeDays),
+				Description: fmt.Sprintf("How many days before the watched resource expires the alert fires. Must be between %d and %d.", minAlertBeforeDays, maxAlertBeforeDays),
 				Validators: []validator.Int64{
 					int64validator.Between(minAlertBeforeDays, maxAlertBeforeDays),
 				},
@@ -144,7 +198,7 @@ func authenticationExpiryConditionSchema() schema.SingleNestedAttribute {
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
-				Description: "Whether to keep notifying once a day until the credential expires, instead of notifying once. Defaults to false.",
+				Description: "Whether to keep notifying once a day until the watched resource expires, instead of notifying once. Defaults to false.",
 			},
 		},
 	}
@@ -153,11 +207,24 @@ func authenticationExpiryConditionSchema() schema.SingleNestedAttribute {
 func alertConditionForAPI(plan alertResourceModel) (alertEvent, any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	if plan.AuthenticationExpiry != nil {
-		event, _ := alertEventForBlock(alertBlockAuthenticationExpiry)
-		return event, authenticationExpiryCondition{
-			AlertBefore:   fmt.Sprintf("%dd", plan.AuthenticationExpiry.AlertBeforeDays.ValueInt64()),
-			DailyReminder: plan.AuthenticationExpiry.DailyReminder.ValueBool(),
+	if plan.Expiry != nil {
+		resourceType := plan.ResourceType.ValueString()
+		event, ok := alertEventFor(resourceType, alertBlockExpiry)
+		if !ok {
+			diags.AddAttributeError(
+				path.Root(alertBlockExpiry),
+				"Unexpected alert condition",
+				fmt.Sprintf(
+					"A %s block does not describe an event on the %s resource type, so there is nothing to tell Infisical when the alert should fire.",
+					alertBlockExpiry, resourceType,
+				),
+			)
+			return alertEvent{}, nil, diags
+		}
+
+		return event, expiryCondition{
+			AlertBefore:   fmt.Sprintf("%dd", plan.Expiry.AlertBeforeDays.ValueInt64()),
+			DailyReminder: plan.Expiry.DailyReminder.ValueBool(),
 		}, diags
 	}
 
@@ -168,23 +235,14 @@ func alertConditionForAPI(plan alertResourceModel) (alertEvent, any, diag.Diagno
 	return alertEvent{}, nil, diags
 }
 
-func alertConditionBlockNames() []string {
-	blocks := make([]string, 0, len(alertEvents))
-	for _, event := range alertEvents {
-		blocks = append(blocks, event.block)
-	}
-	sort.Strings(blocks)
-	return blocks
-}
-
 func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw json.RawMessage) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	state.AuthenticationExpiry = nil
+	state.Expiry = nil
 
-	switch event.eventType {
-	case alertEventTypeIdentityAuthenticationExpiry:
-		condition, conditionDiags := parseAuthenticationExpiryCondition(raw)
+	switch event.block {
+	case alertBlockExpiry:
+		condition, conditionDiags := parseExpiryCondition(raw)
 		diags.Append(conditionDiags...)
 		if diags.HasError() {
 			return diags
@@ -196,7 +254,7 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 			return diags
 		}
 
-		state.AuthenticationExpiry = &authenticationExpiryConditionModel{
+		state.Expiry = &expiryConditionModel{
 			AlertBeforeDays: types.Int64Value(alertBeforeDays),
 			DailyReminder:   types.BoolValue(condition.DailyReminder),
 		}
@@ -210,9 +268,9 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 	return diags
 }
 
-func parseAuthenticationExpiryCondition(raw json.RawMessage) (authenticationExpiryCondition, diag.Diagnostics) {
+func parseExpiryCondition(raw json.RawMessage) (expiryCondition, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	var condition authenticationExpiryCondition
+	var condition expiryCondition
 
 	if len(raw) == 0 || string(raw) == "null" {
 		diags.AddError(

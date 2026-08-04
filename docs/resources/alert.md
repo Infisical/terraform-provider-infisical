@@ -40,8 +40,9 @@ resource "infisical_alert" "ci_identity" {
   name          = "CI identity credentials expiring"
   description   = "Rotate the CI machine identity client secret before it expires"
 
-  # The condition block is what the alert fires on, and every alert carries exactly one.
-  authentication_expiry = {
+  # The condition block is what the alert fires on, and every alert carries exactly one. It is named
+  # after the shape of the condition, so resource_type is what says what expires.
+  expiry = {
     alert_before_days = 30
   }
 
@@ -74,7 +75,7 @@ resource "infisical_alert" "deploy_identity" {
   project_id    = "<your-project-id>" # Required for resources that belong to a project
   name          = "Deploy identity credentials expiring"
 
-  authentication_expiry = {
+  expiry = {
     alert_before_days = 7
     daily_reminder    = true
   }
@@ -115,9 +116,9 @@ resource "infisical_alert" "deploy_identity" {
 
 ### Optional
 
-- `authentication_expiry` (Attributes) Fires before a machine identity's authentication credentials expire. Only for alerts on the identity.authentication resource type. (see [below for nested schema](#nestedatt--authentication_expiry))
 - `description` (String) An optional description of the alert.
 - `enabled` (Boolean) Whether the alert is evaluated. Defaults to true.
+- `expiry` (Attributes) Fires before the watched resource expires. Only for alerts on these resource types: identity.authentication. (see [below for nested schema](#nestedatt--expiry))
 - `project_id` (String) The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones.
 
 ### Read-Only
@@ -185,16 +186,16 @@ Optional:
 
 
 
-<a id="nestedatt--authentication_expiry"></a>
-### Nested Schema for `authentication_expiry`
+<a id="nestedatt--expiry"></a>
+### Nested Schema for `expiry`
 
 Required:
 
-- `alert_before_days` (Number) How many days before an authentication credential expires the alert fires. Must be between 1 and 90.
+- `alert_before_days` (Number) How many days before the watched resource expires the alert fires. Must be between 1 and 90.
 
 Optional:
 
-- `daily_reminder` (Boolean) Whether to keep notifying once a day until the credential expires, instead of notifying once. Defaults to false.
+- `daily_reminder` (Boolean) Whether to keep notifying once a day until the watched resource expires, instead of notifying once. Defaults to false.
 
 ## Import
 

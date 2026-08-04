@@ -46,7 +46,7 @@ type alertResourceModel struct {
 	Description  types.String `tfsdk:"description"`
 	Enabled      types.Bool   `tfsdk:"enabled"`
 
-	AuthenticationExpiry *authenticationExpiryConditionModel `tfsdk:"authentication_expiry"`
+	Expiry *expiryConditionModel `tfsdk:"expiry"`
 
 	Channels map[string]alertChannelModel `tfsdk:"channels"`
 }
@@ -116,8 +116,8 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
-			alertBlockAuthenticationExpiry: authenticationExpiryConditionSchema(),
-			"channels":                     alertChannelsSchema(),
+			alertBlockExpiry: expiryConditionSchema(),
+			"channels":       alertChannelsSchema(),
 		},
 	}
 }
@@ -143,22 +143,25 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 		return
 	}
 
-	for _, event := range alertEvents {
-		var block types.Object
-		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(event.block), &block)...)
+	for _, block := range alertConditionBlockNames() {
+		var condition types.Object
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(block), &condition)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		if block.IsNull() || event.resourceType == resourceType.ValueString() {
+		if condition.IsNull() || condition.IsUnknown() {
+			continue
+		}
+		if _, ok := alertEventFor(resourceType.ValueString(), block); ok {
 			continue
 		}
 
 		resp.Diagnostics.AddAttributeError(
-			path.Root(event.block),
+			path.Root(block),
 			"Unexpected alert condition",
 			fmt.Sprintf(
-				"A %s block describes an alert on the %s resource type, but this alert watches %s. Use one of: %s.",
-				event.block, event.resourceType, resourceType.ValueString(), strings.Join(accepted, ", "),
+				"A %s block does not describe an event on the %s resource type, which is what this alert watches. Use one of: %s.",
+				block, resourceType.ValueString(), strings.Join(accepted, ", "),
 			),
 		)
 	}

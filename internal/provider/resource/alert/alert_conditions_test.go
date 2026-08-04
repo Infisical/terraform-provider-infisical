@@ -60,7 +60,7 @@ func TestAlertResourceModelMatchesSchema(t *testing.T) {
 		Name:         types.StringValue("Credentials expiring"),
 		Description:  types.StringNull(),
 		Enabled:      types.BoolValue(true),
-		AuthenticationExpiry: &authenticationExpiryConditionModel{
+		Expiry: &expiryConditionModel{
 			AlertBeforeDays: types.Int64Value(30),
 			DailyReminder:   types.BoolValue(false),
 		},
@@ -91,8 +91,8 @@ func TestAlertResourceModelMatchesSchema(t *testing.T) {
 		t.Fatalf("converting the schema type back to the model: %v", diags)
 	}
 
-	if roundTripped.AuthenticationExpiry == nil || roundTripped.AuthenticationExpiry.AlertBeforeDays.ValueInt64() != 30 {
-		t.Errorf("condition did not survive the round trip: %+v", roundTripped.AuthenticationExpiry)
+	if roundTripped.Expiry == nil || roundTripped.Expiry.AlertBeforeDays.ValueInt64() != 30 {
+		t.Errorf("condition did not survive the round trip: %+v", roundTripped.Expiry)
 	}
 	if len(roundTripped.Channels) != 2 {
 		t.Errorf("channels did not survive the round trip: %+v", roundTripped.Channels)
@@ -106,10 +106,73 @@ func TestSupportedAlertResourceTypes(t *testing.T) {
 	}
 }
 
+// An event is keyed on its resource type and its condition block together, so every resource type
+// that expires can share one expiry block instead of each declaring its own copy of the same fields.
+func TestAlertEventFor(t *testing.T) {
+	event, ok := alertEventFor(alertResourceTypeIdentityAuthentication, alertBlockExpiry)
+	if !ok {
+		t.Fatalf("alertEventFor(%q, %q) found no event", alertResourceTypeIdentityAuthentication, alertBlockExpiry)
+	}
+	if event.eventType != alertEventTypeIdentityAuthenticationExpiry {
+		t.Errorf("event type = %q, want %q", event.eventType, alertEventTypeIdentityAuthenticationExpiry)
+	}
+
+	if _, ok := alertEventFor("certificate", alertBlockExpiry); ok {
+		t.Error("alertEventFor() resolved an expiry event for a resource type that has none")
+	}
+	if _, ok := alertEventFor(alertResourceTypeIdentityAuthentication, "rotation_failed"); ok {
+		t.Error("alertEventFor() resolved an event for a condition block that does not exist")
+	}
+}
+
+// The schema has one attribute per condition block, so a block that several events share has to be
+// listed once. Listing it twice would have ExactlyOneOf compare the block against itself.
+func TestAlertConditionBlockNamesAreUnique(t *testing.T) {
+	blocks := alertConditionBlockNames()
+
+	seen := make(map[string]bool, len(blocks))
+	for _, block := range blocks {
+		if seen[block] {
+			t.Errorf("alertConditionBlockNames() lists %q more than once: %v", block, blocks)
+		}
+		seen[block] = true
+	}
+
+	for _, event := range alertEvents {
+		if !seen[event.block] {
+			t.Errorf("alertConditionBlockNames() = %v, missing %q", blocks, event.block)
+		}
+	}
+}
+
+func TestAlertBlocksForResourceType(t *testing.T) {
+	blocks := alertBlocksForResourceType(alertResourceTypeIdentityAuthentication)
+	if len(blocks) != 1 || blocks[0] != alertBlockExpiry {
+		t.Errorf("alertBlocksForResourceType(%q) = %v, want only %q", alertResourceTypeIdentityAuthentication, blocks, alertBlockExpiry)
+	}
+
+	if got := alertBlocksForResourceType("certificate"); len(got) != 0 {
+		t.Errorf("alertBlocksForResourceType() for a resource type with no events = %v, want none", got)
+	}
+}
+
+// The expiry block's description names the resource types it applies to, so the list has to come from
+// the event table rather than being written out by hand.
+func TestAlertResourceTypesForBlock(t *testing.T) {
+	resourceTypes := alertResourceTypesForBlock(alertBlockExpiry)
+	if len(resourceTypes) != 1 || resourceTypes[0] != alertResourceTypeIdentityAuthentication {
+		t.Errorf("alertResourceTypesForBlock(%q) = %v, want only %q", alertBlockExpiry, resourceTypes, alertResourceTypeIdentityAuthentication)
+	}
+
+	if got := alertResourceTypesForBlock("rotation_failed"); len(got) != 0 {
+		t.Errorf("alertResourceTypesForBlock() for an unknown block = %v, want none", got)
+	}
+}
+
 func TestAlertConditionForAPI(t *testing.T) {
 	plan := alertResourceModel{
 		ResourceType: types.StringValue(alertResourceTypeIdentityAuthentication),
-		AuthenticationExpiry: &authenticationExpiryConditionModel{
+		Expiry: &expiryConditionModel{
 			AlertBeforeDays: types.Int64Value(30),
 			DailyReminder:   types.BoolValue(true),
 		},
@@ -127,9 +190,9 @@ func TestAlertConditionForAPI(t *testing.T) {
 		t.Errorf("resource type = %q, want %q", event.resourceType, alertResourceTypeIdentityAuthentication)
 	}
 
-	got, ok := condition.(authenticationExpiryCondition)
+	got, ok := condition.(expiryCondition)
 	if !ok {
-		t.Fatalf("condition = %T, want an authenticationExpiryCondition", condition)
+		t.Fatalf("condition = %T, want an expiryCondition", condition)
 	}
 	if got.AlertBefore != "30d" {
 		t.Errorf("alertBefore = %q, want 30d", got.AlertBefore)
@@ -146,6 +209,22 @@ func TestAlertConditionForAPIWithoutABlock(t *testing.T) {
 	}
 }
 
+// The block alone does not name an event type, so a condition on a resource type that has no matching
+// event has nothing to be sent under and cannot fall back to another resource type's event.
+func TestAlertConditionForAPIRejectsBlockOnWrongResourceType(t *testing.T) {
+	plan := alertResourceModel{
+		ResourceType: types.StringValue("certificate"),
+		Expiry: &expiryConditionModel{
+			AlertBeforeDays: types.Int64Value(30),
+			DailyReminder:   types.BoolValue(false),
+		},
+	}
+
+	if _, _, diags := alertConditionForAPI(plan); !diags.HasError() {
+		t.Error("alertConditionForAPI() with a condition the resource type has no event for: no error, want one")
+	}
+}
+
 func TestSetAlertConditionFromAPI(t *testing.T) {
 	event, ok := alertEventForEventType(alertEventTypeIdentityAuthenticationExpiry)
 	if !ok {
@@ -158,13 +237,13 @@ func TestSetAlertConditionFromAPI(t *testing.T) {
 		t.Fatalf("setAlertConditionFromAPI() diagnostics = %v", diags)
 	}
 
-	if state.AuthenticationExpiry == nil {
-		t.Fatal("authentication_expiry block is nil, want it populated")
+	if state.Expiry == nil {
+		t.Fatal("expiry block is nil, want it populated")
 	}
-	if got := state.AuthenticationExpiry.AlertBeforeDays.ValueInt64(); got != 7 {
+	if got := state.Expiry.AlertBeforeDays.ValueInt64(); got != 7 {
 		t.Errorf("alert_before_days = %d, want 7", got)
 	}
-	if !state.AuthenticationExpiry.DailyReminder.ValueBool() {
+	if !state.Expiry.DailyReminder.ValueBool() {
 		t.Error("daily_reminder = false, want true")
 	}
 }
@@ -179,7 +258,7 @@ func TestSetAlertConditionFromAPIDefaultsDailyReminder(t *testing.T) {
 		t.Fatalf("setAlertConditionFromAPI() diagnostics = %v", diags)
 	}
 
-	if state.AuthenticationExpiry.DailyReminder.ValueBool() {
+	if state.Expiry.DailyReminder.ValueBool() {
 		t.Error("daily_reminder = true, want false")
 	}
 }
@@ -201,8 +280,8 @@ func TestSetAlertConditionFromAPIRejectsUnreadableConditions(t *testing.T) {
 			if !diags.HasError() {
 				t.Errorf("setAlertConditionFromAPI(%q): no error, want one", raw)
 			}
-			if state.AuthenticationExpiry != nil {
-				t.Error("authentication_expiry block was populated despite the error")
+			if state.Expiry != nil {
+				t.Error("expiry block was populated despite the error")
 			}
 		})
 	}

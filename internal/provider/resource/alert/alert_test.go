@@ -62,7 +62,7 @@ func alertModel(t *testing.T, channels map[string]alertChannelModel) alertResour
 		Name:         types.StringValue("Credentials expiring"),
 		Description:  types.StringNull(),
 		Enabled:      types.BoolValue(true),
-		AuthenticationExpiry: &authenticationExpiryConditionModel{
+		Expiry: &expiryConditionModel{
 			AlertBeforeDays: types.Int64Value(30),
 			DailyReminder:   types.BoolValue(false),
 		},
@@ -228,7 +228,7 @@ func TestModifyPlanKeepsAnEditedConditionInPlace(t *testing.T) {
 			Enabled: types.BoolValue(true),
 			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 		}})
-		model.AuthenticationExpiry.AlertBeforeDays = types.Int64Value(alertBeforeDays)
+		model.Expiry.AlertBeforeDays = types.Int64Value(alertBeforeDays)
 		return model
 	}
 
@@ -267,7 +267,7 @@ func TestAlertEventFromBlocks(t *testing.T) {
 	}
 
 	// A destroy plan, or a state the resource does not have yet, carries no condition at all.
-	model.AuthenticationExpiry = nil
+	model.Expiry = nil
 	if _, known, diags := alertEventFromBlocks(ctx, alertPlan(t, s, model)); known || diags.HasError() {
 		t.Errorf("alertEventFromBlocks() without a condition block: known = %v, diagnostics = %v, want false and none", known, diags)
 	}
