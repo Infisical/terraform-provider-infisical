@@ -34,6 +34,40 @@ func orgLookupServer(t *testing.T, details, subOrgs http.HandlerFunc) Client {
 	}}
 }
 
+// collectAPIErrors gathers every APIError in an error tree, walking it the way
+// errors.Is and errors.As do: the error itself, then each child, pre-order and
+// depth-first, through both wrapping forms the errors package recognises
+// (Unwrap() error and Unwrap() []error). errors.As alone cannot do this -- it stops at
+// the first match, and both causes here are the same concrete type -- while asserting
+// on the top-level error's own shape would pin an implementation detail rather than the
+// property that matters: both causes stay reachable. Note errors.Unwrap() is not usable
+// for the walk either, since it only calls "Unwrap() error" and so does not descend
+// into joined errors.
+func collectAPIErrors(err error) []*infisicalerrors.APIError {
+	var found []*infisicalerrors.APIError
+
+	var walk func(error)
+	walk = func(e error) {
+		if e == nil {
+			return
+		}
+		if apiErr, ok := e.(*infisicalerrors.APIError); ok {
+			found = append(found, apiErr)
+		}
+		switch x := e.(type) {
+		case interface{ Unwrap() error }:
+			walk(x.Unwrap())
+		case interface{ Unwrap() []error }:
+			for _, inner := range x.Unwrap() {
+				walk(inner)
+			}
+		}
+	}
+	walk(err)
+
+	return found
+}
+
 func jsonResponse(status int, body string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -62,29 +96,17 @@ func TestGetOrganizationBySlugBothLookupsFail(t *testing.T) {
 		t.Error("a failed lookup must not be reported as ErrNotFound: an unavailable source cannot prove absence")
 	}
 
-	// fmt.Errorf with two %w verbs yields an error exposing Unwrap() []error.
-	multi, ok := err.(interface{ Unwrap() []error })
-	if !ok {
-		t.Fatalf("both causes should remain wrapped, got %T which does not expose Unwrap() []error", err)
-	}
-	causes := multi.Unwrap()
-	if len(causes) != 2 {
-		t.Fatalf("expected both source errors to be preserved, got %d", len(causes))
-	}
-
 	// Both causes must stay classifiable, so a caller can tell a 403 from a 500.
+	// What matters is that both are reachable in the error tree, not how the tree is
+	// shaped: two %w verbs, a wrapper around errors.Join, or any other arrangement
+	// errors.Is/errors.As can traverse are all acceptable.
 	statuses := map[int]bool{}
-	for i, cause := range causes {
-		var apiErr *infisicalerrors.APIError
-		if !errors.As(cause, &apiErr) {
-			t.Errorf("cause %d is not classifiable as *errors.APIError: %T", i, cause)
-			continue
-		}
+	for _, apiErr := range collectAPIErrors(err) {
 		statuses[apiErr.StatusCode] = true
 	}
 	for _, want := range []int{http.StatusInternalServerError, http.StatusForbidden} {
 		if !statuses[want] {
-			t.Errorf("status %d is not discoverable through the returned error", want)
+			t.Errorf("status %d is not discoverable in the error tree of %T: %v", want, err, err)
 		}
 	}
 
@@ -97,6 +119,51 @@ func TestGetOrganizationBySlugBothLookupsFail(t *testing.T) {
 	// The actionable guidance stays in the message the user actually reads.
 	if got := err.Error(); !strings.Contains(got, "created inside a sub-organization") {
 		t.Errorf("error message should explain the sub-organization identity cause, got: %s", got)
+	}
+}
+
+// Guards the guard: the dual-failure assertion must hold for any tree errors.Is/As can
+// traverse, so that preserving both causes differently -- e.g. a contextual wrapper
+// around errors.Join instead of two %w verbs -- is not a test failure.
+func TestCollectAPIErrorsWalksBothWrappingForms(t *testing.T) {
+	first := &infisicalerrors.APIError{Operation: "CallGetIdentityDetails", StatusCode: http.StatusInternalServerError}
+	second := &infisicalerrors.APIError{Operation: "CallListSubOrganizations", StatusCode: http.StatusForbidden}
+
+	shapes := map[string]error{
+		"two %w verbs":              fmt.Errorf("context: %w and %w", first, second),
+		"wrapper around Join":       fmt.Errorf("context: %w", errors.Join(first, second)),
+		"nested single wraps":       fmt.Errorf("outer: %w", fmt.Errorf("inner: %w and %w", first, second)),
+		"join of wrapped errors":    errors.Join(fmt.Errorf("a: %w", first), fmt.Errorf("b: %w", second)),
+		"single cause, single wrap": fmt.Errorf("context: %w", first),
+	}
+
+	wantCount := map[string]int{
+		"two %w verbs":              2,
+		"wrapper around Join":       2,
+		"nested single wraps":       2,
+		"join of wrapped errors":    2,
+		"single cause, single wrap": 1,
+	}
+
+	for name, err := range shapes {
+		t.Run(name, func(t *testing.T) {
+			got := collectAPIErrors(err)
+			if len(got) != wantCount[name] {
+				t.Fatalf("expected %d APIError(s) in the tree, got %d", wantCount[name], len(got))
+			}
+			for _, apiErr := range got {
+				if apiErr.StatusCode == 0 {
+					t.Error("collected an APIError with no status code")
+				}
+			}
+		})
+	}
+
+	if collectAPIErrors(nil) != nil {
+		t.Error("a nil error has no causes to collect")
+	}
+	if got := collectAPIErrors(errors.New("plain")); got != nil {
+		t.Errorf("an unwrapped non-API error yields no causes, got %v", got)
 	}
 }
 
