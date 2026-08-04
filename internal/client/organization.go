@@ -14,11 +14,8 @@ func (client Client) GetOrganizationBySlug(slug string) (Organization, error) {
 	if detailsErr == nil {
 		ownOrg := identityDetails.IdentityDetails.Organization
 		if ownOrg.Slug == slug {
-			return Organization{
-				ID:   ownOrg.ID,
-				Name: ownOrg.Name,
-				Slug: ownOrg.Slug,
-			}, nil
+			// IdentityOrganization and Organization carry the same fields, so a conversion is enough
+			return Organization(ownOrg), nil
 		}
 	}
 

@@ -118,7 +118,11 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
         # Identities
         identity|identity_details)
             update_subcategory "$file" "Identities";;
-        
+
+        # Organization
+        organization)
+            update_subcategory "$file" "Organization";;
+
         # KMS
         kms_key_public_key)
             update_subcategory "$file" "KMS";;
