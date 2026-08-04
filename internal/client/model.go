@@ -4117,8 +4117,8 @@ type RemoveCertManagerIdentityResponse struct {
 
 // Organization
 
-// Organization holds the organization fields the provider can resolve for both the
-// organization the caller is authenticated to and its sub-organizations.
+// Organization holds the organization fields the provider can resolve for the
+// identity's root organization and its sub-organizations.
 type Organization struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
