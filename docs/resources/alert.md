@@ -46,11 +46,14 @@ resource "infisical_alert" "ci_identity" {
     alert_before_days = 30
   }
 
-  # Each channel is keyed by its name, and the block it carries is what gives it its type.
-  # Renaming a channel deletes it and creates a new one, so the new channel notifies about
-  # everything that is still expiring, even if the old one already did.
+  # Each channel is keyed by a name of your choosing, and the block it carries is what gives it
+  # its type. The key is never sent to Infisical: it is only how Terraform recognizes the
+  # channel, so its name can be changed freely. Changing the key, on the other hand, deletes the
+  # channel and creates a new one, which notifies about everything that is still expiring, even
+  # if the old one already did.
   channels = {
-    "Security team" = {
+    security_team = {
+      name = "Security team"
       email = {
         recipients = [
           {
@@ -81,20 +84,23 @@ resource "infisical_alert" "deploy_identity" {
   }
 
   channels = {
-    "Platform Slack" = {
+    platform_slack = {
+      name = "Platform Slack"
       slack = {
         webhook_url = "https://hooks.slack.com/services/<your-slack-webhook-path>"
       }
     }
 
-    "Internal automation" = {
+    internal_automation = {
+      name = "Internal automation"
       webhook = {
         url            = "https://example.com/infisical-alerts"
         signing_secret = "<signing-secret>" # Optional: used to sign the payload so the receiver can verify it
       }
     }
 
-    "On-call" = {
+    on_call = {
+      name    = "On-call"
       enabled = false # Configured up front, but not paging anyone yet
       pagerduty = {
         integration_key = "<your-pagerduty-events-api-v2-integration-key>"
@@ -109,7 +115,7 @@ resource "infisical_alert" "deploy_identity" {
 
 ### Required
 
-- `channels` (Attributes Map) The channels the alert is delivered to, keyed by channel name. Renaming a channel deletes it and creates a new one, so the new channel notifies about everything that is still expiring, even if the old one already did. Each channel carries exactly one configuration block, and that block is what gives the channel its type. At least one and at most 10 channels are allowed. (see [below for nested schema](#nestedatt--channels))
+- `channels` (Attributes Map) The channels the alert is delivered to, keyed by a name of your choosing. The key is what identifies a channel to Terraform and is never sent to Infisical, so renaming a channel updates it in place and it keeps the deliveries it has already made. Changing a key, on the other hand, deletes the channel and creates a new one, so the new channel notifies about everything that is still expiring, even if the old one already did. Each channel carries exactly one configuration block, and that block is what gives the channel its type. At least one and at most 10 channels are allowed. (see [below for nested schema](#nestedatt--channels))
 - `name` (String) The name of the alert.
 - `resource_id` (String) The ID of the resource to watch. For the identity.authentication resource type this is a machine identity's ID.
 - `resource_type` (String) The type of the resource to watch. Options: identity.authentication.
@@ -127,6 +133,10 @@ resource "infisical_alert" "deploy_identity" {
 
 <a id="nestedatt--channels"></a>
 ### Nested Schema for `channels`
+
+Required:
+
+- `name` (String) The name the channel is shown under in Infisical. Can be changed freely, and has to be unique within the alert.
 
 Optional:
 
@@ -205,9 +215,10 @@ Import is supported using the following syntax:
 terraform import infisical_alert.example <alert_id>
 
 # An imported alert keys each of its channels by the name it has in Infisical, so write the
-# channels in your configuration under those same names. Keying them differently renames the
-# channels, which deletes them and creates new ones that notify about everything still
-# expiring, even though the imported channels already did.
+# channels in your configuration under those same keys, or the import deletes them and creates
+# new ones that notify about everything still expiring, even though the imported channels
+# already did. The keys are yours to choose from then on, since only the name attribute reaches
+# Infisical.
 #
 # Write-only channel secrets (a Slack webhook URL, a PagerDuty integration key, a webhook
 # signing secret) are never returned by the API, so the first plan after an import shows them

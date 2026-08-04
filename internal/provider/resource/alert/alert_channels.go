@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
@@ -21,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -45,6 +47,7 @@ const (
 
 const (
 	maxChannelsPerAlert     = 10
+	maxChannelKeyLength     = 255
 	maxChannelNameLength    = 255
 	maxRecipientsPerChannel = 20
 )
@@ -102,6 +105,7 @@ type alertPagerDutyChannelModel struct {
 
 type alertChannelModel struct {
 	ID        types.String                `tfsdk:"id"`
+	Name      types.String                `tfsdk:"name"`
 	Enabled   types.Bool                  `tfsdk:"enabled"`
 	Email     *alertEmailChannelModel     `tfsdk:"email"`
 	Slack     *alertSlackChannelModel     `tfsdk:"slack"`
@@ -168,13 +172,13 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 	return schema.MapNestedAttribute{
 		Required: true,
 		Description: fmt.Sprintf(
-			"The channels the alert is delivered to, keyed by channel name. Renaming a channel deletes it and creates a new one, so the new channel notifies about everything that is still expiring, even if the old one already did. Each channel carries exactly one configuration block, and that block is what gives the channel its type. At least one and at most %d channels are allowed.",
+			"The channels the alert is delivered to, keyed by a name of your choosing. The key is what identifies a channel to Terraform and is never sent to Infisical, so renaming a channel updates it in place and it keeps the deliveries it has already made. Changing a key, on the other hand, deletes the channel and creates a new one, so the new channel notifies about everything that is still expiring, even if the old one already did. Each channel carries exactly one configuration block, and that block is what gives the channel its type. At least one and at most %d channels are allowed.",
 			maxChannelsPerAlert,
 		),
 		Validators: []validator.Map{
 			mapvalidator.SizeAtLeast(1),
 			mapvalidator.SizeAtMost(maxChannelsPerAlert),
-			mapvalidator.KeysAre(stringvalidator.LengthBetween(1, maxChannelNameLength)),
+			mapvalidator.KeysAre(stringvalidator.LengthBetween(1, maxChannelKeyLength)),
 		},
 		NestedObject: schema.NestedAttributeObject{
 			Validators: []validator.Object{
@@ -186,6 +190,13 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 					Description: "The ID of the channel in Infisical.",
 					PlanModifiers: []planmodifier.String{
 						stringplanmodifier.UseStateForUnknown(),
+					},
+				},
+				"name": schema.StringAttribute{
+					Required:    true,
+					Description: "The name the channel is shown under in Infisical. Can be changed freely, and has to be unique within the alert.",
+					Validators: []validator.String{
+						stringvalidator.LengthBetween(1, maxChannelNameLength),
 					},
 				},
 				"enabled": schema.BoolAttribute{
@@ -277,21 +288,86 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 	}
 }
 
-func sortedChannelNames(channels map[string]alertChannelModel) []string {
-	names := make([]string, 0, len(channels))
-	for name := range channels {
+func sortedChannelKeys(channels map[string]alertChannelModel) []string {
+	keys := make([]string, 0, len(channels))
+	for key := range channels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func reusedChannelID(channel alertChannelModel, priorChannel alertChannelModel, hadPrior bool) string {
+	if !hadPrior || priorChannel.ID.IsNull() || priorChannel.ID.IsUnknown() {
+		return ""
+	}
+	if priorChannel.channelType() != channel.channelType() {
+		return ""
+	}
+	return priorChannel.ID.ValueString()
+}
+
+func validateChannelNamesAreUnique(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var channels types.Map
+	diags.Append(config.GetAttribute(ctx, path.Root("channels"), &channels)...)
+	if diags.HasError() || channels.IsNull() || channels.IsUnknown() {
+		return diags
+	}
+
+	keysByName := make(map[string][]string, len(channels.Elements()))
+	for key, element := range channels.Elements() {
+		channel, ok := element.(types.Object)
+		if !ok || channel.IsNull() || channel.IsUnknown() {
+			continue
+		}
+		name, ok := channel.Attributes()["name"].(types.String)
+		if !ok || name.IsNull() || name.IsUnknown() {
+			continue
+		}
+		keysByName[name.ValueString()] = append(keysByName[name.ValueString()], key)
+	}
+
+	names := make([]string, 0, len(keysByName))
+	for name := range keysByName {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	return names
+
+	for _, name := range names {
+		keys := keysByName[name]
+		if len(keys) < 2 {
+			continue
+		}
+		sort.Strings(keys)
+
+		quoted := make([]string, 0, len(keys))
+		for _, key := range keys {
+			quoted = append(quoted, fmt.Sprintf("%q", key))
+		}
+
+		for _, key := range keys[1:] {
+			diags.AddAttributeError(
+				path.Root("channels").AtMapKey(key).AtName("name"),
+				"Duplicate channel name",
+				fmt.Sprintf(
+					"Channels %s are all named %q. A name identifies a channel in Infisical, so it has to be unique within the alert.",
+					strings.Join(quoted, ", "), name,
+				),
+			)
+		}
+	}
+
+	return diags
 }
 
 func alertChannelsToAPIInput(ctx context.Context, channels map[string]alertChannelModel, prior map[string]alertChannelModel) ([]infisical.AlertChannelInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	inputs := make([]infisical.AlertChannelInput, 0, len(channels))
-	for _, name := range sortedChannelNames(channels) {
-		channel := channels[name]
+	for _, key := range sortedChannelKeys(channels) {
+		channel := channels[key]
 
 		recipients := make([]infisical.AlertChannelRecipient, 0)
 		if channel.Email != nil && !channel.Email.Recipients.IsNull() && !channel.Email.Recipients.IsUnknown() {
@@ -309,11 +385,8 @@ func alertChannelsToAPIInput(ctx context.Context, channels map[string]alertChann
 			}
 		}
 
-		priorChannel, hadPrior := prior[name]
-		reusedID := ""
-		if hadPrior && !priorChannel.ID.IsNull() && priorChannel.channelType() == channel.channelType() {
-			reusedID = priorChannel.ID.ValueString()
-		}
+		priorChannel, hadPrior := prior[key]
+		reusedID := reusedChannelID(channel, priorChannel, hadPrior)
 
 		config := map[string]any{}
 		switch {
@@ -340,7 +413,7 @@ func alertChannelsToAPIInput(ctx context.Context, channels map[string]alertChann
 		}
 
 		input := infisical.AlertChannelInput{
-			Name:        name,
+			Name:        channel.Name.ValueString(),
 			ChannelType: channel.channelType(),
 			Enabled:     channel.Enabled.ValueBool(),
 			Config:      config,
@@ -357,50 +430,73 @@ func alertChannelsToAPIInput(ctx context.Context, channels map[string]alertChann
 	return inputs, diags
 }
 
-func alertChannelIDsFromAPI(channels map[string]alertChannelModel, apiChannels []infisical.AlertChannel) (map[string]alertChannelModel, diag.Diagnostics) {
+func alertChannelIDsFromAPI(channels map[string]alertChannelModel, prior map[string]alertChannelModel, apiChannels []infisical.AlertChannel) (map[string]alertChannelModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	idsByName := make(map[string]string, len(apiChannels))
-	for _, apiChannel := range apiChannels {
-		if _, ok := idsByName[apiChannel.Name]; !ok {
-			idsByName[apiChannel.Name] = apiChannel.ID
-		}
+	sorted := sortAPIChannels(apiChannels)
+
+	byID := make(map[string]infisical.AlertChannel, len(sorted))
+	for _, apiChannel := range sorted {
+		byID[apiChannel.ID] = apiChannel
 	}
 
+	keys := sortedChannelKeys(channels)
 	withIDs := make(map[string]alertChannelModel, len(channels))
-	for _, name := range sortedChannelNames(channels) {
-		channel := channels[name]
+	claimed := make(map[string]bool, len(sorted))
 
-		id, ok := idsByName[name]
-		if !ok {
+	for _, key := range keys {
+		priorChannel, hadPrior := prior[key]
+		reusedID := reusedChannelID(channels[key], priorChannel, hadPrior)
+		if reusedID == "" {
+			continue
+		}
+		if _, ok := byID[reusedID]; !ok {
+			continue
+		}
+
+		channel := channels[key]
+		channel.ID = types.StringValue(reusedID)
+		withIDs[key] = channel
+		claimed[reusedID] = true
+	}
+
+	for _, key := range keys {
+		if _, done := withIDs[key]; done {
+			continue
+		}
+		channel := channels[key]
+
+		id := ""
+		for _, apiChannel := range sorted {
+			if claimed[apiChannel.ID] {
+				continue
+			}
+			if apiChannel.Name == channel.Name.ValueString() && apiChannel.ChannelType == channel.channelType() {
+				id = apiChannel.ID
+				break
+			}
+		}
+
+		if id == "" {
 			channel.ID = types.StringNull()
-			withIDs[name] = channel
+			withIDs[key] = channel
 			diags.AddAttributeError(
-				path.Root("channels").AtMapKey(name),
+				path.Root("channels").AtMapKey(key),
 				"Missing channel in Infisical's response",
-				fmt.Sprintf("Infisical did not return a channel named %q after writing the alert, so Terraform cannot record that channel's ID and will replace the channel on the next apply. Please report this issue to the provider developers.", name),
+				fmt.Sprintf("Infisical did not return a channel named %q after writing the alert, so Terraform cannot record that channel's ID and will replace the channel on the next apply. Please report this issue to the provider developers.", channel.Name.ValueString()),
 			)
 			continue
 		}
 
 		channel.ID = types.StringValue(id)
-		withIDs[name] = channel
+		withIDs[key] = channel
+		claimed[id] = true
 	}
 
 	return withIDs, diags
 }
 
-func alertChannelsFromAPI(ctx context.Context, apiChannels []infisical.AlertChannel, stateChannels map[string]alertChannelModel) (map[string]alertChannelModel, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	priorByID := make(map[string]alertChannelModel, len(stateChannels))
-	for _, name := range sortedChannelNames(stateChannels) {
-		stateChannel := stateChannels[name]
-		if id := stateChannel.ID.ValueString(); id != "" {
-			priorByID[id] = stateChannel
-		}
-	}
-
+func sortAPIChannels(apiChannels []infisical.AlertChannel) []infisical.AlertChannel {
 	sorted := make([]infisical.AlertChannel, len(apiChannels))
 	copy(sorted, apiChannels)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -409,12 +505,40 @@ func alertChannelsFromAPI(ctx context.Context, apiChannels []infisical.AlertChan
 		}
 		return sorted[i].ID < sorted[j].ID
 	})
+	return sorted
+}
+
+func alertChannelsFromAPI(ctx context.Context, apiChannels []infisical.AlertChannel, stateChannels map[string]alertChannelModel) (map[string]alertChannelModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	priorByID := make(map[string]alertChannelModel, len(stateChannels))
+	keysByID := make(map[string]string, len(stateChannels))
+	for _, key := range sortedChannelKeys(stateChannels) {
+		stateChannel := stateChannels[key]
+		if id := stateChannel.ID.ValueString(); id != "" {
+			priorByID[id] = stateChannel
+			keysByID[id] = key
+		}
+	}
+
+	sorted := sortAPIChannels(apiChannels)
+
+	taken := make(map[string]bool, len(sorted))
+	for _, apiChannel := range sorted {
+		if key, ok := keysByID[apiChannel.ID]; ok {
+			taken[key] = true
+		}
+	}
 
 	refreshed := make(map[string]alertChannelModel, len(sorted))
 	for _, apiChannel := range sorted {
-		key := apiChannel.Name
-		if _, taken := refreshed[key]; taken || key == "" {
-			key = apiChannel.ID
+		key, tracked := keysByID[apiChannel.ID]
+		if !tracked {
+			key = apiChannel.Name
+			if key == "" || taken[key] {
+				key = apiChannel.ID
+			}
+			taken[key] = true
 		}
 
 		var priorState *alertChannelModel
@@ -438,6 +562,7 @@ func alertChannelFromAPI(ctx context.Context, apiChannel infisical.AlertChannel,
 
 	channel := alertChannelModel{
 		ID:      types.StringValue(apiChannel.ID),
+		Name:    types.StringValue(apiChannel.Name),
 		Enabled: types.BoolValue(apiChannel.Enabled),
 	}
 

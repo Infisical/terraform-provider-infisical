@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -129,25 +130,32 @@ func (r *alertResource) ConfigValidators(_ context.Context) []resource.ConfigVal
 }
 
 func (r *alertResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	resp.Diagnostics.Append(validateChannelNamesAreUnique(ctx, req.Config)...)
+	resp.Diagnostics.Append(validateAlertConditionMatchesResourceType(ctx, req.Config)...)
+}
+
+func validateAlertConditionMatchesResourceType(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	var resourceType types.String
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
-	if resp.Diagnostics.HasError() {
-		return
+	diags.Append(config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	if diags.HasError() {
+		return diags
 	}
 	if resourceType.IsNull() || resourceType.IsUnknown() {
-		return
+		return diags
 	}
 
 	accepted := alertBlocksForResourceType(resourceType.ValueString())
 	if len(accepted) == 0 {
-		return
+		return diags
 	}
 
 	for _, block := range alertConditionBlockNames() {
 		var condition types.Object
-		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(block), &condition)...)
-		if resp.Diagnostics.HasError() {
-			return
+		diags.Append(config.GetAttribute(ctx, path.Root(block), &condition)...)
+		if diags.HasError() {
+			return diags
 		}
 		if condition.IsNull() || condition.IsUnknown() {
 			continue
@@ -156,7 +164,7 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 			continue
 		}
 
-		resp.Diagnostics.AddAttributeError(
+		diags.AddAttributeError(
 			path.Root(block),
 			"Unexpected alert condition",
 			fmt.Sprintf(
@@ -165,6 +173,8 @@ func (r *alertResource) ValidateConfig(ctx context.Context, req resource.Validat
 			),
 		)
 	}
+
+	return diags
 }
 
 func (r *alertResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -288,7 +298,7 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	plan.ID = types.StringValue(alert.Alert.ID)
 
-	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, alert.Alert.Channels)
+	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, nil, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -368,7 +378,7 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, alert.Alert.Channels)
+	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, state.Channels, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

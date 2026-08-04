@@ -51,6 +51,13 @@ func alertState(t *testing.T, s schema.Schema, model alertResourceModel) tfsdk.S
 	return tfsdk.State{Raw: plan.Raw, Schema: s}
 }
 
+func alertConfig(t *testing.T, s schema.Schema, model alertResourceModel) tfsdk.Config {
+	t.Helper()
+
+	plan := alertPlan(t, s, model)
+	return tfsdk.Config{Raw: plan.Raw, Schema: s}
+}
+
 func alertModel(t *testing.T, channels map[string]alertChannelModel) alertResourceModel {
 	t.Helper()
 
@@ -94,13 +101,15 @@ func TestModifyPlanUnknownsIDOfRetypedChannel(t *testing.T) {
 	s := alertSchema(t)
 
 	stored := alertModel(t, map[string]alertChannelModel{
-		"On-call": {
+		"on_call": {
 			ID:      types.StringValue("channel-1"),
+			Name:    types.StringValue("On-call"),
 			Enabled: types.BoolValue(true),
 			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 		},
-		"Security team": {
+		"security_team": {
 			ID:      types.StringValue("channel-2"),
+			Name:    types.StringValue("Security team"),
 			Enabled: types.BoolValue(true),
 			Email:   emailChannel(t, alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-1")}),
 		},
@@ -108,13 +117,15 @@ func TestModifyPlanUnknownsIDOfRetypedChannel(t *testing.T) {
 
 	// The plan Terraform proposes keeps the stored ID for both keys, even the one that swapped block.
 	planned := alertModel(t, map[string]alertChannelModel{
-		"On-call": {
+		"on_call": {
 			ID:        types.StringValue("channel-1"),
+			Name:      types.StringValue("On-call"),
 			Enabled:   types.BoolValue(true),
 			PagerDuty: &alertPagerDutyChannelModel{IntegrationKey: types.StringValue("00000000000000000000000000000000")},
 		},
-		"Security team": {
+		"security_team": {
 			ID:      types.StringValue("channel-2"),
+			Name:    types.StringValue("Security team"),
 			Enabled: types.BoolValue(true),
 			Email:   emailChannel(t, alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-2")}),
 		},
@@ -122,11 +133,11 @@ func TestModifyPlanUnknownsIDOfRetypedChannel(t *testing.T) {
 
 	channels := modifiedChannels(t, alertPlan(t, s, planned), alertState(t, s, stored))
 
-	if !channels["On-call"].ID.IsUnknown() {
-		t.Errorf("retyped channel ID = %v, want it unknown so the apply can write the replacement's ID", channels["On-call"].ID)
+	if !channels["on_call"].ID.IsUnknown() {
+		t.Errorf("retyped channel ID = %v, want it unknown so the apply can write the replacement's ID", channels["on_call"].ID)
 	}
 	// An edited channel of the same type is updated in place, so it keeps the ID it already has.
-	if got := channels["Security team"].ID.ValueString(); got != "channel-2" {
+	if got := channels["security_team"].ID.ValueString(); got != "channel-2" {
 		t.Errorf("edited channel ID = %q, want channel-2 kept", got)
 	}
 }
@@ -136,8 +147,9 @@ func TestModifyPlanKeepsIDOfEditedChannel(t *testing.T) {
 	s := alertSchema(t)
 
 	slack := func(url string) map[string]alertChannelModel {
-		return map[string]alertChannelModel{"Platform Slack": {
+		return map[string]alertChannelModel{"platform_slack": {
 			ID:      types.StringValue("channel-1"),
+			Name:    types.StringValue("Platform Slack"),
 			Enabled: types.BoolValue(true),
 			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue(url)},
 		}}
@@ -148,7 +160,7 @@ func TestModifyPlanKeepsIDOfEditedChannel(t *testing.T) {
 		alertState(t, s, alertModel(t, slack("https://hooks.slack.com/services/abc"))),
 	)
 
-	if got := channels["Platform Slack"].ID.ValueString(); got != "channel-1" {
+	if got := channels["platform_slack"].ID.ValueString(); got != "channel-1" {
 		t.Errorf("edited channel ID = %q, want channel-1 kept", got)
 	}
 }
@@ -159,8 +171,9 @@ func TestModifyPlanUnknownsIDOfChannelWithoutOne(t *testing.T) {
 	s := alertSchema(t)
 
 	channel := func(id types.String) map[string]alertChannelModel {
-		return map[string]alertChannelModel{"Platform Slack": {
+		return map[string]alertChannelModel{"platform_slack": {
 			ID:      id,
+			Name:    types.StringValue("Platform Slack"),
 			Enabled: types.BoolValue(true),
 			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 		}}
@@ -171,32 +184,57 @@ func TestModifyPlanUnknownsIDOfChannelWithoutOne(t *testing.T) {
 		alertState(t, s, alertModel(t, channel(types.StringNull()))),
 	)
 
-	if !channels["Platform Slack"].ID.IsUnknown() {
-		t.Errorf("channel ID = %v, want it unknown so the apply can write the replacement's ID", channels["Platform Slack"].ID)
+	if !channels["platform_slack"].ID.IsUnknown() {
+		t.Errorf("channel ID = %v, want it unknown so the apply can write the replacement's ID", channels["platform_slack"].ID)
 	}
 }
 
-// A renamed channel is a new map key that never had an ID, so the plan already reads unknown and
-// there is nothing to correct.
-func TestModifyPlanLeavesRenamedChannelAlone(t *testing.T) {
+// A renamed channel is the same channel under the same key, so it is updated in place and keeps its ID.
+func TestModifyPlanKeepsIDOfRenamedChannel(t *testing.T) {
 	s := alertSchema(t)
 
-	stored := alertModel(t, map[string]alertChannelModel{"Platform Slack": {
+	slack := func(name string) map[string]alertChannelModel {
+		return map[string]alertChannelModel{"platform_slack": {
+			ID:      types.StringValue("channel-1"),
+			Name:    types.StringValue(name),
+			Enabled: types.BoolValue(true),
+			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
+		}}
+	}
+
+	channels := modifiedChannels(t,
+		alertPlan(t, s, alertModel(t, slack("Platform alerts"))),
+		alertState(t, s, alertModel(t, slack("Platform Slack"))),
+	)
+
+	if got := channels["platform_slack"].ID.ValueString(); got != "channel-1" {
+		t.Errorf("renamed channel ID = %q, want channel-1 kept", got)
+	}
+}
+
+// A rekeyed channel is a new map key that never had an ID, so the plan already reads unknown and
+// there is nothing to correct.
+func TestModifyPlanLeavesRekeyedChannelAlone(t *testing.T) {
+	s := alertSchema(t)
+
+	stored := alertModel(t, map[string]alertChannelModel{"platform_slack": {
 		ID:      types.StringValue("channel-1"),
+		Name:    types.StringValue("Platform Slack"),
 		Enabled: types.BoolValue(true),
 		Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 	}})
 
-	planned := alertModel(t, map[string]alertChannelModel{"Platform alerts": {
+	planned := alertModel(t, map[string]alertChannelModel{"platform_alerts": {
 		ID:      types.StringUnknown(),
+		Name:    types.StringValue("Platform Slack"),
 		Enabled: types.BoolValue(true),
 		Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 	}})
 
 	channels := modifiedChannels(t, alertPlan(t, s, planned), alertState(t, s, stored))
 
-	if !channels["Platform alerts"].ID.IsUnknown() {
-		t.Errorf("renamed channel ID = %v, want it unknown", channels["Platform alerts"].ID)
+	if !channels["platform_alerts"].ID.IsUnknown() {
+		t.Errorf("rekeyed channel ID = %v, want it unknown", channels["platform_alerts"].ID)
 	}
 }
 
@@ -204,16 +242,17 @@ func TestModifyPlanLeavesRenamedChannelAlone(t *testing.T) {
 func TestModifyPlanOnCreate(t *testing.T) {
 	s := alertSchema(t)
 
-	planned := alertModel(t, map[string]alertChannelModel{"On-call": {
+	planned := alertModel(t, map[string]alertChannelModel{"on_call": {
 		ID:        types.StringUnknown(),
+		Name:      types.StringValue("On-call"),
 		Enabled:   types.BoolValue(true),
 		PagerDuty: &alertPagerDutyChannelModel{IntegrationKey: types.StringValue("00000000000000000000000000000000")},
 	}})
 
 	channels := modifiedChannels(t, alertPlan(t, s, planned), tfsdk.State{Schema: s})
 
-	if !channels["On-call"].ID.IsUnknown() {
-		t.Errorf("channel ID = %v, want it left unknown", channels["On-call"].ID)
+	if !channels["on_call"].ID.IsUnknown() {
+		t.Errorf("channel ID = %v, want it left unknown", channels["on_call"].ID)
 	}
 }
 
@@ -223,8 +262,9 @@ func TestModifyPlanKeepsAnEditedConditionInPlace(t *testing.T) {
 	s := alertSchema(t)
 
 	alert := func(alertBeforeDays int64) alertResourceModel {
-		model := alertModel(t, map[string]alertChannelModel{"Platform Slack": {
+		model := alertModel(t, map[string]alertChannelModel{"platform_slack": {
 			ID:      types.StringValue("channel-1"),
+			Name:    types.StringValue("Platform Slack"),
 			Enabled: types.BoolValue(true),
 			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 		}})
@@ -249,8 +289,9 @@ func TestAlertEventFromBlocks(t *testing.T) {
 	ctx := context.Background()
 	s := alertSchema(t)
 
-	model := alertModel(t, map[string]alertChannelModel{"Security team": {
+	model := alertModel(t, map[string]alertChannelModel{"security_team": {
 		ID:      types.StringValue("channel-1"),
+		Name:    types.StringValue("Security team"),
 		Enabled: types.BoolValue(true),
 		Email:   emailChannel(t, alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-1")}),
 	}})
