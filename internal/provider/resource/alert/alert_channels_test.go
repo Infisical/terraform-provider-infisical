@@ -678,6 +678,19 @@ func TestWebhookSigningSecretRejectsEmptyValues(t *testing.T) {
 	t.Error("an empty signing secret passed validation, want it rejected")
 }
 
+// errorPath reads the path off the first error diagnostic, which is the attribute a validator
+// rejected.
+func errorPath(t *testing.T, diags diag.Diagnostics) path.Path {
+	t.Helper()
+
+	first := diags.Errors()[0]
+	withPath, ok := first.(diag.DiagnosticWithPath)
+	if !ok {
+		t.Fatalf("diagnostic %T carries no path", first)
+	}
+	return withPath.Path()
+}
+
 // A channel's configuration block is what gives it its type, so a channel that carries none or
 // several is rejected. The one that carries exactly one has to pass: the whole resource is unusable
 // otherwise, since every channel goes through this.
@@ -705,7 +718,7 @@ func TestValidateChannelsHaveOneType(t *testing.T) {
 		t.Fatal("validateChannelsHaveOneType() with no block: no error, want one")
 	}
 	want := path.Root("channels").AtMapKey("platform_slack")
-	if got := diags.Errors()[0].(diag.DiagnosticWithPath).Path(); !got.Equal(want) {
+	if got := errorPath(t, diags); !got.Equal(want) {
 		t.Errorf("error path = %v, want %v", got, want)
 	}
 
@@ -756,7 +769,7 @@ func TestValidateChannelNamesAreUnique(t *testing.T) {
 
 	// The first key alphabetically keeps the name, so the error points at the other one.
 	want := path.Root("channels").AtMapKey("platform_slack").AtName("name")
-	if got := diags.Errors()[0].(diag.DiagnosticWithPath).Path(); !got.Equal(want) {
+	if got := errorPath(t, diags); !got.Equal(want) {
 		t.Errorf("error path = %v, want %v", got, want)
 	}
 }
