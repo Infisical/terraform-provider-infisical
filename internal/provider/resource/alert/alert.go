@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -30,6 +31,11 @@ var (
 	_ resource.ResourceWithModifyPlan       = &alertResource{}
 )
 
+const alertRefreshEscapeHatch = "Until you do, Terraform cannot refresh this alert, which also blocks destroying it. " +
+	"To stop managing it with this version instead, either drop it from state with `terraform state rm` and leave it " +
+	"running in Infisical, or delete it with `terraform destroy -refresh=false`, which destroys straight from state " +
+	"without reading it back."
+
 func NewAlertResource() resource.Resource {
 	return &alertResource{}
 }
@@ -43,6 +49,7 @@ type alertResourceModel struct {
 	ResourceType types.String `tfsdk:"resource_type"`
 	ResourceID   types.String `tfsdk:"resource_id"`
 	ProjectID    types.String `tfsdk:"project_id"`
+	OrgID        types.String `tfsdk:"org_id"`
 	Name         types.String `tfsdk:"name"`
 	Description  types.String `tfsdk:"description"`
 	Enabled      types.Bool   `tfsdk:"enabled"`
@@ -95,6 +102,13 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"org_id": schema.StringAttribute{
+				Description: "The ID of the organization the alert belongs to. Always set, whether the alert is scoped to the organization or to a project, so it is what tells you which organization a project level alert was created under.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -289,6 +303,20 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	alert, err := r.client.CreateAlert(createRequest)
 	if err != nil {
+		if errors.Is(err, infisical.ErrAlertAlreadyExists) {
+			resp.Diagnostics.AddError(
+				"Alert already exists",
+				fmt.Sprintf(
+					"Infisical already has an alert watching %s %q for the event this alert fires on, and it allows only one. "+
+						"Either import that alert into this resource with `terraform import <this resource's address> <alert id>`, "+
+						"taking its ID from the Infisical UI, or delete it in Infisical and apply again. "+
+						"An earlier apply that created the alert but failed before recording it leaves exactly this behind. "+
+						"The full error was: %s",
+					plan.ResourceType.ValueString(), plan.ResourceID.ValueString(), err.Error(),
+				),
+			)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error creating alert",
 			"Couldn't create alert in Infisical, unexpected error: "+err.Error(),
@@ -297,6 +325,7 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	plan.ID = types.StringValue(alert.Alert.ID)
+	plan.OrgID = types.StringValue(alert.Alert.OrgID)
 
 	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, nil, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
@@ -316,7 +345,7 @@ func (r *alertResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		ID: state.ID.ValueString(),
 	})
 	if err != nil {
-		if err == infisical.ErrNotFound {
+		if errors.Is(err, infisical.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -371,12 +400,23 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	alert, err := r.client.UpdateAlert(updateRequest)
 	if err != nil {
+		if errors.Is(err, infisical.ErrNotFound) {
+			resp.Diagnostics.AddError(
+				"Error updating alert",
+				"Alert with ID "+state.ID.ValueString()+" no longer exists in Infisical, so there is nothing to update. "+
+					"It was most likely deleted outside of Terraform. Apply again with refresh enabled and Terraform "+
+					"will notice it is gone and create it anew.",
+			)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error updating alert",
 			"Couldn't update alert in Infisical, unexpected error: "+err.Error(),
 		)
 		return
 	}
+
+	plan.OrgID = types.StringValue(alert.Alert.OrgID)
 
 	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, state.Channels, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
@@ -395,7 +435,7 @@ func (r *alertResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	_, err := r.client.DeleteAlert(infisical.DeleteAlertRequest{
 		ID: state.ID.ValueString(),
 	})
-	if err != nil && err != infisical.ErrNotFound {
+	if err != nil && !errors.Is(err, infisical.ErrNotFound) {
 		resp.Diagnostics.AddError(
 			"Error deleting alert",
 			"Couldn't delete alert from Infisical, unexpected error: "+err.Error(),
@@ -415,8 +455,8 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 		diags.AddError(
 			"Unsupported alert",
 			fmt.Sprintf(
-				"Alert with ID %s watches %s for %s events, which this provider does not know how to manage. Please upgrade the provider.",
-				alert.ID, alert.ResourceType, alert.EventType,
+				"Alert with ID %s watches %s for %s events, which this provider does not know how to manage. Please upgrade the provider. %s",
+				alert.ID, alert.ResourceType, alert.EventType, alertRefreshEscapeHatch,
 			),
 		)
 		return diags
@@ -426,6 +466,7 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 	state.Name = types.StringValue(alert.Name)
 	state.Enabled = types.BoolValue(alert.Enabled)
 	state.ResourceType = types.StringValue(alert.ResourceType)
+	state.OrgID = types.StringValue(alert.OrgID)
 
 	if alert.ResourceID != nil {
 		state.ResourceID = types.StringValue(*alert.ResourceID)

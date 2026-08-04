@@ -3,7 +3,10 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"terraform-provider-infisical/internal/errors"
+
+	"github.com/go-resty/resty/v2"
 )
 
 const (
@@ -12,6 +15,10 @@ const (
 	operationUpdateAlert  = "CallUpdateAlert"
 	operationDeleteAlert  = "CallDeleteAlert"
 )
+
+func isDuplicateAlertResponse(response *resty.Response) bool {
+	return response.StatusCode() == http.StatusBadRequest && strings.Contains(response.String(), "already exists")
+}
 
 func (client Client) CreateAlert(request CreateAlertRequest) (CreateAlertResponse, error) {
 	var body CreateAlertResponse
@@ -27,7 +34,11 @@ func (client Client) CreateAlert(request CreateAlertRequest) (CreateAlertRespons
 	}
 
 	if response.IsError() {
-		return CreateAlertResponse{}, errors.NewAPIErrorWithResponse(operationCreateAlert, response, nil)
+		apiError := errors.NewAPIErrorWithResponse(operationCreateAlert, response, nil)
+		if isDuplicateAlertResponse(response) {
+			return CreateAlertResponse{}, fmt.Errorf("%w: %w", ErrAlertAlreadyExists, apiError)
+		}
+		return CreateAlertResponse{}, apiError
 	}
 
 	return body, nil
@@ -69,6 +80,9 @@ func (client Client) UpdateAlert(request UpdateAlertRequest) (UpdateAlertRespons
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusUnprocessableEntity {
+			return UpdateAlertResponse{}, ErrNotFound
+		}
 		return UpdateAlertResponse{}, errors.NewAPIErrorWithResponse(operationUpdateAlert, response, nil)
 	}
 

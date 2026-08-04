@@ -2,7 +2,10 @@ package resource
 
 import (
 	"context"
+	"strings"
 	"testing"
+
+	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -66,6 +69,7 @@ func alertModel(t *testing.T, channels map[string]alertChannelModel) alertResour
 		ResourceType: types.StringValue(alertResourceTypeIdentityAuthentication),
 		ResourceID:   types.StringValue("identity-1"),
 		ProjectID:    types.StringNull(),
+		OrgID:        types.StringValue("org-1"),
 		Name:         types.StringValue("Credentials expiring"),
 		Description:  types.StringNull(),
 		Enabled:      types.BoolValue(true),
@@ -282,6 +286,26 @@ func TestModifyPlanKeepsAnEditedConditionInPlace(t *testing.T) {
 
 	if len(resp.RequiresReplace) != 0 {
 		t.Errorf("ModifyPlan() requires replacing %v, want the condition updated in place", resp.RequiresReplace)
+	}
+}
+
+// An alert firing on an event this version has never heard of cannot be read, and a read is what
+// stands between the practitioner and destroying it, so the error has to hand them a way out rather
+// than only asking for an upgrade they may not be able to take yet.
+func TestSetStateFromAlertOnAnUnknownEvent(t *testing.T) {
+	state := alertModel(t, nil)
+	diags := (&alertResource{}).setStateFromAlert(context.Background(), &state, infisical.Alert{
+		ID:           "alert-1",
+		Name:         "Credentials expiring",
+		ResourceType: alertResourceTypeIdentityAuthentication,
+		EventType:    "identity.authentication.rotation",
+	})
+
+	if !diags.HasError() {
+		t.Fatal("setStateFromAlert() with an unknown event type: no error, want one")
+	}
+	if detail := diags.Errors()[0].Detail(); !strings.Contains(detail, alertRefreshEscapeHatch) {
+		t.Errorf("error detail = %q, want it to explain how to stop managing the alert", detail)
 	}
 }
 

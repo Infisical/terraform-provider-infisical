@@ -23,4 +23,6 @@ const AWS_MAPPING_BEHAVIOR_ONE_TO_ONE = "one-to-one"
 
 var (
 	ErrNotFound = errors.New("resource not found")
+
+	ErrAlertAlreadyExists = errors.New("alert already exists")
 )

@@ -261,7 +261,10 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 	default:
 		diags.AddError(
 			"Unsupported alert event",
-			fmt.Sprintf("Infisical returned an alert that fires on %q, which this provider does not know how to manage. Please upgrade the provider.", event.eventType),
+			fmt.Sprintf(
+				"Infisical returned an alert that fires on %q, which this provider does not know how to manage. Please upgrade the provider. %s",
+				event.eventType, alertRefreshEscapeHatch,
+			),
 		)
 	}
 

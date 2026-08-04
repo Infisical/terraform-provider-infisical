@@ -547,8 +547,15 @@ func TestAlertChannelsFromAPIRejectsUnknownChannelTypes(t *testing.T) {
 		Config:      map[string]any{},
 	}}
 
-	if _, diags := alertChannelsFromAPI(context.Background(), apiChannels, nil); !diags.HasError() {
-		t.Error("alertChannelsFromAPI() with an unknown channel type: no error, want one")
+	_, diags := alertChannelsFromAPI(context.Background(), apiChannels, nil)
+	if !diags.HasError() {
+		t.Fatal("alertChannelsFromAPI() with an unknown channel type: no error, want one")
+	}
+
+	// The error fails every refresh, and a refresh is what stands between the practitioner and
+	// destroying the alert, so it has to carry the two ways around itself.
+	if detail := diags.Errors()[0].Detail(); !strings.Contains(detail, alertRefreshEscapeHatch) {
+		t.Errorf("error detail = %q, want it to explain how to stop managing the alert", detail)
 	}
 }
 

@@ -130,6 +130,7 @@ resource "infisical_alert" "deploy_identity" {
 ### Read-Only
 
 - `id` (String) The ID of the alert.
+- `org_id` (String) The ID of the organization the alert belongs to. Always set, whether the alert is scoped to the organization or to a project, so it is what tells you which organization a project level alert was created under.
 
 <a id="nestedatt--channels"></a>
 ### Nested Schema for `channels`

@@ -614,8 +614,8 @@ func alertChannelFromAPI(ctx context.Context, apiChannel infisical.AlertChannel,
 		diags.AddError(
 			"Unsupported alert channel",
 			fmt.Sprintf(
-				"Alert channel %q delivers over %q, which this provider does not know how to manage. Please upgrade the provider.",
-				apiChannel.Name, apiChannel.ChannelType,
+				"Alert channel %q delivers over %q, which this provider does not know how to manage. Please upgrade the provider. %s",
+				apiChannel.Name, apiChannel.ChannelType, alertRefreshEscapeHatch,
 			),
 		)
 	}
