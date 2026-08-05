@@ -8,6 +8,7 @@ import (
 	infisicalDatasource "terraform-provider-infisical/internal/provider/datasource"
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
 	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
+	certificateSyncResource "terraform-provider-infisical/internal/provider/resource/certificate_sync"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
 	externalKmsResource "terraform-provider-infisical/internal/provider/resource/external_kms"
 	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
@@ -440,6 +441,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncSupabaseResource,
 		secretSyncResource.NewSecretSyncFlyioResource,
 		secretSyncResource.NewSecretSyncGitlabResource,
+		certificateSyncResource.NewCertificateSyncAwsCertificateManagerResource,
+		certificateSyncResource.NewCertificateSyncCertificateResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,

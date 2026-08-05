@@ -2560,6 +2560,80 @@ type CheckDuplicateDestinationResponse struct {
 	HasDuplicate bool `json:"hasDuplicate"`
 }
 
+type CertificateSync struct {
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	Destination       string                 `json:"destination"`
+	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
+	ConnectionID      string                 `json:"connectionId"`
+	ApplicationID     string                 `json:"applicationId"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type CreateCertificateSyncRequest struct {
+	App               CertificateSyncApp     `json:"-"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	ConnectionID      string                 `json:"connectionId"`
+	ApplicationID     string                 `json:"applicationId"`
+	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type UpdateCertificateSyncRequest struct {
+	App               CertificateSyncApp     `json:"-"`
+	ID                string                 `json:"-"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	ConnectionID      string                 `json:"connectionId"`
+	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type GetCertificateSyncByIdRequest struct {
+	ID string
+}
+
+type DeleteCertificateSyncRequest struct {
+	App CertificateSyncApp
+	ID  string
+}
+
+type CertificateSyncCertificate struct {
+	ID                string `json:"id"`
+	CertificateSyncID string `json:"pkiSyncId"`
+	CertificateID     string `json:"certificateId"`
+}
+
+type AddCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string   `json:"-"`
+	CertificateIDs    []string `json:"certificateIds"`
+}
+
+type AddCertificateSyncCertificatesResponse struct {
+	AddedCertificates []CertificateSyncCertificate `json:"addedCertificates"`
+}
+
+type RemoveCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string   `json:"-"`
+	CertificateIDs    []string `json:"certificateIds"`
+}
+
+type ListCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string
+	Offset            int
+	Limit             int
+}
+
+type ListCertificateSyncCertificatesResponse struct {
+	Certificates []CertificateSyncCertificate `json:"certificates"`
+	TotalCount   int                          `json:"totalCount"`
+}
+
 type DynamicSecret struct {
 	Id               string                 `json:"id"`
 	Name             string                 `json:"name"`
