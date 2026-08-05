@@ -216,9 +216,10 @@ func TestModifyPlanKeepsIDOfRenamedChannel(t *testing.T) {
 	}
 }
 
-// A rekeyed channel is a new map key that never had an ID, so the plan already reads unknown and
-// there is nothing to correct.
-func TestModifyPlanLeavesRekeyedChannelAlone(t *testing.T) {
+// A rekeyed channel is a new map key that never had an ID. UseStateForUnknown reads the state at a
+// key that is not there and plans the ID as null rather than leaving it unknown, so ModifyPlan has to
+// correct it.
+func TestModifyPlanUnknownsIDOfRekeyedChannel(t *testing.T) {
 	s := alertSchema(t)
 
 	stored := alertModel(t, map[string]alertChannelModel{"platform_slack": {
@@ -229,7 +230,7 @@ func TestModifyPlanLeavesRekeyedChannelAlone(t *testing.T) {
 	}})
 
 	planned := alertModel(t, map[string]alertChannelModel{"platform_alerts": {
-		ID:      types.StringUnknown(),
+		ID:      types.StringNull(),
 		Name:    types.StringValue("Platform Slack"),
 		Enabled: types.BoolValue(true),
 		Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
@@ -239,6 +240,42 @@ func TestModifyPlanLeavesRekeyedChannelAlone(t *testing.T) {
 
 	if !channels["platform_alerts"].ID.IsUnknown() {
 		t.Errorf("rekeyed channel ID = %v, want it unknown", channels["platform_alerts"].ID)
+	}
+}
+
+// Adding a channel to an alert that already has one leaves the stored channel alone and plans the new
+// key's ID as unknown, so the apply can write the ID Infisical assigns the channel it creates.
+func TestModifyPlanUnknownsIDOfAddedChannel(t *testing.T) {
+	s := alertSchema(t)
+
+	first := alertChannelModel{
+		ID:      types.StringValue("channel-1"),
+		Name:    types.StringValue("First"),
+		Enabled: types.BoolValue(true),
+		Webhook: &alertWebhookChannelModel{URL: types.StringValue("https://example.com/first"), SigningSecret: types.StringNull()},
+	}
+
+	stored := alertModel(t, map[string]alertChannelModel{"first": first})
+
+	planned := alertModel(t, map[string]alertChannelModel{
+		"first": first,
+		"second": {
+			// The state has no "second" key, so UseStateForUnknown plans its ID as null.
+			ID:      types.StringNull(),
+			Name:    types.StringValue("Second"),
+			Enabled: types.BoolValue(true),
+			Webhook: &alertWebhookChannelModel{URL: types.StringValue("https://example.com/second"), SigningSecret: types.StringNull()},
+		},
+	})
+
+	channels := modifiedChannels(t, alertPlan(t, s, planned), alertState(t, s, stored))
+
+	if !channels["second"].ID.IsUnknown() {
+		t.Errorf("added channel ID = %v, want it unknown so the apply can write the created channel's ID", channels["second"].ID)
+	}
+	// The channel that was already there is untouched, so it keeps the ID it has and stays out of the diff.
+	if got := channels["first"].ID.ValueString(); got != "channel-1" {
+		t.Errorf("existing channel ID = %q, want channel-1 kept", got)
 	}
 }
 

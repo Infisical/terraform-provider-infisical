@@ -230,12 +230,8 @@ func (r *alertResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 			continue
 		}
 
-		storedChannel, ok := storedChannels[name].(types.Object)
-		if !ok {
-			continue
-		}
-
-		if channelKeepsStoredID(channel, storedChannel) {
+		storedChannel, hadStored := storedChannels[name].(types.Object)
+		if hadStored && channelKeepsStoredID(channel, storedChannel) {
 			continue
 		}
 
