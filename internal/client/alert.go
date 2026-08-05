@@ -3,21 +3,47 @@ package infisicalclient
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"terraform-provider-infisical/internal/errors"
-
-	"github.com/go-resty/resty/v2"
 )
 
 const (
 	operationCreateAlert  = "CallCreateAlert"
+	operationListAlerts   = "CallListAlerts"
 	operationGetAlertByID = "CallGetAlertByID"
 	operationUpdateAlert  = "CallUpdateAlert"
 	operationDeleteAlert  = "CallDeleteAlert"
 )
 
-func isDuplicateAlertResponse(response *resty.Response) bool {
-	return response.StatusCode() == http.StatusBadRequest && strings.Contains(response.String(), "already exists")
+type AlertAlreadyExistsError struct {
+	ExistingAlertID string
+	apiError        error
+}
+
+func (e *AlertAlreadyExistsError) Error() string {
+	return fmt.Sprintf("alert %s already watches this resource for this event: %v", e.ExistingAlertID, e.apiError)
+}
+
+func (e *AlertAlreadyExistsError) Unwrap() error {
+	return e.apiError
+}
+
+func (client Client) existingAlertForEvent(request CreateAlertRequest) *Alert {
+	alerts, err := client.ListAlerts(ListAlertsRequest{
+		ResourceType: request.ResourceType,
+		ResourceID:   request.ResourceID,
+		ProjectID:    request.ProjectID,
+	})
+	if err != nil {
+		return nil
+	}
+
+	for _, alert := range alerts.Alerts {
+		if alert.EventType == request.EventType {
+			return &alert
+		}
+	}
+
+	return nil
 }
 
 func (client Client) CreateAlert(request CreateAlertRequest) (CreateAlertResponse, error) {
@@ -35,10 +61,40 @@ func (client Client) CreateAlert(request CreateAlertRequest) (CreateAlertRespons
 
 	if response.IsError() {
 		apiError := errors.NewAPIErrorWithResponse(operationCreateAlert, response, nil)
-		if isDuplicateAlertResponse(response) {
-			return CreateAlertResponse{}, fmt.Errorf("%w: %w", ErrAlertAlreadyExists, apiError)
+		if response.StatusCode() == http.StatusBadRequest {
+			if existing := client.existingAlertForEvent(request); existing != nil {
+				return CreateAlertResponse{}, &AlertAlreadyExistsError{ExistingAlertID: existing.ID, apiError: apiError}
+			}
 		}
 		return CreateAlertResponse{}, apiError
+	}
+
+	return body, nil
+}
+
+func (client Client) ListAlerts(request ListAlertsRequest) (ListAlertsResponse, error) {
+	var body ListAlertsResponse
+	httpRequest := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("resourceType", request.ResourceType)
+
+	if request.ResourceID != "" {
+		httpRequest.SetQueryParam("resourceId", request.ResourceID)
+	}
+	if request.ProjectID != nil {
+		httpRequest.SetQueryParam("projectId", *request.ProjectID)
+	}
+
+	response, err := httpRequest.Get("api/v1/alerts")
+
+	if err != nil {
+		return ListAlertsResponse{}, errors.NewGenericRequestError(operationListAlerts, err)
+	}
+
+	if response.IsError() {
+		return ListAlertsResponse{}, errors.NewAPIErrorWithResponse(operationListAlerts, response, nil)
 	}
 
 	return body, nil

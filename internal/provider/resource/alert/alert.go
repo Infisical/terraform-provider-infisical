@@ -300,16 +300,17 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	alert, err := r.client.CreateAlert(createRequest)
 	if err != nil {
-		if errors.Is(err, infisical.ErrAlertAlreadyExists) {
+		var alreadyExists *infisical.AlertAlreadyExistsError
+		if errors.As(err, &alreadyExists) {
 			resp.Diagnostics.AddError(
 				"Alert already exists",
 				fmt.Sprintf(
 					"Infisical already has an alert watching %s %q for the event this alert fires on, and it allows only one. "+
-						"Either import that alert into this resource with `terraform import <this resource's address> <alert id>`, "+
-						"taking its ID from the Infisical UI, or delete it in Infisical and apply again. "+
+						"Either import that alert into this resource with `terraform import <this resource's address> %s`, "+
+						"or delete it in Infisical and apply again. "+
 						"An earlier apply that created the alert but failed before recording it leaves exactly this behind. "+
 						"The full error was: %s",
-					plan.ResourceType.ValueString(), plan.ResourceID.ValueString(), err.Error(),
+					plan.ResourceType.ValueString(), plan.ResourceID.ValueString(), alreadyExists.ExistingAlertID, err.Error(),
 				),
 			)
 			return

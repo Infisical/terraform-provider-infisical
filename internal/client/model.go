@@ -4300,6 +4300,16 @@ type CreateAlertResponse struct {
 	Alert Alert `json:"alert"`
 }
 
+type ListAlertsRequest struct {
+	ResourceType string
+	ResourceID   string
+	ProjectID    *string
+}
+
+type ListAlertsResponse struct {
+	Alerts []Alert `json:"alerts"`
+}
+
 type GetAlertByIDRequest struct {
 	ID string
 }
