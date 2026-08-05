@@ -6,11 +6,15 @@ import (
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -36,6 +40,8 @@ type DynamicSecretSqlDatabaseConfigurationModel struct {
 	Database             types.String               `tfsdk:"database"`
 	Username             types.String               `tfsdk:"username"`
 	Password             types.String               `tfsdk:"password"`
+	PasswordWO           types.String               `tfsdk:"password_wo"`
+	PasswordWOVersion    types.Int64                `tfsdk:"password_wo_version"`
 	CreationStatement    types.String               `tfsdk:"creation_statement"`
 	RevocationStatement  types.String               `tfsdk:"revocation_statement"`
 	RenewStatement       types.String               `tfsdk:"renew_statement"`
@@ -71,9 +77,35 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				Description: "The username to use to connect to the database.",
 			},
 			"password": schema.StringAttribute{
-				Required:    true,
-				Description: "The password to use to connect to the database.",
+				Optional:    true,
+				Description: "The password to use to connect to the database. This value is stored in the Terraform state; use password_wo to keep it out of state. Exactly one of password or password_wo must be set.",
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(
+						path.MatchRelative().AtParent().AtName("password_wo"),
+					),
+				},
+			},
+			"password_wo": schema.StringAttribute{
+				Optional:    true,
+				WriteOnly:   true,
+				Description: "The password to use to connect to the database (write-only). This value is never stored in the Terraform state and can accept ephemeral values. Because it is not stored, changes to it are not detected; increment password_wo_version to push a new value. Requires Terraform 1.11+.",
+				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(
+						path.MatchRelative().AtParent().AtName("password_wo_version"),
+					),
+				},
+			},
+			"password_wo_version": schema.Int64Attribute{
+				Optional:    true,
+				Description: "The version of the password_wo value. Increment this to trigger an update of the password.",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AlsoRequires(
+						path.MatchRelative().AtParent().AtName("password_wo"),
+					),
+				},
 			},
 			"creation_statement": schema.StringAttribute{
 				Required:    true,
@@ -142,7 +174,7 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 			},
 		},
 
-		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel, config DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			configurationMap := make(map[string]interface{})
 			var configuration DynamicSecretSqlDatabaseConfigurationModel
 
@@ -151,12 +183,24 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				return nil, diags
 			}
 
+			// Write-only values are stripped from the plan, so read them from config
+			var rawConfiguration DynamicSecretSqlDatabaseConfigurationModel
+			diags.Append(config.Configuration.As(ctx, &rawConfiguration, basetypes.ObjectAsOptions{})...)
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			password := configuration.Password.ValueString()
+			if !rawConfiguration.PasswordWO.IsNull() {
+				password = rawConfiguration.PasswordWO.ValueString()
+			}
+
 			configurationMap["client"] = configuration.Client.ValueString()
 			configurationMap["host"] = configuration.Host.ValueString()
 			configurationMap["port"] = configuration.Port.ValueInt64()
 			configurationMap["database"] = configuration.Database.ValueString()
 			configurationMap["username"] = configuration.Username.ValueString()
-			configurationMap["password"] = configuration.Password.ValueString()
+			configurationMap["password"] = password
 			configurationMap["creationStatement"] = configuration.CreationStatement.ValueString()
 			configurationMap["revocationStatement"] = configuration.RevocationStatement.ValueString()
 			configurationMap["renewStatement"] = configuration.RenewStatement.ValueString()
@@ -302,13 +346,22 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				renewStatementValue = types.StringValue(renewStatementFinal)
 			}
 
+			// When password_wo is used, password is null in plan/state and must
+			// stay null so the API's value is never written to the state.
+			passwordValue := types.StringNull()
+			if !existingConfig.Password.IsNull() {
+				passwordValue = types.StringValue(passwordVal)
+			}
+
 			configuration := map[string]attr.Value{
 				"client":               types.StringValue(clientVal),
 				"host":                 types.StringValue(hostVal),
 				"port":                 types.Int64Value(portVal),
 				"database":             types.StringValue(databaseVal),
 				"username":             types.StringValue(usernameVal),
-				"password":             types.StringValue(passwordVal),
+				"password":             passwordValue,
+				"password_wo":          types.StringNull(),
+				"password_wo_version":  existingConfig.PasswordWOVersion,
 				"creation_statement":   types.StringValue(creationStatementFinal),
 				"revocation_statement": types.StringValue(revocationStatementFinal),
 				"renew_statement":      renewStatementValue,
@@ -390,6 +443,8 @@ func NewDynamicSecretSqlDatabaseResource() resource.Resource {
 				"database":             types.StringType,
 				"username":             types.StringType,
 				"password":             types.StringType,
+				"password_wo":          types.StringType,
+				"password_wo_version":  types.Int64Type,
 				"creation_statement":   types.StringType,
 				"revocation_statement": types.StringType,
 				"renew_statement":      types.StringType,
