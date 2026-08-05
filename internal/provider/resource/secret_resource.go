@@ -7,6 +7,7 @@ import (
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	pkg "terraform-provider-infisical/internal/pkg/strings"
+	"time"
 
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -20,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -342,6 +344,63 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	})
 
 	if err != nil {
+		var approvalErr *infisical.SecretApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			approvalDetails := r.pollSecretApprovalRequest(ctx, approvalErr.Approval.ID, defaultApprovalTimeoutSeconds, &resp.Diagnostics)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			secretID := findCommitSecretID(approvalDetails.Commits, plan.Name.ValueString(), "create")
+			if secretID == "" {
+				resp.Diagnostics.AddError(
+					"Error resolving secret after approval",
+					fmt.Sprintf("Could not find the created secret ID in the approval request commits. Approval request ID: %s", approvalErr.Approval.ID),
+				)
+				return
+			}
+
+			// Read the secret state after merge.
+			readResponse, readErr := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+				ID: secretID,
+			})
+			if readErr != nil {
+				resp.Diagnostics.AddError(
+					"Error reading secret after approval merge",
+					"Could not read secret with ID "+secretID+": "+readErr.Error(),
+				)
+				return
+			}
+
+			plan.ID = types.StringValue(readResponse.Secret.ID)
+			plan.Name = types.StringValue(readResponse.Secret.SecretKey)
+			if readResponse.Secret.UpdatedAt != "" {
+				plan.LastUpdated = types.StringValue(readResponse.Secret.UpdatedAt)
+			}
+			if !plan.Value.IsNull() && !plan.Value.IsUnknown() {
+				plan.Value = types.StringValue(readResponse.Secret.SecretValue)
+			}
+
+			if len(readResponse.Secret.SecretMetadata) > 0 {
+				metadataMap := make(map[string]types.String, len(readResponse.Secret.SecretMetadata))
+				for _, item := range readResponse.Secret.SecretMetadata {
+					metadataMap[item.Key] = types.StringValue(item.Value)
+				}
+				plan.Metadata, diags = types.MapValueFrom(ctx, types.StringType, metadataMap)
+				resp.Diagnostics.Append(diags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+			} else if plan.Metadata.IsNull() || plan.Metadata.IsUnknown() {
+				plan.Metadata = types.MapNull(types.StringType)
+			}
+
+			plan.WorkspaceId = types.StringValue(workspaceId)
+			diags = resp.State.Set(ctx, plan)
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error creating secret",
 			"Couldn't save encrypted secrets to Infisical, unexpected error: "+err.Error(),
@@ -570,6 +629,53 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 	updatedSecret, err := r.client.UpdateRawSecretV3(updateRequest)
 
 	if err != nil {
+		var approvalErr *infisical.SecretApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			r.pollSecretApprovalRequest(ctx, approvalErr.Approval.ID, defaultApprovalTimeoutSeconds, &resp.Diagnostics)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			// Read the secret state after merge using the existing ID from state.
+			readResponse, readErr := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+				ID: state.ID.ValueString(),
+			})
+			if readErr != nil {
+				resp.Diagnostics.AddError(
+					"Error reading secret after approval merge",
+					"Could not read secret with ID "+state.ID.ValueString()+": "+readErr.Error(),
+				)
+				return
+			}
+
+			plan.Name = types.StringValue(readResponse.Secret.SecretKey)
+			if readResponse.Secret.UpdatedAt != "" {
+				plan.LastUpdated = types.StringValue(readResponse.Secret.UpdatedAt)
+			}
+			if !plan.Value.IsNull() && !plan.Value.IsUnknown() {
+				plan.Value = types.StringValue(readResponse.Secret.SecretValue)
+			}
+
+			if len(readResponse.Secret.SecretMetadata) > 0 {
+				metadataMap := make(map[string]types.String, len(readResponse.Secret.SecretMetadata))
+				for _, item := range readResponse.Secret.SecretMetadata {
+					metadataMap[item.Key] = types.StringValue(item.Value)
+				}
+				plan.Metadata, diags = types.MapValueFrom(ctx, types.StringType, metadataMap)
+				resp.Diagnostics.Append(diags...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+			} else if plan.Metadata.IsNull() || plan.Metadata.IsUnknown() {
+				plan.Metadata = types.MapNull(types.StringType)
+			}
+
+			plan.WorkspaceId = types.StringValue(workspaceId)
+			diags = resp.State.Set(ctx, plan)
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error updating secret",
 			"Couldn't save encrypted secrets to Infisical, unexpected error: "+err.Error(),
@@ -623,6 +729,17 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		})
 
 		if err != nil {
+			var approvalErr *infisical.SecretApprovalRequiredError
+			if errors.As(err, &approvalErr) {
+				r.pollSecretApprovalRequest(ctx, approvalErr.Approval.ID, defaultApprovalTimeoutSeconds, &resp.Diagnostics)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				// Approval merged, secret is now deleted. Terraform will remove the state automatically.
+				return
+			}
+
 			resp.Diagnostics.AddError(
 				"Error Deleting Infisical secret",
 				"Could not delete secret, unexpected error: "+err.Error(),
@@ -637,6 +754,106 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
+}
+
+const defaultApprovalTimeoutSeconds = 3600 // 1h
+
+func nextBackoffInterval(current, maxInterval time.Duration) time.Duration {
+	next := time.Duration(float64(current) * 1.5)
+	if next > maxInterval {
+		return maxInterval
+	}
+	return next
+}
+
+// pollSecretApprovalRequest polls the secret approval request endpoint until the
+// request is merged, closed, or the context is cancelled. Returns the approval
+// details once merged, or adds a diagnostic error otherwise.
+func (r *secretResource) pollSecretApprovalRequest(ctx context.Context, approvalID string, timeoutSeconds int64, diagnostics *diag.Diagnostics) *infisical.SecretApprovalRequestDetails {
+	timeout := time.Duration(timeoutSeconds) * time.Second
+	startTime := time.Now()
+
+	minInterval := 2 * time.Second
+	maxInterval := 30 * time.Second
+	currentInterval := minInterval
+
+	for {
+		if ctx.Err() != nil {
+			diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+			return nil
+		}
+
+		if time.Since(startTime) > timeout {
+			diagnostics.AddError(
+				"Secret approval request timeout",
+				fmt.Sprintf("Secret approval request was not merged within %d seconds. Approval request ID: %s. Please approve the request and re-run terraform apply.", timeoutSeconds, approvalID),
+			)
+			return nil
+		}
+
+		statusResponse, err := r.client.GetSecretApprovalRequestByID(infisical.GetSecretApprovalRequestByIDRequest{
+			ID: approvalID,
+		})
+		if err != nil {
+			if err == infisical.ErrNotFound {
+				select {
+				case <-ctx.Done():
+					diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+					return nil
+				case <-time.After(currentInterval):
+					currentInterval = nextBackoffInterval(currentInterval, maxInterval)
+					continue
+				}
+			}
+			diagnostics.AddError(
+				"Error checking secret approval request status",
+				fmt.Sprintf("Failed to check secret approval request status: %v. Approval request ID: %s", err, approvalID),
+			)
+			return nil
+		}
+
+		approval := statusResponse.Approval
+
+		if approval.HasMerged {
+			tflog.Info(ctx, "Secret approval request has been merged", map[string]interface{}{
+				"approval_id": approvalID,
+			})
+			return &approval
+		}
+
+		if approval.Status == "closed" {
+			diagnostics.AddError(
+				"Secret approval request was closed",
+				fmt.Sprintf("The secret approval request was closed without being merged. Approval request ID: %s", approvalID),
+			)
+			return nil
+		}
+
+		tflog.Debug(ctx, "Secret approval request is still pending, polling again", map[string]interface{}{
+			"approval_id":      approvalID,
+			"current_interval": currentInterval.String(),
+		})
+
+		select {
+		case <-ctx.Done():
+			diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+			return nil
+		case <-time.After(currentInterval):
+			currentInterval = nextBackoffInterval(currentInterval, maxInterval)
+			continue
+		}
+	}
+}
+
+// findCommitSecretID finds the secret ID from the approval commits for a given
+// secret key and operation type.
+func findCommitSecretID(commits []infisical.SecretApprovalCommit, secretKey string, op string) string {
+	for _, commit := range commits {
+		if commit.SecretKey == secretKey && commit.Op == op && commit.Secret != nil {
+			return commit.Secret.ID
+		}
+	}
+	return ""
 }
 
 func (r *secretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
