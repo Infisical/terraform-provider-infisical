@@ -137,7 +137,7 @@ resource "infisical_alert" "deploy_identity" {
 
 Required:
 
-- `name` (String) The name the channel is shown under in Infisical. Can be changed freely, and has to be unique within the alert.
+- `name` (String) The name the channel is shown under in Infisical.
 
 Optional:
 

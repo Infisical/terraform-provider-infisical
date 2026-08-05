@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -324,6 +325,101 @@ func TestAlertChannelIDsFromAPI(t *testing.T) {
 	}
 	if got := withIDs["security_team"].ID.ValueString(); got != "channel-2" {
 		t.Errorf("security_team ID = %q, want channel-2", got)
+	}
+}
+
+// Two channels of one alert are allowed to share a name and a type, and the response carries no order the
+// created channels can be told apart by: Infisical returns an alert's channels sorted by a creation
+// timestamp they all share to the microsecond. What the response does carry is the configuration each
+// channel was created with, so a webhook pair is matched by its URL. The IDs below sort against the right
+// answer, so a match that fell back to the name alone would pair them the other way round.
+func TestAlertChannelIDsFromAPIWithWebhooksSharingAName(t *testing.T) {
+	channels := map[string]alertChannelModel{
+		"on_call":        {Name: types.StringValue("Platform"), Webhook: &alertWebhookChannelModel{URL: types.StringValue("https://example.com/on-call")}},
+		"platform_slack": {Name: types.StringValue("Platform"), Webhook: &alertWebhookChannelModel{URL: types.StringValue("https://example.com/platform")}},
+	}
+
+	apiChannels := []infisical.AlertChannel{
+		{ID: "channel-1", Name: "Platform", ChannelType: AlertChannelTypeWebhook, Config: map[string]any{channelConfigKeyWebhookURL: "https://example.com/platform"}},
+		{ID: "channel-2", Name: "Platform", ChannelType: AlertChannelTypeWebhook, Config: map[string]any{channelConfigKeyWebhookURL: "https://example.com/on-call"}},
+	}
+
+	withIDs, diags := alertChannelIDsFromAPI(channels, nil, apiChannels)
+	if diags.HasError() {
+		t.Fatalf("alertChannelIDsFromAPI() diagnostics = %v", diags)
+	}
+
+	if got := withIDs["on_call"].ID.ValueString(); got != "channel-2" {
+		t.Errorf("on_call ID = %q, want channel-2, the channel carrying its URL", got)
+	}
+	if got := withIDs["platform_slack"].ID.ValueString(); got != "channel-1" {
+		t.Errorf("platform_slack ID = %q, want channel-1, the channel carrying its URL", got)
+	}
+}
+
+// An email channel's recipients come back too, so a pair of those is told apart the same way, whatever
+// order either side lists the recipients in.
+func TestAlertChannelIDsFromAPIWithEmailChannelsSharingAName(t *testing.T) {
+	channels := map[string]alertChannelModel{
+		"on_call": {Name: types.StringValue("Team"), Email: emailChannel(t,
+			alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-1")},
+		)},
+		"security_team": {Name: types.StringValue("Team"), Email: emailChannel(t,
+			alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-2")},
+			alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeGroup), ID: types.StringValue("group-1")},
+		)},
+	}
+
+	apiChannels := []infisical.AlertChannel{
+		{ID: "channel-1", Name: "Team", ChannelType: AlertChannelTypeEmail, Recipients: []infisical.AlertChannelRecipient{
+			{PrincipalType: AlertRecipientTypeGroup, PrincipalID: "group-1"},
+			{PrincipalType: AlertRecipientTypeUser, PrincipalID: "user-2"},
+		}},
+		{ID: "channel-2", Name: "Team", ChannelType: AlertChannelTypeEmail, Recipients: []infisical.AlertChannelRecipient{
+			{PrincipalType: AlertRecipientTypeUser, PrincipalID: "user-1"},
+		}},
+	}
+
+	withIDs, diags := alertChannelIDsFromAPI(channels, nil, apiChannels)
+	if diags.HasError() {
+		t.Fatalf("alertChannelIDsFromAPI() diagnostics = %v", diags)
+	}
+
+	if got := withIDs["on_call"].ID.ValueString(); got != "channel-2" {
+		t.Errorf("on_call ID = %q, want channel-2, the channel carrying its recipient", got)
+	}
+	if got := withIDs["security_team"].ID.ValueString(); got != "channel-1" {
+		t.Errorf("security_team ID = %q, want channel-1, the channel carrying its recipients", got)
+	}
+}
+
+// A Slack or PagerDuty channel is configured with nothing but a secret, and the response never returns
+// one, so a pair of those that share a name cannot be told apart at all. Each key still has to come away
+// with an ID of its own, and with the same one every time, since the alternative is a channel Terraform
+// has no ID for and would replace on the next apply.
+func TestAlertChannelIDsFromAPIWithIndistinguishableChannels(t *testing.T) {
+	channels := map[string]alertChannelModel{
+		"on_call":        {Name: types.StringValue("Platform Slack"), Slack: &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")}},
+		"platform_slack": {Name: types.StringValue("Platform Slack"), Slack: &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/xyz")}},
+	}
+
+	apiChannels := []infisical.AlertChannel{
+		{ID: "channel-2", Name: "Platform Slack", ChannelType: AlertChannelTypeSlack, Config: map[string]any{channelConfigKeyHasWebhookURL: true}},
+		{ID: "channel-1", Name: "Platform Slack", ChannelType: AlertChannelTypeSlack, Config: map[string]any{channelConfigKeyHasWebhookURL: true}},
+	}
+
+	withIDs, diags := alertChannelIDsFromAPI(channels, nil, apiChannels)
+	if diags.HasError() {
+		t.Fatalf("alertChannelIDsFromAPI() diagnostics = %v", diags)
+	}
+
+	// Both the keys and the response are walked in a fixed order, so the first key alphabetically takes
+	// the first ID.
+	if got := withIDs["on_call"].ID.ValueString(); got != "channel-1" {
+		t.Errorf("on_call ID = %q, want channel-1", got)
+	}
+	if got := withIDs["platform_slack"].ID.ValueString(); got != "channel-2" {
+		t.Errorf("platform_slack ID = %q, want channel-2", got)
 	}
 }
 
@@ -730,46 +826,30 @@ func TestValidateChannelsHaveOneType(t *testing.T) {
 	}
 }
 
-// A channel that was just created is recognized in Infisical's response by its name, so two channels
-// of one alert cannot share a name.
-func TestValidateChannelNamesAreUnique(t *testing.T) {
+// Infisical does not require an alert's channel names to be unique, and an alert imported from one that
+// has duplicates would be unusable if the provider did, so nothing about a config that repeats a name is
+// rejected.
+func TestValidateConfigAllowsDuplicateChannelNames(t *testing.T) {
 	ctx := context.Background()
 	s := alertSchema(t)
 
-	slack := func(name string) alertChannelModel {
+	slack := func(key string) alertChannelModel {
 		return alertChannelModel{
-			ID:      types.StringValue("channel-" + name),
-			Name:    types.StringValue(name),
+			ID:      types.StringValue("channel-" + key),
+			Name:    types.StringValue("Platform Slack"),
 			Enabled: types.BoolValue(true),
-			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
+			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/" + key)},
 		}
 	}
 
-	unique := alertModel(t, map[string]alertChannelModel{
-		"platform_slack": slack("Platform Slack"),
-		"on_call":        slack("On-call"),
-	})
-	if diags := validateChannelNamesAreUnique(ctx, alertConfig(t, s, unique)); diags.HasError() {
-		t.Errorf("validateChannelNamesAreUnique() with distinct names: diagnostics = %v, want none", diags)
-	}
-
 	duplicate := alertModel(t, map[string]alertChannelModel{
-		"platform_slack": slack("Platform Slack"),
-		"on_call":        slack("Platform Slack"),
-		"security_team":  slack("Security team"),
+		"platform_slack": slack("platform_slack"),
+		"on_call":        slack("on_call"),
 	})
 
-	diags := validateChannelNamesAreUnique(ctx, alertConfig(t, s, duplicate))
-	if !diags.HasError() {
-		t.Fatal("validateChannelNamesAreUnique() with two channels sharing a name: no error, want one")
-	}
-	if len(diags.Errors()) != 1 {
-		t.Fatalf("validateChannelNamesAreUnique() reported %d errors, want one for the channel that has to change", len(diags.Errors()))
-	}
-
-	// The first key alphabetically keeps the name, so the error points at the other one.
-	want := path.Root("channels").AtMapKey("platform_slack").AtName("name")
-	if got := errorPath(t, diags); !got.Equal(want) {
-		t.Errorf("error path = %v, want %v", got, want)
+	resp := &resource.ValidateConfigResponse{}
+	(&alertResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{Config: alertConfig(t, s, duplicate)}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Errorf("ValidateConfig() with two channels sharing a name: diagnostics = %v, want none", resp.Diagnostics)
 	}
 }

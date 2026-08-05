@@ -204,7 +204,7 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 				},
 				"name": schema.StringAttribute{
 					Required:    true,
-					Description: "The name the channel is shown under in Infisical. Can be changed freely, and has to be unique within the alert.",
+					Description: "The name the channel is shown under in Infisical.",
 					Validators: []validator.String{
 						stringvalidator.LengthBetween(1, maxChannelNameLength),
 					},
@@ -344,55 +344,6 @@ func validateChannelsHaveOneType(ctx context.Context, config tfsdk.Config) diag.
 	return diags
 }
 
-func validateChannelNamesAreUnique(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	var channels types.Map
-	diags.Append(config.GetAttribute(ctx, path.Root("channels"), &channels)...)
-	if diags.HasError() || channels.IsNull() || channels.IsUnknown() {
-		return diags
-	}
-
-	keysByName := make(map[string][]string, len(channels.Elements()))
-	for key, element := range channels.Elements() {
-		channel, ok := element.(types.Object)
-		if !ok || channel.IsNull() || channel.IsUnknown() {
-			continue
-		}
-		name, ok := channel.Attributes()["name"].(types.String)
-		if !ok || name.IsNull() || name.IsUnknown() {
-			continue
-		}
-		keysByName[name.ValueString()] = append(keysByName[name.ValueString()], key)
-	}
-
-	for _, name := range slices.Sorted(maps.Keys(keysByName)) {
-		keys := keysByName[name]
-		if len(keys) < 2 {
-			continue
-		}
-		slices.Sort(keys)
-
-		quoted := make([]string, 0, len(keys))
-		for _, key := range keys {
-			quoted = append(quoted, fmt.Sprintf("%q", key))
-		}
-
-		for _, key := range keys[1:] {
-			diags.AddAttributeError(
-				path.Root("channels").AtMapKey(key).AtName("name"),
-				"Duplicate channel name",
-				fmt.Sprintf(
-					"Channels %s are all named %q. A name identifies a channel in Infisical, so it has to be unique within the alert.",
-					strings.Join(quoted, ", "), name,
-				),
-			)
-		}
-	}
-
-	return diags
-}
-
 func alertChannelsToAPIInput(ctx context.Context, channels map[string]alertChannelModel, prior map[string]alertChannelModel) ([]infisical.AlertChannelInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -491,40 +442,97 @@ func alertChannelIDsFromAPI(channels map[string]alertChannelModel, prior map[str
 		claimed[reusedID] = true
 	}
 
+	for _, requireConfig := range []bool{true, false} {
+		for _, key := range keys {
+			if _, done := withIDs[key]; done {
+				continue
+			}
+			channel := channels[key]
+
+			for _, apiChannel := range sorted {
+				if claimed[apiChannel.ID] {
+					continue
+				}
+				if apiChannel.Name != channel.Name.ValueString() || apiChannel.ChannelType != channel.channelType() {
+					continue
+				}
+				if requireConfig && !channel.configMatchesAPIChannel(apiChannel) {
+					continue
+				}
+
+				channel.ID = types.StringValue(apiChannel.ID)
+				withIDs[key] = channel
+				claimed[apiChannel.ID] = true
+				break
+			}
+		}
+	}
+
 	for _, key := range keys {
 		if _, done := withIDs[key]; done {
 			continue
 		}
+
 		channel := channels[key]
-
-		id := ""
-		for _, apiChannel := range sorted {
-			if claimed[apiChannel.ID] {
-				continue
-			}
-			if apiChannel.Name == channel.Name.ValueString() && apiChannel.ChannelType == channel.channelType() {
-				id = apiChannel.ID
-				break
-			}
-		}
-
-		if id == "" {
-			channel.ID = types.StringNull()
-			withIDs[key] = channel
-			diags.AddAttributeError(
-				path.Root("channels").AtMapKey(key),
-				"Missing channel in Infisical's response",
-				fmt.Sprintf("Infisical did not return a channel named %q after writing the alert, so Terraform cannot record that channel's ID and will replace the channel on the next apply. Please report this issue to the provider developers.", channel.Name.ValueString()),
-			)
-			continue
-		}
-
-		channel.ID = types.StringValue(id)
+		channel.ID = types.StringNull()
 		withIDs[key] = channel
-		claimed[id] = true
+		diags.AddAttributeError(
+			path.Root("channels").AtMapKey(key),
+			"Missing channel in Infisical's response",
+			fmt.Sprintf("Infisical did not return a channel named %q after writing the alert, so Terraform cannot record that channel's ID and will replace the channel on the next apply. Please report this issue to the provider developers.", channel.Name.ValueString()),
+		)
 	}
 
 	return withIDs, diags
+}
+
+func (c alertChannelModel) configMatchesAPIChannel(apiChannel infisical.AlertChannel) bool {
+	switch {
+	case c.Webhook != nil:
+		return channelConfigString(apiChannel.Config, channelConfigKeyWebhookURL) == c.Webhook.URL.ValueString()
+	case c.Email != nil:
+		return recipientsMatchAPIChannel(c.Email.Recipients, apiChannel.Recipients)
+	default:
+		return false
+	}
+}
+
+func recipientsMatchAPIChannel(recipients types.Set, apiRecipients []infisical.AlertChannelRecipient) bool {
+	if recipients.IsNull() || recipients.IsUnknown() {
+		return false
+	}
+
+	elements := recipients.Elements()
+	if len(elements) != len(apiRecipients) {
+		return false
+	}
+
+	returned := make(map[alertChannelRecipient]bool, len(apiRecipients))
+	for _, apiRecipient := range apiRecipients {
+		returned[alertChannelRecipient{principalType: apiRecipient.PrincipalType, principalID: apiRecipient.PrincipalID}] = true
+	}
+
+	for _, element := range elements {
+		recipient, ok := element.(types.Object)
+		if !ok {
+			return false
+		}
+		principalType, typeKnown := recipient.Attributes()["type"].(types.String)
+		principalID, idKnown := recipient.Attributes()["id"].(types.String)
+		if !typeKnown || !idKnown {
+			return false
+		}
+		if !returned[alertChannelRecipient{principalType: principalType.ValueString(), principalID: principalID.ValueString()}] {
+			return false
+		}
+	}
+
+	return true
+}
+
+type alertChannelRecipient struct {
+	principalType string
+	principalID   string
 }
 
 func sortAPIChannels(apiChannels []infisical.AlertChannel) []infisical.AlertChannel {
