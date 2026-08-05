@@ -773,10 +773,3 @@ func TestValidateChannelNamesAreUnique(t *testing.T) {
 		t.Errorf("error path = %v, want %v", got, want)
 	}
 }
-
-func TestSortedChannelKeys(t *testing.T) {
-	keys := sortedChannelKeys(map[string]alertChannelModel{"c": {}, "a": {}, "b": {}})
-	if strings.Join(keys, ",") != "a,b,c" {
-		t.Errorf("sortedChannelKeys() = %v, want them sorted", keys)
-	}
-}

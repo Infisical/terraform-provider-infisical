@@ -1,10 +1,12 @@
 package resource
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	infisical "terraform-provider-infisical/internal/client"
@@ -296,24 +298,6 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 	}
 }
 
-func sortedChannelKeys(channels map[string]alertChannelModel) []string {
-	keys := make([]string, 0, len(channels))
-	for key := range channels {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedMapKeys(elements map[string]attr.Value) []string {
-	keys := make([]string, 0, len(elements))
-	for key := range elements {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 func reusedChannelID(channel alertChannelModel, priorChannel alertChannelModel, hadPrior bool) string {
 	if !hadPrior || priorChannel.ID.IsNull() || priorChannel.ID.IsUnknown() {
 		return ""
@@ -334,7 +318,7 @@ func validateChannelsHaveOneType(ctx context.Context, config tfsdk.Config) diag.
 	}
 
 	elements := channels.Elements()
-	for _, key := range sortedMapKeys(elements) {
+	for _, key := range slices.Sorted(maps.Keys(elements)) {
 		channel, ok := elements[key].(types.Object)
 		if !ok || channel.IsNull() || channel.IsUnknown() {
 			continue
@@ -382,18 +366,12 @@ func validateChannelNamesAreUnique(ctx context.Context, config tfsdk.Config) dia
 		keysByName[name.ValueString()] = append(keysByName[name.ValueString()], key)
 	}
 
-	names := make([]string, 0, len(keysByName))
-	for name := range keysByName {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
+	for _, name := range slices.Sorted(maps.Keys(keysByName)) {
 		keys := keysByName[name]
 		if len(keys) < 2 {
 			continue
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 
 		quoted := make([]string, 0, len(keys))
 		for _, key := range keys {
@@ -419,7 +397,7 @@ func alertChannelsToAPIInput(ctx context.Context, channels map[string]alertChann
 	var diags diag.Diagnostics
 
 	inputs := make([]infisical.AlertChannelInput, 0, len(channels))
-	for _, key := range sortedChannelKeys(channels) {
+	for _, key := range slices.Sorted(maps.Keys(channels)) {
 		channel := channels[key]
 
 		recipients := make([]infisical.AlertChannelRecipient, 0)
@@ -493,7 +471,7 @@ func alertChannelIDsFromAPI(channels map[string]alertChannelModel, prior map[str
 		byID[apiChannel.ID] = apiChannel
 	}
 
-	keys := sortedChannelKeys(channels)
+	keys := slices.Sorted(maps.Keys(channels))
 	withIDs := make(map[string]alertChannelModel, len(channels))
 	claimed := make(map[string]bool, len(sorted))
 
@@ -552,11 +530,8 @@ func alertChannelIDsFromAPI(channels map[string]alertChannelModel, prior map[str
 func sortAPIChannels(apiChannels []infisical.AlertChannel) []infisical.AlertChannel {
 	sorted := make([]infisical.AlertChannel, len(apiChannels))
 	copy(sorted, apiChannels)
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].Name != sorted[j].Name {
-			return sorted[i].Name < sorted[j].Name
-		}
-		return sorted[i].ID < sorted[j].ID
+	slices.SortFunc(sorted, func(a, b infisical.AlertChannel) int {
+		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.ID, b.ID))
 	})
 	return sorted
 }
@@ -566,7 +541,7 @@ func alertChannelsFromAPI(ctx context.Context, apiChannels []infisical.AlertChan
 
 	priorByID := make(map[string]alertChannelModel, len(stateChannels))
 	keysByID := make(map[string]string, len(stateChannels))
-	for _, key := range sortedChannelKeys(stateChannels) {
+	for _, key := range slices.Sorted(maps.Keys(stateChannels)) {
 		stateChannel := stateChannels[key]
 		if id := stateChannel.ID.ValueString(); id != "" {
 			priorByID[id] = stateChannel
