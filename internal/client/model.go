@@ -2560,7 +2560,7 @@ type CheckDuplicateDestinationResponse struct {
 	HasDuplicate bool `json:"hasDuplicate"`
 }
 
-type PkiSync struct {
+type CertificateSync struct {
 	ID                string                 `json:"id"`
 	Name              string                 `json:"name"`
 	Description       string                 `json:"description"`
@@ -2572,8 +2572,8 @@ type PkiSync struct {
 	DestinationConfig map[string]interface{} `json:"destinationConfig"`
 }
 
-type CreatePkiSyncRequest struct {
-	App               PkiSyncApp             `json:"-"`
+type CreateCertificateSyncRequest struct {
+	App               CertificateSyncApp     `json:"-"`
 	Name              string                 `json:"name"`
 	Description       string                 `json:"description"`
 	ConnectionID      string                 `json:"connectionId"`
@@ -2583,8 +2583,8 @@ type CreatePkiSyncRequest struct {
 	DestinationConfig map[string]interface{} `json:"destinationConfig"`
 }
 
-type UpdatePkiSyncRequest struct {
-	App               PkiSyncApp             `json:"-"`
+type UpdateCertificateSyncRequest struct {
+	App               CertificateSyncApp     `json:"-"`
 	ID                string                 `json:"-"`
 	Name              string                 `json:"name"`
 	Description       string                 `json:"description"`
@@ -2594,44 +2594,44 @@ type UpdatePkiSyncRequest struct {
 	DestinationConfig map[string]interface{} `json:"destinationConfig"`
 }
 
-type GetPkiSyncByIdRequest struct {
+type GetCertificateSyncByIdRequest struct {
 	ID string
 }
 
-type DeletePkiSyncRequest struct {
-	App PkiSyncApp
+type DeleteCertificateSyncRequest struct {
+	App CertificateSyncApp
 	ID  string
 }
 
-type PkiSyncCertificate struct {
-	ID            string `json:"id"`
-	PkiSyncID     string `json:"pkiSyncId"`
-	CertificateID string `json:"certificateId"`
+type CertificateSyncCertificate struct {
+	ID                string `json:"id"`
+	CertificateSyncID string `json:"pkiSyncId"`
+	CertificateID     string `json:"certificateId"`
 }
 
-type AddPkiSyncCertificatesRequest struct {
-	PkiSyncID      string   `json:"-"`
-	CertificateIDs []string `json:"certificateIds"`
+type AddCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string   `json:"-"`
+	CertificateIDs    []string `json:"certificateIds"`
 }
 
-type AddPkiSyncCertificatesResponse struct {
-	AddedCertificates []PkiSyncCertificate `json:"addedCertificates"`
+type AddCertificateSyncCertificatesResponse struct {
+	AddedCertificates []CertificateSyncCertificate `json:"addedCertificates"`
 }
 
-type RemovePkiSyncCertificatesRequest struct {
-	PkiSyncID      string   `json:"-"`
-	CertificateIDs []string `json:"certificateIds"`
+type RemoveCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string   `json:"-"`
+	CertificateIDs    []string `json:"certificateIds"`
 }
 
-type ListPkiSyncCertificatesRequest struct {
-	PkiSyncID string
-	Offset    int
-	Limit     int
+type ListCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string
+	Offset            int
+	Limit             int
 }
 
-type ListPkiSyncCertificatesResponse struct {
-	Certificates []PkiSyncCertificate `json:"certificates"`
-	TotalCount   int                  `json:"totalCount"`
+type ListCertificateSyncCertificatesResponse struct {
+	Certificates []CertificateSyncCertificate `json:"certificates"`
+	TotalCount   int                          `json:"totalCount"`
 }
 
 type DynamicSecret struct {

@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
+	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -13,33 +14,33 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-type PkiSyncAwsCertificateManagerDestinationConfigModel struct {
+type CertificateSyncAwsCertificateManagerDestinationConfigModel struct {
 	Region types.String `tfsdk:"aws_region"`
 }
 
-type PkiSyncAwsCertificateManagerSyncOptionsModel struct {
-	CertificateNameSchema types.String `tfsdk:"certificate_name_schema"`
-	CanRemoveCertificates types.Bool   `tfsdk:"can_remove_certificates"`
-	IncludeRootCa         types.Bool   `tfsdk:"include_root_ca"`
-	PreserveArn           types.Bool   `tfsdk:"preserve_arn"`
+type CertificateSyncAwsCertificateManagerSyncOptionsModel struct {
+	CertificateNameSchema customtypes.TrimmedStringValue `tfsdk:"certificate_name_schema"`
+	CanRemoveCertificates types.Bool                     `tfsdk:"can_remove_certificates"`
+	IncludeRootCa         types.Bool                     `tfsdk:"include_root_ca"`
+	PreserveArn           types.Bool                     `tfsdk:"preserve_arn"`
 }
 
-var pkiSyncAwsCertificateManagerDestinationConfigAttrTypes = map[string]attr.Type{
+var certificateSyncAwsCertificateManagerDestinationConfigAttrTypes = map[string]attr.Type{
 	"aws_region": types.StringType,
 }
 
-var pkiSyncAwsCertificateManagerSyncOptionsAttrTypes = map[string]attr.Type{
-	"certificate_name_schema": types.StringType,
+var certificateSyncAwsCertificateManagerSyncOptionsAttrTypes = map[string]attr.Type{
+	"certificate_name_schema": customtypes.TrimmedStringType{},
 	"can_remove_certificates": types.BoolType,
 	"include_root_ca":         types.BoolType,
 	"preserve_arn":            types.BoolType,
 }
 
-func NewPkiSyncAwsCertificateManagerResource() resource.Resource {
-	return &PkiSyncBaseResource{
-		App:              infisical.PkiSyncAppAWSCertificateManager,
+func NewCertificateSyncAwsCertificateManagerResource() resource.Resource {
+	return &CertificateSyncBaseResource{
+		App:              infisical.CertificateSyncAppAWSCertificateManager,
 		SyncName:         "AWS Certificate Manager",
-		ResourceTypeName: "_pki_sync_aws_certificate_manager",
+		ResourceTypeName: "_certificate_sync_aws_certificate_manager",
 		AppConnection:    infisical.AppConnectionAppAWS,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
@@ -50,6 +51,7 @@ func NewPkiSyncAwsCertificateManagerResource() resource.Resource {
 		SyncOptionsAttributes: map[string]schema.Attribute{
 			"certificate_name_schema": schema.StringAttribute{
 				Required:    true,
+				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The naming scheme for synced certificates. Must include the {{certificateId}} or {{shortCertificateId}} placeholder. Available placeholders: {{certificateId}}, {{shortCertificateId}}, {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.",
 			},
 			"can_remove_certificates": schema.BoolAttribute{
@@ -72,8 +74,8 @@ func NewPkiSyncAwsCertificateManagerResource() resource.Resource {
 			},
 		},
 
-		ReadSyncOptionsFromPlan: func(ctx context.Context, plan PkiSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			var syncOptions PkiSyncAwsCertificateManagerSyncOptionsModel
+		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+			var syncOptions CertificateSyncAwsCertificateManagerSyncOptionsModel
 			diags := plan.SyncOptions.As(ctx, &syncOptions, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
@@ -84,29 +86,30 @@ func NewPkiSyncAwsCertificateManagerResource() resource.Resource {
 				"canRemoveCertificates": syncOptions.CanRemoveCertificates.ValueBool(),
 				"includeRootCa":         syncOptions.IncludeRootCa.ValueBool(),
 				"preserveArn":           syncOptions.PreserveArn.ValueBool(),
-				// AWS Certificate Manager does not support importing certificates.
+				// Sent as a constant rather than exposed in the schema: AWS Certificate Manager
+				// cannot import certificates back into Infisical, so there is nothing to configure.
 				"canImportCertificates": false,
 			}, diags
 		},
 
-		ReadSyncOptionsFromApi: func(_ context.Context, pkiSync infisical.PkiSync) (types.Object, diag.Diagnostics) {
+		ReadSyncOptionsFromApi: func(_ context.Context, certificateSync infisical.CertificateSync) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
-			certificateNameSchema := stringFromMap(pkiSync.SyncOptions, "certificateNameSchema", &diags)
+			certificateNameSchema := trimmedStringFromMap(certificateSync.SyncOptions, "certificateNameSchema", &diags)
 			if diags.HasError() {
-				return types.ObjectNull(pkiSyncAwsCertificateManagerSyncOptionsAttrTypes), diags
+				return types.ObjectNull(certificateSyncAwsCertificateManagerSyncOptionsAttrTypes), diags
 			}
 
-			return types.ObjectValue(pkiSyncAwsCertificateManagerSyncOptionsAttrTypes, map[string]attr.Value{
+			return types.ObjectValue(certificateSyncAwsCertificateManagerSyncOptionsAttrTypes, map[string]attr.Value{
 				"certificate_name_schema": certificateNameSchema,
-				"can_remove_certificates": boolFromMap(pkiSync.SyncOptions, "canRemoveCertificates", true),
-				"include_root_ca":         boolFromMap(pkiSync.SyncOptions, "includeRootCa", false),
-				"preserve_arn":            boolFromMap(pkiSync.SyncOptions, "preserveArn", true),
+				"can_remove_certificates": boolFromMap(certificateSync.SyncOptions, "canRemoveCertificates", true),
+				"include_root_ca":         boolFromMap(certificateSync.SyncOptions, "includeRootCa", false),
+				"preserve_arn":            boolFromMap(certificateSync.SyncOptions, "preserveArn", true),
 			})
 		},
 
-		ReadDestinationConfigFromPlan: func(ctx context.Context, plan PkiSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
-			var destinationConfig PkiSyncAwsCertificateManagerDestinationConfigModel
+		ReadDestinationConfigFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+			var destinationConfig CertificateSyncAwsCertificateManagerDestinationConfigModel
 			diags := plan.DestinationConfig.As(ctx, &destinationConfig, basetypes.ObjectAsOptions{})
 			if diags.HasError() {
 				return nil, diags
@@ -117,15 +120,15 @@ func NewPkiSyncAwsCertificateManagerResource() resource.Resource {
 			}, diags
 		},
 
-		ReadDestinationConfigFromApi: func(_ context.Context, pkiSync infisical.PkiSync) (types.Object, diag.Diagnostics) {
+		ReadDestinationConfigFromApi: func(_ context.Context, certificateSync infisical.CertificateSync) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
-			region := stringFromMap(pkiSync.DestinationConfig, "region", &diags)
+			region := stringFromMap(certificateSync.DestinationConfig, "region", &diags)
 			if diags.HasError() {
-				return types.ObjectNull(pkiSyncAwsCertificateManagerDestinationConfigAttrTypes), diags
+				return types.ObjectNull(certificateSyncAwsCertificateManagerDestinationConfigAttrTypes), diags
 			}
 
-			return types.ObjectValue(pkiSyncAwsCertificateManagerDestinationConfigAttrTypes, map[string]attr.Value{
+			return types.ObjectValue(certificateSyncAwsCertificateManagerDestinationConfigAttrTypes, map[string]attr.Value{
 				"aws_region": region,
 			})
 		},

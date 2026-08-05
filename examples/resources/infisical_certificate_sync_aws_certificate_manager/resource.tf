@@ -17,9 +17,9 @@ provider "infisical" {
   }
 }
 
-resource "infisical_pki_sync_aws_certificate_manager" "example" {
-  name           = "aws-certificate-manager-pki-sync-demo"
-  description    = "Demo of AWS Certificate Manager PKI sync"
+resource "infisical_certificate_sync_aws_certificate_manager" "example" {
+  name           = "aws-certificate-manager-certificate-sync-demo"
+  description    = "Demo of AWS Certificate Manager certificate sync"
   application_id = "<cert-manager-application-id>"
   connection_id  = "<app-connection-id>"
 
