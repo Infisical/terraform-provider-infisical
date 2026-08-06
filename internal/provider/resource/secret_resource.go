@@ -821,10 +821,10 @@ func (r *secretResource) pollSecretApprovalRequest(ctx context.Context, approval
 			return &approval
 		}
 
-		if approval.Status == "closed" {
+		if approval.Status != "open" {
 			diagnostics.AddError(
 				"Secret approval request was closed",
-				fmt.Sprintf("The secret approval request was closed without being merged. Approval request ID: %s", approvalID),
+				fmt.Sprintf("The secret approval request was closed without being merged (status: %s). Approval request ID: %s", approval.Status, approvalID),
 			)
 			return nil
 		}
