@@ -1,6 +1,7 @@
 package infisicalclient
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -4357,4 +4358,98 @@ type SecretApprovalRequestDetails struct {
 
 type GetSecretApprovalRequestByIDResponse struct {
 	Approval SecretApprovalRequestDetails `json:"approval"`
+}
+
+type AlertChannelRecipient struct {
+	PrincipalType string `json:"principalType"`
+	PrincipalID   string `json:"principalId"`
+}
+
+type AlertChannel struct {
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	ChannelType string                  `json:"channelType"`
+	Enabled     bool                    `json:"enabled"`
+	Config      map[string]any          `json:"config"`
+	Recipients  []AlertChannelRecipient `json:"recipients"`
+}
+
+type Alert struct {
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Description  *string         `json:"description"`
+	ResourceType string          `json:"resourceType"`
+	ResourceID   *string         `json:"resourceId"`
+	EventType    string          `json:"eventType"`
+	Condition    json.RawMessage `json:"condition"`
+	Enabled      bool            `json:"enabled"`
+	OrgID        string          `json:"orgId"`
+	ProjectID    *string         `json:"projectId"`
+	Channels     []AlertChannel  `json:"channels"`
+}
+
+type AlertChannelInput struct {
+	ID          *string                 `json:"id,omitempty"`
+	Name        string                  `json:"name"`
+	ChannelType string                  `json:"channelType"`
+	Enabled     bool                    `json:"enabled"`
+	Config      map[string]any          `json:"config"`
+	Recipients  []AlertChannelRecipient `json:"recipients"`
+}
+
+type CreateAlertRequest struct {
+	Name         string              `json:"name"`
+	Description  *string             `json:"description,omitempty"`
+	ResourceType string              `json:"resourceType"`
+	ResourceID   string              `json:"resourceId"`
+	EventType    string              `json:"eventType"`
+	Condition    any                 `json:"condition"`
+	Enabled      bool                `json:"enabled"`
+	ProjectID    *string             `json:"projectId,omitempty"`
+	Channels     []AlertChannelInput `json:"channels"`
+}
+
+type CreateAlertResponse struct {
+	Alert Alert `json:"alert"`
+}
+
+type ListAlertsRequest struct {
+	ResourceType string
+	ResourceID   string
+	ProjectID    *string
+}
+
+type ListAlertsResponse struct {
+	Alerts []Alert `json:"alerts"`
+}
+
+type GetAlertByIDRequest struct {
+	ID string
+}
+
+type GetAlertByIDResponse struct {
+	Alert Alert `json:"alert"`
+}
+
+type UpdateAlertRequest struct {
+	ID          string              `json:"-"`
+	Name        string              `json:"name"`
+	Description *string             `json:"description"`
+	Condition   any                 `json:"condition"`
+	Enabled     bool                `json:"enabled"`
+	Channels    []AlertChannelInput `json:"channels"`
+}
+
+type UpdateAlertResponse struct {
+	Alert Alert `json:"alert"`
+}
+
+type DeleteAlertRequest struct {
+	ID string
+}
+
+type DeleteAlertResponse struct {
+	Alert struct {
+		ID string `json:"id"`
+	} `json:"alert"`
 }
