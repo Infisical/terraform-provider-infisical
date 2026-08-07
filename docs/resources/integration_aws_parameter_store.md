@@ -3,13 +3,13 @@
 page_title: "infisical_integration_aws_parameter_store Resource - terraform-provider-infisical"
 subcategory: "Native Integrations - DEPRECATED"
 description: |-
-  Deprecated: This resource is deprecated and will be removed in a future version. Use infisical_secret_sync_aws_parameter_store instead.
+  Deprecated: Native Integrations are being retired on 08/05/2027. Secret Syncs are the recommended replacement, and they support the same services and offer additional features. Existing integrations continue to work until the retirement date. You can read more about the migration on Migrating from Native Integrations https://infisical.com/docs/integrations/secret-syncs/native-integrations-migration.
   Create AWS Parameter Store integration & save to Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_integration_aws_parameter_store (Resource)
 
-**Deprecated:** This resource is deprecated and will be removed in a future version. Use `infisical_secret_sync_aws_parameter_store` instead.
+**Deprecated:** Native Integrations are being retired on **08/05/2027**. Secret Syncs are the recommended replacement, and they support the same services and offer additional features. Existing integrations continue to work until the retirement date. You can read more about the migration on [Migrating from Native Integrations](https://infisical.com/docs/integrations/secret-syncs/native-integrations-migration).
 
 Create AWS Parameter Store integration & save to Infisical. Only Machine Identity authentication is supported for this resource.
 
