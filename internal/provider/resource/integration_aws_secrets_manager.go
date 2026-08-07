@@ -74,7 +74,8 @@ func (r *IntegrationAWSSecretsManagerResource) Metadata(_ context.Context, req r
 // Schema defines the schema for the resource.
 func (r *IntegrationAWSSecretsManagerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "**Deprecated:** This resource is deprecated and will be removed in a future version. Use `infisical_secret_sync_aws_secrets_manager` instead.\n\nCreate AWS Secrets Manager integration & save to Infisical. Only Machine Identity authentication is supported for this resource.",
+		Description:        "**Deprecated:** Native Integrations are being retired on **August 5, 2027**. Secret Syncs are the recommended replacement, and they support the same services and offer additional features. Existing integrations continue to work until the retirement date. You can read more about the migration on [Migrating from Native Integrations](https://infisical.com/docs/integrations/secret-syncs/native-integrations-migration).\n\nCreate AWS Secrets Manager integration & save to Infisical. Only Machine Identity authentication is supported for this resource.",
+		DeprecationMessage: "Native Integrations are being retired on August 5, 2027. Use the infisical_secret_sync_aws_secrets_manager resource instead, which supports the same provider with additional features. Your existing native integrations will continue to work until the retirement date. See https://infisical.com/docs/integrations/secret-syncs/native-integrations-migration for more information.",
 		Attributes: map[string]schema.Attribute{
 			"options": schema.SingleNestedAttribute{
 				Description: "Integration options",
