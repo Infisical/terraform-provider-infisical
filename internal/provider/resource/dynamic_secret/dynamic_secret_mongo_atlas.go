@@ -161,17 +161,15 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			}
 			adminPrivateKey, ok := dynamicSecret.Inputs["adminPrivateKey"].(string)
 			if !ok {
-				diags.AddError(
-					"Invalid adminPrivateKey type",
-					"Expected 'adminPrivateKey' to be a string but got something else.",
-				)
+				// The API redacts sensitive fields in responses, so fall back to the
+				// value already held in the Terraform plan/state.
+				adminPrivateKey = currentState.AdminPrivateKey.ValueString()
 			}
 			groupId, ok := dynamicSecret.Inputs["groupId"].(string)
 			if !ok {
-				diags.AddError(
-					"Invalid groupId type",
-					"Expected 'groupId' to be a string but got something else.",
-				)
+				// The API may redact or omit this field in responses, so fall back
+				// to the value already held in the Terraform plan/state.
+				groupId = currentState.GroupId.ValueString()
 			}
 
 			if diags.HasError() {
