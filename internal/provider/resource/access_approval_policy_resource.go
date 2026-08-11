@@ -221,7 +221,12 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 	var approvers []infisical.CreateAccessApprovalPolicyApprover
 	for _, a := range validatedApprovers {
 		approvers = append(approvers, infisical.CreateAccessApprovalPolicyApprover{
-			ID: a.ID, Name: a.Name, Type: a.Type,
+			ID:   a.ID,
+			Name: a.Name,
+			Type: a.Type,
+			// For now we only support approvals with one step
+			// So all approvers are for step 1
+			Sequence: 1,
 		})
 	}
 
@@ -272,13 +277,19 @@ func (r *accessApprovalPolicyResource) Create(ctx context.Context, req resource.
 	}
 
 	accessApprovalPolicy, err := r.client.CreateAccessApprovalPolicy(infisical.CreateAccessApprovalPolicyRequest{
-		Name:                  plan.Name.ValueString(),
-		ProjectSlug:           projectDetail.Slug,
-		Environments:          environments,
-		SecretPath:            plan.SecretPath.ValueString(),
-		Approvers:             approvers,
-		Bypassers:             bypassers,
-		RequiredApprovals:     plan.RequiredApprovals.ValueInt64(),
+		Name:              plan.Name.ValueString(),
+		ProjectSlug:       projectDetail.Slug,
+		Environments:      environments,
+		SecretPath:        plan.SecretPath.ValueString(),
+		Approvers:         approvers,
+		Bypassers:         bypassers,
+		RequiredApprovals: plan.RequiredApprovals.ValueInt64(),
+		ApprovalsRequired: []infisical.AccessApprovalPolicyApprovalsRequired{
+			{
+				NumberOfApprovals: plan.RequiredApprovals.ValueInt64(),
+				StepNumber:        1,
+			},
+		},
 		EnforcementLevel:      plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals:  plan.AllowSelfApproval.ValueBool(),
 		MaxTimePeriod:         infisicaltf.OptionalStringPointer(plan.MaxTimePeriod),
