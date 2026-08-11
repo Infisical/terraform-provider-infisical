@@ -36,6 +36,6 @@ resource "infisical_secret_sync_circleci" "example" {
   sync_options = {
     initial_sync_behavior   = "overwrite-destination"
     disable_secret_deletion = false
-    key_schema              = "{{secretKey}}-{{environment}}"
+    key_schema              = "{{secretKey}}_{{environment}}"
   }
 }
