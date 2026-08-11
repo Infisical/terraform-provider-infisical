@@ -134,6 +134,10 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
         # KMS
         kms_key_public_key)
             update_subcategory "$file" "KMS";;
+
+        # Gateways
+        gateway)
+            update_subcategory "$file" "Gateways";;
     esac
 done
 
