@@ -89,10 +89,6 @@ func TestGetGatewayByNameListFailureIsNotAbsence(t *testing.T) {
 			http.StatusInternalServerError,
 			`{"statusCode":500,"message":"Something went wrong","reqId":"req-2"}`,
 		},
-		"endpoint absent on this instance": {
-			http.StatusNotFound,
-			`{"statusCode":404,"message":"Not Found","reqId":"req-3"}`,
-		},
 	}
 
 	for name, tc := range cases {

@@ -24,29 +24,3 @@ data "infisical_gateway" "example" {
 output "gateway-id" {
   value = data.infisical_gateway.example.id
 }
-
-# The resolved ID can be passed anywhere a gateway is referenced, such as a dynamic secret
-resource "infisical_dynamic_secret_sql_database" "sql-database" {
-  name             = "postgres-dynamic-secret"
-  project_slug     = "<project-slug>"
-  environment_slug = "prod"
-  path             = "/"
-
-  configuration = {
-    client               = "postgres"
-    host                 = "postgres.internal"
-    port                 = "5432"
-    database             = "infisical"
-    username             = "infisical"
-    password             = "infisical"
-    gateway_id           = data.infisical_gateway.example.id
-    creation_statement   = <<-EOT
-      CREATE USER "{{username}}" WITH ENCRYPTED PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-      GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{username}}";
-    EOT
-    revocation_statement = <<-EOT
-      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{username}}";
-      DROP ROLE "{{username}}";
-    EOT
-  }
-}
