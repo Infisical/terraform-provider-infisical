@@ -93,13 +93,15 @@ resource "infisical_dynamic_secret_mongo_atlas" "mongo-atlas" {
 
 Required:
 
-- `admin_private_key` (String, Sensitive) Admin user private API key
 - `admin_public_key` (String) Admin user public API key
 - `group_id` (String) Unique 24-hexadecimal digit string that identifies your project. This is the same as the project ID.
 - `roles` (Attributes List) (see [below for nested schema](#nestedatt--configuration--roles))
 
 Optional:
 
+- `admin_private_key` (String, Sensitive) Admin user private API key. This value is stored in the Terraform state; use admin_private_key_wo to keep it out of state. Exactly one of admin_private_key or admin_private_key_wo must be set.
+- `admin_private_key_wo` (String, Sensitive) Admin user private API key (write-only). This value is never stored in the Terraform state and can accept ephemeral values. Because it is not stored, changes to it are not detected; increment admin_private_key_wo_version to push a new value. Requires Terraform 1.11+.
+- `admin_private_key_wo_version` (Number) The version of the admin_private_key_wo value. Increment this to trigger an update of the private key.
 - `scopes` (Attributes List) (see [below for nested schema](#nestedatt--configuration--scopes))
 
 <a id="nestedatt--configuration--roles"></a>

@@ -128,7 +128,7 @@ func NewDynamicSecretKubernetesResource() resource.Resource {
 			},
 		},
 
-		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
+		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel, config DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			configurationMap := make(map[string]interface{})
 			var configuration DynamicSecretKubernetesConfigurationModel
 

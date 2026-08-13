@@ -25,7 +25,7 @@ type DynamicSecretBaseResource struct {
 	DynamicSecretName         string // complete descriptive name of the dynamic secret
 	client                    *infisical.Client
 	ConfigurationAttributes   map[string]schema.Attribute
-	ReadConfigurationFromPlan func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
+	ReadConfigurationFromPlan func(ctx context.Context, plan DynamicSecretBaseResourceModel, config DynamicSecretBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadConfigurationFromApi  func(ctx context.Context, dynamicSecret infisical.DynamicSecret, configState types.Object) (types.Object, diag.Diagnostics)
 }
 
@@ -150,7 +150,14 @@ func (r *DynamicSecretBaseResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	configurationMap, diags := r.ReadConfigurationFromPlan(ctx, plan)
+	var config DynamicSecretBaseResourceModel
+	diags = req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	configurationMap, diags := r.ReadConfigurationFromPlan(ctx, plan, config)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
@@ -306,7 +313,14 @@ func (r *DynamicSecretBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	configurationMap, diags := r.ReadConfigurationFromPlan(ctx, plan)
+	var config DynamicSecretBaseResourceModel
+	diags = req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	configurationMap, diags := r.ReadConfigurationFromPlan(ctx, plan, config)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return

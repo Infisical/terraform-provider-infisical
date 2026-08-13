@@ -60,7 +60,7 @@ func NewDynamicSecretMongoDbResource() resource.Resource {
 			},
 		},
 
-		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]any, diag.Diagnostics) {
+		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel, config DynamicSecretBaseResourceModel) (map[string]any, diag.Diagnostics) {
 			configurationMap := make(map[string]any)
 			var configuration DynamicSecretMongoDbConfigurationModel
 
