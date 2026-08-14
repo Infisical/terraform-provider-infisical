@@ -4215,6 +4215,15 @@ type RemoveCertManagerIdentityResponse struct {
 	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
 }
 
+// Gateway
+
+// Gateway holds the gateway fields the provider resolves by name. The list endpoint returns more
+// per gateway; only these two are read.
+type Gateway struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // Organization
 
 // Organization holds the organization fields the provider can resolve for the
