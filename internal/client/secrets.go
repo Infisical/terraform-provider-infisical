@@ -2,6 +2,7 @@ package infisicalclient
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -169,6 +170,29 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 	return secretsResponse, nil
 }
 
+// SecretApprovalRequiredError is returned when a secret operation triggers
+// a change policy and requires approval before being applied.
+type SecretApprovalRequiredError struct {
+	Approval SecretApprovalResponse
+}
+
+func (e *SecretApprovalRequiredError) Error() string {
+	return fmt.Sprintf("secret change requires approval (approval request ID: %s)", e.Approval.ID)
+}
+
+// checkForApprovalResponse checks if the API response body contains an approval
+// object instead of the expected secret data. This happens when a secret change
+// policy is in place and the change requires approval before being applied.
+func checkForApprovalResponse(body []byte) *SecretApprovalRequiredError {
+	var approvalResponse struct {
+		Approval SecretApprovalResponse `json:"approval"`
+	}
+	if err := json.Unmarshal(body, &approvalResponse); err == nil && approvalResponse.Approval.ID != "" {
+		return &SecretApprovalRequiredError{Approval: approvalResponse.Approval}
+	}
+	return nil
+}
+
 func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) (RawV3Secret, error) {
 	var secretsResponse CreateRawSecretsV3Response
 	response, err := client.Config.HttpClient.
@@ -185,6 +209,12 @@ func (client Client) CreateRawSecretsV3(request CreateRawSecretV3Request) (RawV3
 	if response.IsError() {
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
 		return RawV3Secret{}, errors.NewAPIErrorWithResponse(operationCreateRawSecretsV3, response, &additionalContext)
+	}
+
+	if secretsResponse.Secret.ID == "" {
+		if approvalErr := checkForApprovalResponse(response.Body()); approvalErr != nil {
+			return RawV3Secret{}, approvalErr
+		}
 	}
 
 	return secretsResponse.Secret, nil
@@ -208,6 +238,10 @@ func (client Client) DeleteRawSecretV3(request DeleteRawSecretV3Request) error {
 		return errors.NewAPIErrorWithResponse(operationDeleteRawSecretV3, response, &additionalContext)
 	}
 
+	if approvalErr := checkForApprovalResponse(response.Body()); approvalErr != nil {
+		return approvalErr
+	}
+
 	return nil
 }
 
@@ -229,6 +263,12 @@ func (client Client) UpdateRawSecretV3(request UpdateRawSecretByNameV3Request) (
 	if response.IsError() {
 		additionalContext := "Please make sure your secret path, workspace and environment name are all correct"
 		return RawV3Secret{}, errors.NewAPIErrorWithResponse(operationUpdateRawSecretV3, response, &additionalContext)
+	}
+
+	if secretsResponse.Secret.ID == "" {
+		if approvalErr := checkForApprovalResponse(response.Body()); approvalErr != nil {
+			return RawV3Secret{}, approvalErr
+		}
 	}
 
 	return secretsResponse.Secret, nil
