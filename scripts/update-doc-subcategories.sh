@@ -38,7 +38,11 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Secret Syncs
         secret_sync_*)
             update_subcategory "$file" "Secret Syncs";;
-        
+
+        # Certificate Syncs
+        certificate_sync_*)
+            update_subcategory "$file" "Certificate Syncs";;
+
         # Secret Rotations
         secret_rotation_*)
             update_subcategory "$file" "Secret Rotations";;
@@ -94,6 +98,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Certificate Management
         cert_manager_*)
             update_subcategory "$file" "Certificate Management";;
+
+        # Alerts
+        alert|alert_*)
+            update_subcategory "$file" "Alerts";;
     esac
 done
 
@@ -118,10 +126,18 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
         # Identities
         identity|identity_details)
             update_subcategory "$file" "Identities";;
-        
+
+        # Organization
+        organization)
+            update_subcategory "$file" "Organization";;
+
         # KMS
         kms_key_public_key)
             update_subcategory "$file" "KMS";;
+
+        # Gateways
+        gateway)
+            update_subcategory "$file" "Gateways";;
     esac
 done
 

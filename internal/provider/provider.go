@@ -2,12 +2,16 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalDatasource "terraform-provider-infisical/internal/provider/datasource"
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
+	alertResource "terraform-provider-infisical/internal/provider/resource/alert"
 	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
+	certificateSyncResource "terraform-provider-infisical/internal/provider/resource/certificate_sync"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
 	externalKmsResource "terraform-provider-infisical/internal/provider/resource/external_kms"
 	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
@@ -52,6 +56,15 @@ type infisicalProviderModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 
 	Auth *authModel `tfsdk:"auth"`
+}
+
+// authMethodToStrategy maps user-facing auth_method values to their auth strategy.
+var authMethodToStrategy = map[string]infisical.AuthStrategyType{
+	"token":      infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY,
+	"universal":  infisical.AuthStrategy.UNIVERSAL_MACHINE_IDENTITY,
+	"oidc":       infisical.AuthStrategy.OIDC_MACHINE_IDENTITY,
+	"kubernetes": infisical.AuthStrategy.KUBERNETES_MACHINE_IDENTITY,
+	"aws_iam":    infisical.AuthStrategy.AWS_IAM_MACHINE_IDENTITY,
 }
 
 type authModel struct {
@@ -225,6 +238,7 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 	serviceAccountToken := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_NAME)
 	serviceAccountTokenPath := os.Getenv(infisical.INFISICAL_KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH_NAME)
 	organizationSlug := os.Getenv(infisical.INFISICAL_AUTH_ORGANIZATION_SLUG_ENV_NAME)
+	authMethodName := os.Getenv(infisical.INFISICAL_AUTH_METHOD_NAME)
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -299,14 +313,26 @@ func (p *infisicalProvider) Configure(ctx context.Context, req provider.Configur
 		}
 	}
 
-	// strict env vars check:
 	if authStrategy == "" {
-		// ? note(daniel): this fix only works for token auth.
-		// ? we currently don't have a way to identify if a user wants to use the different identity-id based auth strategies.
-		// ? We should have a field for specifying the target auth strategy, like we do for the CLI (--method=aws-auth as an example)
-		if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
-			authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
-			token = envVarToken
+		if strings.TrimSpace(strings.ToLower(authMethodName)) != "" {
+			strategy, ok := authMethodToStrategy[authMethodName]
+			if !ok {
+				resp.Diagnostics.AddError(
+					"Invalid auth method",
+					fmt.Sprintf("%q is not a valid authentication method. Valid values are: token, universal, oidc, kubernetes, aws_iam.", authMethodName),
+				)
+				return
+			}
+			authStrategy = strategy
+		} else {
+
+			// Legacy fallback: when no auth method is specified anywhere, fall back to token auth
+			// if INFISICAL_TOKEN is set. Otherwise leave the strategy empty so the client can still
+			// detect universal auth from its client id/secret.
+			if envVarToken := os.Getenv(infisical.INFISICAL_TOKEN_NAME); envVarToken != "" {
+				authStrategy = infisical.AuthStrategy.TOKEN_MACHINE_IDENTITY
+				token = envVarToken
+			}
 		}
 
 	}
@@ -359,6 +385,8 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectRoleDataSource,
 		infisicalDatasource.NewProjectEnvironmentDataSource,
 		infisicalDatasource.NewProjectUserDataSource,
+		infisicalDatasource.NewOrganizationDataSource,
+		infisicalDatasource.NewGatewayDataSource,
 	}
 }
 
@@ -424,6 +452,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		appConnectionResource.NewAppConnectionGithubResource,
 		appConnectionResource.NewAppConnectionHashicorpVaultResource,
 		appConnectionResource.NewAppConnectionDatadogResource,
+		appConnectionResource.NewAppConnectionCircleCIResource,
 		secretSyncResource.NewSecretSyncGcpSecretManagerResource,
 		secretSyncResource.NewSecretSyncAzureAppConfigurationResource,
 		secretSyncResource.NewSecretSyncAzureKeyVaultResource,
@@ -440,6 +469,9 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretSyncResource.NewSecretSyncSupabaseResource,
 		secretSyncResource.NewSecretSyncFlyioResource,
 		secretSyncResource.NewSecretSyncGitlabResource,
+		secretSyncResource.NewSecretSyncCircleCIResource,
+		certificateSyncResource.NewCertificateSyncAwsCertificateManagerResource,
+		certificateSyncResource.NewCertificateSyncCertificateResource,
 		dynamicSecretResource.NewDynamicSecretSqlDatabaseResource,
 		dynamicSecretResource.NewDynamicSecretAwsIamResource,
 		dynamicSecretResource.NewDynamicSecretKubernetesResource,
@@ -470,6 +502,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerGroupResource,
 		infisicalResource.NewCertManagerIdentityResource,
 		externalKmsResource.NewExternalKmsAwsResource,
+		alertResource.NewAlertResource,
 	}
 }
 

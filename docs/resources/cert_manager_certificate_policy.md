@@ -184,15 +184,15 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
 
 ### Required
 
-- `name` (String) The name of the certificate policy
+- `name` (String) The name of the certificate policy. Must be in slug format: lowercase letters and numbers, separated by single hyphens (e.g. 'web-server-policy').
 
 ### Optional
 
-- `algorithms` (Block, Optional) Algorithm constraints for the certificate policy. At least one signature algorithm and one key algorithm must be specified. (see [below for nested schema](#nestedblock--algorithms))
+- `algorithms` (Block, Optional) Algorithm constraints for the certificate policy. Omit the block to accept any algorithm; each list restricts its own kind independently and needs at least one value when set. (see [below for nested schema](#nestedblock--algorithms))
 - `basic_constraints` (Block, Optional) Basic constraints policy for the certificate policy, controlling whether issued certificates may act as certificate authorities. (see [below for nested schema](#nestedblock--basic_constraints))
-- `description` (String) The description of the certificate policy
-- `extended_key_usages` (Block, Optional) Extended key usage policies for the certificate policy (see [below for nested schema](#nestedblock--extended_key_usages))
-- `key_usages` (Block, Optional) Key usage policies for the certificate policy (see [below for nested schema](#nestedblock--key_usages))
+- `description` (String) The description of the certificate policy (max 255 characters). Omit the attribute instead of passing an empty string.
+- `extended_key_usages` (Block, Optional) Extended key usage policies for the certificate policy. When this block is present, requested extended key usages must be within the union of allowed and required; setting allowed and required to empty lists denies all extended key usages. Omit the block for no constraint. (see [below for nested schema](#nestedblock--extended_key_usages))
+- `key_usages` (Block, Optional) Key usage policies for the certificate policy. When this block is present, requested key usages must be within the union of allowed and required; setting allowed and required to empty lists denies all key usages. Omit the block for no constraint. (see [below for nested schema](#nestedblock--key_usages))
 - `sans` (Block List) Subject alternative name (SAN) policies for the certificate policy (see [below for nested schema](#nestedblock--sans))
 - `subject` (Block List) Subject attribute policies for the certificate policy. Each block constrains a single subject DN attribute (e.g. common_name, organization). Values are matched against the corresponding attribute parsed from the CSR; the '*' wildcard matches any sequence of characters (including dots). common_name matches the CN attribute only. domain_component (DC) is an independent attribute matched separately from common_name: a certificate may carry multiple DC values, and each is matched individually against this block. (see [below for nested schema](#nestedblock--subject))
 - `validity` (Block, Optional) Validity constraints for the certificate policy (see [below for nested schema](#nestedblock--validity))
@@ -204,10 +204,10 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
 <a id="nestedblock--algorithms"></a>
 ### Nested Schema for `algorithms`
 
-Required:
+Optional:
 
-- `key_algorithm` (List of String) List of allowed key algorithms (at least one required). Supported values: RSA-2048, RSA-3072, RSA-4096, ECDSA-P256, ECDSA-P521, ECDSA-P384
-- `signature` (List of String) List of allowed signature algorithms (at least one required). Supported values: SHA256-RSA, SHA512-RSA, SHA384-ECDSA, SHA384-RSA, SHA256-ECDSA, SHA512-ECDSA
+- `key_algorithm` (List of String) List of allowed key algorithms (at least one value when set). Supported values: RSA-2048, RSA-3072, RSA-4096, ECDSA-P256, ECDSA-P521, ECDSA-P384
+- `signature` (List of String) List of allowed signature algorithms (at least one value when set). Supported values: SHA256-RSA, SHA512-RSA, SHA384-ECDSA, SHA384-RSA, SHA256-ECDSA, SHA512-ECDSA
 
 
 <a id="nestedblock--basic_constraints"></a>

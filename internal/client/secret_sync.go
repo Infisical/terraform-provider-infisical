@@ -25,6 +25,7 @@ const (
 	SecretSyncAppSupabase              SecretSyncApp = "supabase"
 	SecretSyncAppFlyio                 SecretSyncApp = "flyio"
 	SecretSyncAppGitlab                SecretSyncApp = "gitlab"
+	SecretSyncAppCircleCI              SecretSyncApp = "circleci"
 )
 
 type SecretSyncBehavior string

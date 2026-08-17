@@ -1,6 +1,7 @@
 package infisicalclient
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -2560,6 +2561,80 @@ type CheckDuplicateDestinationResponse struct {
 	HasDuplicate bool `json:"hasDuplicate"`
 }
 
+type CertificateSync struct {
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	Destination       string                 `json:"destination"`
+	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
+	ConnectionID      string                 `json:"connectionId"`
+	ApplicationID     string                 `json:"applicationId"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type CreateCertificateSyncRequest struct {
+	App               CertificateSyncApp     `json:"-"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	ConnectionID      string                 `json:"connectionId"`
+	ApplicationID     string                 `json:"applicationId"`
+	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type UpdateCertificateSyncRequest struct {
+	App               CertificateSyncApp     `json:"-"`
+	ID                string                 `json:"-"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	ConnectionID      string                 `json:"connectionId"`
+	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
+	SyncOptions       map[string]interface{} `json:"syncOptions"`
+	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+}
+
+type GetCertificateSyncByIdRequest struct {
+	ID string
+}
+
+type DeleteCertificateSyncRequest struct {
+	App CertificateSyncApp
+	ID  string
+}
+
+type CertificateSyncCertificate struct {
+	ID                string `json:"id"`
+	CertificateSyncID string `json:"pkiSyncId"`
+	CertificateID     string `json:"certificateId"`
+}
+
+type AddCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string   `json:"-"`
+	CertificateIDs    []string `json:"certificateIds"`
+}
+
+type AddCertificateSyncCertificatesResponse struct {
+	AddedCertificates []CertificateSyncCertificate `json:"addedCertificates"`
+}
+
+type RemoveCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string   `json:"-"`
+	CertificateIDs    []string `json:"certificateIds"`
+}
+
+type ListCertificateSyncCertificatesRequest struct {
+	CertificateSyncID string
+	Offset            int
+	Limit             int
+}
+
+type ListCertificateSyncCertificatesResponse struct {
+	Certificates []CertificateSyncCertificate `json:"certificates"`
+	TotalCount   int                          `json:"totalCount"`
+}
+
 type DynamicSecret struct {
 	Id               string                 `json:"id"`
 	Name             string                 `json:"name"`
@@ -2790,15 +2865,18 @@ type DeleteSecretRotationResponse struct {
 }
 
 type ProjectTemplate struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Roles        []Role        `json:"roles"`
-	Environments []Environment `json:"environments"`
-	OrgID        string        `json:"orgId"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	UpdatedAt    time.Time     `json:"updatedAt"`
-	Type         string        `json:"type"`
+	ID           string                    `json:"id"`
+	Name         string                    `json:"name"`
+	Description  string                    `json:"description"`
+	Roles        []Role                    `json:"roles"`
+	Environments []Environment             `json:"environments"`
+	Identities   []ProjectTemplateIdentity `json:"identities"`
+	Users        []ProjectTemplateUser     `json:"users"`
+	Groups       []ProjectTemplateGroup    `json:"groups"`
+	OrgID        string                    `json:"orgId"`
+	CreatedAt    time.Time                 `json:"createdAt"`
+	UpdatedAt    time.Time                 `json:"updatedAt"`
+	Type         string                    `json:"type"`
 }
 
 type Environment struct {
@@ -2820,12 +2898,30 @@ type Permission struct {
 	Inverted   bool           `json:"inverted"`
 }
 
+type ProjectTemplateIdentity struct {
+	IdentityID string   `json:"identityId"`
+	Roles      []string `json:"roles"`
+}
+
+type ProjectTemplateUser struct {
+	Username string   `json:"username"`
+	Roles    []string `json:"roles"`
+}
+
+type ProjectTemplateGroup struct {
+	GroupSlug string   `json:"groupSlug"`
+	Roles     []string `json:"roles"`
+}
+
 type CreateProjectTemplateRequest struct {
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Type         string        `json:"type"`
-	Roles        []Role        `json:"roles,omitempty"`
-	Environments []Environment `json:"environments"`
+	Name         string                    `json:"name"`
+	Description  string                    `json:"description"`
+	Type         string                    `json:"type"`
+	Roles        []Role                    `json:"roles,omitempty"`
+	Environments []Environment             `json:"environments"`
+	Identities   []ProjectTemplateIdentity `json:"identities,omitempty"`
+	Users        []ProjectTemplateUser     `json:"users,omitempty"`
+	Groups       []ProjectTemplateGroup    `json:"groups,omitempty"`
 }
 
 type CreateProjectTemplateResponse struct {
@@ -2847,6 +2943,10 @@ type UpdateProjectTemplateRequest struct {
 	Type         string        `json:"type"`
 	Roles        []Role        `json:"roles,omitempty"`
 	Environments []Environment `json:"environments"`
+	// No omitempty: removing these from config must send an explicit [] to clear them server-side.
+	Identities []ProjectTemplateIdentity `json:"identities"`
+	Users      []ProjectTemplateUser     `json:"users"`
+	Groups     []ProjectTemplateGroup    `json:"groups"`
 }
 
 type UpdateProjectTemplateResponse struct {
@@ -3096,15 +3196,15 @@ type CertificatePolicySAN struct {
 }
 
 type CertificatePolicyKeyUsages struct {
-	Allowed  []string `json:"allowed,omitempty"`
-	Required []string `json:"required,omitempty"`
-	Denied   []string `json:"denied,omitempty"`
+	Allowed  *[]string `json:"allowed,omitempty"`
+	Required *[]string `json:"required,omitempty"`
+	Denied   *[]string `json:"denied,omitempty"`
 }
 
 type CertificatePolicyExtendedKeyUsages struct {
-	Allowed  []string `json:"allowed,omitempty"`
-	Required []string `json:"required,omitempty"`
-	Denied   []string `json:"denied,omitempty"`
+	Allowed  *[]string `json:"allowed,omitempty"`
+	Required *[]string `json:"required,omitempty"`
+	Denied   *[]string `json:"denied,omitempty"`
 }
 
 type CertificatePolicyAlgorithms struct {
@@ -3164,14 +3264,14 @@ type GetCertificatePolicyResponse struct {
 type UpdateCertificatePolicyRequest struct {
 	PolicyId          string                              `json:"-"`
 	Name              string                              `json:"name,omitempty"`
-	Description       string                              `json:"description,omitempty"`
-	Subject           []CertificatePolicySubject          `json:"subject,omitempty"`
-	Sans              []CertificatePolicySAN              `json:"sans,omitempty"`
-	KeyUsages         *CertificatePolicyKeyUsages         `json:"keyUsages,omitempty"`
-	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages,omitempty"`
-	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms,omitempty"`
-	Validity          *CertificatePolicyValidity          `json:"validity,omitempty"`
-	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints,omitempty"`
+	Description       string                              `json:"description"`
+	Subject           []CertificatePolicySubject          `json:"subject"`
+	Sans              []CertificatePolicySAN              `json:"sans"`
+	KeyUsages         *CertificatePolicyKeyUsages         `json:"keyUsages"`
+	ExtendedKeyUsages *CertificatePolicyExtendedKeyUsages `json:"extendedKeyUsages"`
+	Algorithms        *CertificatePolicyAlgorithms        `json:"algorithms"`
+	Validity          *CertificatePolicyValidity          `json:"validity"`
+	BasicConstraints  *CertificatePolicyBasicConstraints  `json:"basicConstraints"`
 }
 
 type UpdateCertificatePolicyResponse struct {
@@ -4115,6 +4215,25 @@ type RemoveCertManagerIdentityResponse struct {
 	IdentityMembership CertManagerIdentityMembershipBasic `json:"identityMembership"`
 }
 
+// Gateway
+
+// Gateway holds the gateway fields the provider resolves by name. The list endpoint returns more
+// per gateway; only these two are read.
+type Gateway struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Organization
+
+// Organization holds the organization fields the provider can resolve for the
+// identity's root organization and its sub-organizations.
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 // Sub-organization
 
 type SubOrganization struct {
@@ -4305,4 +4424,98 @@ type DeleteSecretValidationRuleRequest struct {
 
 type DeleteSecretValidationRuleResponse struct {
 	Rule SecretValidationRule `json:"rule"`
+}
+
+type AlertChannelRecipient struct {
+	PrincipalType string `json:"principalType"`
+	PrincipalID   string `json:"principalId"`
+}
+
+type AlertChannel struct {
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	ChannelType string                  `json:"channelType"`
+	Enabled     bool                    `json:"enabled"`
+	Config      map[string]any          `json:"config"`
+	Recipients  []AlertChannelRecipient `json:"recipients"`
+}
+
+type Alert struct {
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Description  *string         `json:"description"`
+	ResourceType string          `json:"resourceType"`
+	ResourceID   *string         `json:"resourceId"`
+	EventType    string          `json:"eventType"`
+	Condition    json.RawMessage `json:"condition"`
+	Enabled      bool            `json:"enabled"`
+	OrgID        string          `json:"orgId"`
+	ProjectID    *string         `json:"projectId"`
+	Channels     []AlertChannel  `json:"channels"`
+}
+
+type AlertChannelInput struct {
+	ID          *string                 `json:"id,omitempty"`
+	Name        string                  `json:"name"`
+	ChannelType string                  `json:"channelType"`
+	Enabled     bool                    `json:"enabled"`
+	Config      map[string]any          `json:"config"`
+	Recipients  []AlertChannelRecipient `json:"recipients"`
+}
+
+type CreateAlertRequest struct {
+	Name         string              `json:"name"`
+	Description  *string             `json:"description,omitempty"`
+	ResourceType string              `json:"resourceType"`
+	ResourceID   string              `json:"resourceId"`
+	EventType    string              `json:"eventType"`
+	Condition    any                 `json:"condition"`
+	Enabled      bool                `json:"enabled"`
+	ProjectID    *string             `json:"projectId,omitempty"`
+	Channels     []AlertChannelInput `json:"channels"`
+}
+
+type CreateAlertResponse struct {
+	Alert Alert `json:"alert"`
+}
+
+type ListAlertsRequest struct {
+	ResourceType string
+	ResourceID   string
+	ProjectID    *string
+}
+
+type ListAlertsResponse struct {
+	Alerts []Alert `json:"alerts"`
+}
+
+type GetAlertByIDRequest struct {
+	ID string
+}
+
+type GetAlertByIDResponse struct {
+	Alert Alert `json:"alert"`
+}
+
+type UpdateAlertRequest struct {
+	ID          string              `json:"-"`
+	Name        string              `json:"name"`
+	Description *string             `json:"description"`
+	Condition   any                 `json:"condition"`
+	Enabled     bool                `json:"enabled"`
+	Channels    []AlertChannelInput `json:"channels"`
+}
+
+type UpdateAlertResponse struct {
+	Alert Alert `json:"alert"`
+}
+
+type DeleteAlertRequest struct {
+	ID string
+}
+
+type DeleteAlertResponse struct {
+	Alert struct {
+		ID string `json:"id"`
+	} `json:"alert"`
 }

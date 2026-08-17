@@ -5,10 +5,14 @@ import (
 	"strconv"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -25,11 +29,13 @@ type DynamicSecretMongoAtlasScopePlanModel struct {
 }
 
 type DynamicSecretMongoAtlasConfigurationModel struct {
-	AdminPublicKey  types.String `tfsdk:"admin_public_key"`
-	AdminPrivateKey types.String `tfsdk:"admin_private_key"`
-	GroupId         types.String `tfsdk:"group_id"`
-	Roles           types.List   `tfsdk:"roles"`
-	Scopes          types.List   `tfsdk:"scopes"`
+	AdminPublicKey           types.String `tfsdk:"admin_public_key"`
+	AdminPrivateKey          types.String `tfsdk:"admin_private_key"`
+	AdminPrivateKeyWO        types.String `tfsdk:"admin_private_key_wo"`
+	AdminPrivateKeyWOVersion types.Int64  `tfsdk:"admin_private_key_wo_version"`
+	GroupId                  types.String `tfsdk:"group_id"`
+	Roles                    types.List   `tfsdk:"roles"`
+	Scopes                   types.List   `tfsdk:"scopes"`
 }
 
 func NewDynamicSecretMongoAtlasResource() resource.Resource {
@@ -43,9 +49,35 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				Description: "Admin user public API key",
 			},
 			"admin_private_key": schema.StringAttribute{
-				Required:    true,
-				Description: "Admin user private API key",
+				Optional:    true,
+				Description: "Admin user private API key. This value is stored in the Terraform state; use admin_private_key_wo to keep it out of state. Exactly one of admin_private_key or admin_private_key_wo must be set.",
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(
+						path.MatchRelative().AtParent().AtName("admin_private_key_wo"),
+					),
+				},
+			},
+			"admin_private_key_wo": schema.StringAttribute{
+				Optional:    true,
+				WriteOnly:   true,
+				Description: "Admin user private API key (write-only). This value is never stored in the Terraform state and can accept ephemeral values. Because it is not stored, changes to it are not detected; increment admin_private_key_wo_version to push a new value. Requires Terraform 1.11+.",
+				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(
+						path.MatchRelative().AtParent().AtName("admin_private_key_wo_version"),
+					),
+				},
+			},
+			"admin_private_key_wo_version": schema.Int64Attribute{
+				Optional:    true,
+				Description: "The version of the admin_private_key_wo value. Increment this to trigger an update of the private key.",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AlsoRequires(
+						path.MatchRelative().AtParent().AtName("admin_private_key_wo"),
+					),
+				},
 			},
 			"group_id": schema.StringAttribute{
 				Required:    true,
@@ -88,7 +120,7 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			},
 		},
 
-		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel) (map[string]any, diag.Diagnostics) {
+		ReadConfigurationFromPlan: func(ctx context.Context, plan DynamicSecretBaseResourceModel, config DynamicSecretBaseResourceModel) (map[string]any, diag.Diagnostics) {
 			configurationMap := make(map[string]any)
 			var configuration DynamicSecretMongoAtlasConfigurationModel
 
@@ -97,8 +129,20 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				return nil, diags
 			}
 
+			// Write-only values are stripped from the plan, so read them from config
+			var rawConfiguration DynamicSecretMongoAtlasConfigurationModel
+			diags.Append(config.Configuration.As(ctx, &rawConfiguration, basetypes.ObjectAsOptions{})...)
+			if diags.HasError() {
+				return nil, diags
+			}
+
+			adminPrivateKey := configuration.AdminPrivateKey.ValueString()
+			if !rawConfiguration.AdminPrivateKeyWO.IsNull() {
+				adminPrivateKey = rawConfiguration.AdminPrivateKeyWO.ValueString()
+			}
+
 			configurationMap["adminPublicKey"] = configuration.AdminPublicKey.ValueString()
-			configurationMap["adminPrivateKey"] = configuration.AdminPrivateKey.ValueString()
+			configurationMap["adminPrivateKey"] = adminPrivateKey
 			configurationMap["groupId"] = configuration.GroupId.ValueString()
 
 			if !configuration.Roles.IsNull() && !configuration.Roles.IsUnknown() {
@@ -178,10 +222,20 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 				return types.ObjectNull(configState.AttributeTypes(ctx)), diags
 			}
 
+			// When admin_private_key_wo is used, admin_private_key is null in
+			// plan/state and must stay null so the API's value is never written
+			// to the state.
+			adminPrivateKeyValue := types.StringNull()
+			if !currentState.AdminPrivateKey.IsNull() {
+				adminPrivateKeyValue = types.StringValue(adminPrivateKey)
+			}
+
 			configuration := map[string]attr.Value{
-				"admin_public_key":  types.StringValue(adminPublicKey),
-				"admin_private_key": types.StringValue(adminPrivateKey),
-				"group_id":          types.StringValue(groupId),
+				"admin_public_key":             types.StringValue(adminPublicKey),
+				"admin_private_key":            adminPrivateKeyValue,
+				"admin_private_key_wo":         types.StringNull(),
+				"admin_private_key_wo_version": currentState.AdminPrivateKeyWOVersion,
+				"group_id":                     types.StringValue(groupId),
 			}
 
 			rolesRaw, ok := dynamicSecret.Inputs["roles"].([]any)
@@ -328,9 +382,11 @@ func NewDynamicSecretMongoAtlasResource() resource.Resource {
 			}
 
 			configType := map[string]attr.Type{
-				"admin_public_key":  types.StringType,
-				"admin_private_key": types.StringType,
-				"group_id":          types.StringType,
+				"admin_public_key":             types.StringType,
+				"admin_private_key":            types.StringType,
+				"admin_private_key_wo":         types.StringType,
+				"admin_private_key_wo_version": types.Int64Type,
+				"group_id":                     types.StringType,
 				"roles": types.ListType{
 					ElemType: types.ObjectType{
 						AttrTypes: map[string]attr.Type{

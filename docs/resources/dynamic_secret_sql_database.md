@@ -109,7 +109,6 @@ Required:
 - `creation_statement` (String) The creation statement to use to create the dynamic secret lease.
 - `database` (String) The name of the database to use.
 - `host` (String) The host of the database server.
-- `password` (String, Sensitive) The password to use to connect to the database.
 - `port` (Number) The port of the database server.
 - `revocation_statement` (String) The revocation statement to use to revoke the dynamic secret lease.
 - `username` (String) The username to use to connect to the database.
@@ -118,7 +117,10 @@ Optional:
 
 - `ca` (String) The CA certificate to use to connect to the database.
 - `gateway_id` (String) The Gateway ID to use to connect to the database.
+- `password` (String, Sensitive) The password to use to connect to the database. This value is stored in the Terraform state; use password_wo to keep it out of state. Exactly one of password or password_wo must be set.
 - `password_requirements` (Attributes) The password requirements to use to create the dynamic secret lease. (see [below for nested schema](#nestedatt--configuration--password_requirements))
+- `password_wo` (String, Sensitive) The password to use to connect to the database (write-only). This value is never stored in the Terraform state and can accept ephemeral values. Because it is not stored, changes to it are not detected; increment password_wo_version to push a new value. Requires Terraform 1.11+.
+- `password_wo_version` (Number) The version of the password_wo value. Increment this to trigger an update of the password.
 - `renew_statement` (String) The renew statement to use to renew the dynamic secret lease.
 
 <a id="nestedatt--configuration--password_requirements"></a>

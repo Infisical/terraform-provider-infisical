@@ -3,12 +3,15 @@
 page_title: "infisical_integration_circleci Resource - terraform-provider-infisical"
 subcategory: "Native Integrations - DEPRECATED"
 description: |-
-  Create CircleCI integration & save to Infisical. Only Machine Identity authentication is supported for this data source
+  Deprecated: Native Integrations are being retired on August 19, 2027. Secret Syncs are the recommended replacement, and they support the same services and offer additional features. Existing integrations continue to work until the retirement date. You can read more about the migration on Migrating from Native Integrations https://infisical.com/docs/integrations/secret-syncs/native-integrations-migration.
+  Create CircleCI integration & save to Infisical. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_integration_circleci (Resource)
 
-Create CircleCI integration & save to Infisical. Only Machine Identity authentication is supported for this data source
+**Deprecated:** Native Integrations are being retired on **August 19, 2027**. Secret Syncs are the recommended replacement, and they support the same services and offer additional features. Existing integrations continue to work until the retirement date. You can read more about the migration on [Migrating from Native Integrations](https://infisical.com/docs/integrations/secret-syncs/native-integrations-migration).
+
+Create CircleCI integration & save to Infisical. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 

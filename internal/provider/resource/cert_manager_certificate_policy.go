@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var (
@@ -39,6 +41,7 @@ var (
 		"RSA-2048", "RSA-3072", "RSA-4096",
 		"ECDSA-P256", "ECDSA-P521", "ECDSA-P384",
 	}
+	POLICY_NAME_SLUG_REGEX = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 )
 
 var (
@@ -111,22 +114,125 @@ func (r *certManagerCertificatePolicyResource) Metadata(_ context.Context, req r
 	resp.TypeName = req.ProviderTypeName + "_cert_manager_certificate_policy"
 }
 
-func (r *certManagerCertificatePolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var basicConstraints *certManagerCertificatePolicyBasicConstraintsModel
+type certManagerCertificatePolicyConfigModel struct {
+	Id                types.String `tfsdk:"id"`
+	Name              types.String `tfsdk:"name"`
+	Description       types.String `tfsdk:"description"`
+	Subject           types.List   `tfsdk:"subject"`
+	Sans              types.List   `tfsdk:"sans"`
+	KeyUsages         types.Object `tfsdk:"key_usages"`
+	ExtendedKeyUsages types.Object `tfsdk:"extended_key_usages"`
+	Algorithms        types.Object `tfsdk:"algorithms"`
+	Validity          types.Object `tfsdk:"validity"`
+	BasicConstraints  types.Object `tfsdk:"basic_constraints"`
+}
 
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("basic_constraints"), &basicConstraints)...)
+func (r *certManagerCertificatePolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var rawConfig certManagerCertificatePolicyConfigModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &rawConfig)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if basicConstraints != nil &&
-		basicConstraints.IsCa.ValueString() == "denied" &&
-		!basicConstraints.MaxPathLength.IsNull() &&
-		!basicConstraints.MaxPathLength.IsUnknown() {
+	var config certManagerCertificatePolicyResourceModel
+
+	if !rawConfig.Subject.IsNull() && !rawConfig.Subject.IsUnknown() {
+		resp.Diagnostics.Append(rawConfig.Subject.ElementsAs(ctx, &config.Subject, false)...)
+	}
+	if !rawConfig.Sans.IsNull() && !rawConfig.Sans.IsUnknown() {
+		resp.Diagnostics.Append(rawConfig.Sans.ElementsAs(ctx, &config.Sans, false)...)
+	}
+	if !rawConfig.KeyUsages.IsNull() && !rawConfig.KeyUsages.IsUnknown() {
+		config.KeyUsages = &certManagerCertificatePolicyKeyUsagesModel{}
+		resp.Diagnostics.Append(rawConfig.KeyUsages.As(ctx, config.KeyUsages, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.ExtendedKeyUsages.IsNull() && !rawConfig.ExtendedKeyUsages.IsUnknown() {
+		config.ExtendedKeyUsages = &certManagerCertificatePolicyExtendedKeyUsagesModel{}
+		resp.Diagnostics.Append(rawConfig.ExtendedKeyUsages.As(ctx, config.ExtendedKeyUsages, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.Algorithms.IsNull() && !rawConfig.Algorithms.IsUnknown() {
+		config.Algorithms = &certManagerCertificatePolicyAlgorithmsModel{}
+		resp.Diagnostics.Append(rawConfig.Algorithms.As(ctx, config.Algorithms, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.Validity.IsNull() && !rawConfig.Validity.IsUnknown() {
+		config.Validity = &certManagerCertificatePolicyValidityModel{}
+		resp.Diagnostics.Append(rawConfig.Validity.As(ctx, config.Validity, basetypes.ObjectAsOptions{})...)
+	}
+	if !rawConfig.BasicConstraints.IsNull() && !rawConfig.BasicConstraints.IsUnknown() {
+		config.BasicConstraints = &certManagerCertificatePolicyBasicConstraintsModel{}
+		resp.Diagnostics.Append(rawConfig.BasicConstraints.As(ctx, config.BasicConstraints, basetypes.ObjectAsOptions{})...)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if config.BasicConstraints != nil &&
+		config.BasicConstraints.IsCa.ValueString() == "denied" &&
+		!config.BasicConstraints.MaxPathLength.IsNull() &&
+		!config.BasicConstraints.MaxPathLength.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("basic_constraints").AtName("max_path_length"),
 			"Invalid basic_constraints configuration",
 			"max_path_length cannot be set when is_ca is \"denied\". Remove max_path_length or set is_ca to \"allowed\" or \"required\".",
+		)
+	}
+
+	for i, subj := range config.Subject {
+		if subj.Allowed.IsNull() && subj.Required.IsNull() && subj.Denied.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("subject").AtListIndex(i),
+				"Empty subject block",
+				"A subject block must set at least one of allowed, required, or denied. Remove the block instead of leaving it empty.",
+			)
+		}
+	}
+	for i, san := range config.Sans {
+		if san.Allowed.IsNull() && san.Required.IsNull() && san.Denied.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("sans").AtListIndex(i),
+				"Empty sans block",
+				"A sans block must set at least one of allowed, required, or denied. Remove the block instead of leaving it empty.",
+			)
+		}
+	}
+	if config.KeyUsages != nil &&
+		config.KeyUsages.Allowed.IsNull() && config.KeyUsages.Required.IsNull() && config.KeyUsages.Denied.IsNull() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("key_usages"),
+			"Empty key_usages block",
+			"The key_usages block must set at least one of allowed, required, or denied. Remove the block instead of leaving it empty.",
+		)
+	}
+	if config.ExtendedKeyUsages != nil &&
+		config.ExtendedKeyUsages.Allowed.IsNull() && config.ExtendedKeyUsages.Required.IsNull() && config.ExtendedKeyUsages.Denied.IsNull() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("extended_key_usages"),
+			"Empty extended_key_usages block",
+			"The extended_key_usages block must set at least one of allowed, required, or denied. Remove the block instead of leaving it empty.",
+		)
+	}
+	if config.Algorithms != nil &&
+		config.Algorithms.Signature.IsNull() && config.Algorithms.KeyAlgorithm.IsNull() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("algorithms"),
+			"Empty algorithms block",
+			"The algorithms block must set signature or key_algorithm. Remove the block instead of leaving it empty.",
+		)
+	}
+	if config.Validity != nil && config.Validity.Max.IsNull() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("validity"),
+			"Empty validity block",
+			"The validity block must set max. Remove the block instead of leaving it empty.",
+		)
+	}
+	if config.BasicConstraints != nil &&
+		config.BasicConstraints.IsCa.IsNull() && config.BasicConstraints.MaxPathLength.IsNull() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("basic_constraints"),
+			"Empty basic_constraints block",
+			"The basic_constraints block must set is_ca or max_path_length. Remove the block instead of leaving it empty.",
 		)
 	}
 }
@@ -143,12 +249,19 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the certificate policy",
+				Description: "The name of the certificate policy. Must be in slug format: lowercase letters and numbers, separated by single hyphens (e.g. 'web-server-policy').",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(255),
+					stringvalidator.RegexMatches(POLICY_NAME_SLUG_REGEX, "must be lowercase letters and numbers separated by single hyphens (e.g. 'web-server-policy')"),
+				},
 			},
 			"description": schema.StringAttribute{
-				Description: "The description of the certificate policy",
+				Description: "The description of the certificate policy (max 255 characters). Omit the attribute instead of passing an empty string.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 255),
+				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -167,16 +280,25 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 							Description: "List of allowed values for this subject attribute. Supports the '*' wildcard.",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"required": schema.ListAttribute{
 							Description: "List of required values for this subject attribute. Supports the '*' wildcard.",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"denied": schema.ListAttribute{
 							Description: "List of denied values for this subject attribute. Supports the '*' wildcard.",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 					},
 				},
@@ -196,22 +318,31 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 							Description: "List of allowed values for this SAN type",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"required": schema.ListAttribute{
 							Description: "List of required values for this SAN type",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 						"denied": schema.ListAttribute{
 							Description: "List of denied values for this SAN type",
 							Optional:    true,
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 					},
 				},
 			},
 			"key_usages": schema.SingleNestedBlock{
-				Description: "Key usage policies for the certificate policy",
+				Description: "Key usage policies for the certificate policy. When this block is present, requested key usages must be within the union of allowed and required; setting allowed and required to empty lists denies all key usages. Omit the block for no constraint.",
 				Attributes: map[string]schema.Attribute{
 					"allowed": schema.ListAttribute{
 						Description: "List of allowed key usages. Possible values: " + strings.Join(SUPPORTED_CERT_KEY_USAGES, ", "),
@@ -240,7 +371,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 				},
 			},
 			"extended_key_usages": schema.SingleNestedBlock{
-				Description: "Extended key usage policies for the certificate policy",
+				Description: "Extended key usage policies for the certificate policy. When this block is present, requested extended key usages must be within the union of allowed and required; setting allowed and required to empty lists denies all extended key usages. Omit the block for no constraint.",
 				Attributes: map[string]schema.Attribute{
 					"allowed": schema.ListAttribute{
 						Description: "List of allowed extended key usages. Possible values: " + strings.Join(SUPPORTED_CERT_EXT_KEY_USAGES, ", "),
@@ -269,11 +400,11 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 				},
 			},
 			"algorithms": schema.SingleNestedBlock{
-				Description: "Algorithm constraints for the certificate policy. At least one signature algorithm and one key algorithm must be specified.",
+				Description: "Algorithm constraints for the certificate policy. Omit the block to accept any algorithm; each list restricts its own kind independently and needs at least one value when set.",
 				Attributes: map[string]schema.Attribute{
 					"signature": schema.ListAttribute{
-						Description: "List of allowed signature algorithms (at least one required). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", "),
-						Required:    true,
+						Description: "List of allowed signature algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", "),
+						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
 							listvalidator.SizeAtLeast(1),
@@ -281,8 +412,8 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						},
 					},
 					"key_algorithm": schema.ListAttribute{
-						Description: "List of allowed key algorithms (at least one required). Supported values: " + strings.Join(SUPPORTED_KEY_ALGORITHMS, ", "),
-						Required:    true,
+						Description: "List of allowed key algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_KEY_ALGORITHMS, ", "),
+						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
 							listvalidator.SizeAtLeast(1),
@@ -421,19 +552,19 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 		if !plan.KeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.KeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			createPolicyRequest.KeyUsages.Allowed = allowed
+			createPolicyRequest.KeyUsages.Allowed = &allowed
 		}
 
 		if !plan.KeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.KeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			createPolicyRequest.KeyUsages.Required = required
+			createPolicyRequest.KeyUsages.Required = &required
 		}
 
 		if !plan.KeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.KeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			createPolicyRequest.KeyUsages.Denied = denied
+			createPolicyRequest.KeyUsages.Denied = &denied
 		}
 	}
 
@@ -443,19 +574,19 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 		if !plan.ExtendedKeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.ExtendedKeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			createPolicyRequest.ExtendedKeyUsages.Allowed = allowed
+			createPolicyRequest.ExtendedKeyUsages.Allowed = &allowed
 		}
 
 		if !plan.ExtendedKeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.ExtendedKeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			createPolicyRequest.ExtendedKeyUsages.Required = required
+			createPolicyRequest.ExtendedKeyUsages.Required = &required
 		}
 
 		if !plan.ExtendedKeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.ExtendedKeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			createPolicyRequest.ExtendedKeyUsages.Denied = denied
+			createPolicyRequest.ExtendedKeyUsages.Denied = &denied
 		}
 	}
 
@@ -507,6 +638,14 @@ func (r *certManagerCertificatePolicyResource) Create(ctx context.Context, req r
 	plan.Id = types.StringValue(policy.CertificatePolicy.Id)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+
+	if policy.CertificatePolicy.Name != plan.Name.ValueString() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("name"),
+			"Certificate policy name already in use",
+			fmt.Sprintf("A certificate policy named '%s' already exists in the project, so the server created this one as '%s'. Choose a unique name; the resource will be replaced on the next apply.", plan.Name.ValueString(), policy.CertificatePolicy.Name),
+		)
+	}
 }
 
 func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -567,11 +706,7 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 				resp.Diagnostics.Append(diags...)
 				state.Subject[i].Required = requiredList
 			} else {
-				if len(currentState.Subject) > i && !currentState.Subject[i].Required.IsNull() {
-					state.Subject[i].Required = currentState.Subject[i].Required
-				} else {
-					state.Subject[i].Required = types.ListNull(types.StringType)
-				}
+				state.Subject[i].Required = types.ListNull(types.StringType)
 			}
 
 			if len(subj.Denied) > 0 {
@@ -620,24 +755,24 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 	if policy.CertificatePolicy.KeyUsages != nil {
 		state.KeyUsages = &certManagerCertificatePolicyKeyUsagesModel{}
 
-		if len(policy.CertificatePolicy.KeyUsages.Allowed) > 0 {
-			allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Allowed)
+		if policy.CertificatePolicy.KeyUsages.Allowed != nil {
+			allowedList, diags := types.ListValueFrom(ctx, types.StringType, *policy.CertificatePolicy.KeyUsages.Allowed)
 			resp.Diagnostics.Append(diags...)
 			state.KeyUsages.Allowed = allowedList
 		} else {
 			state.KeyUsages.Allowed = types.ListNull(types.StringType)
 		}
 
-		if len(policy.CertificatePolicy.KeyUsages.Required) > 0 {
-			requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Required)
+		if policy.CertificatePolicy.KeyUsages.Required != nil {
+			requiredList, diags := types.ListValueFrom(ctx, types.StringType, *policy.CertificatePolicy.KeyUsages.Required)
 			resp.Diagnostics.Append(diags...)
 			state.KeyUsages.Required = requiredList
 		} else {
 			state.KeyUsages.Required = types.ListNull(types.StringType)
 		}
 
-		if len(policy.CertificatePolicy.KeyUsages.Denied) > 0 {
-			deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.KeyUsages.Denied)
+		if policy.CertificatePolicy.KeyUsages.Denied != nil {
+			deniedList, diags := types.ListValueFrom(ctx, types.StringType, *policy.CertificatePolicy.KeyUsages.Denied)
 			resp.Diagnostics.Append(diags...)
 			state.KeyUsages.Denied = deniedList
 		} else {
@@ -648,24 +783,24 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 	if policy.CertificatePolicy.ExtendedKeyUsages != nil {
 		state.ExtendedKeyUsages = &certManagerCertificatePolicyExtendedKeyUsagesModel{}
 
-		if len(policy.CertificatePolicy.ExtendedKeyUsages.Allowed) > 0 {
-			allowedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Allowed)
+		if policy.CertificatePolicy.ExtendedKeyUsages.Allowed != nil {
+			allowedList, diags := types.ListValueFrom(ctx, types.StringType, *policy.CertificatePolicy.ExtendedKeyUsages.Allowed)
 			resp.Diagnostics.Append(diags...)
 			state.ExtendedKeyUsages.Allowed = allowedList
 		} else {
 			state.ExtendedKeyUsages.Allowed = types.ListNull(types.StringType)
 		}
 
-		if len(policy.CertificatePolicy.ExtendedKeyUsages.Required) > 0 {
-			requiredList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Required)
+		if policy.CertificatePolicy.ExtendedKeyUsages.Required != nil {
+			requiredList, diags := types.ListValueFrom(ctx, types.StringType, *policy.CertificatePolicy.ExtendedKeyUsages.Required)
 			resp.Diagnostics.Append(diags...)
 			state.ExtendedKeyUsages.Required = requiredList
 		} else {
 			state.ExtendedKeyUsages.Required = types.ListNull(types.StringType)
 		}
 
-		if len(policy.CertificatePolicy.ExtendedKeyUsages.Denied) > 0 {
-			deniedList, diags := types.ListValueFrom(ctx, types.StringType, policy.CertificatePolicy.ExtendedKeyUsages.Denied)
+		if policy.CertificatePolicy.ExtendedKeyUsages.Denied != nil {
+			deniedList, diags := types.ListValueFrom(ctx, types.StringType, *policy.CertificatePolicy.ExtendedKeyUsages.Denied)
 			resp.Diagnostics.Append(diags...)
 			state.ExtendedKeyUsages.Denied = deniedList
 		} else {
@@ -673,7 +808,8 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 		}
 	}
 
-	if policy.CertificatePolicy.Algorithms != nil {
+	if policy.CertificatePolicy.Algorithms != nil &&
+		len(policy.CertificatePolicy.Algorithms.Signature)+len(policy.CertificatePolicy.Algorithms.KeyAlgorithm) > 0 {
 		state.Algorithms = &certManagerCertificatePolicyAlgorithmsModel{}
 
 		if len(policy.CertificatePolicy.Algorithms.Signature) > 0 {
@@ -699,7 +835,8 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 		}
 	}
 
-	if policy.CertificatePolicy.BasicConstraints != nil {
+	if policy.CertificatePolicy.BasicConstraints != nil &&
+		(policy.CertificatePolicy.BasicConstraints.IsCA != "" || policy.CertificatePolicy.BasicConstraints.MaxPathLength != nil) {
 		state.BasicConstraints = &certManagerCertificatePolicyBasicConstraintsModel{}
 
 		if policy.CertificatePolicy.BasicConstraints.IsCA != "" {
@@ -800,19 +937,19 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 		if !plan.KeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.KeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			updatePolicyRequest.KeyUsages.Allowed = allowed
+			updatePolicyRequest.KeyUsages.Allowed = &allowed
 		}
 
 		if !plan.KeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.KeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			updatePolicyRequest.KeyUsages.Required = required
+			updatePolicyRequest.KeyUsages.Required = &required
 		}
 
 		if !plan.KeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.KeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.KeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			updatePolicyRequest.KeyUsages.Denied = denied
+			updatePolicyRequest.KeyUsages.Denied = &denied
 		}
 	}
 
@@ -822,19 +959,19 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 		if !plan.ExtendedKeyUsages.Allowed.IsNull() {
 			allowed := make([]string, 0, len(plan.ExtendedKeyUsages.Allowed.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Allowed.ElementsAs(ctx, &allowed, false)...)
-			updatePolicyRequest.ExtendedKeyUsages.Allowed = allowed
+			updatePolicyRequest.ExtendedKeyUsages.Allowed = &allowed
 		}
 
 		if !plan.ExtendedKeyUsages.Required.IsNull() {
 			required := make([]string, 0, len(plan.ExtendedKeyUsages.Required.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Required.ElementsAs(ctx, &required, false)...)
-			updatePolicyRequest.ExtendedKeyUsages.Required = required
+			updatePolicyRequest.ExtendedKeyUsages.Required = &required
 		}
 
 		if !plan.ExtendedKeyUsages.Denied.IsNull() {
 			denied := make([]string, 0, len(plan.ExtendedKeyUsages.Denied.Elements()))
 			resp.Diagnostics.Append(plan.ExtendedKeyUsages.Denied.ElementsAs(ctx, &denied, false)...)
-			updatePolicyRequest.ExtendedKeyUsages.Denied = denied
+			updatePolicyRequest.ExtendedKeyUsages.Denied = &denied
 		}
 	}
 
@@ -877,9 +1014,21 @@ func (r *certManagerCertificatePolicyResource) Update(ctx context.Context, req r
 		return
 	}
 
-	_, err := r.client.UpdateCertificatePolicy(updatePolicyRequest)
+	updatedPolicy, err := r.client.UpdateCertificatePolicy(updatePolicyRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating certificate policy", err.Error())
+		return
+	}
+
+	if updatedPolicy.CertificatePolicy.Name != plan.Name.ValueString() {
+		requestedName := plan.Name.ValueString()
+		plan.Name = types.StringValue(updatedPolicy.CertificatePolicy.Name)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+		resp.Diagnostics.AddAttributeError(
+			path.Root("name"),
+			"Certificate policy name already in use",
+			fmt.Sprintf("A certificate policy named '%s' already exists in the project, so the server renamed this one to '%s'. Choose a unique name.", requestedName, updatedPolicy.CertificatePolicy.Name),
+		)
 		return
 	}
 
