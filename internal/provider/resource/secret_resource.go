@@ -773,7 +773,7 @@ func (r *secretResource) pollSecretApprovalRequest(ctx context.Context, approval
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	startTime := time.Now()
 
-	minInterval := 2 * time.Second
+	minInterval := 10 * time.Second
 	maxInterval := 30 * time.Second
 	currentInterval := minInterval
 
