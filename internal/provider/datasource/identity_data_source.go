@@ -4,17 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &IdentityDataSource{}
+var (
+	_ datasource.DataSource                     = &IdentityDataSource{}
+	_ datasource.DataSourceWithConfigValidators = &IdentityDataSource{}
+)
 
 func NewIdentityDataSource() datasource.DataSource {
 	return &IdentityDataSource{}
@@ -56,14 +63,16 @@ func (d *IdentityDataSource) Metadata(ctx context.Context, req datasource.Metada
 
 func (d *IdentityDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Look up an Infisical identity by its ID. Returns the identity's details including its name, organization role, auth methods, and metadata. Only Machine Identity authentication is supported for this data source.",
+		Description: "Look up an Infisical identity by its ID or its name. Returns the identity's details including its name, organization role, auth methods, and metadata. Identity names are not unique, so a lookup by name fails when more than one identity matches. Only Machine Identity authentication is supported for this data source.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the identity to look up",
-				Required:    true,
+				Description: "The ID of the identity to look up. Exactly one of id or name must be set.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the identity",
+				Description: "The name of the identity to look up. Exactly one of id or name must be set. Identity names are not unique, so the lookup fails if more than one identity has this name; use id to select a specific one.",
+				Optional:    true,
 				Computed:    true,
 			},
 			"has_delete_protection": schema.BoolAttribute{
@@ -107,6 +116,63 @@ func (d *IdentityDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 	}
 }
 
+func (d *IdentityDataSource) ConfigValidators(_ context.Context) []datasource.ConfigValidator {
+	return []datasource.ConfigValidator{
+		datasourcevalidator.ExactlyOneOf(
+			path.MatchRoot("id"),
+			path.MatchRoot("name"),
+		),
+	}
+}
+
+// resolveIdentityIDByName turns an identity name into the ID of the one identity that
+// bears it. Identity names are not unique, so anything other than exactly one match is
+// an error
+func resolveIdentityIDByName(client *infisical.Client, name string) (string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	result, err := client.SearchIdentitiesByName(name)
+	if err != nil {
+		diags.AddError(
+			"Something went wrong while searching for the identity",
+			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
+				"Infisical Client Error: "+err.Error(),
+		)
+		return "", diags
+	}
+
+	switch {
+	case len(result.Identities) == 0:
+		diags.AddError(
+			"Identity not found",
+			fmt.Sprintf("No identity was found with name %q", name),
+		)
+		return "", diags
+
+	case len(result.Identities) > 1:
+		ids := make([]string, 0, len(result.Identities))
+		for _, match := range result.Identities {
+			ids = append(ids, match.Identity.ID)
+		}
+
+		detail := fmt.Sprintf(
+			"%d identities are named %q, so the name does not identify a single identity. "+
+				"Set id to one of the following instead of name:\n  %s",
+			result.TotalCount, name, strings.Join(ids, "\n  "),
+		)
+		// The search returns one page, so a pathological number of duplicates would be
+		// truncated. Say so rather than presenting a partial list as the whole set.
+		if result.TotalCount > len(ids) {
+			detail += fmt.Sprintf("\n  ...and %d more", result.TotalCount-len(ids))
+		}
+
+		diags.AddError("Multiple identities match that name", detail)
+		return "", diags
+	}
+
+	return result.Identities[0].Identity.ID, diags
+}
+
 func (d *IdentityDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
@@ -146,14 +212,27 @@ func (d *IdentityDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
+	// ConfigValidators guarantees exactly one of id and name is set.
+	identityID := data.ID.ValueString()
+	if data.ID.IsNull() {
+		resolvedID, diags := resolveIdentityIDByName(d.client, data.Name.ValueString())
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		identityID = resolvedID
+	}
+
+	// Both lookup paths finish with a fetch by ID. The search endpoint omits identity
+	// metadata and auth
 	orgIdentity, err := d.client.GetIdentity(infisical.GetIdentityRequest{
-		IdentityID: data.ID.ValueString(),
+		IdentityID: identityID,
 	})
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
 			resp.Diagnostics.AddError(
 				"Identity not found",
-				fmt.Sprintf("No identity was found with ID %s", data.ID.ValueString()),
+				fmt.Sprintf("No identity was found with ID %s", identityID),
 			)
 			return
 		}
@@ -165,6 +244,7 @@ func (d *IdentityDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
+	data.ID = types.StringValue(orgIdentity.Identity.ID)
 	data.Name = types.StringValue(orgIdentity.Identity.Name)
 	data.HasDeleteProtection = types.BoolValue(orgIdentity.Identity.HasDeleteProtection)
 	data.OrgID = types.StringValue(orgIdentity.OrgID)
