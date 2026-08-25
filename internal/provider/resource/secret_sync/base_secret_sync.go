@@ -5,7 +5,9 @@ import (
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -49,6 +51,19 @@ type SecretSyncBaseResourceModel struct {
 // Metadata returns the resource type name.
 func (r *SecretSyncBaseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + r.ResourceTypeName
+}
+
+// ImportState imports an existing secret sync by its ID. Read then populates every attribute.
+func (r *SecretSyncBaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.Parse(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("Expected the %s secret sync ID to be a valid UUID, got: %s", r.SyncName, req.ID),
+		)
+		return
+	}
+
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
 func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

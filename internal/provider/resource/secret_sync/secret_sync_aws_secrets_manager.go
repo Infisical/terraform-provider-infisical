@@ -177,18 +177,20 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 				syncOptionsMap["aws_kms_key_id"] = types.StringNull() // Add a null value for missing attributes
 			}
 
+			// The API omits this field when it is off, so treat an absent value as false
+			// to match the schema default. Returning null here causes a permanent diff.
+			syncSecretMetadataAsTags := false
 			if secretSync.SyncOptions["syncSecretMetadataAsTags"] != nil {
-
-				syncSecretMetadataAsTags, ok := secretSync.SyncOptions["syncSecretMetadataAsTags"].(bool)
+				syncMetadataAsTags, ok := secretSync.SyncOptions["syncSecretMetadataAsTags"].(bool)
 				if !ok {
 					diags.AddError("Invalid syncSecretMetadataAsTags type", "Expected 'syncSecretMetadataAsTags' to be a boolean but got something else")
 					return types.ObjectNull(map[string]attr.Type{}), diags
 				}
 
-				syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolValue(syncSecretMetadataAsTags)
-			} else {
-				syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolNull()
+				syncSecretMetadataAsTags = syncMetadataAsTags
 			}
+
+			syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolValue(syncSecretMetadataAsTags)
 
 			if secretSync.SyncOptions["tags"] != nil {
 				rawTags, ok := secretSync.SyncOptions["tags"].([]interface{})
