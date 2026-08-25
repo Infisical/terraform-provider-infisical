@@ -95,3 +95,12 @@ Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Fly.io. Enable this option if you intend to manage some secrets manually outside of Infisical.
 - `key_schema` (String) The format to use for structuring secret keys in the Fly.io destination.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the Fly.io secret sync by its ID
+terraform import infisical_secret_sync_flyio.example <secret_sync_id>
+```
