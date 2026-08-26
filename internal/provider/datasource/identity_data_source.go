@@ -127,7 +127,7 @@ func (d *IdentityDataSource) ConfigValidators(_ context.Context) []datasource.Co
 
 // resolveIdentityIDByName turns an identity name into the ID of the one identity that
 // bears it. Identity names are not unique, so anything other than exactly one match is
-// an error
+// an error.
 func resolveIdentityIDByName(client *infisical.Client, name string) (string, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
