@@ -1472,6 +1472,33 @@ type GetIdentityResponse struct {
 	Identity OrgIdentity `json:"identity"`
 }
 
+// SearchIdentitiesNameFilter matches identities whose name is exactly equal to Eq.
+// The API also exposes $contains and $in, which are deliberately not surfaced here:
+// a lookup that has to resolve to a single identity is only well defined on an
+// exact match.
+type SearchIdentitiesNameFilter struct {
+	Eq string `json:"$eq"`
+}
+
+type SearchIdentitiesFilter struct {
+	Name *SearchIdentitiesNameFilter `json:"name,omitempty"`
+}
+
+type SearchIdentitiesRequest struct {
+	Limit  int                    `json:"limit"`
+	Offset int                    `json:"offset"`
+	Search SearchIdentitiesFilter `json:"search"`
+}
+
+// SearchIdentitiesResponse carries the matches for one page alongside TotalCount,
+// the number of matches across every page. The two differ when more identities share
+// a name than fit in a single page, so error messages should report TotalCount rather
+// than len(Identities).
+type SearchIdentitiesResponse struct {
+	Identities []OrgIdentity `json:"identities"`
+	TotalCount int           `json:"totalCount"`
+}
+
 type IdentityAuthTrustedIpRequest struct {
 	IPAddress string `json:"ipAddress"`
 }
