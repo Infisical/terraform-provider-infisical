@@ -15,6 +15,7 @@ const (
 	SecretRotationProviderAzureClientSecret   SecretRotationProvider = "azure-client-secret"
 	SecretRotationProviderAwsIamUserSecret    SecretRotationProvider = "aws-iam-user-secret"
 	SecretRotationProviderLdapPassword        SecretRotationProvider = "ldap-password"
+	SecretRotationProviderDatadogApiKey       SecretRotationProvider = "datadog-api-key"
 )
 
 const (
