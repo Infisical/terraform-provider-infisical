@@ -3,12 +3,12 @@
 page_title: "infisical_projects Data Source - terraform-provider-infisical"
 subcategory: "Projects"
 description: |-
-  Look up an Infisical project by its ID or its slug. Returns the project's details including its name, type, and environments. Only Machine Identity authentication is supported for this data source.
+  Look up an Infisical project by its ID or its slug. Only Machine Identity authentication is supported for this data source.
 ---
 
 # infisical_projects (Data Source)
 
-Look up an Infisical project by its ID or its slug. Returns the project's details including its name, type, and environments. Only Machine Identity authentication is supported for this data source.
+Look up an Infisical project by its ID or its slug. Only Machine Identity authentication is supported for this data source.
 
 ## Example Usage
 
