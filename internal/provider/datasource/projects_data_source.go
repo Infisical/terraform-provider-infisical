@@ -2,18 +2,25 @@ package datasource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &ProjectsDataSource{}
+var (
+	_ datasource.DataSource                     = &ProjectsDataSource{}
+	_ datasource.DataSourceWithConfigValidators = &ProjectsDataSource{}
+)
 
 func NewProjectDataSource() datasource.DataSource {
 	return &ProjectsDataSource{}
@@ -51,16 +58,18 @@ func (d *ProjectsDataSource) Metadata(ctx context.Context, req datasource.Metada
 
 func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Interact with Infisical projects. Only Machine Identity authentication is supported for this data source.",
+		Description: "Look up an Infisical project by its ID or its slug. Only Machine Identity authentication is supported for this data source.",
 
 		Attributes: map[string]schema.Attribute{
 			"slug": schema.StringAttribute{
-				Description: "The slug of the project to fetch",
-				Required:    true,
+				Description: "The slug of the project to fetch. Exactly one of id or slug must be set.",
+				Optional:    true,
+				Computed:    true,
 			},
 
 			"id": schema.StringAttribute{
-				Description: "The ID of the project",
+				Description: "The ID of the project to fetch. Exactly one of id or slug must be set.",
+				Optional:    true,
 				Computed:    true,
 			},
 
@@ -127,6 +136,53 @@ func (d *ProjectsDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 	}
 }
 
+func (d *ProjectsDataSource) ConfigValidators(_ context.Context) []datasource.ConfigValidator {
+	return []datasource.ConfigValidator{
+		datasourcevalidator.ExactlyOneOf(
+			path.MatchRoot("id"),
+			path.MatchRoot("slug"),
+		),
+	}
+}
+
+func fetchProject(client *infisical.Client, id string, slug string) (infisical.ProjectWithEnvironments, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var (
+		project infisical.ProjectWithEnvironments
+		err     error
+	)
+
+	if slug != "" {
+		project, err = client.GetProject(infisical.GetProjectRequest{Slug: slug})
+	} else {
+		project, err = client.GetProjectById(infisical.GetProjectByIdRequest{ID: id})
+	}
+
+	if err != nil {
+		if errors.Is(err, infisical.ErrNotFound) {
+			notFoundMessage := ""
+			if slug != "" {
+				notFoundMessage = fmt.Sprintf("No project was found with slug %q", slug)
+			} else {
+				notFoundMessage = fmt.Sprintf("No project was found with ID %s", id)
+			}
+
+			diags.AddError("Project not found", notFoundMessage)
+			return infisical.ProjectWithEnvironments{}, diags
+		}
+
+		diags.AddError(
+			"Something went wrong while fetching the project",
+			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
+				"Infisical Client Error: "+err.Error(),
+		)
+		return infisical.ProjectWithEnvironments{}, diags
+	}
+
+	return project, diags
+}
+
 func (d *ProjectsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
@@ -166,15 +222,10 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	project, err := d.client.GetProject(infisical.GetProjectRequest{
-		Slug: data.Slug.ValueString(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Something went wrong while fetching the project",
-			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
-				"Infisical Client Error: "+err.Error(),
-		)
+	project, diags := fetchProject(d.client, data.ID.ValueString(), data.Slug.ValueString())
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	data = ProjectDataSourceModel{
@@ -188,7 +239,6 @@ func (d *ProjectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		UpdatedAt:          types.StringValue(project.UpdatedAt.Format(time.RFC3339Nano)),
 		Version:            types.Int64Value(project.Version),
 		UpgradeStatus:      types.StringValue(project.UpgradeStatus),
-		Environments:       data.Environments,
 	}
 
 	data.Environments = make(map[string]ProjectEnvironmentDetails)
