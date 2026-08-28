@@ -121,3 +121,12 @@ Required:
 
 - `key` (String) The key of the tag
 - `value` (String) The value of the tag
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the AWS Secrets Manager secret sync by its ID
+terraform import infisical_secret_sync_aws_secrets_manager.example <secret_sync_id>
+```

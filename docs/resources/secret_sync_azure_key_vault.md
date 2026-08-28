@@ -90,3 +90,12 @@ Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Azure Key Vault. Enable this option if you intend to manage some secrets manually outside of Infisical.
 - `key_schema` (String) The format to use for structuring secret keys in the Azure Key Vault destination.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# This will import the Azure Key Vault secret sync by its ID
+terraform import infisical_secret_sync_azure_key_vault.example <secret_sync_id>
+```

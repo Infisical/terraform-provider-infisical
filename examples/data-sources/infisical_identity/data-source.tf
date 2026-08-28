@@ -17,10 +17,23 @@ provider "infisical" {
   }
 }
 
-data "infisical_identity" "example" {
+# Look up an identity by ID.
+data "infisical_identity" "by_id" {
   id = "<identity-id>"
 }
 
+# Or look up the same identity by name, for cases where the ID differs between
+# environments but the name is kept consistent. Identity names are not unique, so
+# this fails if more than one identity carries the name; the error lists the
+# matching IDs so you can switch to `id` to pick one.
+data "infisical_identity" "by_name" {
+  name = "<identity-name>"
+}
+
 output "identity" {
-  value = data.infisical_identity.example
+  value = data.infisical_identity.by_id
+}
+
+output "identity_id_by_name" {
+  value = data.infisical_identity.by_name.id
 }
