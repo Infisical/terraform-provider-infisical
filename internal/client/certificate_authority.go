@@ -16,6 +16,9 @@ const (
 	operationUpdateACMECA     = "CallUpdateACMECA"
 	operationCreateADCSCA     = "CallCreateADCSCA"
 	operationUpdateADCSCA     = "CallUpdateADCSCA"
+	operationGetDigiCertCA    = "CallGetDigiCertCA"
+	operationCreateDigiCertCA = "CallCreateDigiCertCA"
+	operationUpdateDigiCertCA = "CallUpdateDigiCertCA"
 )
 
 func (client Client) CreateInternalCA(request CreateInternalCARequest) (CreateInternalCAResponse, error) {
@@ -256,6 +259,87 @@ func (client Client) UpdateADCSCA(request UpdateADCSCARequest) (UpdateADCSCAResp
 
 	if response.IsError() {
 		return UpdateADCSCAResponse{}, errors.NewAPIErrorWithResponse(operationUpdateADCSCA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) GetDigiCertCA(request GetCARequest) (GetCAResponse, error) {
+	var caResponse GetCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/cert-manager/ca/digicert/%s", request.CAId))
+
+	if err != nil {
+		return GetCAResponse{}, errors.NewGenericRequestError(operationGetDigiCertCA, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == 404 || response.StatusCode() == 422 {
+			return GetCAResponse{}, ErrNotFound
+		}
+		return GetCAResponse{}, errors.NewAPIErrorWithResponse(operationGetDigiCertCA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) CreateDigiCertCA(request CreateDigiCertCARequest) (CreateDigiCertCAResponse, error) {
+	var caResponse CreateDigiCertCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post("api/v1/cert-manager/ca/digicert")
+
+	if err != nil {
+		return CreateDigiCertCAResponse{}, errors.NewGenericRequestError(operationCreateDigiCertCA, err)
+	}
+
+	if response.IsError() {
+		return CreateDigiCertCAResponse{}, errors.NewAPIErrorWithResponse(operationCreateDigiCertCA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) UpdateDigiCertCA(request UpdateDigiCertCARequest) (UpdateDigiCertCAResponse, error) {
+	var caResponse UpdateDigiCertCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("api/v1/cert-manager/ca/digicert/%s", request.CAId))
+
+	if err != nil {
+		return UpdateDigiCertCAResponse{}, errors.NewGenericRequestError(operationUpdateDigiCertCA, err)
+	}
+
+	if response.IsError() {
+		return UpdateDigiCertCAResponse{}, errors.NewAPIErrorWithResponse(operationUpdateDigiCertCA, response, nil)
+	}
+
+	return caResponse, nil
+}
+
+func (client Client) DeleteDigiCertCA(request DeleteCARequest) (DeleteCAResponse, error) {
+	var caResponse DeleteCAResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&caResponse).
+		SetHeader("User-Agent", USER_AGENT).
+		Delete(fmt.Sprintf("api/v1/cert-manager/ca/digicert/%s", request.CAId))
+
+	if err != nil {
+		return DeleteCAResponse{}, errors.NewGenericRequestError(operationDeleteCA, err)
+	}
+
+	if response.IsError() {
+		return DeleteCAResponse{}, errors.NewAPIErrorWithResponse(operationDeleteCA, response, nil)
 	}
 
 	return caResponse, nil

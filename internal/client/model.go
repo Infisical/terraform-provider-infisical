@@ -3117,6 +3117,21 @@ type CertificateAuthorityConfiguration struct {
 
 	// ADCS-specific fields
 	AzureAdcsConnectionId string `json:"azureAdcsConnectionId,omitempty"`
+
+	// DigiCert-specific fields
+	AppConnectionId string                     `json:"appConnectionId,omitempty"`
+	DigiCertOrgId   *int                       `json:"organizationId,omitempty"`
+	ProductNameId   string                     `json:"productNameId,omitempty"`
+	Purpose         string                     `json:"purpose,omitempty"`
+	VerifiedContact *DigiCertCAVerifiedContact `json:"verifiedContact,omitempty"`
+}
+
+type DigiCertCAVerifiedContact struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Email     string `json:"email"`
+	JobTitle  string `json:"jobTitle"`
+	Telephone string `json:"telephone"`
 }
 
 type CertificateAuthority struct {
@@ -3205,6 +3220,27 @@ type UpdateADCSCARequest struct {
 }
 
 type UpdateADCSCAResponse struct {
+	CertificateAuthority
+}
+
+type CreateDigiCertCARequest struct {
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type CreateDigiCertCAResponse struct {
+	CertificateAuthority
+}
+
+type UpdateDigiCertCARequest struct {
+	CAId          string                            `json:"-"`
+	Name          string                            `json:"name"`
+	Status        string                            `json:"status"`
+	Configuration CertificateAuthorityConfiguration `json:"configuration"`
+}
+
+type UpdateDigiCertCAResponse struct {
 	CertificateAuthority
 }
 
