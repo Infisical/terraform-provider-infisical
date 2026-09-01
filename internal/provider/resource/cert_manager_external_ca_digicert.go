@@ -16,10 +16,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+const digiCertCaPurposeSsl = "ssl"
+
 var (
 	_ resource.Resource = &certManagerExternalCADigiCertResource{}
 
-	SUPPORTED_DIGICERT_CA_PURPOSES = []string{"ssl", "code_signing"}
+	SUPPORTED_DIGICERT_CA_PURPOSES = []string{digiCertCaPurposeSsl, "code_signing"}
 )
 
 func NewCertManagerExternalCADigiCertResource() resource.Resource {
@@ -176,11 +178,45 @@ func (r *certManagerExternalCADigiCertResource) buildConfiguration(plan certMana
 	return configuration
 }
 
-// applyCA copies the API response onto the model so computed values reflect what the server stored.
-func (r *certManagerExternalCADigiCertResource) applyCA(model *certManagerExternalCADigiCertResourceModel, ca infisical.CertificateAuthority) {
+// keepIfOnlyWhitespaceDiffers returns the value already held in state when it
+// differs from the server's value by surrounding whitespace alone. The API trims
+// these fields, so mirroring the trimmed value back unconditionally would leave a
+// permanent diff on a config that is already applied. A difference beyond
+// whitespace is real drift and the server value wins.
+func keepIfOnlyWhitespaceDiffers(current types.String, serverValue string) types.String {
+	if !current.IsNull() && !current.IsUnknown() && strings.TrimSpace(current.ValueString()) == serverValue {
+		return current
+	}
+	return types.StringValue(serverValue)
+}
+
+// applyServerOwnedFields copies back only the values the server owns after a write.
+//
+// Config-owned attributes are deliberately left untouched here. The API trims and
+// normalizes strings (every verifiedContact field and the CA name go through a
+// zod .trim()), and writing the normalized value back over what the practitioner
+// configured fails Terraform's "Provider produced inconsistent result after apply"
+// check for attributes that are not Computed. Read reconciles those instead, where
+// a difference is reported as drift rather than an error.
+func (r *certManagerExternalCADigiCertResource) applyServerOwnedFields(model *certManagerExternalCADigiCertResourceModel, ca infisical.CertificateAuthority) {
 	model.Id = types.StringValue(ca.Id)
-	model.Name = types.StringValue(ca.Name)
 	model.Status = types.StringValue(ca.Status)
+
+	// purpose is Optional+Computed, so it must never be left unknown after apply.
+	purpose := ca.Configuration.Purpose
+	if purpose == "" {
+		purpose = digiCertCaPurposeSsl
+	}
+	model.Purpose = types.StringValue(purpose)
+}
+
+// applyCAToState mirrors the full API response onto the model. Only Read uses this:
+// there, a value differing from config is legitimate drift and Terraform surfaces it
+// as a diff.
+func (r *certManagerExternalCADigiCertResource) applyCAToState(model *certManagerExternalCADigiCertResourceModel, ca infisical.CertificateAuthority) {
+	r.applyServerOwnedFields(model, ca)
+
+	model.Name = keepIfOnlyWhitespaceDiffers(model.Name, ca.Name)
 
 	if ca.Configuration.AppConnectionId != "" {
 		model.AppConnectionId = types.StringValue(ca.Configuration.AppConnectionId)
@@ -194,17 +230,18 @@ func (r *certManagerExternalCADigiCertResource) applyCA(model *certManagerExtern
 		model.ProductNameId = types.StringValue(ca.Configuration.ProductNameId)
 	}
 
-	if ca.Configuration.Purpose != "" {
-		model.Purpose = types.StringValue(ca.Configuration.Purpose)
-	}
+	if contact := ca.Configuration.VerifiedContact; contact != nil {
+		current := model.VerifiedContact
+		if current == nil {
+			current = &certManagerExternalCADigiCertVerifiedContactModel{}
+		}
 
-	if ca.Configuration.VerifiedContact != nil {
 		model.VerifiedContact = &certManagerExternalCADigiCertVerifiedContactModel{
-			FirstName: types.StringValue(ca.Configuration.VerifiedContact.FirstName),
-			LastName:  types.StringValue(ca.Configuration.VerifiedContact.LastName),
-			Email:     types.StringValue(ca.Configuration.VerifiedContact.Email),
-			JobTitle:  types.StringValue(ca.Configuration.VerifiedContact.JobTitle),
-			Telephone: types.StringValue(ca.Configuration.VerifiedContact.Telephone),
+			FirstName: keepIfOnlyWhitespaceDiffers(current.FirstName, contact.FirstName),
+			LastName:  keepIfOnlyWhitespaceDiffers(current.LastName, contact.LastName),
+			Email:     keepIfOnlyWhitespaceDiffers(current.Email, contact.Email),
+			JobTitle:  keepIfOnlyWhitespaceDiffers(current.JobTitle, contact.JobTitle),
+			Telephone: keepIfOnlyWhitespaceDiffers(current.Telephone, contact.Telephone),
 		}
 	} else {
 		model.VerifiedContact = nil
@@ -246,7 +283,7 @@ func (r *certManagerExternalCADigiCertResource) Create(ctx context.Context, req 
 		return
 	}
 
-	r.applyCA(&plan, newCA.CertificateAuthority)
+	r.applyServerOwnedFields(&plan, newCA.CertificateAuthority)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -288,7 +325,7 @@ func (r *certManagerExternalCADigiCertResource) Read(ctx context.Context, req re
 		return
 	}
 
-	r.applyCA(&state, ca.CertificateAuthority)
+	r.applyCAToState(&state, ca.CertificateAuthority)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -335,7 +372,7 @@ func (r *certManagerExternalCADigiCertResource) Update(ctx context.Context, req 
 		return
 	}
 
-	r.applyCA(&plan, updatedCA.CertificateAuthority)
+	r.applyServerOwnedFields(&plan, updatedCA.CertificateAuthority)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
