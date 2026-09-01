@@ -151,7 +151,6 @@ func (r *certManagerExternalCADigiCertResource) Configure(_ context.Context, req
 	r.client = client
 }
 
-// buildConfiguration maps the plan onto the API's DigiCert CA configuration payload.
 func (r *certManagerExternalCADigiCertResource) buildConfiguration(plan certManagerExternalCADigiCertResourceModel) infisical.CertificateAuthorityConfiguration {
 	organizationId := int(plan.OrganizationId.ValueInt64())
 
@@ -178,11 +177,9 @@ func (r *certManagerExternalCADigiCertResource) buildConfiguration(plan certMana
 	return configuration
 }
 
-// keepIfOnlyWhitespaceDiffers returns the value already held in state when it
-// differs from the server's value by surrounding whitespace alone. The API trims
-// these fields, so mirroring the trimmed value back unconditionally would leave a
-// permanent diff on a config that is already applied. A difference beyond
-// whitespace is real drift and the server value wins.
+// The API trims these fields, so mirroring the trimmed value back would leave a
+// permanent diff on an already-applied config. Anything beyond whitespace is real
+// drift, and there the server wins.
 func keepIfOnlyWhitespaceDiffers(current types.String, serverValue string) types.String {
 	if !current.IsNull() && !current.IsUnknown() && strings.TrimSpace(current.ValueString()) == serverValue {
 		return current
@@ -190,14 +187,9 @@ func keepIfOnlyWhitespaceDiffers(current types.String, serverValue string) types
 	return types.StringValue(serverValue)
 }
 
-// applyServerOwnedFields copies back only the values the server owns after a write.
-//
-// Config-owned attributes are deliberately left untouched here. The API trims and
-// normalizes strings (every verifiedContact field and the CA name go through a
-// zod .trim()), and writing the normalized value back over what the practitioner
-// configured fails Terraform's "Provider produced inconsistent result after apply"
-// check for attributes that are not Computed. Read reconciles those instead, where
-// a difference is reported as drift rather than an error.
+// Config-owned attributes are deliberately not copied back: the API trims strings,
+// and overwriting what the practitioner configured fails Terraform's
+// inconsistent-result check on attributes that are not Computed.
 func (r *certManagerExternalCADigiCertResource) applyServerOwnedFields(model *certManagerExternalCADigiCertResourceModel, ca infisical.CertificateAuthority) {
 	model.Id = types.StringValue(ca.Id)
 	model.Status = types.StringValue(ca.Status)
@@ -210,9 +202,7 @@ func (r *certManagerExternalCADigiCertResource) applyServerOwnedFields(model *ce
 	model.Purpose = types.StringValue(purpose)
 }
 
-// applyCAToState mirrors the full API response onto the model. Only Read uses this:
-// there, a value differing from config is legitimate drift and Terraform surfaces it
-// as a diff.
+// Only Read uses this: there a value differing from config is drift, not an error.
 func (r *certManagerExternalCADigiCertResource) applyCAToState(model *certManagerExternalCADigiCertResourceModel, ca infisical.CertificateAuthority) {
 	r.applyServerOwnedFields(model, ca)
 
