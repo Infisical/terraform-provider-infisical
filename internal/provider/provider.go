@@ -424,6 +424,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIntegrationCircleCiResource,
 		infisicalResource.NewIntegrationDatabricksResource,
 		infisicalResource.NewSecretApprovalPolicyResource,
+		infisicalResource.NewSecretValidationRuleResource,
 		infisicalResource.NewAccessApprovalPolicyResource,
 		infisicalResource.NewProjectSecretImportResource,
 		infisicalResource.NewGroupResource,
