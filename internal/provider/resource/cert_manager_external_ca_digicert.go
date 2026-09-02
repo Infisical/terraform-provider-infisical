@@ -16,12 +16,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-const digiCertCaPurposeSsl = "ssl"
+const (
+	digiCertCaPurposeSsl         = "ssl"
+	digiCertCaPurposeCodeSigning = "code_signing"
+)
 
 var (
 	_ resource.Resource = &certManagerExternalCADigiCertResource{}
 
-	SUPPORTED_DIGICERT_CA_PURPOSES = []string{digiCertCaPurposeSsl, "code_signing"}
+	SUPPORTED_DIGICERT_CA_PURPOSES = []string{digiCertCaPurposeSsl, digiCertCaPurposeCodeSigning}
 )
 
 func NewCertManagerExternalCADigiCertResource() resource.Resource {
