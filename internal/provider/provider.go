@@ -485,6 +485,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationAwsIamUserSecretResource,
 		secretRotationResource.NewSecretRotationLdapPasswordResource,
 		secretRotationResource.NewSecretRotationDatadogApiKeyResource,
+		secretRotationResource.NewSecretRotationAuth0ClientSecretResource,
 		infisicalResource.NewProjectTemplateResource,
 		infisicalResource.NewKMSKeyResource,
 		infisicalResource.NewCertManagerInternalCAResource,

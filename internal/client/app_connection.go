@@ -40,6 +40,7 @@ const (
 	AppConnectionAppDatadog               AppConnectionApp = "datadog"
 	AppConnectionAppCircleCI              AppConnectionApp = "circleci"
 	AppConnectionAppDigiCert              AppConnectionApp = "digicert"
+	AppConnectionAppAuth0                 AppConnectionApp = "auth0"
 )
 
 const (
