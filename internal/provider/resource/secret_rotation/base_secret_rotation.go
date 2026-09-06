@@ -100,12 +100,14 @@ func (r *SecretRotationBaseResource) Schema(_ context.Context, _ resource.Schema
 				Description: "The ID of the connection to use for the secret rotation.",
 			},
 			"environment": schema.StringAttribute{
-				Required:    true,
-				Description: "The slug of the project environment to rotate secrets from.",
+				Required:      true,
+				Description:   "The slug of the project environment to rotate secrets from.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"secret_path": schema.StringAttribute{
-				Required:    true,
-				Description: "The folder path to rotate secrets from.",
+				Required:      true,
+				Description:   "The folder path to rotate secrets from.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 
 			"rotation_interval": schema.Int32Attribute{
@@ -407,8 +409,6 @@ func (r *SecretRotationBaseResource) Update(ctx context.Context, req resource.Up
 		Description:         plan.Description.ValueString(),
 		AutoRotationEnabled: plan.AutoRotationEnabled.ValueBool(),
 		ConnectionID:        plan.ConnectionID.ValueString(),
-		Environment:         plan.Environment.ValueString(),
-		SecretPath:          plan.SecretPath.ValueString(),
 
 		RotationInterval: plan.RotationInterval.ValueInt32(),
 		RotateAtUtc: infisical.SecretRotationRotateAtUtc{

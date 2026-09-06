@@ -2867,8 +2867,6 @@ type UpdateSecretRotationRequest struct {
 	Description         string `json:"description"`
 	AutoRotationEnabled bool   `json:"isAutoRotationEnabled,omitempty"`
 	ConnectionID        string `json:"connectionId,omitempty"`
-	Environment         string `json:"environment,omitempty"`
-	SecretPath          string `json:"secretPath,omitempty"`
 
 	RotationInterval int32                     `json:"rotationInterval,omitempty"`
 	RotateAtUtc      SecretRotationRotateAtUtc `json:"rotateAtUtc,omitempty"`
