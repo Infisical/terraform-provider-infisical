@@ -12,6 +12,7 @@ const (
 	operationUpdateProjectUser            = "CallUpdateProjectUser"
 	operationGetProjectUserByUsername     = "CallGetProjectUserByUsername"
 	operationGetProjectMembershipByUserID = "CallGetProjectMembershipByUserID"
+	operationGetProjectMemberships        = "CallGetProjectMemberships"
 )
 
 func (client Client) InviteUsersToProject(request InviteUsersToProjectRequest) ([]ProjectMemberships, error) {
@@ -97,6 +98,25 @@ func (client Client) GetProjectUserByUsername(request GetProjectUserByUserNameRe
 	}
 
 	return projectUserResponse, nil
+}
+
+func (client Client) GetProjectMemberships(request GetProjectMembershipsRequest) (GetProjectMembershipsResponse, error) {
+	var body GetProjectMembershipsResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v1/projects/%s/memberships", request.ProjectID))
+
+	if err != nil {
+		return GetProjectMembershipsResponse{}, errors.NewGenericRequestError(operationGetProjectMemberships, err)
+	}
+
+	if response.IsError() {
+		return GetProjectMembershipsResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectMemberships, response, nil)
+	}
+
+	return body, nil
 }
 
 func (client Client) GetProjectMembershipByUserID(request GetProjectMembershipByUserIDRequest) (GetProjectUserByUserNameResponse, error) {
