@@ -202,7 +202,7 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 						Computed:    true,
 					},
 					"sign_ra_with_ca": schema.BoolAttribute{
-						Description: "Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Required by strict clients such as Apple and Microsoft Intune. Only supported for internal CAs. Cannot be changed once SCEP enrollment is configured, since changing it regenerates the RA certificate and would break devices that already trust the current one; Terraform will error on the plan if you try. To change it, remove scep_config (or the whole resource) to disable SCEP enrollment in one apply, then add scep_config back with the new value in a subsequent apply. Defaults to false.",
+						Description: "Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Cannot be changed once SCEP enrollment is configured. Defaults to false.",
 						Optional:    true,
 						Computed:    true,
 					},
