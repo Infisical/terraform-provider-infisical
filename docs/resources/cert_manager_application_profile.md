@@ -112,6 +112,7 @@ resource "infisical_cert_manager_application_profile" "platform_web_server" {
     challenge_password          = "change-me-scep-secret"
     include_ca_cert_in_response = true
     allow_cert_based_renewal    = true
+    sign_ra_with_ca             = false
   }
 }
 ```
@@ -187,6 +188,7 @@ Optional:
 - `dynamic_challenge_expiry_minutes` (Number) Expiry of a dynamic challenge in minutes (1-1440). Only used when challenge_type is dynamic.
 - `dynamic_challenge_max_pending` (Number) Maximum pending dynamic challenges (1-1000). Only used when challenge_type is dynamic.
 - `include_ca_cert_in_response` (Boolean) Include the issuing CA certificate in SCEP responses. Defaults to true.
+- `sign_ra_with_ca` (Boolean) Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Required by strict clients such as Apple and Microsoft Intune. Only supported for internal CAs. Cannot be changed once SCEP enrollment is configured; changing it requires disabling and reconfiguring SCEP enrollment, which regenerates the RA certificate and breaks devices that already trust the current one. Defaults to false.
 
 Read-Only:
 

@@ -65,6 +65,7 @@ type certManagerApplicationProfileScepConfig struct {
 	ChallengePassword             types.String `tfsdk:"challenge_password"`
 	IncludeCaCertInResponse       types.Bool   `tfsdk:"include_ca_cert_in_response"`
 	AllowCertBasedRenewal         types.Bool   `tfsdk:"allow_cert_based_renewal"`
+	SignRaWithCa                  types.Bool   `tfsdk:"sign_ra_with_ca"`
 	DynamicChallengeExpiryMinutes types.Int64  `tfsdk:"dynamic_challenge_expiry_minutes"`
 	DynamicChallengeMaxPending    types.Int64  `tfsdk:"dynamic_challenge_max_pending"`
 	ScepEndpointUrl               types.String `tfsdk:"scep_endpoint_url"`
@@ -196,6 +197,11 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 					},
 					"allow_cert_based_renewal": schema.BoolAttribute{
 						Description: "Allow certificate-based renewal. Defaults to true.",
+						Optional:    true,
+						Computed:    true,
+					},
+					"sign_ra_with_ca": schema.BoolAttribute{
+						Description: "Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Required by strict clients such as Apple and Microsoft Intune. Only supported for internal CAs. Cannot be changed once SCEP enrollment is configured; changing it requires disabling and reconfiguring SCEP enrollment, which regenerates the RA certificate and breaks devices that already trust the current one. Defaults to false.",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -376,6 +382,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 			v := plan.ScepConfig.AllowCertBasedRenewal.ValueBool()
 			setReq.AllowCertBasedRenewal = &v
 		}
+		if !plan.ScepConfig.SignRaWithCa.IsNull() && !plan.ScepConfig.SignRaWithCa.IsUnknown() {
+			v := plan.ScepConfig.SignRaWithCa.ValueBool()
+			setReq.SignRaWithCa = &v
+		}
 		if !plan.ScepConfig.DynamicChallengeExpiryMinutes.IsNull() && !plan.ScepConfig.DynamicChallengeExpiryMinutes.IsUnknown() {
 			v := int(plan.ScepConfig.DynamicChallengeExpiryMinutes.ValueInt64())
 			setReq.DynamicChallengeExpiryMinutes = &v
@@ -467,6 +477,7 @@ func (r *certManagerApplicationProfileResource) refresh(model *certManagerApplic
 		model.ScepConfig.ChallengeType = types.StringValue(enrollment.Scep.ChallengeType)
 		model.ScepConfig.IncludeCaCertInResponse = types.BoolValue(enrollment.Scep.IncludeCaCertInResponse)
 		model.ScepConfig.AllowCertBasedRenewal = types.BoolValue(enrollment.Scep.AllowCertBasedRenewal)
+		model.ScepConfig.SignRaWithCa = types.BoolValue(enrollment.Scep.SignRaWithCa)
 		if enrollment.Scep.DynamicChallengeExpiryMinutes != nil {
 			model.ScepConfig.DynamicChallengeExpiryMinutes = types.Int64Value(int64(*enrollment.Scep.DynamicChallengeExpiryMinutes))
 		} else {
