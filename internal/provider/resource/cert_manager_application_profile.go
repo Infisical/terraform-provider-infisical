@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	_ resource.Resource = &certManagerApplicationProfileResource{}
+	_ resource.Resource               = &certManagerApplicationProfileResource{}
+	_ resource.ResourceWithModifyPlan = &certManagerApplicationProfileResource{}
 )
 
 func NewCertManagerApplicationProfileResource() resource.Resource {
@@ -256,6 +257,36 @@ func (r *certManagerApplicationProfileResource) Configure(_ context.Context, req
 		return
 	}
 	r.client = client
+}
+
+func (r *certManagerApplicationProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var prior, plan certManagerApplicationProfileResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !prior.ApplicationId.Equal(plan.ApplicationId) || !prior.ProfileId.Equal(plan.ProfileId) {
+		return
+	}
+	if prior.ScepConfig == nil || plan.ScepConfig == nil {
+		return
+	}
+	if prior.ScepConfig.SignRaWithCa.IsUnknown() || plan.ScepConfig.SignRaWithCa.IsUnknown() {
+		return
+	}
+	if prior.ScepConfig.SignRaWithCa.ValueBool() != plan.ScepConfig.SignRaWithCa.ValueBool() {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("scep_config").AtName("sign_ra_with_ca"),
+			"Invalid sign_ra_with_ca change",
+			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured, so this apply will fail. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
+		)
+	}
 }
 
 func (r *certManagerApplicationProfileResource) applyEnrollment(
