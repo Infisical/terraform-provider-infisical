@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -19,8 +20,7 @@ import (
 )
 
 var (
-	_ resource.Resource               = &certManagerApplicationProfileResource{}
-	_ resource.ResourceWithModifyPlan = &certManagerApplicationProfileResource{}
+	_ resource.Resource = &certManagerApplicationProfileResource{}
 )
 
 func NewCertManagerApplicationProfileResource() resource.Resource {
@@ -202,9 +202,12 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 						Computed:    true,
 					},
 					"sign_ra_with_ca": schema.BoolAttribute{
-						Description: "Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Cannot be changed once SCEP enrollment is configured. Defaults to false.",
+						Description: "Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Required by strict clients such as Apple and Microsoft Intune. Only supported for internal CAs. Cannot be changed once SCEP enrollment is configured. To change it, remove scep_config (or the whole resource) to disable SCEP enrollment in one apply, then add scep_config back with the new value in a subsequent apply. Defaults to false.",
 						Optional:    true,
 						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
 					},
 					"dynamic_challenge_expiry_minutes": schema.Int64Attribute{
 						Description: "Expiry of a dynamic challenge in minutes (1-1440). Only used when challenge_type is dynamic.",
@@ -253,34 +256,6 @@ func (r *certManagerApplicationProfileResource) Configure(_ context.Context, req
 		return
 	}
 	r.client = client
-}
-
-func (r *certManagerApplicationProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
-		return
-	}
-
-	var prior, plan certManagerApplicationProfileResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if prior.ScepConfig == nil || plan.ScepConfig == nil {
-		return
-	}
-	if prior.ScepConfig.SignRaWithCa.IsUnknown() || plan.ScepConfig.SignRaWithCa.IsUnknown() {
-		return
-	}
-	if prior.ScepConfig.SignRaWithCa.ValueBool() != plan.ScepConfig.SignRaWithCa.ValueBool() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("scep_config").AtName("sign_ra_with_ca"),
-			"Cannot change sign_ra_with_ca on an existing SCEP configuration",
-			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured: changing it regenerates the RA certificate and would break devices that already trust the current one. "+
-				"To change it, first remove the scep_config block (or the whole resource) and apply, to disable SCEP enrollment; then add scep_config back with the new value and apply again.",
-		)
-	}
 }
 
 func (r *certManagerApplicationProfileResource) applyEnrollment(
@@ -631,6 +606,18 @@ func (r *certManagerApplicationProfileResource) Update(ctx context.Context, req 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if prior.ScepConfig != nil && plan.ScepConfig != nil &&
+		!prior.ScepConfig.SignRaWithCa.IsUnknown() && !plan.ScepConfig.SignRaWithCa.IsUnknown() &&
+		prior.ScepConfig.SignRaWithCa.ValueBool() != plan.ScepConfig.SignRaWithCa.ValueBool() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("scep_config").AtName("sign_ra_with_ca"),
+			"Cannot change sign_ra_with_ca on an existing SCEP configuration",
+			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured: changing it regenerates the RA certificate and would break devices that already trust the current one. "+
+				"To change it, first remove the scep_config block (or the whole resource) and apply, to disable SCEP enrollment; then add scep_config back with the new value and apply again.",
+		)
 		return
 	}
 
