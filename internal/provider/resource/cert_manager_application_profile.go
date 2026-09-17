@@ -259,30 +259,45 @@ func (r *certManagerApplicationProfileResource) Configure(_ context.Context, req
 	r.client = client
 }
 
+func signRaWithCaPath() path.Path {
+	return path.Root("scep_config").AtName("sign_ra_with_ca")
+}
+
+func signRaWithCaChanged(prior, plan types.Bool) bool {
+	if prior.IsNull() || prior.IsUnknown() || plan.IsNull() || plan.IsUnknown() {
+		return false
+	}
+	return prior.ValueBool() != plan.ValueBool()
+}
+
 func (r *certManagerApplicationProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
 
-	var prior, plan certManagerApplicationProfileResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	var priorApp, planApp, priorProfile, planProfile types.String
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("application_id"), &priorApp)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("application_id"), &planApp)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("profile_id"), &priorProfile)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("profile_id"), &planProfile)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !prior.ApplicationId.Equal(plan.ApplicationId) || !prior.ProfileId.Equal(plan.ProfileId) {
+	if !priorApp.Equal(planApp) || !priorProfile.Equal(planProfile) {
 		return
 	}
-	if prior.ScepConfig == nil || plan.ScepConfig == nil {
+
+	var priorSign, planSign types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, signRaWithCaPath(), &priorSign)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, signRaWithCaPath(), &planSign)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
-	if prior.ScepConfig.SignRaWithCa.IsUnknown() || plan.ScepConfig.SignRaWithCa.IsUnknown() {
-		return
-	}
-	if prior.ScepConfig.SignRaWithCa.ValueBool() != plan.ScepConfig.SignRaWithCa.ValueBool() {
+
+	if signRaWithCaChanged(priorSign, planSign) {
 		resp.Diagnostics.AddAttributeWarning(
-			path.Root("scep_config").AtName("sign_ra_with_ca"),
+			signRaWithCaPath(),
 			"Invalid sign_ra_with_ca change",
 			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured, so this apply will fail. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
 		)
@@ -641,13 +656,11 @@ func (r *certManagerApplicationProfileResource) Update(ctx context.Context, req 
 	}
 
 	if prior.ScepConfig != nil && plan.ScepConfig != nil &&
-		!prior.ScepConfig.SignRaWithCa.IsUnknown() && !plan.ScepConfig.SignRaWithCa.IsUnknown() &&
-		prior.ScepConfig.SignRaWithCa.ValueBool() != plan.ScepConfig.SignRaWithCa.ValueBool() {
+		signRaWithCaChanged(prior.ScepConfig.SignRaWithCa, plan.ScepConfig.SignRaWithCa) {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("scep_config").AtName("sign_ra_with_ca"),
-			"Cannot change sign_ra_with_ca on an existing SCEP configuration",
-			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured: changing it regenerates the RA certificate and would break devices that already trust the current one. "+
-				"To change it, first remove the scep_config block (or the whole resource) and apply, to disable SCEP enrollment; then add scep_config back with the new value and apply again.",
+			signRaWithCaPath(),
+			"Invalid sign_ra_with_ca change",
+			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
 		)
 		return
 	}
