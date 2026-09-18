@@ -318,8 +318,17 @@ func TestKMSKeyExportabilityOnLegacyInstance(t *testing.T) {
 		assertKMSKeyExportability(t, readResp.State, true)
 	})
 
-	t.Run("configured_create_fails_and_keeps_state", func(t *testing.T) {
-		r := newKMSKeyTestResource(t, legacyHandler(t, func(map[string]json.RawMessage) {}))
+	t.Run("configured_create_deletes_the_exportable_key", func(t *testing.T) {
+		deleted := false
+		r := newKMSKeyTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodDelete {
+				if req.URL.Path != "/api/v1/kms/keys/key-1" {
+					t.Errorf("DELETE %s, want /api/v1/kms/keys/key-1", req.URL.Path)
+				}
+				deleted = true
+			}
+			legacyHandler(t, func(map[string]json.RawMessage) {})(w, req)
+		})
 
 		model := basePlan
 		model.IsExportable = types.BoolValue(false)
@@ -328,10 +337,35 @@ func TestKMSKeyExportabilityOnLegacyInstance(t *testing.T) {
 		if !createResp.Diagnostics.HasError() {
 			t.Fatal("creating a non-exportable key against an instance that ignores isExportable must fail")
 		}
-		if summary := createResp.Diagnostics.Errors()[0].Detail(); !strings.Contains(summary, "does not support is_exportable") {
-			t.Errorf("unexpected diagnostic: %s", summary)
+		if detail := createResp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, "does not support is_exportable") {
+			t.Errorf("unexpected diagnostic: %s", detail)
 		}
-		// The key exists on the server, so it has to land in state instead of leaking.
+		if !deleted {
+			t.Error("the exportable key must be deleted again")
+		}
+		// The key is gone, so Terraform must not track it.
+		if !createResp.State.Raw.IsNull() {
+			t.Errorf("state = %v, want no state for a key that was deleted", createResp.State.Raw)
+		}
+	})
+
+	t.Run("configured_create_keeps_state_when_cleanup_fails", func(t *testing.T) {
+		r := newKMSKeyTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodDelete {
+				http.Error(w, `{"message":"delete protection enabled"}`, http.StatusBadRequest)
+				return
+			}
+			legacyHandler(t, func(map[string]json.RawMessage) {})(w, req)
+		})
+
+		model := basePlan
+		model.IsExportable = types.BoolValue(false)
+		createResp := resource.CreateResponse{State: tfsdk.State{Schema: resourceSchema}}
+		r.Create(ctx, resource.CreateRequest{Plan: kmsKeyTestPlan(t, ctx, resourceSchema, model)}, &createResp)
+		if !createResp.Diagnostics.HasError() {
+			t.Fatal("creating a non-exportable key against an instance that ignores isExportable must fail")
+		}
+		// The key outlived the failed delete, so it has to land in state instead of leaking.
 		assertKMSKeyAttribute(t, createResp.State, "id", types.StringValue("key-1"))
 		assertKMSKeyExportability(t, createResp.State, true)
 	})

@@ -265,11 +265,27 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	if configuredExportability && kmsKey.Key.IsExportable == nil {
+		// Nothing can be encrypted under a key this new, so delete it rather than leave a key behind whose
+		// material is exportable against an explicit is_exportable = false.
+		if _, deleteErr := r.client.DeleteKMSKey(infisical.DeleteKMSKeyRequest{KeyId: kmsKey.Key.ID}); deleteErr != nil {
+			// The key outlived the failed create, so it has to be tracked in state instead of leaking.
+			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+			resp.Diagnostics.AddError(
+				"Error creating KMS key",
+				"This Infisical instance does not support is_exportable, so the key was created as exportable, and "+
+					"deleting it again failed: "+deleteErr.Error()+". Destroy the key, then either upgrade to "+
+					"Infisical v0.161.1 or later or remove is_exportable from the configuration.",
+			)
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error creating KMS key",
-			"This Infisical instance does not support is_exportable, so the key was created as exportable. "+
-				"Upgrade to Infisical v0.161.1 or later, or remove is_exportable from the configuration.",
+			"This Infisical instance does not support is_exportable, so the key would have been created as "+
+				"exportable. The key was deleted again. Upgrade to Infisical v0.161.1 or later, or remove "+
+				"is_exportable from the configuration.",
 		)
+		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
