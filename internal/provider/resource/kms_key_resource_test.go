@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	infisical "terraform-provider-infisical/internal/client"
@@ -14,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/defaults"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,52 +30,124 @@ func kmsKeyTestSchema(t *testing.T) schema.Schema {
 	return resp.Schema
 }
 
-func TestKMSKeyExportabilityPlan(t *testing.T) {
+func kmsKeyExportabilityAttribute(t *testing.T, resourceSchema schema.Schema) schema.BoolAttribute {
+	t.Helper()
+	attribute, ok := resourceSchema.Attributes["is_exportable"].(schema.BoolAttribute)
+	if !ok || !attribute.Optional || !attribute.Computed {
+		t.Fatal("is_exportable must be an optional, computed boolean")
+	}
+
+	if attribute.Default != nil {
+		t.Fatal("is_exportable must not declare a static default")
+	}
+	return attribute
+}
+
+func newKMSKeyTestResource(t *testing.T, handler http.HandlerFunc) *kmsKeyResource {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	return &kmsKeyResource{client: &infisical.Client{Config: infisical.Config{
+		HttpClient: resty.New().SetBaseURL(server.URL),
+	}}}
+}
+
+func kmsKeyTestPlan(t *testing.T, ctx context.Context, resourceSchema schema.Schema, model kmsKeyResourceModel) tfsdk.Plan {
+	t.Helper()
+	plan := tfsdk.Plan{Schema: resourceSchema}
+	if diags := plan.Set(ctx, &model); diags.HasError() {
+		t.Fatal(diags)
+	}
+	return plan
+}
+
+func TestKMSKeyExportabilityPlanModifiers(t *testing.T) {
 	ctx := context.Background()
 	resourceSchema := kmsKeyTestSchema(t)
-	attribute, ok := resourceSchema.Attributes["is_exportable"].(schema.BoolAttribute)
-	if !ok || !attribute.Optional || !attribute.Computed || attribute.Default == nil {
-		t.Fatal("is_exportable must be an optional boolean with a default")
+	attribute := kmsKeyExportabilityAttribute(t, resourceSchema)
+
+	tests := []struct {
+		name            string
+		config          types.Bool
+		state           types.Bool
+		plan            types.Bool
+		wantPlan        types.Bool
+		wantReplacement bool
+	}{
+		{
+			// A key created outside Terraform with isExportable=false and then imported.
+			name:     "unconfigured_keeps_non_exportable_key",
+			config:   types.BoolNull(),
+			state:    types.BoolValue(false),
+			plan:     types.BoolValue(false),
+			wantPlan: types.BoolValue(false),
+		},
+		{
+			// State written before this attribute existed, planned with -refresh=false. The value is resolved by
+			// the apply, which must not be a replacement.
+			name:     "unconfigured_tolerates_missing_state",
+			config:   types.BoolNull(),
+			state:    types.BoolNull(),
+			plan:     types.BoolUnknown(),
+			wantPlan: types.BoolUnknown(),
+		},
+		{
+			name:            "configured_change_replaces",
+			config:          types.BoolValue(false),
+			state:           types.BoolValue(true),
+			plan:            types.BoolValue(false),
+			wantPlan:        types.BoolValue(false),
+			wantReplacement: true,
+		},
+		{
+			name:     "configured_match_is_kept",
+			config:   types.BoolValue(false),
+			state:    types.BoolValue(false),
+			plan:     types.BoolValue(false),
+			wantPlan: types.BoolValue(false),
+		},
 	}
 
-	var defaultResp defaults.BoolResponse
-	attribute.Default.DefaultBool(ctx, defaults.BoolRequest{Path: path.Root("is_exportable")}, &defaultResp)
-	if defaultResp.Diagnostics.HasError() || !defaultResp.PlanValue.Equal(types.BoolValue(true)) {
-		t.Fatalf("omitting is_exportable must preserve the API default of true: %+v", defaultResp)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configState := tfsdk.State{Schema: resourceSchema}
+			if diags := configState.Set(ctx, &kmsKeyResourceModel{IsExportable: test.config}); diags.HasError() {
+				t.Fatal(diags)
+			}
+			config := tfsdk.Config{Schema: resourceSchema, Raw: configState.Raw}
+			state := tfsdk.State{Schema: resourceSchema}
+			if diags := state.Set(ctx, &kmsKeyResourceModel{IsExportable: test.state}); diags.HasError() {
+				t.Fatal(diags)
+			}
+			plan := kmsKeyTestPlan(t, ctx, resourceSchema, kmsKeyResourceModel{IsExportable: test.plan})
 
-	for _, before := range []bool{false, true} {
-		for _, after := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%t_to_%t", before, after), func(t *testing.T) {
-				state := tfsdk.State{Schema: resourceSchema}
-				if diags := state.Set(ctx, &kmsKeyResourceModel{IsExportable: types.BoolValue(before)}); diags.HasError() {
-					t.Fatal(diags)
+			planValue := test.plan
+			requiresReplace := false
+			for _, modifier := range attribute.PlanModifiers {
+				modifierResp := planmodifier.BoolResponse{PlanValue: planValue}
+				modifier.PlanModifyBool(ctx, planmodifier.BoolRequest{
+					Path:        path.Root("is_exportable"),
+					Config:      config,
+					ConfigValue: test.config,
+					State:       state,
+					StateValue:  test.state,
+					Plan:        plan,
+					PlanValue:   planValue,
+				}, &modifierResp)
+				if modifierResp.Diagnostics.HasError() {
+					t.Fatal(modifierResp.Diagnostics)
 				}
-				plan := tfsdk.Plan{Schema: resourceSchema}
-				if diags := plan.Set(ctx, &kmsKeyResourceModel{IsExportable: types.BoolValue(after)}); diags.HasError() {
-					t.Fatal(diags)
-				}
+				planValue = modifierResp.PlanValue
+				requiresReplace = requiresReplace || modifierResp.RequiresReplace
+			}
 
-				requiresReplace := false
-				for _, modifier := range attribute.PlanModifiers {
-					var resp planmodifier.BoolResponse
-					modifier.PlanModifyBool(ctx, planmodifier.BoolRequest{
-						Path:       path.Root("is_exportable"),
-						State:      state,
-						StateValue: types.BoolValue(before),
-						Plan:       plan,
-						PlanValue:  types.BoolValue(after),
-					}, &resp)
-					if resp.Diagnostics.HasError() {
-						t.Fatal(resp.Diagnostics)
-					}
-					requiresReplace = requiresReplace || resp.RequiresReplace
-				}
-				if requiresReplace != (before != after) {
-					t.Errorf("RequiresReplace = %t for is_exportable changing from %t to %t", requiresReplace, before, after)
-				}
-			})
-		}
+			if !planValue.Equal(test.wantPlan) {
+				t.Errorf("planned is_exportable = %v, want %v", planValue, test.wantPlan)
+			}
+			if requiresReplace != test.wantReplacement {
+				t.Errorf("RequiresReplace = %t, want %t", requiresReplace, test.wantReplacement)
+			}
+		})
 	}
 }
 
@@ -84,8 +156,8 @@ func TestKMSKeyExportabilityLifecycle(t *testing.T) {
 		t.Run(fmt.Sprintf("exportable_%t", exportable), func(t *testing.T) {
 			ctx := context.Background()
 			resourceSchema := kmsKeyTestSchema(t)
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				name := "test-key"
+			name := "test-key"
+			r := newKMSKeyTestResource(t, func(w http.ResponseWriter, req *http.Request) {
 				switch req.Method + " " + req.URL.Path {
 				case "POST /api/v1/kms/keys":
 					var body map[string]json.RawMessage
@@ -120,14 +192,9 @@ func TestKMSKeyExportabilityLifecycle(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = fmt.Fprintf(w, `{"key":{"id":"key-1","projectId":"project-1","name":%q,"isExportable":%t,"isDisabled":false,"keyUsage":"encrypt-decrypt","encryptionAlgorithm":"aes-256-gcm"}}`, name, exportable)
-			}))
-			t.Cleanup(server.Close)
-			r := &kmsKeyResource{client: &infisical.Client{Config: infisical.Config{
-				HttpClient: resty.New().SetBaseURL(server.URL),
-			}}}
+			})
 
-			plan := tfsdk.Plan{Schema: resourceSchema}
-			if diags := plan.Set(ctx, &kmsKeyResourceModel{
+			plan := kmsKeyTestPlan(t, ctx, resourceSchema, kmsKeyResourceModel{
 				ProjectId:           types.StringValue("project-1"),
 				Name:                types.StringValue("test-key"),
 				Description:         types.StringValue(""),
@@ -135,9 +202,7 @@ func TestKMSKeyExportabilityLifecycle(t *testing.T) {
 				EncryptionAlgorithm: types.StringValue(ENCRYPTION_ALGORITHM_AES_256_GCM),
 				IsDisabled:          types.BoolValue(false),
 				IsExportable:        types.BoolValue(exportable),
-			}); diags.HasError() {
-				t.Fatal(diags)
-			}
+			})
 			createResp := resource.CreateResponse{State: tfsdk.State{Schema: resourceSchema}}
 			r.Create(ctx, resource.CreateRequest{Plan: plan}, &createResp)
 			if createResp.Diagnostics.HasError() {
@@ -157,7 +222,8 @@ func TestKMSKeyExportabilityLifecycle(t *testing.T) {
 			}
 			assertKMSKeyExportability(t, readResp.State, exportable)
 
-			// Imports start with only an ID, so Read must populate exportability.
+			// Imports start with only an ID, so Read must populate every attribute the configuration can set.
+			// A null project_id would force a replacement on the first apply after the import.
 			importState := tfsdk.State{Schema: resourceSchema}
 			if diags := importState.Set(ctx, &kmsKeyResourceModel{}); diags.HasError() {
 				t.Fatal(diags)
@@ -173,6 +239,7 @@ func TestKMSKeyExportabilityLifecycle(t *testing.T) {
 				t.Fatal(readResp.Diagnostics)
 			}
 			assertKMSKeyExportability(t, readResp.State, exportable)
+			assertKMSKeyAttribute(t, readResp.State, "project_id", types.StringValue("project-1"))
 
 			updatePlan := tfsdk.Plan{Schema: resourceSchema, Raw: createResp.State.Raw}
 			if diags := updatePlan.SetAttribute(ctx, path.Root("name"), "renamed-key"); diags.HasError() {
@@ -188,6 +255,88 @@ func TestKMSKeyExportabilityLifecycle(t *testing.T) {
 	}
 }
 
+// Instances older than Infisical v0.161.1 do not know about isExportable: they omit it from every response, and
+// the provider must read that as the exportable keys those instances create, not as false.
+func TestKMSKeyExportabilityOnLegacyInstance(t *testing.T) {
+	ctx := context.Background()
+	resourceSchema := kmsKeyTestSchema(t)
+
+	legacyHandler := func(t *testing.T, assertCreateBody func(map[string]json.RawMessage)) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodPost {
+				var body map[string]json.RawMessage
+				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+					t.Error(err)
+					http.Error(w, "invalid JSON", http.StatusBadRequest)
+					return
+				}
+				assertCreateBody(body)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprint(w, `{"key":{"id":"key-1","projectId":"project-1","name":"test-key","isDisabled":false,"keyUsage":"encrypt-decrypt","encryptionAlgorithm":"aes-256-gcm"}}`)
+		}
+	}
+
+	basePlan := kmsKeyResourceModel{
+		ProjectId:           types.StringValue("project-1"),
+		Name:                types.StringValue("test-key"),
+		Description:         types.StringValue(""),
+		KeyUsage:            types.StringValue(ENCRYPTION_KEY_USAGE),
+		EncryptionAlgorithm: types.StringValue(ENCRYPTION_ALGORITHM_AES_256_GCM),
+		IsDisabled:          types.BoolValue(false),
+	}
+
+	t.Run("unconfigured_create_reports_exportable", func(t *testing.T) {
+		r := newKMSKeyTestResource(t, legacyHandler(t, func(body map[string]json.RawMessage) {
+			if _, exists := body["isExportable"]; exists {
+				t.Error("POST must omit isExportable when it is not configured")
+			}
+		}))
+
+		model := basePlan
+		model.IsExportable = types.BoolUnknown()
+		createResp := resource.CreateResponse{State: tfsdk.State{Schema: resourceSchema}}
+		r.Create(ctx, resource.CreateRequest{Plan: kmsKeyTestPlan(t, ctx, resourceSchema, model)}, &createResp)
+		if createResp.Diagnostics.HasError() {
+			t.Fatal(createResp.Diagnostics)
+		}
+		assertKMSKeyExportability(t, createResp.State, true)
+	})
+
+	t.Run("read_reports_exportable", func(t *testing.T) {
+		r := newKMSKeyTestResource(t, legacyHandler(t, func(map[string]json.RawMessage) {}))
+
+		state := tfsdk.State{Schema: resourceSchema}
+		if diags := state.Set(ctx, &kmsKeyResourceModel{ID: types.StringValue("key-1")}); diags.HasError() {
+			t.Fatal(diags)
+		}
+		readResp := resource.ReadResponse{State: state}
+		r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
+		if readResp.Diagnostics.HasError() {
+			t.Fatal(readResp.Diagnostics)
+		}
+		assertKMSKeyExportability(t, readResp.State, true)
+	})
+
+	t.Run("configured_create_fails_and_keeps_state", func(t *testing.T) {
+		r := newKMSKeyTestResource(t, legacyHandler(t, func(map[string]json.RawMessage) {}))
+
+		model := basePlan
+		model.IsExportable = types.BoolValue(false)
+		createResp := resource.CreateResponse{State: tfsdk.State{Schema: resourceSchema}}
+		r.Create(ctx, resource.CreateRequest{Plan: kmsKeyTestPlan(t, ctx, resourceSchema, model)}, &createResp)
+		if !createResp.Diagnostics.HasError() {
+			t.Fatal("creating a non-exportable key against an instance that ignores isExportable must fail")
+		}
+		if summary := createResp.Diagnostics.Errors()[0].Detail(); !strings.Contains(summary, "does not support is_exportable") {
+			t.Errorf("unexpected diagnostic: %s", summary)
+		}
+		// The key exists on the server, so it has to land in state instead of leaking.
+		assertKMSKeyAttribute(t, createResp.State, "id", types.StringValue("key-1"))
+		assertKMSKeyExportability(t, createResp.State, true)
+	})
+}
+
 func assertKMSKeyExportability(t *testing.T, state tfsdk.State, want bool) {
 	t.Helper()
 	var got types.Bool
@@ -196,5 +345,16 @@ func assertKMSKeyExportability(t *testing.T, state tfsdk.State, want bool) {
 	}
 	if !got.Equal(types.BoolValue(want)) {
 		t.Errorf("is_exportable = %v, want %t", got, want)
+	}
+}
+
+func assertKMSKeyAttribute(t *testing.T, state tfsdk.State, name string, want types.String) {
+	t.Helper()
+	var got types.String
+	if diags := state.GetAttribute(context.Background(), path.Root(name), &got); diags.HasError() {
+		t.Fatal(diags)
+	}
+	if !got.Equal(want) {
+		t.Errorf("%s = %v, want %v", name, got, want)
 	}
 }

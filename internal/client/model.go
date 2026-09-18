@@ -3002,7 +3002,7 @@ type KMSKey struct {
 	ID                  string    `json:"id"`
 	Description         string    `json:"description"`
 	IsDisabled          bool      `json:"isDisabled"`
-	IsExportable        bool      `json:"isExportable"`
+	IsExportable        *bool     `json:"isExportable"`
 	OrgId               string    `json:"orgId"`
 	Name                string    `json:"name"`
 	CreatedAt           time.Time `json:"createdAt"`

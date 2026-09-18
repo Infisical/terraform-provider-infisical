@@ -62,6 +62,14 @@ type kmsKeyResourceModel struct {
 	UpdatedAt           types.String `tfsdk:"updated_at"`
 }
 
+func kmsKeyIsExportable(key infisical.KMSKey) types.Bool {
+	if key.IsExportable == nil {
+		return types.BoolValue(true)
+	}
+
+	return types.BoolValue(*key.IsExportable)
+}
+
 func (r *kmsKeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_kms_key"
 }
@@ -135,9 +143,10 @@ func (r *kmsKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Description: "Whether the raw key material can be exported. Defaults to true. Changing this value requires replacing the key.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(true),
 				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
+					// Exportability is immutable, but keys created outside of Terraform or before this attribute
+					// existed must not be replaced just because the configuration leaves it unset.
+					boolplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
 			"org_id": schema.StringAttribute{
@@ -189,10 +198,13 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	createKMSKeyRequest := infisical.CreateKMSKeyRequest{
-		ProjectId:    plan.ProjectId.ValueString(),
-		Name:         plan.Name.ValueString(),
-		Description:  plan.Description.ValueString(),
-		IsExportable: plan.IsExportable.ValueBoolPointer(),
+		ProjectId:   plan.ProjectId.ValueString(),
+		Name:        plan.Name.ValueString(),
+		Description: plan.Description.ValueString(),
+	}
+
+	if !plan.IsExportable.IsNull() && !plan.IsExportable.IsUnknown() {
+		createKMSKeyRequest.IsExportable = plan.IsExportable.ValueBoolPointer()
 	}
 
 	if !plan.KeyUsage.IsNull() && !plan.KeyUsage.IsUnknown() {
@@ -213,11 +225,13 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	plan.ID = types.StringValue(kmsKey.Key.ID)
-	plan.IsExportable = types.BoolValue(kmsKey.Key.IsExportable)
 	plan.OrgId = types.StringValue(kmsKey.Key.OrgId)
 	plan.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	plan.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
 	plan.UpdatedAt = types.StringValue(kmsKey.Key.UpdatedAt.Format(time.RFC3339))
+
+	configuredExportability := !plan.IsExportable.IsNull() && !plan.IsExportable.IsUnknown()
+	plan.IsExportable = kmsKeyIsExportable(kmsKey.Key)
 
 	if plan.KeyUsage.IsNull() || plan.KeyUsage.IsUnknown() {
 		plan.KeyUsage = types.StringValue(kmsKey.Key.KeyUsage)
@@ -248,6 +262,14 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 			plan.UpdatedAt = types.StringValue(updatedKey.Key.UpdatedAt.Format(time.RFC3339))
 		}
+	}
+
+	if configuredExportability && kmsKey.Key.IsExportable == nil {
+		resp.Diagnostics.AddError(
+			"Error creating KMS key",
+			"This Infisical instance does not support is_exportable, so the key was created as exportable. "+
+				"Upgrade to Infisical v0.161.1 or later, or remove is_exportable from the configuration.",
+		)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -284,7 +306,11 @@ func (r *kmsKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.KeyUsage = types.StringValue(kmsKey.Key.KeyUsage)
 	state.EncryptionAlgorithm = types.StringValue(kmsKey.Key.EncryptionAlgorithm)
 	state.IsDisabled = types.BoolValue(kmsKey.Key.IsDisabled)
-	state.IsExportable = types.BoolValue(kmsKey.Key.IsExportable)
+	state.IsExportable = kmsKeyIsExportable(kmsKey.Key)
+	if kmsKey.Key.ProjectId != "" {
+		// Imports only carry the key ID, and a null project_id would force a replacement on the next apply.
+		state.ProjectId = types.StringValue(kmsKey.Key.ProjectId)
+	}
 	state.OrgId = types.StringValue(kmsKey.Key.OrgId)
 	state.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	state.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
@@ -341,7 +367,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	plan.KeyUsage = types.StringValue(updatedKey.Key.KeyUsage)
 	plan.EncryptionAlgorithm = types.StringValue(updatedKey.Key.EncryptionAlgorithm)
 	plan.IsDisabled = types.BoolValue(updatedKey.Key.IsDisabled)
-	plan.IsExportable = types.BoolValue(updatedKey.Key.IsExportable)
+	plan.IsExportable = kmsKeyIsExportable(updatedKey.Key)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
