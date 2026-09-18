@@ -3002,6 +3002,7 @@ type KMSKey struct {
 	ID                  string    `json:"id"`
 	Description         string    `json:"description"`
 	IsDisabled          bool      `json:"isDisabled"`
+	IsExportable        bool      `json:"isExportable"`
 	OrgId               string    `json:"orgId"`
 	Name                string    `json:"name"`
 	CreatedAt           time.Time `json:"createdAt"`
@@ -3018,6 +3019,7 @@ type CreateKMSKeyRequest struct {
 	Description         string `json:"description,omitempty"`
 	KeyUsage            string `json:"keyUsage,omitempty"`
 	EncryptionAlgorithm string `json:"encryptionAlgorithm,omitempty"`
+	IsExportable        *bool  `json:"isExportable,omitempty"`
 }
 
 type CreateKMSKeyResponse struct {

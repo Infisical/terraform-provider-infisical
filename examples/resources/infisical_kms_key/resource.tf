@@ -24,6 +24,7 @@ resource "infisical_kms_key" "encryption_key" {
   description          = "KMS key for encrypting sensitive data"
   key_usage            = "encrypt-decrypt"
   encryption_algorithm = "aes-256-gcm"
+  is_exportable        = false
 }
 
 # Create a signing KMS key

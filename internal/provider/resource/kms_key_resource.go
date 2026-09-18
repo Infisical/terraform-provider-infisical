@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -54,6 +55,7 @@ type kmsKeyResourceModel struct {
 	KeyUsage            types.String `tfsdk:"key_usage"`
 	EncryptionAlgorithm types.String `tfsdk:"encryption_algorithm"`
 	IsDisabled          types.Bool   `tfsdk:"is_disabled"`
+	IsExportable        types.Bool   `tfsdk:"is_exportable"`
 	OrgId               types.String `tfsdk:"org_id"`
 	Version             types.Int64  `tfsdk:"version"`
 	CreatedAt           types.String `tfsdk:"created_at"`
@@ -129,6 +131,15 @@ func (r *kmsKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"is_exportable": schema.BoolAttribute{
+				Description: "Whether the raw key material can be exported. Defaults to true. Changing this value requires replacing the key.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
 			"org_id": schema.StringAttribute{
 				Description: "The ID of the organization.",
 				Computed:    true,
@@ -178,9 +189,10 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	createKMSKeyRequest := infisical.CreateKMSKeyRequest{
-		ProjectId:   plan.ProjectId.ValueString(),
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
+		ProjectId:    plan.ProjectId.ValueString(),
+		Name:         plan.Name.ValueString(),
+		Description:  plan.Description.ValueString(),
+		IsExportable: plan.IsExportable.ValueBoolPointer(),
 	}
 
 	if !plan.KeyUsage.IsNull() && !plan.KeyUsage.IsUnknown() {
@@ -201,6 +213,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	plan.ID = types.StringValue(kmsKey.Key.ID)
+	plan.IsExportable = types.BoolValue(kmsKey.Key.IsExportable)
 	plan.OrgId = types.StringValue(kmsKey.Key.OrgId)
 	plan.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	plan.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
@@ -271,6 +284,7 @@ func (r *kmsKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.KeyUsage = types.StringValue(kmsKey.Key.KeyUsage)
 	state.EncryptionAlgorithm = types.StringValue(kmsKey.Key.EncryptionAlgorithm)
 	state.IsDisabled = types.BoolValue(kmsKey.Key.IsDisabled)
+	state.IsExportable = types.BoolValue(kmsKey.Key.IsExportable)
 	state.OrgId = types.StringValue(kmsKey.Key.OrgId)
 	state.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	state.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
@@ -327,6 +341,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	plan.KeyUsage = types.StringValue(updatedKey.Key.KeyUsage)
 	plan.EncryptionAlgorithm = types.StringValue(updatedKey.Key.EncryptionAlgorithm)
 	plan.IsDisabled = types.BoolValue(updatedKey.Key.IsDisabled)
+	plan.IsExportable = types.BoolValue(updatedKey.Key.IsExportable)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
