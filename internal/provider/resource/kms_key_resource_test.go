@@ -318,6 +318,29 @@ func TestKMSKeyExportabilityOnLegacyInstance(t *testing.T) {
 		assertKMSKeyExportability(t, readResp.State, true)
 	})
 
+	// Every key on such an instance is exportable, so an explicit is_exportable = true is already satisfied.
+	t.Run("configured_exportable_create_succeeds", func(t *testing.T) {
+		r := newKMSKeyTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodDelete {
+				t.Error("a key that matches the configuration must not be deleted")
+			}
+			legacyHandler(t, func(body map[string]json.RawMessage) {
+				if got := string(body["isExportable"]); got != "true" {
+					t.Errorf("POST isExportable = %q, want true", got)
+				}
+			})(w, req)
+		})
+
+		model := basePlan
+		model.IsExportable = types.BoolValue(true)
+		createResp := resource.CreateResponse{State: tfsdk.State{Schema: resourceSchema}}
+		r.Create(ctx, resource.CreateRequest{Plan: kmsKeyTestPlan(t, ctx, resourceSchema, model)}, &createResp)
+		if createResp.Diagnostics.HasError() {
+			t.Fatal(createResp.Diagnostics)
+		}
+		assertKMSKeyExportability(t, createResp.State, true)
+	})
+
 	t.Run("configured_create_deletes_the_exportable_key", func(t *testing.T) {
 		deleted := false
 		r := newKMSKeyTestResource(t, func(w http.ResponseWriter, req *http.Request) {

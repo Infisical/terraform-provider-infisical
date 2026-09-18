@@ -230,7 +230,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	plan.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
 	plan.UpdatedAt = types.StringValue(kmsKey.Key.UpdatedAt.Format(time.RFC3339))
 
-	configuredExportability := !plan.IsExportable.IsNull() && !plan.IsExportable.IsUnknown()
+	configuredNonExportable := !plan.IsExportable.IsNull() && !plan.IsExportable.IsUnknown() && !plan.IsExportable.ValueBool()
 	plan.IsExportable = kmsKeyIsExportable(kmsKey.Key)
 
 	if plan.KeyUsage.IsNull() || plan.KeyUsage.IsUnknown() {
@@ -264,7 +264,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 	}
 
-	if configuredExportability && kmsKey.Key.IsExportable == nil {
+	if configuredNonExportable && kmsKey.Key.IsExportable == nil {
 		// Nothing can be encrypted under a key this new, so delete it rather than leave a key behind whose
 		// material is exportable against an explicit is_exportable = false.
 		if _, deleteErr := r.client.DeleteKMSKey(infisical.DeleteKMSKeyRequest{KeyId: kmsKey.Key.ID}); deleteErr != nil {
