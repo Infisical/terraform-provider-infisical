@@ -39,6 +39,7 @@ resource "infisical_kms_key" "encryption_key" {
   description          = "KMS key for encrypting sensitive data"
   key_usage            = "encrypt-decrypt"
   encryption_algorithm = "aes-256-gcm"
+  is_exportable        = false
 }
 
 # Create a signing KMS key
@@ -64,6 +65,7 @@ resource "infisical_kms_key" "signing_key" {
 - `description` (String) The description of the KMS key. Maximum 500 characters.
 - `encryption_algorithm` (String) The encryption algorithm for the key. Options: aes-256-gcm, aes-128-gcm, RSA_4096, ECC_NIST_P256. Defaults to 'aes-256-gcm'.
 - `is_disabled` (Boolean) Whether the key is disabled. Defaults to false.
+- `is_exportable` (Boolean) Whether the raw key material can be exported. Defaults to true. Changing this value requires replacing the key.
 - `key_usage` (String) The usage of the key. Options: encrypt-decrypt, sign-verify. Defaults to 'encrypt-decrypt'.
 
 ### Read-Only
