@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -54,10 +55,19 @@ type kmsKeyResourceModel struct {
 	KeyUsage            types.String `tfsdk:"key_usage"`
 	EncryptionAlgorithm types.String `tfsdk:"encryption_algorithm"`
 	IsDisabled          types.Bool   `tfsdk:"is_disabled"`
+	IsExportable        types.Bool   `tfsdk:"is_exportable"`
 	OrgId               types.String `tfsdk:"org_id"`
 	Version             types.Int64  `tfsdk:"version"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
+}
+
+func kmsKeyIsExportable(key infisical.KMSKey) types.Bool {
+	if key.IsExportable == nil {
+		return types.BoolValue(true)
+	}
+
+	return types.BoolValue(*key.IsExportable)
 }
 
 func (r *kmsKeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -129,6 +139,16 @@ func (r *kmsKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"is_exportable": schema.BoolAttribute{
+				Description: "Whether the raw key material can be exported. Defaults to true. Changing this value requires replacing the key.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					// Exportability is immutable, but keys created outside of Terraform or before this attribute
+					// existed must not be replaced just because the configuration leaves it unset.
+					boolplanmodifier.RequiresReplaceIfConfigured(),
+				},
+			},
 			"org_id": schema.StringAttribute{
 				Description: "The ID of the organization.",
 				Computed:    true,
@@ -183,6 +203,10 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		Description: plan.Description.ValueString(),
 	}
 
+	if !plan.IsExportable.IsNull() && !plan.IsExportable.IsUnknown() {
+		createKMSKeyRequest.IsExportable = plan.IsExportable.ValueBoolPointer()
+	}
+
 	if !plan.KeyUsage.IsNull() && !plan.KeyUsage.IsUnknown() {
 		createKMSKeyRequest.KeyUsage = plan.KeyUsage.ValueString()
 	}
@@ -205,6 +229,9 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	plan.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	plan.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
 	plan.UpdatedAt = types.StringValue(kmsKey.Key.UpdatedAt.Format(time.RFC3339))
+
+	configuredNonExportable := !plan.IsExportable.IsNull() && !plan.IsExportable.IsUnknown() && !plan.IsExportable.ValueBool()
+	plan.IsExportable = kmsKeyIsExportable(kmsKey.Key)
 
 	if plan.KeyUsage.IsNull() || plan.KeyUsage.IsUnknown() {
 		plan.KeyUsage = types.StringValue(kmsKey.Key.KeyUsage)
@@ -235,6 +262,30 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 			plan.UpdatedAt = types.StringValue(updatedKey.Key.UpdatedAt.Format(time.RFC3339))
 		}
+	}
+
+	if configuredNonExportable && kmsKey.Key.IsExportable == nil {
+		// Nothing can be encrypted under a key this new, so delete it rather than leave a key behind whose
+		// material is exportable against an explicit is_exportable = false.
+		if _, deleteErr := r.client.DeleteKMSKey(infisical.DeleteKMSKeyRequest{KeyId: kmsKey.Key.ID}); deleteErr != nil {
+			// The key outlived the failed create, so it has to be tracked in state instead of leaking.
+			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+			resp.Diagnostics.AddError(
+				"Error creating KMS key",
+				"This Infisical instance does not support is_exportable, so the key was created as exportable, and "+
+					"deleting it again failed: "+deleteErr.Error()+". Destroy the key, then either upgrade to "+
+					"Infisical v0.161.1 or later or remove is_exportable from the configuration.",
+			)
+			return
+		}
+
+		resp.Diagnostics.AddError(
+			"Error creating KMS key",
+			"This Infisical instance does not support is_exportable, so the key would have been created as "+
+				"exportable. The key was deleted again. Upgrade to Infisical v0.161.1 or later, or remove "+
+				"is_exportable from the configuration.",
+		)
+		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -271,6 +322,11 @@ func (r *kmsKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.KeyUsage = types.StringValue(kmsKey.Key.KeyUsage)
 	state.EncryptionAlgorithm = types.StringValue(kmsKey.Key.EncryptionAlgorithm)
 	state.IsDisabled = types.BoolValue(kmsKey.Key.IsDisabled)
+	state.IsExportable = kmsKeyIsExportable(kmsKey.Key)
+	if kmsKey.Key.ProjectId != "" {
+		// Imports only carry the key ID, and a null project_id would force a replacement on the next apply.
+		state.ProjectId = types.StringValue(kmsKey.Key.ProjectId)
+	}
 	state.OrgId = types.StringValue(kmsKey.Key.OrgId)
 	state.Version = types.Int64Value(int64(kmsKey.Key.Version))
 	state.CreatedAt = types.StringValue(kmsKey.Key.CreatedAt.Format(time.RFC3339))
@@ -327,6 +383,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	plan.KeyUsage = types.StringValue(updatedKey.Key.KeyUsage)
 	plan.EncryptionAlgorithm = types.StringValue(updatedKey.Key.EncryptionAlgorithm)
 	plan.IsDisabled = types.BoolValue(updatedKey.Key.IsDisabled)
+	plan.IsExportable = kmsKeyIsExportable(updatedKey.Key)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
