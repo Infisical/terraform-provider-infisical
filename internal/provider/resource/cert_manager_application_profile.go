@@ -296,10 +296,10 @@ func (r *certManagerApplicationProfileResource) ModifyPlan(ctx context.Context, 
 	}
 
 	if signRaWithCaChanged(priorSign, planSign) {
-		resp.Diagnostics.AddAttributeWarning(
+		resp.Diagnostics.AddAttributeError(
 			signRaWithCaPath(),
 			"Invalid sign_ra_with_ca change",
-			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured, so this apply will fail. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
+			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
 		)
 	}
 }
