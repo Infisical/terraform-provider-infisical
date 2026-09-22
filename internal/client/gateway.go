@@ -16,8 +16,7 @@ const (
 	operationMintGatewayEnrollmentToken = "CallMintGatewayEnrollmentToken"
 )
 
-// ListGateways returns the gateways in the machine identity's organization. This stays on v2 so the
-// gateway data source keeps working against instances that predate the v3 gateway API.
+// Stays on v2 so the gateway data source keeps working against pre-v3 instances.
 func (client Client) ListGateways() ([]Gateway, error) {
 	var gateways []Gateway
 	response, err := client.Config.HttpClient.
@@ -55,8 +54,6 @@ func (client Client) GetGatewayByName(name string) (Gateway, error) {
 	return Gateway{}, ErrNotFound
 }
 
-// GatewayAlreadyExistsError carries the id of the gateway holding the name, so a caller whose
-// earlier apply created a gateway but failed before recording it can be told what to import.
 type GatewayAlreadyExistsError struct {
 	ExistingGatewayID string
 	apiError          error
@@ -161,8 +158,7 @@ func (client Client) DeleteGateway(id string) error {
 	return nil
 }
 
-// MintGatewayEnrollmentToken issues the one-time bootstrap token for a token-auth gateway. Minting
-// invalidates any token issued earlier for the same gateway.
+// Minting invalidates any token issued earlier for the same gateway.
 func (client Client) MintGatewayEnrollmentToken(gatewayId string) (MintGatewayEnrollmentTokenResponse, error) {
 	var body MintGatewayEnrollmentTokenResponse
 	response, err := client.Config.HttpClient.

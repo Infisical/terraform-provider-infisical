@@ -37,8 +37,7 @@ var (
 
 const defaultStsEndpoint = "https://sts.amazonaws.com/"
 
-// Mirrors the API's slug rule, which refuses anything slugify would rewrite. Validating it here
-// turns an apply-time 400 into a plan-time error.
+// Mirrors the API's slug rule so a bad name fails at plan time, not apply.
 var gatewayNameSlugRegex = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 func NewGatewayResource() resource.Resource {
@@ -246,8 +245,7 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				Computed:    true,
 			},
 			"ca_certificate": schema.StringAttribute{
-				// Infisical strips the trailing newline, and file() always supplies one, so the
-				// values are compared with surrounding whitespace ignored.
+				// The API strips the trailing newline that file() always adds.
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The PEM-encoded CA certificate that issued the Kubernetes API server's TLS certificate.",
 				Optional:    true,
@@ -313,8 +311,7 @@ func (r *GatewayResource) ConfigValidators(_ context.Context) []resource.ConfigV
 	}
 }
 
-// ValidateConfig carries the API's cross-field rules into the plan. resourcevalidator cannot
-// express them: its combinators would fire on blocks the configuration never set.
+// resourcevalidator cannot express these: its combinators fire on blocks the config never set.
 func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config GatewayResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
@@ -322,8 +319,7 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 		return
 	}
 
-	// An unknown set resolves at apply time, so treating it as empty here would reject a valid
-	// configuration that draws its allowlist from another resource.
+	// Unknown resolves at apply time, so it must not count as empty.
 	isEmpty := func(set types.Set) bool { return !set.IsUnknown() && len(set.Elements()) == 0 }
 
 	switch {
@@ -345,7 +341,6 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			)
 		}
 
-		// An IAM token carries no Compute Engine claim, so there is nothing for these to match.
 		if config.GcpAuth.Type.ValueString() == infisical.GatewayGcpAuthTypeIam {
 			if !isEmpty(config.GcpAuth.AllowedProjects) || !isEmpty(config.GcpAuth.AllowedZones) {
 				resp.Diagnostics.AddAttributeError(
@@ -498,8 +493,7 @@ func (r *GatewayResource) Update(ctx context.Context, req resource.UpdateRequest
 		updateRequest.Name = infisicalstrings.StringToPtr(plan.Name.ValueString())
 	}
 
-	// Resending an unchanged auth method is not free: Kubernetes configs are re-validated against
-	// the live cluster, so a rename would fail whenever that cluster happens to be unreachable.
+	// Resending Kubernetes auth re-validates against the live cluster, so a rename would need it up.
 	authChanged, diags := gatewayAuthMethodChanged(ctx, req)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -563,8 +557,6 @@ func (r *GatewayResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-// Importing checks the auth method first. Letting a legacy identity-bound gateway into state would
-// wedge the resource, because Read refuses it and every later plan, apply and destroy fails on that.
 func (r *GatewayResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -605,8 +597,6 @@ func (r *GatewayResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// gatewayAuthMethodChanged reports whether the configured auth method differs from the one in
-// state, comparing the blocks as Terraform sees them rather than as the API echoes them back.
 func gatewayAuthMethodChanged(ctx context.Context, req resource.UpdateRequest) (bool, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -625,8 +615,6 @@ func gatewayAuthMethodChanged(ctx context.Context, req resource.UpdateRequest) (
 	return false, diags
 }
 
-// gatewayAuthMethodInput builds the API payload from whichever auth block the configuration set.
-// ConfigValidators has already established that exactly one of them is non-null.
 func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (infisical.GatewayAuthMethodInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -684,8 +672,7 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 			VerifyTlsCertificate: plan.KubernetesAuth.VerifyTlsCertificate.ValueBoolPointer(),
 		}
 
-		// Sending an empty host fails the host format check, and gateway review mode rejects a host
-		// outright, so anything blank is omitted rather than sent as "".
+		// Gateway review mode rejects a host outright, and "" fails the format check.
 		if host := plan.KubernetesAuth.KubernetesHost.ValueString(); host != "" {
 			input.KubernetesHost = infisicalstrings.StringToPtr(host)
 		}
@@ -715,8 +702,7 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 	return infisical.GatewayAuthMethodInput{}, diags
 }
 
-// applyGatewayToModel writes the API's view of the gateway onto the model, leaving the write-only
-// reviewer JWT as the configuration supplied it, since Infisical never returns it.
+// The reviewer JWT is kept from config: the API never returns it.
 func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gateway infisical.GatewayDetails) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -824,8 +810,6 @@ func optionalString(value *string) types.String {
 	return types.StringValue(*value)
 }
 
-// csvFromSet renders a set as the comma-separated string the API takes. The elements are sorted so
-// two applies of the same configuration send the same string, which keeps the audit log readable.
 func csvFromSet(ctx context.Context, set types.Set) (string, diag.Diagnostics) {
 	var diags diag.Diagnostics
 

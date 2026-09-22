@@ -138,10 +138,7 @@ func (r *GatewayEnrollmentTokenResource) Create(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-// Read cannot verify the token, since Infisical offers no way to read one back. What it can check is
-// that the gateway still exists and still takes token auth, which is the failure that otherwise goes
-// unnoticed: switching the gateway to another method deletes the token server-side, and nothing in a
-// plan would say so.
+// The token itself cannot be read back, so this only checks the gateway still takes token auth.
 func (r *GatewayEnrollmentTokenResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -172,9 +169,7 @@ func (r *GatewayEnrollmentTokenResource) Read(ctx context.Context, req resource.
 		return
 	}
 
-	// Switching the gateway off token auth deletes the token server-side, so the resource really is
-	// gone. Saying so lets Terraform reconcile normally; erroring here would fail every later plan,
-	// including one that only wanted to remove this resource.
+	// The token is deleted server-side when the method changes, so it really is gone.
 	if gateway.AuthMethod.Method != infisical.GatewayAuthMethodToken {
 		resp.Diagnostics.AddWarning(
 			"Gateway no longer uses token authentication",
@@ -191,8 +186,7 @@ func (r *GatewayEnrollmentTokenResource) Read(ctx context.Context, req resource.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Every configurable attribute forces replacement, so Terraform never calls this. It carries the
-// plan forward with the minted values intact in case that ever stops being true.
+// Unreachable while every configurable attribute forces replacement.
 func (r *GatewayEnrollmentTokenResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan GatewayEnrollmentTokenResourceModel
 	var state GatewayEnrollmentTokenResourceModel
@@ -209,8 +203,6 @@ func (r *GatewayEnrollmentTokenResource) Update(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-// Destroying does nothing in Infisical. The only revoke available is gateway-wide and would cut off
-// the running gateway, which is far more than removing a bootstrap credential should do, and an
-// unused token expires within the hour regardless.
+// No-op: the only revoke is gateway-wide, and an unused token expires within the hour.
 func (r *GatewayEnrollmentTokenResource) Delete(_ context.Context, _ resource.DeleteRequest, _ *resource.DeleteResponse) {
 }

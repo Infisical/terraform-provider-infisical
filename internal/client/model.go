@@ -4303,9 +4303,7 @@ const (
 	GatewayKubernetesTokenReviewModeGateway = "gateway"
 )
 
-// GatewayAuthMethodConfig flattens every method's config into one struct. The API returns a
-// discriminated union whose arms share no field names apart from `id`, so `Method` alone says
-// which fields carry a value.
+// Flattened union: Method says which fields carry a value.
 type GatewayAuthMethodConfig struct {
 	ID string `json:"id"`
 
@@ -4338,8 +4336,7 @@ type GatewayAuthMethod struct {
 	Config GatewayAuthMethodConfig `json:"config"`
 }
 
-// GatewayAuthMethodInput is the settable half of the union. Every field is a pointer so an
-// explicitly empty allowlist is sent rather than silently falling back to the server default.
+// Pointers so an explicitly empty allowlist is sent rather than defaulted server-side.
 type GatewayAuthMethodInput struct {
 	Method string `json:"method"`
 
@@ -4364,8 +4361,6 @@ type GatewayAuthMethodInput struct {
 	VerifyTlsCertificate *bool   `json:"verifyTlsCertificate,omitempty"`
 }
 
-// GatewayDetails is a gateway as the v3 API returns it. Everything below Name is runtime state the
-// gateway process writes after it connects, not configuration.
 type GatewayDetails struct {
 	ID         string            `json:"id"`
 	Name       string            `json:"name"`

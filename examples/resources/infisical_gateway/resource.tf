@@ -17,11 +17,9 @@ provider "infisical" {
   }
 }
 
-# A gateway record is the thing everything else references. Deploy the gateway itself separately
-# with the Helm chart or the CLI and point it at this resource's id, so rebuilding the machine
-# never changes the id that app connections and dynamic secrets are pinned to.
+# The record only. Deploy the gateway itself with the Helm chart or CLI, pointed at its id.
 
-# AWS: an EC2 instance authenticates with its instance role on every start.
+# AWS: the instance authenticates with its instance role on every start.
 resource "infisical_gateway" "aws" {
   name = "prod-us-east"
 
@@ -31,8 +29,7 @@ resource "infisical_gateway" "aws" {
   }
 }
 
-# GCP: a Compute Engine VM or a GKE pod with workload identity presents a metadata ID token.
-# A zone on its own restricts nothing, so at least one service account or project is required.
+# GCP: a metadata ID token from Compute Engine or GKE workload identity.
 resource "infisical_gateway" "gcp" {
   name = "prod-gce"
 
@@ -44,8 +41,7 @@ resource "infisical_gateway" "gcp" {
   }
 }
 
-# Kubernetes: Infisical reviews the pod's projected service account token against the cluster's
-# API server.
+# Kubernetes: Infisical reviews the pod's service account token against the API server.
 resource "infisical_gateway" "gke" {
   name = "gke-prod"
 
@@ -58,10 +54,7 @@ resource "infisical_gateway" "gke" {
   }
 }
 
-# The same, for a cluster whose API server Infisical cannot reach: an already-connected gateway
-# in that cluster performs the TokenReview with its own service account, so no host or reviewer
-# token is needed. The reviewing gateway has to be a different one, and the first gateway in a
-# cluster therefore has to use the api mode above.
+# For a cluster Infisical cannot reach: another connected gateway in it does the TokenReview.
 resource "infisical_gateway" "gke_second" {
   name = "gke-prod-2"
 
@@ -73,15 +66,13 @@ resource "infisical_gateway" "gke_second" {
   }
 }
 
-# Token: for machines no cloud or cluster can vouch for. The token itself is a separate resource.
+# Token: for machines no cloud or cluster can vouch for.
 resource "infisical_gateway" "datacenter" {
   name = "datacenter-01"
 
   token_auth = {}
 }
 
-# Downstream resources reference the record, not the machine, so an instance rebuild leaves them
-# untouched.
 output "gateway_id" {
   value = infisical_gateway.aws.id
 }

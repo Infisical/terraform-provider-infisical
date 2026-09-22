@@ -8,8 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-// GetProviderSchema is where the framework runs ValidateImplementation over every resource schema,
-// so a schema the framework rejects fails here rather than on a user's first plan.
+// GetProviderSchema runs the framework's ValidateImplementation over every resource schema.
 func TestProviderSchemaIsValid(t *testing.T) {
 	server, err := providerserver.NewProtocol6WithError(New("test")())()
 	if err != nil {

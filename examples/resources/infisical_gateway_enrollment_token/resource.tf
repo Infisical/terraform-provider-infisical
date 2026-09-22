@@ -27,8 +27,7 @@ resource "infisical_gateway" "datacenter" {
   token_auth = {}
 }
 
-# The AMI the instance is built from. A new Canonical image replaces the instance, which re-runs
-# its user data, which needs a token that has not been used yet.
+# A new AMI replaces the instance, which re-runs user data and needs an unused token.
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"]
@@ -39,12 +38,8 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# keepers is the only thing that re-mints the token, and nothing validates it. List every input
-# that forces the machine to be rebuilt: miss one and the rebuilt machine boots with a token that
-# was already consumed, stays offline, and plan shows no drift.
-#
-# The instance cannot be referenced here, because it consumes the token and that would be a cycle.
-# Mirror the values it is built from instead.
+# keepers is the only thing that re-mints. List every input that rebuilds the machine; the
+# instance itself cannot be referenced, since it consumes the token.
 resource "infisical_gateway_enrollment_token" "datacenter" {
   gateway_id = infisical_gateway.datacenter.id
 
