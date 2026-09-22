@@ -35,8 +35,6 @@ var (
 	_ resource.ResourceWithValidateConfig   = &GatewayResource{}
 )
 
-const defaultStsEndpoint = "https://sts.amazonaws.com/"
-
 // Mirrors the API's slug rule so a bad name fails at plan time, not apply.
 var gatewayNameSlugRegex = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
@@ -49,9 +47,8 @@ type GatewayResource struct {
 }
 
 type gatewayAwsAuthModel struct {
-	StsEndpoint          types.String `tfsdk:"sts_endpoint"`
-	AllowedPrincipalArns types.Set    `tfsdk:"allowed_principal_arns"`
-	AllowedAccountIds    types.Set    `tfsdk:"allowed_account_ids"`
+	AllowedPrincipalArns types.Set `tfsdk:"allowed_principal_arns"`
+	AllowedAccountIds    types.Set `tfsdk:"allowed_account_ids"`
 }
 
 type gatewayGcpAuthModel struct {
@@ -167,12 +164,6 @@ func gatewayAwsAuthSchema() schema.SingleNestedAttribute {
 		Optional:    true,
 		Description: "Authenticate the gateway with its AWS IAM identity. The machine re-authenticates on every start, so no secret is stored. At least one of `allowed_principal_arns` or `allowed_account_ids` must be non-empty.",
 		Attributes: map[string]schema.Attribute{
-			"sts_endpoint": schema.StringAttribute{
-				Description: "The AWS STS endpoint used to verify the signed request. Defaults to " + defaultStsEndpoint + ".",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(defaultStsEndpoint),
-			},
 			"allowed_principal_arns": schema.SetAttribute{
 				Description: "IAM principal ARNs allowed to authenticate as this gateway. Supports `*` wildcards.",
 				ElementType: types.StringType,
@@ -630,7 +621,6 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 
 		return infisical.GatewayAuthMethodInput{
 			Method:               infisical.GatewayAuthMethodAws,
-			StsEndpoint:          infisicalstrings.StringToPtr(plan.AwsAuth.StsEndpoint.ValueString()),
 			AllowedPrincipalArns: infisicalstrings.StringToPtr(principalArns),
 			AllowedAccountIds:    infisicalstrings.StringToPtr(accountIds),
 		}, diags
@@ -727,7 +717,6 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 		diags.Append(d...)
 
 		model.AwsAuth = &gatewayAwsAuthModel{
-			StsEndpoint:          types.StringValue(config.StsEndpoint),
 			AllowedPrincipalArns: principalArns,
 			AllowedAccountIds:    accountIds,
 		}

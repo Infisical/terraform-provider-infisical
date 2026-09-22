@@ -126,7 +126,6 @@ Optional:
 
 - `allowed_account_ids` (Set of String) AWS account IDs allowed to authenticate as this gateway.
 - `allowed_principal_arns` (Set of String) IAM principal ARNs allowed to authenticate as this gateway. Supports `*` wildcards.
-- `sts_endpoint` (String) The AWS STS endpoint used to verify the signed request. Defaults to https://sts.amazonaws.com/.
 
 
 <a id="nestedatt--gcp_auth"></a>
