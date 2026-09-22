@@ -44,7 +44,6 @@ func (r *GatewayEnrollmentTokenResource) Schema(_ context.Context, _ resource.Sc
 	resp.Schema = schema.Schema{
 		Description: "Mint the one-time enrollment token a token-auth gateway uses to bootstrap. " +
 			"The token is single-use and expires an hour after it is issued, and minting a new one invalidates any token issued earlier for the same gateway. " +
-			"Infisical has no endpoint to read an enrollment token back and deletes the record the moment a gateway enrolls, so Terraform cannot detect that the token was used, expired unused, or that the gateway never came up: a plan stays clean either way. " +
 			"Use `keepers` to tie re-minting to whatever forces the machine that consumes the token to be rebuilt. " +
 			"Where the platform can vouch for the machine, prefer `aws_auth`, `gcp_auth` or `kubernetes_auth` on the gateway instead, since those re-authenticate on every start and need none of this.",
 		Attributes: map[string]schema.Attribute{

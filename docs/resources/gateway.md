@@ -103,21 +103,13 @@ output "gateway_id" {
 ### Optional
 
 - `aws_auth` (Attributes) Authenticate the gateway with its AWS IAM identity. The machine re-authenticates on every start, so no secret is stored. At least one of `allowed_principal_arns` or `allowed_account_ids` must be non-empty. (see [below for nested schema](#nestedatt--aws_auth))
-- `gcp_auth` (Attributes) Authenticate the gateway with its GCP identity. The machine re-authenticates on every start, so no secret is stored. At least one of `allowed_service_accounts` or `allowed_projects` must be non-empty, because a zone on its own restricts nothing. (see [below for nested schema](#nestedatt--gcp_auth))
+- `gcp_auth` (Attributes) Authenticate the gateway with its GCP identity. The machine re-authenticates on every start, so no secret is stored. At least one of `allowed_service_accounts` or `allowed_projects` must be non-empty. (see [below for nested schema](#nestedatt--gcp_auth))
 - `kubernetes_auth` (Attributes) Authenticate the gateway with its Kubernetes service account token. The pod re-authenticates on every start, so no secret is stored. At least one of `allowed_namespaces` or `allowed_service_account_names` must be non-empty. (see [below for nested schema](#nestedatt--kubernetes_auth))
 - `token_auth` (Attributes) Authenticate the gateway with a one-time enrollment token. The token itself is minted by a separate `infisical_gateway_enrollment_token` resource. This block takes no arguments, because token auth has nothing to configure: write `token_auth = {}`. Prefer `aws_auth`, `gcp_auth` or `kubernetes_auth` where the platform can vouch for the machine, since those re-authenticate on every start and put no secret in state. (see [below for nested schema](#nestedatt--token_auth))
 
 ### Read-Only
 
-- `can_revoke` (Boolean) Whether the gateway currently holds credentials that revoking would invalidate.
-- `created_at` (String) When the gateway was created.
-- `direct_address` (String) The address the gateway advertises for direct connections. Written by the gateway process when it connects.
-- `direct_heartbeat` (String) When the gateway was last reachable at its direct address.
-- `heartbeat` (String) When the gateway was last reachable through its relay.
 - `id` (String) The ID of the gateway.
-- `identity_id` (String) The machine identity a legacy gateway is bound to. Only set on gateways created before auth methods existed, which cannot be managed by this resource.
-- `relay_id` (String) The relay the gateway connected through. Written by the gateway process when it connects, so it is empty until then.
-- `updated_at` (String) When the gateway was last updated.
 
 <a id="nestedatt--aws_auth"></a>
 ### Nested Schema for `aws_auth`

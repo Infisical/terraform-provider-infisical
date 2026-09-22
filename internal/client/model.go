@@ -4365,16 +4365,6 @@ type GatewayDetails struct {
 	ID         string            `json:"id"`
 	Name       string            `json:"name"`
 	AuthMethod GatewayAuthMethod `json:"authMethod"`
-
-	IdentityID      *string `json:"identityId"`
-	RelayID         *string `json:"relayId"`
-	DirectAddress   *string `json:"directAddress"`
-	Heartbeat       *string `json:"heartbeat"`
-	DirectHeartbeat *string `json:"directHeartbeat"`
-	HeartbeatTTL    *int64  `json:"heartbeatTTL"`
-	CanRevoke       bool    `json:"canRevoke"`
-	CreatedAt       string  `json:"createdAt"`
-	UpdatedAt       string  `json:"updatedAt"`
 }
 
 type CreateGatewayRequest struct {

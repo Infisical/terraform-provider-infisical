@@ -81,15 +81,6 @@ type GatewayResourceModel struct {
 	GcpAuth        *gatewayGcpAuthModel        `tfsdk:"gcp_auth"`
 	KubernetesAuth *gatewayKubernetesAuthModel `tfsdk:"kubernetes_auth"`
 	TokenAuth      *gatewayTokenAuthModel      `tfsdk:"token_auth"`
-
-	IdentityID      types.String `tfsdk:"identity_id"`
-	RelayID         types.String `tfsdk:"relay_id"`
-	DirectAddress   types.String `tfsdk:"direct_address"`
-	Heartbeat       types.String `tfsdk:"heartbeat"`
-	DirectHeartbeat types.String `tfsdk:"direct_heartbeat"`
-	CanRevoke       types.Bool   `tfsdk:"can_revoke"`
-	CreatedAt       types.String `tfsdk:"created_at"`
-	UpdatedAt       types.String `tfsdk:"updated_at"`
 }
 
 func (r *GatewayResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -121,40 +112,6 @@ func (r *GatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"gcp_auth":        gatewayGcpAuthSchema(),
 			"kubernetes_auth": gatewayKubernetesAuthSchema(),
 			"token_auth":      gatewayTokenAuthSchema(),
-
-			"identity_id": schema.StringAttribute{
-				Description: "The machine identity a legacy gateway is bound to. Only set on gateways created before auth methods existed, which cannot be managed by this resource.",
-				Computed:    true,
-			},
-			"relay_id": schema.StringAttribute{
-				Description: "The relay the gateway connected through. Written by the gateway process when it connects, so it is empty until then.",
-				Computed:    true,
-			},
-			"direct_address": schema.StringAttribute{
-				Description: "The address the gateway advertises for direct connections. Written by the gateway process when it connects.",
-				Computed:    true,
-			},
-			"heartbeat": schema.StringAttribute{
-				Description: "When the gateway was last reachable through its relay.",
-				Computed:    true,
-			},
-			"direct_heartbeat": schema.StringAttribute{
-				Description: "When the gateway was last reachable at its direct address.",
-				Computed:    true,
-			},
-			"can_revoke": schema.BoolAttribute{
-				Description: "Whether the gateway currently holds credentials that revoking would invalidate.",
-				Computed:    true,
-			},
-			"created_at": schema.StringAttribute{
-				Description:   "When the gateway was created.",
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"updated_at": schema.StringAttribute{
-				Description: "When the gateway was last updated.",
-				Computed:    true,
-			},
 		},
 	}
 }
@@ -183,7 +140,7 @@ func gatewayAwsAuthSchema() schema.SingleNestedAttribute {
 func gatewayGcpAuthSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional:    true,
-		Description: "Authenticate the gateway with its GCP identity. The machine re-authenticates on every start, so no secret is stored. At least one of `allowed_service_accounts` or `allowed_projects` must be non-empty, because a zone on its own restricts nothing.",
+		Description: "Authenticate the gateway with its GCP identity. The machine re-authenticates on every start, so no secret is stored. At least one of `allowed_service_accounts` or `allowed_projects` must be non-empty.",
 		Attributes: map[string]schema.Attribute{
 			"type": schema.StringAttribute{
 				Description: "How the gateway proves its identity. `gce` verifies an ID token from the instance metadata server, which covers Compute Engine VMs and GKE workload identity. `iam` verifies a JWT the service account signed through the IAM Credentials API, for hosts outside Compute Engine. Defaults to `gce`.",
@@ -698,14 +655,6 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 
 	model.ID = types.StringValue(gateway.ID)
 	model.Name = types.StringValue(gateway.Name)
-	model.IdentityID = optionalString(gateway.IdentityID)
-	model.RelayID = optionalString(gateway.RelayID)
-	model.DirectAddress = optionalString(gateway.DirectAddress)
-	model.Heartbeat = optionalString(gateway.Heartbeat)
-	model.DirectHeartbeat = optionalString(gateway.DirectHeartbeat)
-	model.CanRevoke = types.BoolValue(gateway.CanRevoke)
-	model.CreatedAt = types.StringValue(gateway.CreatedAt)
-	model.UpdatedAt = types.StringValue(gateway.UpdatedAt)
 
 	config := gateway.AuthMethod.Config
 
