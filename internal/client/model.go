@@ -4285,6 +4285,119 @@ type Gateway struct {
 	Name string `json:"name"`
 }
 
+const (
+	GatewayAuthMethodAws        = "aws"
+	GatewayAuthMethodGcp        = "gcp"
+	GatewayAuthMethodKubernetes = "kubernetes"
+	GatewayAuthMethodToken      = "token"
+	GatewayAuthMethodIdentity   = "identity"
+)
+
+const (
+	GatewayGcpAuthTypeGce = "gce"
+	GatewayGcpAuthTypeIam = "iam"
+)
+
+const (
+	GatewayKubernetesTokenReviewModeApi     = "api"
+	GatewayKubernetesTokenReviewModeGateway = "gateway"
+)
+
+// GatewayAuthMethodConfig flattens every method's config into one struct. The API returns a
+// discriminated union whose arms share no field names apart from `id`, so `Method` alone says
+// which fields carry a value.
+type GatewayAuthMethodConfig struct {
+	ID string `json:"id"`
+
+	StsEndpoint          string `json:"stsEndpoint"`
+	AllowedPrincipalArns string `json:"allowedPrincipalArns"`
+	AllowedAccountIds    string `json:"allowedAccountIds"`
+
+	Type                   string `json:"type"`
+	AllowedServiceAccounts string `json:"allowedServiceAccounts"`
+	AllowedProjects        string `json:"allowedProjects"`
+	AllowedZones           string `json:"allowedZones"`
+
+	KubernetesHost       string  `json:"kubernetesHost"`
+	TokenReviewMode      string  `json:"tokenReviewMode"`
+	GatewayID            *string `json:"gatewayId"`
+	GatewayPoolID        *string `json:"gatewayPoolId"`
+	AllowedNamespaces    string  `json:"allowedNamespaces"`
+	AllowedNames         string  `json:"allowedNames"`
+	AllowedAudience      string  `json:"allowedAudience"`
+	VerifyTlsCertificate bool    `json:"verifyTlsCertificate"`
+	CaCertificate        string  `json:"caCertificate"`
+	HasTokenReviewerJwt  bool    `json:"hasTokenReviewerJwt"`
+
+	IdentityID   string  `json:"identityId"`
+	IdentityName *string `json:"identityName"`
+}
+
+type GatewayAuthMethod struct {
+	Method string                  `json:"method"`
+	Config GatewayAuthMethodConfig `json:"config"`
+}
+
+// GatewayAuthMethodInput is the settable half of the union. Every field is a pointer so an
+// explicitly empty allowlist is sent rather than silently falling back to the server default.
+type GatewayAuthMethodInput struct {
+	Method string `json:"method"`
+
+	StsEndpoint          *string `json:"stsEndpoint,omitempty"`
+	AllowedPrincipalArns *string `json:"allowedPrincipalArns,omitempty"`
+	AllowedAccountIds    *string `json:"allowedAccountIds,omitempty"`
+
+	Type                   *string `json:"type,omitempty"`
+	AllowedServiceAccounts *string `json:"allowedServiceAccounts,omitempty"`
+	AllowedProjects        *string `json:"allowedProjects,omitempty"`
+	AllowedZones           *string `json:"allowedZones,omitempty"`
+
+	KubernetesHost       *string `json:"kubernetesHost,omitempty"`
+	CaCertificate        *string `json:"caCertificate,omitempty"`
+	TokenReviewerJwt     *string `json:"tokenReviewerJwt,omitempty"`
+	TokenReviewMode      *string `json:"tokenReviewMode,omitempty"`
+	GatewayID            *string `json:"gatewayId,omitempty"`
+	GatewayPoolID        *string `json:"gatewayPoolId,omitempty"`
+	AllowedNamespaces    *string `json:"allowedNamespaces,omitempty"`
+	AllowedNames         *string `json:"allowedNames,omitempty"`
+	AllowedAudience      *string `json:"allowedAudience,omitempty"`
+	VerifyTlsCertificate *bool   `json:"verifyTlsCertificate,omitempty"`
+}
+
+// GatewayDetails is a gateway as the v3 API returns it. Everything below Name is runtime state the
+// gateway process writes after it connects, not configuration.
+type GatewayDetails struct {
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	AuthMethod GatewayAuthMethod `json:"authMethod"`
+
+	IdentityID      *string `json:"identityId"`
+	RelayID         *string `json:"relayId"`
+	DirectAddress   *string `json:"directAddress"`
+	Heartbeat       *string `json:"heartbeat"`
+	DirectHeartbeat *string `json:"directHeartbeat"`
+	HeartbeatTTL    *int64  `json:"heartbeatTTL"`
+	CanRevoke       bool    `json:"canRevoke"`
+	CreatedAt       string  `json:"createdAt"`
+	UpdatedAt       string  `json:"updatedAt"`
+}
+
+type CreateGatewayRequest struct {
+	Name       string                 `json:"name"`
+	AuthMethod GatewayAuthMethodInput `json:"authMethod"`
+}
+
+type UpdateGatewayRequest struct {
+	ID         string                  `json:"-"`
+	Name       *string                 `json:"name,omitempty"`
+	AuthMethod *GatewayAuthMethodInput `json:"authMethod,omitempty"`
+}
+
+type MintGatewayEnrollmentTokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
 // Organization
 
 // Organization holds the organization fields the provider can resolve for the
