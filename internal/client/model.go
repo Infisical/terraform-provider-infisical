@@ -3937,6 +3937,7 @@ type PkiApplicationScepEnrollmentState struct {
 	ChallengeType                 string    `json:"challengeType"`
 	IncludeCaCertInResponse       bool      `json:"includeCaCertInResponse"`
 	AllowCertBasedRenewal         bool      `json:"allowCertBasedRenewal"`
+	SignRaWithCa                  bool      `json:"signRaWithCa"`
 	DynamicChallengeExpiryMinutes *int      `json:"dynamicChallengeExpiryMinutes,omitempty"`
 	DynamicChallengeMaxPending    *int      `json:"dynamicChallengeMaxPending,omitempty"`
 	ScepEndpointUrl               string    `json:"scepEndpointUrl"`
@@ -4062,6 +4063,7 @@ type SetPkiApplicationScepEnrollmentRequest struct {
 	ChallengePassword             string `json:"challengePassword,omitempty"`
 	IncludeCaCertInResponse       *bool  `json:"includeCaCertInResponse,omitempty"`
 	AllowCertBasedRenewal         *bool  `json:"allowCertBasedRenewal,omitempty"`
+	SignRaWithCa                  *bool  `json:"signRaWithCa,omitempty"`
 	DynamicChallengeExpiryMinutes *int   `json:"dynamicChallengeExpiryMinutes,omitempty"`
 	DynamicChallengeMaxPending    *int   `json:"dynamicChallengeMaxPending,omitempty"`
 }
