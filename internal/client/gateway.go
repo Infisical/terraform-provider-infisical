@@ -142,7 +142,7 @@ func (client Client) DeleteGateway(id string) error {
 	response, err := client.Config.HttpClient.
 		R().
 		SetHeader("User-Agent", USER_AGENT).
-		Delete(fmt.Sprintf("api/v3/gateways/%s", id))
+		Delete(fmt.Sprintf("api/v2/gateways/%s", id))
 
 	if err != nil {
 		return errors.NewGenericRequestError(operationDeleteGateway, err)
