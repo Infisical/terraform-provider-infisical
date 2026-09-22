@@ -20,9 +20,6 @@ var (
 	_ resource.ResourceWithConfigure = &GatewayEnrollmentTokenResource{}
 )
 
-const gatewayEnrollmentTokenEscapeHatch = "To stop managing this token with Terraform, drop it from state with `terraform state rm`. " +
-	"To destroy it without reading it back, use `terraform destroy -refresh=false`."
-
 func NewGatewayEnrollmentTokenResource() resource.Resource {
 	return &GatewayEnrollmentTokenResource{}
 }
@@ -175,15 +172,19 @@ func (r *GatewayEnrollmentTokenResource) Read(ctx context.Context, req resource.
 		return
 	}
 
+	// Switching the gateway off token auth deletes the token server-side, so the resource really is
+	// gone. Saying so lets Terraform reconcile normally; erroring here would fail every later plan,
+	// including one that only wanted to remove this resource.
 	if gateway.AuthMethod.Method != infisical.GatewayAuthMethodToken {
-		resp.Diagnostics.AddError(
+		resp.Diagnostics.AddWarning(
 			"Gateway no longer uses token authentication",
 			fmt.Sprintf(
-				"Gateway %q now authenticates with the %s method, so this enrollment token was invalidated when the method changed and no new one can be minted. "+
-					"Either set `token_auth` back on the gateway, or remove this resource from your configuration. %s",
-				gateway.Name, gateway.AuthMethod.Method, gatewayEnrollmentTokenEscapeHatch,
+				"Gateway %q now authenticates with the %s method, which invalidated this enrollment token, so it has been removed from state. "+
+					"Set `token_auth` back on the gateway to mint a new one, or drop this resource from your configuration.",
+				gateway.Name, gateway.AuthMethod.Method,
 			),
 		)
+		resp.State.RemoveResource(ctx)
 		return
 	}
 

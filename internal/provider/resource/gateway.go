@@ -32,6 +32,7 @@ var (
 	_ resource.ResourceWithConfigure        = &GatewayResource{}
 	_ resource.ResourceWithImportState      = &GatewayResource{}
 	_ resource.ResourceWithConfigValidators = &GatewayResource{}
+	_ resource.ResourceWithValidateConfig   = &GatewayResource{}
 )
 
 const defaultStsEndpoint = "https://sts.amazonaws.com/"
@@ -309,6 +310,60 @@ func (r *GatewayResource) ConfigValidators(_ context.Context) []resource.ConfigV
 			path.MatchRoot("kubernetes_auth"),
 			path.MatchRoot("token_auth"),
 		),
+	}
+}
+
+// ValidateConfig carries the API's cross-field rules into the plan. resourcevalidator cannot
+// express them: its combinators would fire on blocks the configuration never set.
+func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config GatewayResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// An unknown set resolves at apply time, so treating it as empty here would reject a valid
+	// configuration that draws its allowlist from another resource.
+	isEmpty := func(set types.Set) bool { return !set.IsUnknown() && len(set.Elements()) == 0 }
+
+	switch {
+	case config.AwsAuth != nil:
+		if isEmpty(config.AwsAuth.AllowedPrincipalArns) && isEmpty(config.AwsAuth.AllowedAccountIds) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("aws_auth"),
+				"No AWS allowlist configured",
+				"Set allowed_principal_arns or allowed_account_ids. Without one, any AWS caller could authenticate as this gateway.",
+			)
+		}
+
+	case config.GcpAuth != nil:
+		if isEmpty(config.GcpAuth.AllowedServiceAccounts) && isEmpty(config.GcpAuth.AllowedProjects) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("gcp_auth"),
+				"No GCP allowlist configured",
+				"Set allowed_service_accounts or allowed_projects. A zone on its own restricts nothing, because anyone can create an instance in a given zone.",
+			)
+		}
+
+		// An IAM token carries no Compute Engine claim, so there is nothing for these to match.
+		if config.GcpAuth.Type.ValueString() == infisical.GatewayGcpAuthTypeIam {
+			if !isEmpty(config.GcpAuth.AllowedProjects) || !isEmpty(config.GcpAuth.AllowedZones) {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("gcp_auth"),
+					"Projects and zones do not apply to the iam type",
+					"allowed_projects and allowed_zones only narrow a Compute Engine token. Restrict an iam service account token with allowed_service_accounts instead.",
+				)
+			}
+		}
+
+	case config.KubernetesAuth != nil:
+		if isEmpty(config.KubernetesAuth.AllowedNamespaces) && isEmpty(config.KubernetesAuth.AllowedServiceAccountName) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("kubernetes_auth"),
+				"No Kubernetes allowlist configured",
+				"Set allowed_namespaces or allowed_service_account_names. Without one, any service account in the cluster could authenticate as this gateway.",
+			)
+		}
 	}
 }
 
