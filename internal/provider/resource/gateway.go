@@ -439,8 +439,20 @@ func (r *GatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// Everything the API counts as moving the destination, compared the way the API compares it:
-	// it trims the CA and normalizes the host, so a trailing newline is not a move.
+	// Everything the API counts as moving the destination. An unknown one resolves at apply and
+	// may well resolve to what is already stored, so refusing here would block a gateway that
+	// simply takes its reviewer or host from another resource in the same run.
+	for _, value := range []attr.Value{
+		planned.KubernetesHost, planned.CaCertificate, planned.TokenReviewMode,
+		planned.ReviewerGatewayID, planned.ReviewerGatewayPoolID, planned.VerifyTlsCertificate,
+	} {
+		if value.IsUnknown() {
+			return
+		}
+	}
+
+	// Compared the way the API compares it: it trims the CA and normalizes the host, so a
+	// trailing newline is not a move.
 	unchanged := customtypes.NormalizeKubernetesHost(planned.KubernetesHost.ValueString()) ==
 		customtypes.NormalizeKubernetesHost(stored.KubernetesHost.ValueString()) &&
 		strings.TrimSpace(planned.CaCertificate.ValueString()) == strings.TrimSpace(stored.CaCertificate.ValueString()) &&
