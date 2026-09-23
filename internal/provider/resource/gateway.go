@@ -71,6 +71,7 @@ type gatewayKubernetesAuthModel struct {
 	AllowedServiceAccountName types.Set                       `tfsdk:"allowed_service_account_names"`
 	AllowedAudience           types.String                    `tfsdk:"allowed_audience"`
 	VerifyTlsCertificate      types.Bool                      `tfsdk:"verify_tls_certificate"`
+	HasTokenReviewerJwt       types.Bool                      `tfsdk:"has_token_reviewer_jwt"`
 }
 
 type gatewayTokenAuthModel struct{}
@@ -285,6 +286,10 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				Description: "The audience the service account token must carry. Leave empty to skip the audience check.",
 				Optional:    true,
 			},
+			"has_token_reviewer_jwt": schema.BoolAttribute{
+				Description: "Whether Infisical holds a token reviewer JWT for this gateway. The JWT itself is never returned, so this is the only way to tell a stored one apart from none.",
+				Computed:    true,
+			},
 			"verify_tls_certificate": schema.BoolAttribute{
 				Description: "Whether to verify the Kubernetes API server's TLS certificate. Defaults to true.",
 				Optional:    true,
@@ -405,6 +410,57 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			}
 		}
 	}
+}
+
+// The API discards a stored reviewer JWT when the destination moves, since a token validated
+// against one address must not be sent to another. That is only safe if the operator can see it
+// coming, and a write-only attribute cannot show it in the plan, so refuse instead.
+func (r *GatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var state, plan GatewayResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	stored := decodeAuthBlock[gatewayKubernetesAuthModel](ctx, state.KubernetesAuth, &resp.Diagnostics)
+	planned := decodeAuthBlock[gatewayKubernetesAuthModel](ctx, plan.KubernetesAuth, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() || stored == nil || planned == nil {
+		return
+	}
+
+	// Only bites when the configuration cannot resupply the token, so an operator who keeps it in
+	// Terraform is never stopped.
+	if !stored.HasTokenReviewerJwt.ValueBool() || !planned.TokenReviewerJwt.IsNull() {
+		return
+	}
+
+	// Everything the API counts as moving the destination, compared the way the API compares it:
+	// it trims the CA and normalizes the host, so a trailing newline is not a move.
+	unchanged := customtypes.NormalizeKubernetesHost(planned.KubernetesHost.ValueString()) ==
+		customtypes.NormalizeKubernetesHost(stored.KubernetesHost.ValueString()) &&
+		strings.TrimSpace(planned.CaCertificate.ValueString()) == strings.TrimSpace(stored.CaCertificate.ValueString()) &&
+		planned.TokenReviewMode.Equal(stored.TokenReviewMode) &&
+		planned.ReviewerGatewayID.Equal(stored.ReviewerGatewayID) &&
+		planned.ReviewerGatewayPoolID.Equal(stored.ReviewerGatewayPoolID) &&
+		planned.VerifyTlsCertificate.Equal(stored.VerifyTlsCertificate)
+	if unchanged {
+		return
+	}
+
+	resp.Diagnostics.AddAttributeError(
+		path.Root("kubernetes_auth"),
+		"This change would discard the stored token reviewer JWT",
+		"Infisical holds a token reviewer JWT for this gateway that it never returns, so Terraform cannot put it back. "+
+			"Moving the host, review mode, reviewer gateway, CA certificate or TLS verification makes Infisical drop it, "+
+			"and the gateway stops being able to authenticate.\n\n"+
+			"Set token_reviewer_jwt to the token you want used from now on, or to \"\" to drop it on purpose and let the "+
+			"gateway's own service account review its tokens.",
+	)
 }
 
 func (r *GatewayResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -729,8 +785,10 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 		}
 		// Always sent: "" is how the API is told to clear a stored certificate.
 		input.CaCertificate = infisicalstrings.StringToPtr(kubernetesAuth.CaCertificate.ValueString())
-		if jwt := kubernetesAuth.TokenReviewerJwt.ValueString(); jwt != "" {
-			input.TokenReviewerJwt = infisicalstrings.StringToPtr(jwt)
+		// Sent whenever it is set, "" included: the API keeps the stored token when the field is
+		// absent and clears it when it arrives empty.
+		if !kubernetesAuth.TokenReviewerJwt.IsNull() && !kubernetesAuth.TokenReviewerJwt.IsUnknown() {
+			input.TokenReviewerJwt = infisicalstrings.StringToPtr(kubernetesAuth.TokenReviewerJwt.ValueString())
 		}
 		if gatewayID := kubernetesAuth.ReviewerGatewayID.ValueString(); gatewayID != "" {
 			input.GatewayID = infisicalstrings.StringToPtr(gatewayID)
@@ -839,7 +897,7 @@ func (r *GatewayResource) applyGatewayToModel(ctx context.Context, model *Gatewa
 		// The API reports only whether a reviewer JWT is stored, never its value. Once it is
 		// gone, ours has to go too, or a cleared credential leaves a clean plan behind.
 		reviewerJwt := prior.TokenReviewerJwt
-		if !config.HasTokenReviewerJwt {
+		if !config.HasTokenReviewerJwt && reviewerJwt.ValueString() != "" {
 			reviewerJwt = types.StringNull()
 		}
 
@@ -854,6 +912,7 @@ func (r *GatewayResource) applyGatewayToModel(ctx context.Context, model *Gatewa
 			AllowedServiceAccountName: names,
 			AllowedAudience:           keepUnsetString(config.AllowedAudience, prior.AllowedAudience),
 			VerifyTlsCertificate:      types.BoolValue(config.VerifyTlsCertificate),
+			HasTokenReviewerJwt:       types.BoolValue(config.HasTokenReviewerJwt),
 		}, &diags)
 
 	case infisical.GatewayAuthMethodToken:

@@ -147,6 +147,10 @@ Optional:
 - `token_reviewer_jwt` (String, Sensitive) A long-lived service account token with the system:auth-delegator ClusterRole, used to submit TokenReview requests. Write-only: Infisical never returns it, so Terraform cannot detect a change made outside this configuration, and an imported gateway leaves it empty.
 - `verify_tls_certificate` (Boolean) Whether to verify the Kubernetes API server's TLS certificate. Defaults to true.
 
+Read-Only:
+
+- `has_token_reviewer_jwt` (Boolean) Whether Infisical holds a token reviewer JWT for this gateway. The JWT itself is never returned, so this is the only way to tell a stored one apart from none.
+
 
 <a id="nestedatt--token_auth"></a>
 ### Nested Schema for `token_auth`
