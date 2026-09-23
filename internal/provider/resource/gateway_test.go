@@ -4,7 +4,10 @@ import (
 	"context"
 	"testing"
 
+	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -76,5 +79,64 @@ func TestSetFromCsvDropsEmptyEntries(t *testing.T) {
 	}
 	if len(set.Elements()) != 2 {
 		t.Fatalf("expected two elements, got %d", len(set.Elements()))
+	}
+}
+
+func TestNormalizeKubernetesHostMatchesTheApi(t *testing.T) {
+	canonical := "https://cluster.example.com:6443"
+
+	for _, raw := range []string{
+		canonical,
+		canonical + "/",
+		"HTTPS://cluster.example.com:6443",
+		"cluster.example.com:6443",
+		"  cluster.example.com:6443  ",
+		"https://CLUSTER.example.com:6443",
+	} {
+		if got := customtypes.NormalizeKubernetesHost(raw); got != canonical {
+			t.Errorf("%q normalized to %q, want %q", raw, got, canonical)
+		}
+	}
+}
+
+// Anything the API rejects is left alone, so the rejection is reported rather than hidden.
+func TestNormalizeKubernetesHostLeavesRejectableInputAlone(t *testing.T) {
+	for _, raw := range []string{
+		"http://cluster.example.com:6443",
+		"https://cluster.example.com:6443/api",
+		"https://user:pass@cluster.example.com:6443",
+	} {
+		if got := customtypes.NormalizeKubernetesHost(raw); got != raw {
+			t.Errorf("%q was rewritten to %q, want it untouched", raw, got)
+		}
+	}
+}
+
+func TestKeepUnsetSetPreservesTheConfiguredFormOfUnset(t *testing.T) {
+	var diags diag.Diagnostics
+
+	if got := keepUnsetSet("", types.SetNull(types.StringType), &diags); !got.IsNull() {
+		t.Errorf("a null prior should stay null, got %v", got)
+	}
+
+	empty, _ := types.SetValue(types.StringType, []attr.Value{})
+	if got := keepUnsetSet("", empty, &diags); got.IsNull() {
+		t.Error("an explicitly empty set should stay an empty set, got null")
+	}
+
+	if got := keepUnsetSet("a,b", types.SetNull(types.StringType), &diags); len(got.Elements()) != 2 {
+		t.Errorf("expected two elements, got %d", len(got.Elements()))
+	}
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestKeepUnsetStringPreservesNull(t *testing.T) {
+	if got := keepUnsetString("", types.StringNull()); !got.IsNull() {
+		t.Errorf("a null prior should stay null, got %v", got)
+	}
+	if got := keepUnsetString("aud", types.StringNull()); got.ValueString() != "aud" {
+		t.Errorf("expected the API value, got %v", got)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -59,16 +60,16 @@ type gatewayGcpAuthModel struct {
 }
 
 type gatewayKubernetesAuthModel struct {
-	TokenReviewMode           types.String                   `tfsdk:"token_review_mode"`
-	KubernetesHost            types.String                   `tfsdk:"kubernetes_host"`
-	CaCertificate             customtypes.TrimmedStringValue `tfsdk:"ca_certificate"`
-	TokenReviewerJwt          types.String                   `tfsdk:"token_reviewer_jwt"`
-	ReviewerGatewayID         types.String                   `tfsdk:"reviewer_gateway_id"`
-	ReviewerGatewayPoolID     types.String                   `tfsdk:"reviewer_gateway_pool_id"`
-	AllowedNamespaces         types.Set                      `tfsdk:"allowed_namespaces"`
-	AllowedServiceAccountName types.Set                      `tfsdk:"allowed_service_account_names"`
-	AllowedAudience           types.String                   `tfsdk:"allowed_audience"`
-	VerifyTlsCertificate      types.Bool                     `tfsdk:"verify_tls_certificate"`
+	TokenReviewMode           types.String                    `tfsdk:"token_review_mode"`
+	KubernetesHost            customtypes.KubernetesHostValue `tfsdk:"kubernetes_host"`
+	CaCertificate             customtypes.TrimmedStringValue  `tfsdk:"ca_certificate"`
+	TokenReviewerJwt          types.String                    `tfsdk:"token_reviewer_jwt"`
+	ReviewerGatewayID         types.String                    `tfsdk:"reviewer_gateway_id"`
+	ReviewerGatewayPoolID     types.String                    `tfsdk:"reviewer_gateway_pool_id"`
+	AllowedNamespaces         types.Set                       `tfsdk:"allowed_namespaces"`
+	AllowedServiceAccountName types.Set                       `tfsdk:"allowed_service_account_names"`
+	AllowedAudience           types.String                    `tfsdk:"allowed_audience"`
+	VerifyTlsCertificate      types.Bool                      `tfsdk:"verify_tls_certificate"`
 }
 
 type gatewayTokenAuthModel struct{}
@@ -116,6 +117,18 @@ func (r *GatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	}
 }
 
+// Allowlists cross the wire as one comma-separated string, so a value carrying a comma would
+// split into two entries and one carrying surrounding whitespace would come back trimmed.
+func csvSafeEntries() validator.Set {
+	return setvalidator.ValueStringsAre(
+		stringvalidator.NoneOf(""),
+		stringvalidator.RegexMatches(
+			regexp.MustCompile(`^[^,\s](?:[^,]*[^,\s])?$`),
+			"must not contain a comma or begin or end with whitespace",
+		),
+	)
+}
+
 func gatewayAwsAuthSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional:    true,
@@ -125,13 +138,13 @@ func gatewayAwsAuthSchema() schema.SingleNestedAttribute {
 				Description: "IAM principal ARNs allowed to authenticate as this gateway. Supports `*` wildcards.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 			"allowed_account_ids": schema.SetAttribute{
 				Description: "AWS account IDs allowed to authenticate as this gateway.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 		},
 	}
@@ -155,19 +168,19 @@ func gatewayGcpAuthSchema() schema.SingleNestedAttribute {
 				Description: "GCP service account emails allowed to authenticate as this gateway.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 			"allowed_projects": schema.SetAttribute{
 				Description: "GCP project IDs whose Compute Engine instances are allowed to authenticate as this gateway. Only applies when `type` is `gce`.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 			"allowed_zones": schema.SetAttribute{
 				Description: "GCP zones whose Compute Engine instances are allowed to authenticate as this gateway. Only applies when `type` is `gce`.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 		},
 	}
@@ -188,6 +201,8 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"kubernetes_host": schema.StringAttribute{
+				// The API normalizes to https://host[:port], so a trailing slash would diff forever.
+				CustomType:  customtypes.KubernetesHostType{},
 				Description: "The URL of the Kubernetes API server, for example https://my-cluster.example.com:6443. Required unless `token_review_mode` is `gateway`, where it must be omitted.",
 				Optional:    true,
 				Computed:    true,
@@ -197,7 +212,6 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The PEM-encoded CA certificate that issued the Kubernetes API server's TLS certificate.",
 				Optional:    true,
-				Computed:    true,
 			},
 			"token_reviewer_jwt": schema.StringAttribute{
 				Description: "A long-lived service account token with the system:auth-delegator ClusterRole, used to submit TokenReview requests. Write-only: Infisical never returns it, so Terraform cannot detect a change made outside this configuration, and an imported gateway leaves it empty.",
@@ -216,19 +230,17 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				Description: "Kubernetes namespaces whose service accounts are allowed to authenticate as this gateway. Supports `*` wildcards.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 			"allowed_service_account_names": schema.SetAttribute{
 				Description: "Kubernetes service account names allowed to authenticate as this gateway. Supports `*` wildcards.",
 				ElementType: types.StringType,
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.Set{csvSafeEntries()},
 			},
 			"allowed_audience": schema.StringAttribute{
 				Description: "The audience the service account token must carry. Leave empty to skip the audience check.",
 				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(""),
 			},
 			"verify_tls_certificate": schema.BoolAttribute{
 				Description: "Whether to verify the Kubernetes API server's TLS certificate. Defaults to true.",
@@ -306,6 +318,34 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 				"No Kubernetes allowlist configured",
 				"Set allowed_namespaces or allowed_service_account_names. Without one, any service account in the cluster could authenticate as this gateway.",
 			)
+		}
+
+		hasReviewerGateway := config.KubernetesAuth.ReviewerGatewayID.ValueString() != ""
+		hasReviewerPool := config.KubernetesAuth.ReviewerGatewayPoolID.ValueString() != ""
+
+		if hasReviewerGateway && hasReviewerPool {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("kubernetes_auth"),
+				"Two TokenReview reviewers configured",
+				"Set reviewer_gateway_id or reviewer_gateway_pool_id, not both. A pool picks any healthy member, so naming a gateway as well has no meaning.",
+			)
+		}
+
+		if config.KubernetesAuth.TokenReviewMode.ValueString() == infisical.GatewayKubernetesTokenReviewModeGateway {
+			if !hasReviewerGateway {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("kubernetes_auth"),
+					"No reviewer gateway configured",
+					`token_review_mode "gateway" needs reviewer_gateway_id, naming a different gateway already connected in the cluster that will run the TokenReview.`,
+				)
+			}
+			if hasReviewerPool {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("kubernetes_auth"),
+					"A pool cannot review tokens",
+					`token_review_mode "gateway" needs a specific reviewer_gateway_id, because the reviewer decides the outcome and pool membership can change after the config is saved. Use token_review_mode "api" to route through a pool.`,
+				)
+			}
 		}
 	}
 }
@@ -623,9 +663,8 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 		if host := plan.KubernetesAuth.KubernetesHost.ValueString(); host != "" {
 			input.KubernetesHost = infisicalstrings.StringToPtr(host)
 		}
-		if ca := plan.KubernetesAuth.CaCertificate.ValueString(); ca != "" {
-			input.CaCertificate = infisicalstrings.StringToPtr(ca)
-		}
+		// Always sent: "" is how the API is told to clear a stored certificate.
+		input.CaCertificate = infisicalstrings.StringToPtr(plan.KubernetesAuth.CaCertificate.ValueString())
 		if jwt := plan.KubernetesAuth.TokenReviewerJwt.ValueString(); jwt != "" {
 			input.TokenReviewerJwt = infisicalstrings.StringToPtr(jwt)
 		}
@@ -660,54 +699,73 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 
 	switch gateway.AuthMethod.Method {
 	case infisical.GatewayAuthMethodAws:
-		principalArns, d := setFromCsv(config.AllowedPrincipalArns)
-		diags.Append(d...)
-		accountIds, d := setFromCsv(config.AllowedAccountIds)
-		diags.Append(d...)
+		prior := gatewayAwsAuthModel{
+			AllowedPrincipalArns: types.SetNull(types.StringType),
+			AllowedAccountIds:    types.SetNull(types.StringType),
+		}
+		if model.AwsAuth != nil {
+			prior = *model.AwsAuth
+		}
 
 		model.AwsAuth = &gatewayAwsAuthModel{
-			AllowedPrincipalArns: principalArns,
-			AllowedAccountIds:    accountIds,
+			AllowedPrincipalArns: keepUnsetSet(config.AllowedPrincipalArns, prior.AllowedPrincipalArns, &diags),
+			AllowedAccountIds:    keepUnsetSet(config.AllowedAccountIds, prior.AllowedAccountIds, &diags),
 		}
 		model.GcpAuth, model.KubernetesAuth, model.TokenAuth = nil, nil, nil
 
 	case infisical.GatewayAuthMethodGcp:
-		serviceAccounts, d := setFromCsv(config.AllowedServiceAccounts)
-		diags.Append(d...)
-		projects, d := setFromCsv(config.AllowedProjects)
-		diags.Append(d...)
-		zones, d := setFromCsv(config.AllowedZones)
-		diags.Append(d...)
+		prior := gatewayGcpAuthModel{
+			AllowedServiceAccounts: types.SetNull(types.StringType),
+			AllowedProjects:        types.SetNull(types.StringType),
+			AllowedZones:           types.SetNull(types.StringType),
+		}
+		if model.GcpAuth != nil {
+			prior = *model.GcpAuth
+		}
 
 		model.GcpAuth = &gatewayGcpAuthModel{
 			Type:                   types.StringValue(config.Type),
-			AllowedServiceAccounts: serviceAccounts,
-			AllowedProjects:        projects,
-			AllowedZones:           zones,
+			AllowedServiceAccounts: keepUnsetSet(config.AllowedServiceAccounts, prior.AllowedServiceAccounts, &diags),
+			AllowedProjects:        keepUnsetSet(config.AllowedProjects, prior.AllowedProjects, &diags),
+			AllowedZones:           keepUnsetSet(config.AllowedZones, prior.AllowedZones, &diags),
 		}
 		model.AwsAuth, model.KubernetesAuth, model.TokenAuth = nil, nil, nil
 
 	case infisical.GatewayAuthMethodKubernetes:
-		namespaces, d := setFromCsv(config.AllowedNamespaces)
-		diags.Append(d...)
-		names, d := setFromCsv(config.AllowedNames)
-		diags.Append(d...)
-
-		reviewerJwt := types.StringNull()
+		prior := gatewayKubernetesAuthModel{
+			TokenReviewerJwt:          types.StringNull(),
+			CaCertificate:             customtypes.NewTrimmedStringNull(),
+			KubernetesHost:            customtypes.NewKubernetesHostNull(),
+			AllowedAudience:           types.StringNull(),
+			AllowedNamespaces:         types.SetNull(types.StringType),
+			AllowedServiceAccountName: types.SetNull(types.StringType),
+		}
 		if model.KubernetesAuth != nil {
-			reviewerJwt = model.KubernetesAuth.TokenReviewerJwt
+			prior = *model.KubernetesAuth
+		}
+
+		namespaces := keepUnsetSet(config.AllowedNamespaces, prior.AllowedNamespaces, &diags)
+		names := keepUnsetSet(config.AllowedNames, prior.AllowedServiceAccountName, &diags)
+
+		host := prior.KubernetesHost
+		if config.KubernetesHost != "" {
+			host = customtypes.NewKubernetesHostValue(config.KubernetesHost)
+		}
+		ca := prior.CaCertificate
+		if config.CaCertificate != "" {
+			ca = customtypes.NewTrimmedStringValue(config.CaCertificate)
 		}
 
 		model.KubernetesAuth = &gatewayKubernetesAuthModel{
 			TokenReviewMode:           types.StringValue(config.TokenReviewMode),
-			KubernetesHost:            types.StringValue(config.KubernetesHost),
-			CaCertificate:             customtypes.NewTrimmedStringValue(config.CaCertificate),
-			TokenReviewerJwt:          reviewerJwt,
+			KubernetesHost:            host,
+			CaCertificate:             ca,
+			TokenReviewerJwt:          prior.TokenReviewerJwt,
 			ReviewerGatewayID:         optionalString(config.GatewayID),
 			ReviewerGatewayPoolID:     optionalString(config.GatewayPoolID),
 			AllowedNamespaces:         namespaces,
 			AllowedServiceAccountName: names,
-			AllowedAudience:           types.StringValue(config.AllowedAudience),
+			AllowedAudience:           keepUnsetString(config.AllowedAudience, prior.AllowedAudience),
 			VerifyTlsCertificate:      types.BoolValue(config.VerifyTlsCertificate),
 		}
 		model.AwsAuth, model.GcpAuth, model.TokenAuth = nil, nil, nil
@@ -739,6 +797,28 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 	}
 
 	return diags
+}
+
+// An empty value from the API means unset. Overwriting a null config with "" or an empty set
+// produces "inconsistent result after apply", so the configured form of unset is kept.
+func keepUnsetString(apiValue string, prior types.String) types.String {
+	if apiValue == "" {
+		return prior
+	}
+	return types.StringValue(apiValue)
+}
+
+func keepUnsetSet(csv string, prior types.Set, diags *diag.Diagnostics) types.Set {
+	if csv == "" {
+		if prior.IsNull() || prior.IsUnknown() {
+			return types.SetNull(types.StringType)
+		}
+		return prior
+	}
+
+	set, d := setFromCsv(csv)
+	diags.Append(d...)
+	return set
 }
 
 func optionalString(value *string) types.String {
