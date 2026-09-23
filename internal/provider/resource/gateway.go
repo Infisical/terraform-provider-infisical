@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var (
@@ -78,10 +79,12 @@ type GatewayResourceModel struct {
 	ID   types.String `tfsdk:"id"`
 	Name types.String `tfsdk:"name"`
 
-	AwsAuth        *gatewayAwsAuthModel        `tfsdk:"aws_auth"`
-	GcpAuth        *gatewayGcpAuthModel        `tfsdk:"gcp_auth"`
-	KubernetesAuth *gatewayKubernetesAuthModel `tfsdk:"kubernetes_auth"`
-	TokenAuth      *gatewayTokenAuthModel      `tfsdk:"token_auth"`
+	// Objects rather than pointers: a pointer has no way to say "unknown", which is what an
+	// auth block is when the expression choosing it reads a value that only exists after apply.
+	AwsAuth        types.Object `tfsdk:"aws_auth"`
+	GcpAuth        types.Object `tfsdk:"gcp_auth"`
+	KubernetesAuth types.Object `tfsdk:"kubernetes_auth"`
+	TokenAuth      types.Object `tfsdk:"token_auth"`
 }
 
 func (r *GatewayResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -115,6 +118,40 @@ func (r *GatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"token_auth":      gatewayTokenAuthSchema(),
 		},
 	}
+}
+
+// Derived from the schema so the two cannot drift.
+func authBlockAttrTypes(block schema.SingleNestedAttribute) map[string]attr.Type {
+	attrTypes := make(map[string]attr.Type, len(block.Attributes))
+	for name, attribute := range block.Attributes {
+		attrTypes[name] = attribute.GetType()
+	}
+	return attrTypes
+}
+
+// An unknown block decodes to nil: nothing can be read off it yet, so callers treat it the
+// way they treat an absent one.
+func decodeAuthBlock[T any](ctx context.Context, block types.Object, diags *diag.Diagnostics) *T {
+	if block.IsNull() || block.IsUnknown() {
+		return nil
+	}
+
+	var decoded T
+	diags.Append(block.As(ctx, &decoded, basetypes.ObjectAsOptions{})...)
+	return &decoded
+}
+
+func encodeAuthBlock(ctx context.Context, blockSchema schema.SingleNestedAttribute, value any, diags *diag.Diagnostics) types.Object {
+	object, d := types.ObjectValueFrom(ctx, authBlockAttrTypes(blockSchema), value)
+	diags.Append(d...)
+	return object
+}
+
+func nullAuthBlocks(model *GatewayResourceModel) {
+	model.AwsAuth = types.ObjectNull(authBlockAttrTypes(gatewayAwsAuthSchema()))
+	model.GcpAuth = types.ObjectNull(authBlockAttrTypes(gatewayGcpAuthSchema()))
+	model.KubernetesAuth = types.ObjectNull(authBlockAttrTypes(gatewayKubernetesAuthSchema()))
+	model.TokenAuth = types.ObjectNull(authBlockAttrTypes(gatewayTokenAuthSchema()))
 }
 
 // Allowlists cross the wire as one comma-separated string, so a value carrying a comma would
@@ -282,9 +319,18 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 	// Unknown resolves at apply time, so it must not count as empty.
 	isEmpty := func(set types.Set) bool { return !set.IsUnknown() && len(set.Elements()) == 0 }
 
+	// A block that is still unknown holds nothing to check yet, so it decodes to nil here and
+	// the API enforces these same rules at apply time.
+	awsAuth := decodeAuthBlock[gatewayAwsAuthModel](ctx, config.AwsAuth, &resp.Diagnostics)
+	gcpAuth := decodeAuthBlock[gatewayGcpAuthModel](ctx, config.GcpAuth, &resp.Diagnostics)
+	kubernetesAuth := decodeAuthBlock[gatewayKubernetesAuthModel](ctx, config.KubernetesAuth, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	switch {
-	case config.AwsAuth != nil:
-		if isEmpty(config.AwsAuth.AllowedPrincipalArns) && isEmpty(config.AwsAuth.AllowedAccountIds) {
+	case awsAuth != nil:
+		if isEmpty(awsAuth.AllowedPrincipalArns) && isEmpty(awsAuth.AllowedAccountIds) {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("aws_auth"),
 				"No AWS allowlist configured",
@@ -292,8 +338,8 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			)
 		}
 
-	case config.GcpAuth != nil:
-		if isEmpty(config.GcpAuth.AllowedServiceAccounts) && isEmpty(config.GcpAuth.AllowedProjects) {
+	case gcpAuth != nil:
+		if isEmpty(gcpAuth.AllowedServiceAccounts) && isEmpty(gcpAuth.AllowedProjects) {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("gcp_auth"),
 				"No GCP allowlist configured",
@@ -301,8 +347,8 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			)
 		}
 
-		if config.GcpAuth.Type.ValueString() == infisical.GatewayGcpAuthTypeIam {
-			if !isEmpty(config.GcpAuth.AllowedProjects) || !isEmpty(config.GcpAuth.AllowedZones) {
+		if gcpAuth.Type.ValueString() == infisical.GatewayGcpAuthTypeIam {
+			if !isEmpty(gcpAuth.AllowedProjects) || !isEmpty(gcpAuth.AllowedZones) {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("gcp_auth"),
 					"Projects and zones do not apply to the iam type",
@@ -311,8 +357,8 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			}
 		}
 
-	case config.KubernetesAuth != nil:
-		if isEmpty(config.KubernetesAuth.AllowedNamespaces) && isEmpty(config.KubernetesAuth.AllowedServiceAccountName) {
+	case kubernetesAuth != nil:
+		if isEmpty(kubernetesAuth.AllowedNamespaces) && isEmpty(kubernetesAuth.AllowedServiceAccountName) {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("kubernetes_auth"),
 				"No Kubernetes allowlist configured",
@@ -320,8 +366,8 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			)
 		}
 
-		hasReviewerGateway := config.KubernetesAuth.ReviewerGatewayID.ValueString() != ""
-		hasReviewerPool := config.KubernetesAuth.ReviewerGatewayPoolID.ValueString() != ""
+		hasReviewerGateway := kubernetesAuth.ReviewerGatewayID.ValueString() != ""
+		hasReviewerPool := kubernetesAuth.ReviewerGatewayPoolID.ValueString() != ""
 
 		if hasReviewerGateway && hasReviewerPool {
 			resp.Diagnostics.AddAttributeError(
@@ -331,7 +377,7 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			)
 		}
 
-		if config.KubernetesAuth.TokenReviewMode.ValueString() == infisical.GatewayKubernetesTokenReviewModeGateway {
+		if kubernetesAuth.TokenReviewMode.ValueString() == infisical.GatewayKubernetesTokenReviewModeGateway {
 			if !hasReviewerGateway {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("kubernetes_auth"),
@@ -414,7 +460,7 @@ func (r *GatewayResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	resp.Diagnostics.Append(r.applyGatewayToModel(&plan, gateway)...)
+	resp.Diagnostics.Append(r.applyGatewayToModel(ctx, &plan, gateway)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -450,7 +496,7 @@ func (r *GatewayResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	resp.Diagnostics.Append(r.applyGatewayToModel(&state, gateway)...)
+	resp.Diagnostics.Append(r.applyGatewayToModel(ctx, &state, gateway)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -513,7 +559,7 @@ func (r *GatewayResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	resp.Diagnostics.Append(r.applyGatewayToModel(&plan, gateway)...)
+	resp.Diagnostics.Append(r.applyGatewayToModel(ctx, &plan, gateway)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -606,11 +652,18 @@ func gatewayAuthMethodChanged(ctx context.Context, req resource.UpdateRequest) (
 func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (infisical.GatewayAuthMethodInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	awsAuth := decodeAuthBlock[gatewayAwsAuthModel](ctx, plan.AwsAuth, &diags)
+	gcpAuth := decodeAuthBlock[gatewayGcpAuthModel](ctx, plan.GcpAuth, &diags)
+	kubernetesAuth := decodeAuthBlock[gatewayKubernetesAuthModel](ctx, plan.KubernetesAuth, &diags)
+	if diags.HasError() {
+		return infisical.GatewayAuthMethodInput{}, diags
+	}
+
 	switch {
-	case plan.AwsAuth != nil:
-		principalArns, d := csvFromSet(ctx, plan.AwsAuth.AllowedPrincipalArns)
+	case awsAuth != nil:
+		principalArns, d := csvFromSet(ctx, awsAuth.AllowedPrincipalArns)
 		diags.Append(d...)
-		accountIds, d := csvFromSet(ctx, plan.AwsAuth.AllowedAccountIds)
+		accountIds, d := csvFromSet(ctx, awsAuth.AllowedAccountIds)
 		diags.Append(d...)
 		if diags.HasError() {
 			return infisical.GatewayAuthMethodInput{}, diags
@@ -622,12 +675,12 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 			AllowedAccountIds:    infisicalstrings.StringToPtr(accountIds),
 		}, diags
 
-	case plan.GcpAuth != nil:
-		serviceAccounts, d := csvFromSet(ctx, plan.GcpAuth.AllowedServiceAccounts)
+	case gcpAuth != nil:
+		serviceAccounts, d := csvFromSet(ctx, gcpAuth.AllowedServiceAccounts)
 		diags.Append(d...)
-		projects, d := csvFromSet(ctx, plan.GcpAuth.AllowedProjects)
+		projects, d := csvFromSet(ctx, gcpAuth.AllowedProjects)
 		diags.Append(d...)
-		zones, d := csvFromSet(ctx, plan.GcpAuth.AllowedZones)
+		zones, d := csvFromSet(ctx, gcpAuth.AllowedZones)
 		diags.Append(d...)
 		if diags.HasError() {
 			return infisical.GatewayAuthMethodInput{}, diags
@@ -635,16 +688,16 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 
 		return infisical.GatewayAuthMethodInput{
 			Method:                 infisical.GatewayAuthMethodGcp,
-			Type:                   infisicalstrings.StringToPtr(plan.GcpAuth.Type.ValueString()),
+			Type:                   infisicalstrings.StringToPtr(gcpAuth.Type.ValueString()),
 			AllowedServiceAccounts: infisicalstrings.StringToPtr(serviceAccounts),
 			AllowedProjects:        infisicalstrings.StringToPtr(projects),
 			AllowedZones:           infisicalstrings.StringToPtr(zones),
 		}, diags
 
-	case plan.KubernetesAuth != nil:
-		namespaces, d := csvFromSet(ctx, plan.KubernetesAuth.AllowedNamespaces)
+	case kubernetesAuth != nil:
+		namespaces, d := csvFromSet(ctx, kubernetesAuth.AllowedNamespaces)
 		diags.Append(d...)
-		names, d := csvFromSet(ctx, plan.KubernetesAuth.AllowedServiceAccountName)
+		names, d := csvFromSet(ctx, kubernetesAuth.AllowedServiceAccountName)
 		diags.Append(d...)
 		if diags.HasError() {
 			return infisical.GatewayAuthMethodInput{}, diags
@@ -652,33 +705,43 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 
 		input := infisical.GatewayAuthMethodInput{
 			Method:               infisical.GatewayAuthMethodKubernetes,
-			TokenReviewMode:      infisicalstrings.StringToPtr(plan.KubernetesAuth.TokenReviewMode.ValueString()),
+			TokenReviewMode:      infisicalstrings.StringToPtr(kubernetesAuth.TokenReviewMode.ValueString()),
 			AllowedNamespaces:    infisicalstrings.StringToPtr(namespaces),
 			AllowedNames:         infisicalstrings.StringToPtr(names),
-			AllowedAudience:      infisicalstrings.StringToPtr(plan.KubernetesAuth.AllowedAudience.ValueString()),
-			VerifyTlsCertificate: plan.KubernetesAuth.VerifyTlsCertificate.ValueBoolPointer(),
+			AllowedAudience:      infisicalstrings.StringToPtr(kubernetesAuth.AllowedAudience.ValueString()),
+			VerifyTlsCertificate: kubernetesAuth.VerifyTlsCertificate.ValueBoolPointer(),
 		}
 
 		// Gateway review mode rejects a host outright, and "" fails the format check.
-		if host := plan.KubernetesAuth.KubernetesHost.ValueString(); host != "" {
+		if host := kubernetesAuth.KubernetesHost.ValueString(); host != "" {
 			input.KubernetesHost = infisicalstrings.StringToPtr(host)
 		}
 		// Always sent: "" is how the API is told to clear a stored certificate.
-		input.CaCertificate = infisicalstrings.StringToPtr(plan.KubernetesAuth.CaCertificate.ValueString())
-		if jwt := plan.KubernetesAuth.TokenReviewerJwt.ValueString(); jwt != "" {
+		input.CaCertificate = infisicalstrings.StringToPtr(kubernetesAuth.CaCertificate.ValueString())
+		if jwt := kubernetesAuth.TokenReviewerJwt.ValueString(); jwt != "" {
 			input.TokenReviewerJwt = infisicalstrings.StringToPtr(jwt)
 		}
-		if gatewayID := plan.KubernetesAuth.ReviewerGatewayID.ValueString(); gatewayID != "" {
+		if gatewayID := kubernetesAuth.ReviewerGatewayID.ValueString(); gatewayID != "" {
 			input.GatewayID = infisicalstrings.StringToPtr(gatewayID)
 		}
-		if poolID := plan.KubernetesAuth.ReviewerGatewayPoolID.ValueString(); poolID != "" {
+		if poolID := kubernetesAuth.ReviewerGatewayPoolID.ValueString(); poolID != "" {
 			input.GatewayPoolID = infisicalstrings.StringToPtr(poolID)
 		}
 
 		return input, diags
 
-	case plan.TokenAuth != nil:
+	case !plan.TokenAuth.IsNull() && !plan.TokenAuth.IsUnknown():
 		return infisical.GatewayAuthMethodInput{Method: infisical.GatewayAuthMethodToken}, diags
+	}
+
+	// Apply resolves every config expression, so a block still unknown here means the plan was
+	// never refined and reporting it as "none configured" would send the reader the wrong way.
+	if plan.AwsAuth.IsUnknown() || plan.GcpAuth.IsUnknown() || plan.KubernetesAuth.IsUnknown() || plan.TokenAuth.IsUnknown() {
+		diags.AddError(
+			"Auth method not resolved",
+			"The auth method block is still unknown at apply time. Select it with a value Terraform can resolve during planning, such as a variable or a local, rather than an attribute of a resource created in the same run.",
+		)
+		return infisical.GatewayAuthMethodInput{}, diags
 	}
 
 	diags.AddError(
@@ -689,7 +752,7 @@ func gatewayAuthMethodInput(ctx context.Context, plan *GatewayResourceModel) (in
 }
 
 // The reviewer JWT is kept from config: the API never returns it.
-func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gateway infisical.GatewayDetails) diag.Diagnostics {
+func (r *GatewayResource) applyGatewayToModel(ctx context.Context, model *GatewayResourceModel, gateway infisical.GatewayDetails) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	model.ID = types.StringValue(gateway.ID)
@@ -697,21 +760,28 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 
 	config := gateway.AuthMethod.Config
 
+	priorAws := decodeAuthBlock[gatewayAwsAuthModel](ctx, model.AwsAuth, &diags)
+	priorGcp := decodeAuthBlock[gatewayGcpAuthModel](ctx, model.GcpAuth, &diags)
+	priorKubernetes := decodeAuthBlock[gatewayKubernetesAuthModel](ctx, model.KubernetesAuth, &diags)
+	if diags.HasError() {
+		return diags
+	}
+	nullAuthBlocks(model)
+
 	switch gateway.AuthMethod.Method {
 	case infisical.GatewayAuthMethodAws:
 		prior := gatewayAwsAuthModel{
 			AllowedPrincipalArns: types.SetNull(types.StringType),
 			AllowedAccountIds:    types.SetNull(types.StringType),
 		}
-		if model.AwsAuth != nil {
-			prior = *model.AwsAuth
+		if priorAws != nil {
+			prior = *priorAws
 		}
 
-		model.AwsAuth = &gatewayAwsAuthModel{
+		model.AwsAuth = encodeAuthBlock(ctx, gatewayAwsAuthSchema(), gatewayAwsAuthModel{
 			AllowedPrincipalArns: keepUnsetSet(config.AllowedPrincipalArns, prior.AllowedPrincipalArns, &diags),
 			AllowedAccountIds:    keepUnsetSet(config.AllowedAccountIds, prior.AllowedAccountIds, &diags),
-		}
-		model.GcpAuth, model.KubernetesAuth, model.TokenAuth = nil, nil, nil
+		}, &diags)
 
 	case infisical.GatewayAuthMethodGcp:
 		prior := gatewayGcpAuthModel{
@@ -719,17 +789,16 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 			AllowedProjects:        types.SetNull(types.StringType),
 			AllowedZones:           types.SetNull(types.StringType),
 		}
-		if model.GcpAuth != nil {
-			prior = *model.GcpAuth
+		if priorGcp != nil {
+			prior = *priorGcp
 		}
 
-		model.GcpAuth = &gatewayGcpAuthModel{
+		model.GcpAuth = encodeAuthBlock(ctx, gatewayGcpAuthSchema(), gatewayGcpAuthModel{
 			Type:                   types.StringValue(config.Type),
 			AllowedServiceAccounts: keepUnsetSet(config.AllowedServiceAccounts, prior.AllowedServiceAccounts, &diags),
 			AllowedProjects:        keepUnsetSet(config.AllowedProjects, prior.AllowedProjects, &diags),
 			AllowedZones:           keepUnsetSet(config.AllowedZones, prior.AllowedZones, &diags),
-		}
-		model.AwsAuth, model.KubernetesAuth, model.TokenAuth = nil, nil, nil
+		}, &diags)
 
 	case infisical.GatewayAuthMethodKubernetes:
 		prior := gatewayKubernetesAuthModel{
@@ -740,8 +809,8 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 			AllowedNamespaces:         types.SetNull(types.StringType),
 			AllowedServiceAccountName: types.SetNull(types.StringType),
 		}
-		if model.KubernetesAuth != nil {
-			prior = *model.KubernetesAuth
+		if priorKubernetes != nil {
+			prior = *priorKubernetes
 		}
 
 		namespaces := keepUnsetSet(config.AllowedNamespaces, prior.AllowedNamespaces, &diags)
@@ -756,7 +825,7 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 			ca = customtypes.NewTrimmedStringValue(config.CaCertificate)
 		}
 
-		model.KubernetesAuth = &gatewayKubernetesAuthModel{
+		model.KubernetesAuth = encodeAuthBlock(ctx, gatewayKubernetesAuthSchema(), gatewayKubernetesAuthModel{
 			TokenReviewMode:           types.StringValue(config.TokenReviewMode),
 			KubernetesHost:            host,
 			CaCertificate:             ca,
@@ -767,12 +836,10 @@ func (r *GatewayResource) applyGatewayToModel(model *GatewayResourceModel, gatew
 			AllowedServiceAccountName: names,
 			AllowedAudience:           keepUnsetString(config.AllowedAudience, prior.AllowedAudience),
 			VerifyTlsCertificate:      types.BoolValue(config.VerifyTlsCertificate),
-		}
-		model.AwsAuth, model.GcpAuth, model.TokenAuth = nil, nil, nil
+		}, &diags)
 
 	case infisical.GatewayAuthMethodToken:
-		model.TokenAuth = &gatewayTokenAuthModel{}
-		model.AwsAuth, model.GcpAuth, model.KubernetesAuth = nil, nil, nil
+		model.TokenAuth = encodeAuthBlock(ctx, gatewayTokenAuthSchema(), gatewayTokenAuthModel{}, &diags)
 
 	case infisical.GatewayAuthMethodIdentity:
 		diags.AddError(
