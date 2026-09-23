@@ -140,7 +140,7 @@ Optional:
 - `allowed_namespaces` (Set of String) Kubernetes namespaces whose service accounts are allowed to authenticate as this gateway. Supports `*` wildcards.
 - `allowed_service_account_names` (Set of String) Kubernetes service account names allowed to authenticate as this gateway. Supports `*` wildcards.
 - `ca_certificate` (String) The PEM-encoded CA certificate that issued the Kubernetes API server's TLS certificate.
-- `kubernetes_host` (String) The URL of the Kubernetes API server, for example https://my-cluster.example.com:6443. Required unless `token_review_mode` is `gateway`, where it must be omitted.
+- `kubernetes_host` (String) The URL of the Kubernetes API server, for example https://my-cluster.example.com:6443. Must be https with no path, and reachable from Infisical over the public internet. Required unless `token_review_mode` is `gateway`, where it must be omitted.
 - `reviewer_gateway_id` (String) The gateway that performs the TokenReview. Required when `token_review_mode` is `gateway`, and must be a different gateway that is already connected in the cluster. Mutually exclusive with `reviewer_gateway_pool_id`.
 - `reviewer_gateway_pool_id` (String) The gateway pool to route TokenReview traffic through. Mutually exclusive with `reviewer_gateway_id`, and rejected when `token_review_mode` is `gateway`.
 - `token_review_mode` (String) Who performs the TokenReview. `api` means Infisical does, calling `kubernetes_host` directly. `gateway` means another already-connected gateway does it with its own in-cluster service account, which needs no host or reviewer token. Defaults to `api`.

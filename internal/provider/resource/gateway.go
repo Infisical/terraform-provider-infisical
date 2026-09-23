@@ -240,9 +240,15 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 			"kubernetes_host": schema.StringAttribute{
 				// The API normalizes to https://host[:port], so a trailing slash would diff forever.
 				CustomType:  customtypes.KubernetesHostType{},
-				Description: "The URL of the Kubernetes API server, for example https://my-cluster.example.com:6443. Required unless `token_review_mode` is `gateway`, where it must be omitted.",
+				Description: "The URL of the Kubernetes API server, for example https://my-cluster.example.com:6443. Must be https with no path, and reachable from Infisical over the public internet. Required unless `token_review_mode` is `gateway`, where it must be omitted.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^(?:https://)?[A-Za-z0-9._~\[\]-]+(?::[0-9]{1,5})?/?$`),
+						"must be an https API server address with no path, credentials or query, for example https://my-cluster.example.com:6443",
+					),
+				},
 			},
 			"ca_certificate": schema.StringAttribute{
 				// The API strips the trailing newline that file() always adds.
@@ -366,8 +372,13 @@ func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.Valid
 			)
 		}
 
-		hasReviewerGateway := kubernetesAuth.ReviewerGatewayID.ValueString() != ""
-		hasReviewerPool := kubernetesAuth.ReviewerGatewayPoolID.ValueString() != ""
+		// Unknown means set to something that resolves at apply, such as another gateway
+		// created in the same run. Reading it as absent would reject that configuration.
+		isConfigured := func(value types.String) bool {
+			return !value.IsNull() && (value.IsUnknown() || value.ValueString() != "")
+		}
+		hasReviewerGateway := isConfigured(kubernetesAuth.ReviewerGatewayID)
+		hasReviewerPool := isConfigured(kubernetesAuth.ReviewerGatewayPoolID)
 
 		if hasReviewerGateway && hasReviewerPool {
 			resp.Diagnostics.AddAttributeError(
@@ -825,11 +836,18 @@ func (r *GatewayResource) applyGatewayToModel(ctx context.Context, model *Gatewa
 			ca = customtypes.NewTrimmedStringValue(config.CaCertificate)
 		}
 
+		// The API reports only whether a reviewer JWT is stored, never its value. Once it is
+		// gone, ours has to go too, or a cleared credential leaves a clean plan behind.
+		reviewerJwt := prior.TokenReviewerJwt
+		if !config.HasTokenReviewerJwt {
+			reviewerJwt = types.StringNull()
+		}
+
 		model.KubernetesAuth = encodeAuthBlock(ctx, gatewayKubernetesAuthSchema(), gatewayKubernetesAuthModel{
 			TokenReviewMode:           types.StringValue(config.TokenReviewMode),
 			KubernetesHost:            host,
 			CaCertificate:             ca,
-			TokenReviewerJwt:          prior.TokenReviewerJwt,
+			TokenReviewerJwt:          reviewerJwt,
 			ReviewerGatewayID:         optionalString(config.GatewayID),
 			ReviewerGatewayPoolID:     optionalString(config.GatewayPoolID),
 			AllowedNamespaces:         namespaces,
