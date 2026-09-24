@@ -59,3 +59,4 @@ Read-Only:
 - `org_id` (String) The organization ID of the group
 - `role` (String) The role of the group in the organization
 - `role_id` (String) The role ID of the group in the organization
+- `slug` (String) The slug of the group
