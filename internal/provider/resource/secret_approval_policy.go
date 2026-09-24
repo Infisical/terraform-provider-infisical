@@ -51,6 +51,7 @@ type secretApprovalPolicyResourceModel struct {
 	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
 	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
 	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
+	BypassForMIs      types.Bool       `tfsdk:"bypass_approvals_for_machine_identities"`
 }
 
 // Metadata returns the resource type name.
@@ -97,6 +98,12 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
+			},
+			"bypass_approvals_for_machine_identities": schema.BoolAttribute{
+				Description: "Whether machine identities can bypass the approval policy. Defaults to false",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
 			},
 			"approvers": schema.SetNestedAttribute{
 				Required:    true,
@@ -268,6 +275,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
+		BypassForMachineIDs:  plan.BypassForMIs.ValueBoolPointer(),
 	})
 
 	if err != nil {
@@ -333,6 +341,10 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.EnforcementLevel)
 	state.AllowSelfApproval = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.AllowedSelfApprovals)
+	// Older Infisical instances don't return this field, so we need to check for nil
+	if secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs != nil {
+		state.BypassForMIs = types.BoolPointerValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
+	}
 
 	approvers := make([]SecretApprover, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
 	for i, el := range secretApprovalPolicy.SecretApprovalPolicy.Approvers {
@@ -493,6 +505,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
+		BypassForMachineIDs:  plan.BypassForMIs.ValueBoolPointer(),
 		Environments:         environments,
 	})
 

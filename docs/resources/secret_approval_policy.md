@@ -51,8 +51,9 @@ resource "infisical_secret_approval_policy" "prod-policy" {
       type     = "user"
       username = "name@infisical.com"
   }]
-  required_approvals = 1
-  enforcement_level  = "hard"
+  required_approvals                      = 1
+  enforcement_level                       = "hard"
+  bypass_approvals_for_machine_identities = false
 }
 ```
 
@@ -69,6 +70,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 ### Optional
 
 - `allow_self_approval` (Boolean) Whether to allow the  approvers to approve their own changes
+- `bypass_approvals_for_machine_identities` (Boolean) Whether machine identities can bypass the approval policy. Defaults to false
 - `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the secret approval policy to
