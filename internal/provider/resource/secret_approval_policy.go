@@ -100,7 +100,7 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Default:     booldefault.StaticBool(true),
 			},
 			"bypass_approvals_for_machine_identities": schema.BoolAttribute{
-				Description: "Whether machine identities can bypass the approval policy. Defaults to false",
+				Description: "Whether machine identities can bypass the policy. Defaults to false",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
