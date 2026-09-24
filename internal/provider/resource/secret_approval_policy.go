@@ -40,18 +40,18 @@ type SecretBypasser struct {
 
 // secretApprovalPolicyResourceModel describes the data source data model.
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String     `tfsdk:"id"`
-	ProjectID         types.String     `tfsdk:"project_id"`
-	Name              types.String     `tfsdk:"name"`
-	EnvironmentSlug   types.String     `tfsdk:"environment_slug"`
-	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
-	SecretPath        types.String     `tfsdk:"secret_path"`
-	Approvers         []SecretApprover `tfsdk:"approvers"`
-	Bypassers         []SecretBypasser `tfsdk:"bypassers"`
-	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
-	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
-	BypassForMIs      types.Bool       `tfsdk:"bypass_approvals_for_machine_identities"`
+	ID                         types.String     `tfsdk:"id"`
+	ProjectID                  types.String     `tfsdk:"project_id"`
+	Name                       types.String     `tfsdk:"name"`
+	EnvironmentSlug            types.String     `tfsdk:"environment_slug"`
+	EnvironmentSlugs           types.List       `tfsdk:"environment_slugs"`
+	SecretPath                 types.String     `tfsdk:"secret_path"`
+	Approvers                  []SecretApprover `tfsdk:"approvers"`
+	Bypassers                  []SecretBypasser `tfsdk:"bypassers"`
+	RequiredApprovals          types.Int64      `tfsdk:"required_approvals"`
+	EnforcementLevel           types.String     `tfsdk:"enforcement_level"`
+	AllowSelfApproval          types.Bool       `tfsdk:"allow_self_approval"`
+	BypassForMachineIdentities types.Bool       `tfsdk:"bypass_approvals_for_machine_identities"`
 }
 
 // Metadata returns the resource type name.
@@ -275,7 +275,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
-		BypassForMachineIDs:  plan.BypassForMIs.ValueBoolPointer(),
+		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBoolPointer(),
 	})
 
 	if err != nil {
@@ -343,7 +343,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.AllowSelfApproval = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.AllowedSelfApprovals)
 	// Older Infisical instances don't return this field, so we need to check for nil
 	if secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs != nil {
-		state.BypassForMIs = types.BoolPointerValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
+		state.BypassForMachineIdentities = types.BoolPointerValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
 	}
 
 	approvers := make([]SecretApprover, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
@@ -505,7 +505,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
-		BypassForMachineIDs:  plan.BypassForMIs.ValueBoolPointer(),
+		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBoolPointer(),
 		Environments:         environments,
 	})
 
