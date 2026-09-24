@@ -275,7 +275,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
-		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBoolPointer(),
+		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBool(),
 	})
 
 	if err != nil {
@@ -341,10 +341,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.EnforcementLevel)
 	state.AllowSelfApproval = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.AllowedSelfApprovals)
-	// Older Infisical instances don't return this field, so we need to check for nil
-	if secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs != nil {
-		state.BypassForMachineIdentities = types.BoolPointerValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
-	}
+	state.BypassForMachineIdentities = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
 
 	approvers := make([]SecretApprover, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
 	for i, el := range secretApprovalPolicy.SecretApprovalPolicy.Approvers {
@@ -505,7 +502,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
-		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBoolPointer(),
+		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBool(),
 		Environments:         environments,
 	})
 
