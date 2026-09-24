@@ -113,6 +113,39 @@ func (v KubernetesHostValue) StringSemanticEquals(_ context.Context, newValuable
 	return NormalizeKubernetesHost(v.ValueString()) == NormalizeKubernetesHost(newValue.ValueString()), diags
 }
 
+// ValidateKubernetesHost reports what the API would reject about a host, so the refusal lands
+// at plan time. Shares the parse with NormalizeKubernetesHost, which keeps bracketed IPv6
+// addresses such as https://[2001:db8::1]:6443 working.
+func ValidateKubernetesHost(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+
+	lowered := strings.ToLower(trimmed)
+	if strings.Contains(lowered, "://") && !strings.HasPrefix(lowered, "https://") {
+		return fmt.Errorf("must use https")
+	}
+
+	withScheme := trimmed
+	if !strings.HasPrefix(lowered, "https://") {
+		withScheme = "https://" + trimmed
+	}
+
+	parsed, err := url.Parse(withScheme)
+	if err != nil || parsed.Host == "" {
+		return fmt.Errorf("must be a valid URL, for example https://my-cluster.example.com:6443")
+	}
+	if parsed.User != nil {
+		return fmt.Errorf("must not include credentials")
+	}
+	if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("must be the API server address only, with no path or query")
+	}
+
+	return nil
+}
+
 // NormalizeKubernetesHost mirrors the API's normalization: lowercase https scheme, lowercase
 // host, port preserved, no trailing slash. Anything the API would reject outright is returned
 // trimmed only, so the rejection surfaces as its own error rather than a silent rewrite.

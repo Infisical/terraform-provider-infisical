@@ -155,6 +155,30 @@ func nullAuthBlocks(model *GatewayResourceModel) {
 	model.TokenAuth = types.ObjectNull(authBlockAttrTypes(gatewayTokenAuthSchema()))
 }
 
+type kubernetesHostValidator struct{}
+
+func (kubernetesHostValidator) Description(_ context.Context) string {
+	return "must be an https API server address with no path, query or credentials"
+}
+
+func (v kubernetesHostValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (kubernetesHostValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	if err := customtypes.ValidateKubernetesHost(req.ConfigValue.ValueString()); err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid Kubernetes host",
+			fmt.Sprintf("Kubernetes host %s.", err.Error()),
+		)
+	}
+}
+
 // Allowlists cross the wire as one comma-separated string, so a value carrying a comma would
 // split into two entries and one carrying surrounding whitespace would come back trimmed.
 func csvSafeEntries() validator.Set {
@@ -244,12 +268,7 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				Description: "The URL of the Kubernetes API server, for example https://my-cluster.example.com:6443. Must be https with no path, and reachable from Infisical over the public internet. Required unless `token_review_mode` is `gateway`, where it must be omitted.",
 				Optional:    true,
 				Computed:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(
-						regexp.MustCompile(`^(?:https://)?[A-Za-z0-9._~\[\]-]+(?::[0-9]{1,5})?/?$`),
-						"must be an https API server address with no path, credentials or query, for example https://my-cluster.example.com:6443",
-					),
-				},
+				Validators:  []validator.String{kubernetesHostValidator{}},
 			},
 			"ca_certificate": schema.StringAttribute{
 				// The API strips the trailing newline that file() always adds.
@@ -439,28 +458,36 @@ func (r *GatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// Everything the API counts as moving the destination. An unknown one resolves at apply and
-	// may well resolve to what is already stored, so refusing here would block a gateway that
-	// simply takes its reviewer or host from another resource in the same run.
-	for _, value := range []attr.Value{
-		planned.KubernetesHost, planned.CaCertificate, planned.TokenReviewMode,
-		planned.ReviewerGatewayID, planned.ReviewerGatewayPoolID, planned.VerifyTlsCertificate,
-	} {
-		if value.IsUnknown() {
-			return
+	// Everything the API counts as moving the destination, each judged on its own. An unknown
+	// value may resolve to what is already stored, so it defers rather than refusing, but a
+	// field already known to differ still moves the destination whatever its neighbours do.
+	// The host is normalized and the CA trimmed, matching how the API compares them.
+	moved := false
+	differs := func(planned, stored attr.Value, changed func() bool) {
+		if !planned.IsUnknown() && !stored.IsUnknown() && changed() {
+			moved = true
 		}
 	}
-
-	// Compared the way the API compares it: it trims the CA and normalizes the host, so a
-	// trailing newline is not a move.
-	unchanged := customtypes.NormalizeKubernetesHost(planned.KubernetesHost.ValueString()) ==
-		customtypes.NormalizeKubernetesHost(stored.KubernetesHost.ValueString()) &&
-		strings.TrimSpace(planned.CaCertificate.ValueString()) == strings.TrimSpace(stored.CaCertificate.ValueString()) &&
-		planned.TokenReviewMode.Equal(stored.TokenReviewMode) &&
-		planned.ReviewerGatewayID.Equal(stored.ReviewerGatewayID) &&
-		planned.ReviewerGatewayPoolID.Equal(stored.ReviewerGatewayPoolID) &&
-		planned.VerifyTlsCertificate.Equal(stored.VerifyTlsCertificate)
-	if unchanged {
+	differs(planned.KubernetesHost, stored.KubernetesHost, func() bool {
+		return customtypes.NormalizeKubernetesHost(planned.KubernetesHost.ValueString()) !=
+			customtypes.NormalizeKubernetesHost(stored.KubernetesHost.ValueString())
+	})
+	differs(planned.CaCertificate, stored.CaCertificate, func() bool {
+		return strings.TrimSpace(planned.CaCertificate.ValueString()) != strings.TrimSpace(stored.CaCertificate.ValueString())
+	})
+	differs(planned.TokenReviewMode, stored.TokenReviewMode, func() bool {
+		return !planned.TokenReviewMode.Equal(stored.TokenReviewMode)
+	})
+	differs(planned.ReviewerGatewayID, stored.ReviewerGatewayID, func() bool {
+		return !planned.ReviewerGatewayID.Equal(stored.ReviewerGatewayID)
+	})
+	differs(planned.ReviewerGatewayPoolID, stored.ReviewerGatewayPoolID, func() bool {
+		return !planned.ReviewerGatewayPoolID.Equal(stored.ReviewerGatewayPoolID)
+	})
+	differs(planned.VerifyTlsCertificate, stored.VerifyTlsCertificate, func() bool {
+		return !planned.VerifyTlsCertificate.Equal(stored.VerifyTlsCertificate)
+	})
+	if !moved {
 		return
 	}
 
