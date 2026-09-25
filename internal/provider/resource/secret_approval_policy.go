@@ -7,9 +7,11 @@ import (
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -40,17 +42,18 @@ type SecretBypasser struct {
 
 // secretApprovalPolicyResourceModel describes the data source data model.
 type secretApprovalPolicyResourceModel struct {
-	ID                types.String     `tfsdk:"id"`
-	ProjectID         types.String     `tfsdk:"project_id"`
-	Name              types.String     `tfsdk:"name"`
-	EnvironmentSlug   types.String     `tfsdk:"environment_slug"`
-	EnvironmentSlugs  types.List       `tfsdk:"environment_slugs"`
-	SecretPath        types.String     `tfsdk:"secret_path"`
-	Approvers         []SecretApprover `tfsdk:"approvers"`
-	Bypassers         []SecretBypasser `tfsdk:"bypassers"`
-	RequiredApprovals types.Int64      `tfsdk:"required_approvals"`
-	EnforcementLevel  types.String     `tfsdk:"enforcement_level"`
-	AllowSelfApproval types.Bool       `tfsdk:"allow_self_approval"`
+	ID                         types.String     `tfsdk:"id"`
+	ProjectID                  types.String     `tfsdk:"project_id"`
+	Name                       types.String     `tfsdk:"name"`
+	EnvironmentSlug            types.String     `tfsdk:"environment_slug"`
+	EnvironmentSlugs           types.List       `tfsdk:"environment_slugs"`
+	SecretPath                 types.String     `tfsdk:"secret_path"`
+	Approvers                  []SecretApprover `tfsdk:"approvers"`
+	Bypassers                  []SecretBypasser `tfsdk:"bypassers"`
+	RequiredApprovals          types.Int64      `tfsdk:"required_approvals"`
+	EnforcementLevel           types.String     `tfsdk:"enforcement_level"`
+	AllowSelfApproval          types.Bool       `tfsdk:"allow_self_approval"`
+	BypassForMachineIdentities types.Bool       `tfsdk:"bypass_approvals_for_machine_identities"`
 }
 
 // Metadata returns the resource type name.
@@ -97,6 +100,12 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
+			},
+			"bypass_approvals_for_machine_identities": schema.BoolAttribute{
+				Description:   "Whether machine identities can bypass the policy. If not set, the Infisical default is used on creation and the current value is left unchanged on update",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"approvers": schema.SetNestedAttribute{
 				Required:    true,
@@ -268,6 +277,7 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
+		BypassForMachineIDs:  plan.BypassForMachineIdentities.ValueBoolPointer(),
 	})
 
 	if err != nil {
@@ -280,6 +290,9 @@ func (r *secretApprovalPolicyResource) Create(ctx context.Context, req resource.
 
 	plan.ID = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.ID)
 	plan.Name = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.Name)
+	if plan.BypassForMachineIdentities.IsUnknown() {
+		plan.BypassForMachineIdentities = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -333,6 +346,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.RequiredApprovals = types.Int64Value(secretApprovalPolicy.SecretApprovalPolicy.RequiredApprovals)
 	state.EnforcementLevel = types.StringValue(secretApprovalPolicy.SecretApprovalPolicy.EnforcementLevel)
 	state.AllowSelfApproval = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.AllowedSelfApprovals)
+	state.BypassForMachineIdentities = types.BoolValue(secretApprovalPolicy.SecretApprovalPolicy.BypassForMachineIDs)
 
 	approvers := make([]SecretApprover, len(secretApprovalPolicy.SecretApprovalPolicy.Approvers))
 	for i, el := range secretApprovalPolicy.SecretApprovalPolicy.Approvers {
@@ -484,7 +498,15 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 	} else {
 		environments = []string{plan.EnvironmentSlug.ValueString()}
 	}
-	_, err := r.client.UpdateSecretApprovalPolicy(infisical.UpdateSecretApprovalPolicyRequest{
+	// Only send the value when it's set in the config, otherwise the API leaves it unchanged
+	var bypassForMachineIdentitiesConfig types.Bool
+	diags = req.Config.GetAttribute(ctx, path.Root("bypass_approvals_for_machine_identities"), &bypassForMachineIdentitiesConfig)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	updatedPolicy, err := r.client.UpdateSecretApprovalPolicy(infisical.UpdateSecretApprovalPolicyRequest{
 		ID:                   plan.ID.ValueString(),
 		Name:                 plan.Name.ValueString(),
 		SecretPath:           plan.SecretPath.ValueString(),
@@ -493,6 +515,7 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 		RequiredApprovals:    plan.RequiredApprovals.ValueInt64(),
 		EnforcementLevel:     plan.EnforcementLevel.ValueString(),
 		AllowedSelfApprovals: plan.AllowSelfApproval.ValueBool(),
+		BypassForMachineIDs:  bypassForMachineIdentitiesConfig.ValueBoolPointer(),
 		Environments:         environments,
 	})
 
@@ -502,6 +525,10 @@ func (r *secretApprovalPolicyResource) Update(ctx context.Context, req resource.
 			"Couldn't update secret approval policy, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	if plan.BypassForMachineIdentities.IsUnknown() {
+		plan.BypassForMachineIdentities = types.BoolValue(updatedPolicy.SecretApprovalPolicy.BypassForMachineIDs)
 	}
 
 	diags = resp.State.Set(ctx, plan)
