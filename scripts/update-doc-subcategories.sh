@@ -102,6 +102,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Alerts
         alert|alert_*)
             update_subcategory "$file" "Alerts";;
+
+        # Audit Log Streams
+        audit_log_stream_*)
+            update_subcategory "$file" "Audit Log Streams";;
     esac
 done
 

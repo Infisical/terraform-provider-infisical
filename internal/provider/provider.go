@@ -11,6 +11,7 @@ import (
 	infisicalResource "terraform-provider-infisical/internal/provider/resource"
 	alertResource "terraform-provider-infisical/internal/provider/resource/alert"
 	appConnectionResource "terraform-provider-infisical/internal/provider/resource/app_connection"
+	auditLogStreamResource "terraform-provider-infisical/internal/provider/resource/audit_log_stream"
 	certificateSyncResource "terraform-provider-infisical/internal/provider/resource/certificate_sync"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
 	externalKmsResource "terraform-provider-infisical/internal/provider/resource/external_kms"
@@ -506,6 +507,12 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerIdentityResource,
 		externalKmsResource.NewExternalKmsAwsResource,
 		alertResource.NewAlertResource,
+		auditLogStreamResource.NewAuditLogStreamAzureResource,
+		auditLogStreamResource.NewAuditLogStreamCriblResource,
+		auditLogStreamResource.NewAuditLogStreamCustomResource,
+		auditLogStreamResource.NewAuditLogStreamDatadogResource,
+		auditLogStreamResource.NewAuditLogStreamSplunkResource,
+		auditLogStreamResource.NewAuditLogStreamSumoLogicResource,
 	}
 }
 
