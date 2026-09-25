@@ -32,6 +32,7 @@ type GroupsDataSourceModel struct {
 type InfisicalGroupDetails struct {
 	ID     types.String `tfsdk:"id"`
 	Name   types.String `tfsdk:"name"`
+	Slug   types.String `tfsdk:"slug"`
 	OrgID  types.String `tfsdk:"org_id"`
 	Role   types.String `tfsdk:"role"`
 	RoleId types.String `tfsdk:"role_id"`
@@ -56,6 +57,10 @@ func (d *GroupsDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 						},
 						"name": schema.StringAttribute{
 							Description: "The name of the group",
+							Computed:    true,
+						},
+						"slug": schema.StringAttribute{
+							Description: "The slug of the group",
 							Computed:    true,
 						},
 						"org_id": schema.StringAttribute{
@@ -123,6 +128,7 @@ func (d *GroupsDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			"If the error is not clear, please get in touch at infisical.com/slack\n\n"+
 				"Infisical Client Error: "+err.Error(),
 		)
+		return
 	}
 
 	planGroups := make([]InfisicalGroupDetails, len(groups))
@@ -130,6 +136,7 @@ func (d *GroupsDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		planGroups[i] = InfisicalGroupDetails{
 			ID:     types.StringValue(el.ID),
 			Name:   types.StringValue(el.Name),
+			Slug:   types.StringValue(el.Slug),
 			OrgID:  types.StringValue(el.OrgID),
 			Role:   types.StringValue(el.Role),
 			RoleId: types.StringValue(el.RoleId),
@@ -140,6 +147,7 @@ func (d *GroupsDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		AttrTypes: map[string]attr.Type{
 			"id":      types.StringType,
 			"name":    types.StringType,
+			"slug":    types.StringType,
 			"org_id":  types.StringType,
 			"role":    types.StringType,
 			"role_id": types.StringType,
