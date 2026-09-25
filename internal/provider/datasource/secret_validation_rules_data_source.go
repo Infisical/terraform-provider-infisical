@@ -51,15 +51,11 @@ var secretValidationRuleStringConstraintsAttrTypes = map[string]attr.Type{
 	"required_suffix": types.StringType,
 }
 
-var secretValidationRuleReusePreventionAttrTypes = map[string]attr.Type{
-	"previous_versions":   types.Int64Type,
-	"unique_within_scope": types.BoolType,
-}
-
 var secretValidationRuleValueConstraintsAttrTypes = func() map[string]attr.Type {
-	result := make(map[string]attr.Type, len(secretValidationRuleStringConstraintsAttrTypes)+1)
+	result := make(map[string]attr.Type, len(secretValidationRuleStringConstraintsAttrTypes)+2)
 	maps.Copy(result, secretValidationRuleStringConstraintsAttrTypes)
-	result["reuse_prevention"] = types.ObjectType{AttrTypes: secretValidationRuleReusePreventionAttrTypes}
+	result["previous_versions"] = types.Int64Type
+	result["unique_within_scope"] = types.BoolType
 
 	return result
 }()
@@ -119,19 +115,13 @@ func stringConstraintsDataSourceAttributes(subject string) map[string]schema.Att
 
 func (d *SecretValidationRulesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	valueConstraintsAttributes := stringConstraintsDataSourceAttributes("secret value")
-	valueConstraintsAttributes["reuse_prevention"] = schema.SingleNestedAttribute{
+	valueConstraintsAttributes["previous_versions"] = schema.Int64Attribute{
 		Computed:    true,
-		Description: "How the rule rejects a value for repeating one already in use. Null when the rule allows reuse.",
-		Attributes: map[string]schema.Attribute{
-			"previous_versions": schema.Int64Attribute{
-				Computed:    true,
-				Description: "How many of the secret's own previous versions the new value must differ from.",
-			},
-			"unique_within_scope": schema.BoolAttribute{
-				Computed:    true,
-				Description: "Whether the rule rejects a value that another secret in the rule's scope already holds.",
-			},
-		},
+		Description: "How many of the secret's own previous versions the new value must differ from. Null when the rule allows a value that repeats a previous version.",
+	}
+	valueConstraintsAttributes["unique_within_scope"] = schema.BoolAttribute{
+		Computed:    true,
+		Description: "Whether the rule rejects a value that another secret in the rule's scope already holds. Null when the rule allows a value another secret already holds.",
 	}
 
 	resp.Schema = schema.Schema{
@@ -385,16 +375,8 @@ func secretValidationRuleConstraintsObject(ctx context.Context, rule infisical.S
 	value := types.ObjectNull(secretValidationRuleValueConstraintsAttrTypes)
 	if rule.ValueConstraints != nil {
 		values := secretValidationRuleStringConstraintsValues(&rule.ValueConstraints.SecretValidationRuleStringConstraints)
-
-		values["reuse_prevention"] = types.ObjectNull(secretValidationRuleReusePreventionAttrTypes)
-		if rule.ValueConstraints.UniqueAcrossLastVersions != nil || rule.ValueConstraints.UniqueWithinScope != nil {
-			reusePrevention, reuseDiags := types.ObjectValue(secretValidationRuleReusePreventionAttrTypes, map[string]attr.Value{
-				"previous_versions":   secretValidationRuleInt64Value(rule.ValueConstraints.UniqueAcrossLastVersions),
-				"unique_within_scope": secretValidationRuleBoolValue(rule.ValueConstraints.UniqueWithinScope),
-			})
-			diags.Append(reuseDiags...)
-			values["reuse_prevention"] = reusePrevention
-		}
+		values["previous_versions"] = secretValidationRuleInt64Value(rule.ValueConstraints.UniqueAcrossLastVersions)
+		values["unique_within_scope"] = secretValidationRuleBoolValue(rule.ValueConstraints.UniqueWithinScope)
 
 		valueObject, valueDiags := types.ObjectValue(secretValidationRuleValueConstraintsAttrTypes, values)
 		diags.Append(valueDiags...)

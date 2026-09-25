@@ -28,35 +28,25 @@ type staticSecretsConstraintsModel struct {
 	ValueConstraints types.Object `tfsdk:"value_constraints"`
 }
 
-// valueConstraintsModel is the shared string constraints plus the one field only a stored value
-// can have.
+// valueConstraintsModel is the shared string constraints plus the uniqueness settings only a stored
+// value can have. Those sit flat on the API's valueConstraints.
 type valueConstraintsModel struct {
-	MinLength       types.Int64  `tfsdk:"min_length"`
-	MaxLength       types.Int64  `tfsdk:"max_length"`
-	RegexPattern    types.String `tfsdk:"regex_pattern"`
-	RequiredPrefix  types.String `tfsdk:"required_prefix"`
-	RequiredSuffix  types.String `tfsdk:"required_suffix"`
-	ReusePrevention types.Object `tfsdk:"reuse_prevention"`
-}
-
-// reusePreventionModel groups the API's two uniqueness settings, which sit flat on
-// valueConstraints as uniqueAcrossLastVersions and uniqueWithinScope.
-type reusePreventionModel struct {
-	PreviousVersions  types.Int64 `tfsdk:"previous_versions"`
-	UniqueWithinScope types.Bool  `tfsdk:"unique_within_scope"`
-}
-
-var reusePreventionAttrTypes = map[string]attr.Type{
-	"previous_versions":   types.Int64Type,
-	"unique_within_scope": types.BoolType,
+	MinLength         types.Int64  `tfsdk:"min_length"`
+	MaxLength         types.Int64  `tfsdk:"max_length"`
+	RegexPattern      types.String `tfsdk:"regex_pattern"`
+	RequiredPrefix    types.String `tfsdk:"required_prefix"`
+	RequiredSuffix    types.String `tfsdk:"required_suffix"`
+	PreviousVersions  types.Int64  `tfsdk:"previous_versions"`
+	UniqueWithinScope types.Bool   `tfsdk:"unique_within_scope"`
 }
 
 // valueConstraintsAttrTypes mirrors valueConstraintsModel, extending the shared string constraints
 // rather than restating them.
 var valueConstraintsAttrTypes = func() map[string]attr.Type {
-	result := make(map[string]attr.Type, len(stringConstraintsAttrTypes)+1)
+	result := make(map[string]attr.Type, len(stringConstraintsAttrTypes)+2)
 	maps.Copy(result, stringConstraintsAttrTypes)
-	result["reuse_prevention"] = types.ObjectType{AttrTypes: reusePreventionAttrTypes}
+	result["previous_versions"] = types.Int64Type
+	result["unique_within_scope"] = types.BoolType
 
 	return result
 }()
@@ -68,24 +58,14 @@ var staticSecretsConstraintsAttrTypes = map[string]attr.Type{
 
 func valueConstraintsAttributes() map[string]schema.Attribute {
 	attributes := stringConstraintsAttributes("secret value", secretConstraintsMaxLength, "")
-	attributes["reuse_prevention"] = schema.SingleNestedAttribute{
+	attributes["previous_versions"] = schema.Int64Attribute{
 		Optional:    true,
-		Description: "Rejects a value for repeating one already in use. Omit to allow any value the other constraints accept.",
-		Attributes: map[string]schema.Attribute{
-			"previous_versions": schema.Int64Attribute{
-				Optional:    true,
-				Description: "How many of the secret's own previous versions the new value must differ from. Between 1 and 25.",
-				Validators: []validator.Int64{
-					int64validator.Between(1, 25),
-					// An empty block would send no uniqueness setting and read back as null.
-					int64validator.AtLeastOneOf(path.MatchRelative().AtParent().AtName("unique_within_scope")),
-				},
-			},
-			"unique_within_scope": schema.BoolAttribute{
-				Optional:    true,
-				Description: "Set to `true` to reject a value that another secret in the rule's scope already holds. Requires blind indexing on the project.",
-			},
-		},
+		Description: "How many of the secret's own previous versions the new value must differ from. Between 1 and 25. Omit to allow a value that repeats a previous version.",
+		Validators:  []validator.Int64{int64validator.Between(1, 25)},
+	}
+	attributes["unique_within_scope"] = schema.BoolAttribute{
+		Optional:    true,
+		Description: "Set to `true` to reject a value that another secret in the rule's scope already holds. Requires blind indexing on the project. Omit to allow a value another secret already holds.",
 	}
 
 	return attributes
@@ -207,17 +187,8 @@ func valueConstraintsFromObject(ctx context.Context, object types.Object) (*infi
 			RequiredPrefix: model.RequiredPrefix,
 			RequiredSuffix: model.RequiredSuffix,
 		}),
-	}
-
-	if !(model.ReusePrevention.IsNull() || model.ReusePrevention.IsUnknown()) {
-		var reusePrevention reusePreventionModel
-		diags.Append(model.ReusePrevention.As(ctx, &reusePrevention, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return nil, diags
-		}
-
-		constraints.UniqueAcrossLastVersions = int64Pointer(reusePrevention.PreviousVersions)
-		constraints.UniqueWithinScope = boolPointer(reusePrevention.UniqueWithinScope)
+		UniqueAcrossLastVersions: int64Pointer(model.PreviousVersions),
+		UniqueWithinScope:        boolPointer(model.UniqueWithinScope),
 	}
 
 	return &constraints, diags
@@ -229,20 +200,8 @@ func valueConstraintsToObject(constraints *infisical.SecretValidationRuleValueCo
 	}
 
 	values := stringConstraintsValues(&constraints.SecretValidationRuleStringConstraints)
-
-	if constraints.UniqueAcrossLastVersions == nil && constraints.UniqueWithinScope == nil {
-		values["reuse_prevention"] = types.ObjectNull(reusePreventionAttrTypes)
-	} else {
-		reusePrevention, diags := types.ObjectValue(reusePreventionAttrTypes, map[string]attr.Value{
-			"previous_versions":   int64Value(constraints.UniqueAcrossLastVersions),
-			"unique_within_scope": boolValue(constraints.UniqueWithinScope),
-		})
-		if diags.HasError() {
-			return types.ObjectNull(valueConstraintsAttrTypes), diags
-		}
-
-		values["reuse_prevention"] = reusePrevention
-	}
+	values["previous_versions"] = int64Value(constraints.UniqueAcrossLastVersions)
+	values["unique_within_scope"] = boolValue(constraints.UniqueWithinScope)
 
 	return types.ObjectValue(valueConstraintsAttrTypes, values)
 }

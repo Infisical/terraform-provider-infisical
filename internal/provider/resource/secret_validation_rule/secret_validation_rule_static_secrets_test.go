@@ -86,9 +86,9 @@ func TestStaticSecretsReadConstraintsFromPlanOnUpdate(t *testing.T) {
 	}
 }
 
-// reuse_prevention groups two settings the API keeps flat on valueConstraints, so they have to be
-// spread back out under the API's own names.
-func TestValueConstraintsFromObjectReusePrevention(t *testing.T) {
+// previous_versions and unique_within_scope sit on value constraints and map to the API's
+// uniqueAcrossLastVersions and uniqueWithinScope.
+func TestValueConstraintsFromObjectUniqueness(t *testing.T) {
 	ctx := context.Background()
 
 	want := infisical.SecretValidationRuleValueConstraints{
@@ -113,7 +113,7 @@ func TestValueConstraintsFromObjectReusePrevention(t *testing.T) {
 		t.Fatalf("valueConstraintsFromObject() diagnostics = %v", diags)
 	}
 	if got.UniqueAcrossLastVersions != nil || got.UniqueWithinScope != nil {
-		t.Errorf("uniqueness settings = %v, %v, want both unset without a reuse_prevention block", got.UniqueAcrossLastVersions, got.UniqueWithinScope)
+		t.Errorf("uniqueness settings = %v, %v, want both unset when the configuration omits them", got.UniqueAcrossLastVersions, got.UniqueWithinScope)
 	}
 }
 
@@ -143,27 +143,20 @@ func TestValueConstraintsToObject(t *testing.T) {
 		t.Errorf("valueConstraintsToObject(nil) = %v, want null", object)
 	}
 
-	readReusePrevention := func(constraints infisical.SecretValidationRuleValueConstraints) types.Object {
+	readValueConstraints := func(constraints infisical.SecretValidationRuleValueConstraints) valueConstraintsModel {
 		var model valueConstraintsModel
 		if diags := valueConstraintsObject(t, &constraints).As(ctx, &model, basetypes.ObjectAsOptions{}); diags.HasError() {
 			t.Fatalf("reading the value constraints: %v", diags)
 		}
-		return model.ReusePrevention
+		return model
 	}
 
-	if reuse := readReusePrevention(infisical.SecretValidationRuleValueConstraints{}); !reuse.IsNull() {
-		t.Errorf("reuse_prevention without uniqueness settings = %v, want null", reuse)
+	unset := readValueConstraints(infisical.SecretValidationRuleValueConstraints{})
+	if !unset.PreviousVersions.IsNull() || !unset.UniqueWithinScope.IsNull() {
+		t.Errorf("uniqueness settings = %v, %v, want both null when the API omits them", unset.PreviousVersions, unset.UniqueWithinScope)
 	}
 
-	reuse := readReusePrevention(infisical.SecretValidationRuleValueConstraints{UniqueAcrossLastVersions: int64Ptr(3)})
-	if reuse.IsNull() {
-		t.Fatal("reuse_prevention is null, want the uniqueness setting the API returned")
-	}
-
-	var model reusePreventionModel
-	if diags := reuse.As(ctx, &model, basetypes.ObjectAsOptions{}); diags.HasError() {
-		t.Fatalf("reading reuse_prevention: %v", diags)
-	}
+	model := readValueConstraints(infisical.SecretValidationRuleValueConstraints{UniqueAcrossLastVersions: int64Ptr(3)})
 	if got := model.PreviousVersions.ValueInt64(); got != 3 {
 		t.Errorf("previous_versions = %d, want 3", got)
 	}
@@ -255,24 +248,16 @@ func TestStaticSecretsRequiresKeyOrValueConstraints(t *testing.T) {
 	}
 }
 
-// An empty reuse_prevention block sends no uniqueness setting and reads back as null, so it would diff
-// on every plan. It has to set at least one of the two, and previous_versions has to be in the range
-// the API allows.
-func TestReusePreventionValidation(t *testing.T) {
+// previous_versions has to stay in the range the API allows. Omitting it, or setting only
+// unique_within_scope, is valid because both fields are optional on their own.
+func TestPreviousVersionsValidation(t *testing.T) {
 	s := ruleSchema(t, ruleResources(t)["static_secrets"])
-	previousVersions := path.Root("constraints").AtName("value_constraints").AtName("reuse_prevention").AtName("previous_versions")
+	previousVersions := path.Root("constraints").AtName("value_constraints").AtName("previous_versions")
 
-	withReuse := func(previous types.Int64, uniqueWithinScope types.Bool) bool {
-		reuse, diags := types.ObjectValue(reusePreventionAttrTypes, map[string]attr.Value{
-			"previous_versions":   previous,
-			"unique_within_scope": uniqueWithinScope,
-		})
-		if diags.HasError() {
-			t.Fatalf("building reuse_prevention: %v", diags)
-		}
-
+	withUniqueness := func(previous types.Int64, uniqueWithinScope types.Bool) bool {
 		values := stringConstraintsValues(&infisical.SecretValidationRuleStringConstraints{})
-		values["reuse_prevention"] = reuse
+		values["previous_versions"] = previous
+		values["unique_within_scope"] = uniqueWithinScope
 		value, diags := types.ObjectValue(valueConstraintsAttrTypes, values)
 		if diags.HasError() {
 			t.Fatalf("building value_constraints: %v", diags)
@@ -290,15 +275,15 @@ func TestReusePreventionValidation(t *testing.T) {
 		"previous versions only":   {previous: types.Int64Value(5), uniqueWithinScope: types.BoolNull()},
 		"unique within scope only": {previous: types.Int64Null(), uniqueWithinScope: types.BoolValue(true)},
 		"both":                     {previous: types.Int64Value(25), uniqueWithinScope: types.BoolValue(false)},
-		"neither":                  {previous: types.Int64Null(), uniqueWithinScope: types.BoolNull(), wantError: true},
+		"neither":                  {previous: types.Int64Null(), uniqueWithinScope: types.BoolNull()},
 		"zero previous versions":   {previous: types.Int64Value(0), uniqueWithinScope: types.BoolNull(), wantError: true},
 		"too many versions":        {previous: types.Int64Value(26), uniqueWithinScope: types.BoolNull(), wantError: true},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got := withReuse(c.previous, c.uniqueWithinScope); got != c.wantError {
-				t.Errorf("reuse_prevention {previous_versions = %v, unique_within_scope = %v} rejected = %v, want %v", c.previous, c.uniqueWithinScope, got, c.wantError)
+			if got := withUniqueness(c.previous, c.uniqueWithinScope); got != c.wantError {
+				t.Errorf("previous_versions = %v, unique_within_scope = %v rejected = %v, want %v", c.previous, c.uniqueWithinScope, got, c.wantError)
 			}
 		})
 	}

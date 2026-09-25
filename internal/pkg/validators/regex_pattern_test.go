@@ -40,8 +40,6 @@ func TestRegexPattern(t *testing.T) {
 		{`[^\S\n]`, true},
 		{`.*?`, true},
 		{`a{1000}`, true},
-		{`\C`, true},
-		{`\cA`, true},
 
 		{`(?=.*[A-Z]).+`, false},
 		{`(?!x).+`, false},
@@ -49,6 +47,8 @@ func TestRegexPattern(t *testing.T) {
 		{`(a)\1`, false},
 		{`\Z`, false},
 		{`\e`, false},
+		{`\C`, false},
+		{`\cA`, false},
 		{`a{1001}`, false},
 		{`a++`, false},
 		{`a*+`, false},
