@@ -506,6 +506,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerIdentityResource,
 		externalKmsResource.NewExternalKmsAwsResource,
 		alertResource.NewAlertResource,
+		infisicalResource.NewGatewayResource,
+		infisicalResource.NewGatewayEnrollmentTokenResource,
 	}
 }
 

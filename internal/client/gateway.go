@@ -1,12 +1,22 @@
 package infisicalclient
 
 import (
+	"fmt"
+	"net/http"
+
 	"terraform-provider-infisical/internal/errors"
 )
 
-const operationListGateways = "CallListGateways"
+const (
+	operationListGateways               = "CallListGateways"
+	operationCreateGateway              = "CallCreateGateway"
+	operationGetGateway                 = "CallGetGateway"
+	operationUpdateGateway              = "CallUpdateGateway"
+	operationDeleteGateway              = "CallDeleteGateway"
+	operationMintGatewayEnrollmentToken = "CallMintGatewayEnrollmentToken"
+)
 
-// ListGateways returns the gateways in the machine identity's organization.
+// Stays on v2 so the gateway data source keeps working against pre-v3 instances.
 func (client Client) ListGateways() ([]Gateway, error) {
 	var gateways []Gateway
 	response, err := client.Config.HttpClient.
@@ -42,4 +52,131 @@ func (client Client) GetGatewayByName(name string) (Gateway, error) {
 	}
 
 	return Gateway{}, ErrNotFound
+}
+
+type GatewayAlreadyExistsError struct {
+	ExistingGatewayID string
+	apiError          error
+}
+
+func (e *GatewayAlreadyExistsError) Error() string {
+	return fmt.Sprintf("gateway %s already uses this name: %v", e.ExistingGatewayID, e.apiError)
+}
+
+func (e *GatewayAlreadyExistsError) Unwrap() error {
+	return e.apiError
+}
+
+func (client Client) CreateGateway(request CreateGatewayRequest) (GatewayDetails, error) {
+	var body GatewayDetails
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post("api/v3/gateways")
+
+	if err != nil {
+		return GatewayDetails{}, errors.NewGenericRequestError(operationCreateGateway, err)
+	}
+
+	if response.IsError() {
+		apiError := errors.NewAPIErrorWithResponse(operationCreateGateway, response, nil)
+		if response.StatusCode() == http.StatusBadRequest {
+			if existing, lookupErr := client.GetGatewayByName(request.Name); lookupErr == nil {
+				return GatewayDetails{}, &GatewayAlreadyExistsError{ExistingGatewayID: existing.ID, apiError: apiError}
+			}
+		}
+		return GatewayDetails{}, apiError
+	}
+
+	return body, nil
+}
+
+func (client Client) GetGatewayById(id string) (GatewayDetails, error) {
+	var body GatewayDetails
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		Get(fmt.Sprintf("api/v3/gateways/%s", id))
+
+	if err != nil {
+		return GatewayDetails{}, errors.NewGenericRequestError(operationGetGateway, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusUnprocessableEntity {
+			return GatewayDetails{}, ErrNotFound
+		}
+		return GatewayDetails{}, errors.NewAPIErrorWithResponse(operationGetGateway, response, nil)
+	}
+
+	return body, nil
+}
+
+func (client Client) UpdateGateway(request UpdateGatewayRequest) (GatewayDetails, error) {
+	var body GatewayDetails
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Patch(fmt.Sprintf("api/v3/gateways/%s", request.ID))
+
+	if err != nil {
+		return GatewayDetails{}, errors.NewGenericRequestError(operationUpdateGateway, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GatewayDetails{}, ErrNotFound
+		}
+		return GatewayDetails{}, errors.NewAPIErrorWithResponse(operationUpdateGateway, response, nil)
+	}
+
+	return body, nil
+}
+
+func (client Client) DeleteGateway(id string) error {
+	response, err := client.Config.HttpClient.
+		R().
+		SetHeader("User-Agent", USER_AGENT).
+		Delete(fmt.Sprintf("api/v2/gateways/%s", id))
+
+	if err != nil {
+		return errors.NewGenericRequestError(operationDeleteGateway, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return ErrNotFound
+		}
+		return errors.NewAPIErrorWithResponse(operationDeleteGateway, response, nil)
+	}
+
+	return nil
+}
+
+// Minting invalidates any token issued earlier for the same gateway.
+func (client Client) MintGatewayEnrollmentToken(gatewayId string) (MintGatewayEnrollmentTokenResponse, error) {
+	var body MintGatewayEnrollmentTokenResponse
+	response, err := client.Config.HttpClient.
+		R().
+		SetResult(&body).
+		SetHeader("User-Agent", USER_AGENT).
+		Post(fmt.Sprintf("api/v3/gateways/%s/token-auth/generate-enrollment-token", gatewayId))
+
+	if err != nil {
+		return MintGatewayEnrollmentTokenResponse{}, errors.NewGenericRequestError(operationMintGatewayEnrollmentToken, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return MintGatewayEnrollmentTokenResponse{}, ErrNotFound
+		}
+		return MintGatewayEnrollmentTokenResponse{}, errors.NewAPIErrorWithResponse(operationMintGatewayEnrollmentToken, response, nil)
+	}
+
+	return body, nil
 }
