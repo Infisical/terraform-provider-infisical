@@ -86,7 +86,7 @@ func TestStaticSecretsReadConstraintsFromPlanOnUpdate(t *testing.T) {
 	}
 }
 
-// previous_versions and unique_within_scope sit on value constraints and map to the API's
+// unique_across_last_versions and unique_within_scope sit on value constraints and map to the API's
 // uniqueAcrossLastVersions and uniqueWithinScope.
 func TestValueConstraintsFromObjectUniqueness(t *testing.T) {
 	ctx := context.Background()
@@ -152,13 +152,13 @@ func TestValueConstraintsToObject(t *testing.T) {
 	}
 
 	unset := readValueConstraints(infisical.SecretValidationRuleValueConstraints{})
-	if !unset.PreviousVersions.IsNull() || !unset.UniqueWithinScope.IsNull() {
-		t.Errorf("uniqueness settings = %v, %v, want both null when the API omits them", unset.PreviousVersions, unset.UniqueWithinScope)
+	if !unset.UniqueAcrossLastVersions.IsNull() || !unset.UniqueWithinScope.IsNull() {
+		t.Errorf("uniqueness settings = %v, %v, want both null when the API omits them", unset.UniqueAcrossLastVersions, unset.UniqueWithinScope)
 	}
 
 	model := readValueConstraints(infisical.SecretValidationRuleValueConstraints{UniqueAcrossLastVersions: int64Ptr(3)})
-	if got := model.PreviousVersions.ValueInt64(); got != 3 {
-		t.Errorf("previous_versions = %d, want 3", got)
+	if got := model.UniqueAcrossLastVersions.ValueInt64(); got != 3 {
+		t.Errorf("unique_across_last_versions = %d, want 3", got)
 	}
 	if !model.UniqueWithinScope.IsNull() {
 		t.Errorf("unique_within_scope = %v, want null", model.UniqueWithinScope)
@@ -274,15 +274,15 @@ func TestStaticSecretsRequiresKeyOrValueConstraints(t *testing.T) {
 	}
 }
 
-// previous_versions has to stay in the range the API allows. Omitting it, or setting only
+// unique_across_last_versions has to stay in the range the API allows. Omitting it, or setting only
 // unique_within_scope, is valid because both fields are optional on their own.
-func TestPreviousVersionsValidation(t *testing.T) {
+func TestUniqueAcrossLastVersionsValidation(t *testing.T) {
 	s := ruleSchema(t, ruleResources(t)["static_secrets"])
-	previousVersions := path.Root("constraints").AtName("value_constraints").AtName("previous_versions")
+	uniqueAcrossLastVersions := path.Root("constraints").AtName("value_constraints").AtName("unique_across_last_versions")
 
 	withUniqueness := func(previous types.Int64, uniqueWithinScope types.Bool) bool {
 		values := stringConstraintsValues(&infisical.SecretValidationRuleStringConstraints{})
-		values["previous_versions"] = previous
+		values["unique_across_last_versions"] = previous
 		values["unique_within_scope"] = uniqueWithinScope
 		value, diags := types.ObjectValue(valueConstraintsAttrTypes, values)
 		if diags.HasError() {
@@ -290,7 +290,7 @@ func TestPreviousVersionsValidation(t *testing.T) {
 		}
 
 		config := ruleConfig(t, s, ruleModel(staticSecretsConstraintsObject(t, types.ObjectNull(stringConstraintsAttrTypes), value)))
-		return validateInt64(t, s, config, previousVersions, previous)
+		return validateInt64(t, s, config, uniqueAcrossLastVersions, previous)
 	}
 
 	cases := map[string]struct {
@@ -309,7 +309,7 @@ func TestPreviousVersionsValidation(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			if got := withUniqueness(c.previous, c.uniqueWithinScope); got != c.wantError {
-				t.Errorf("previous_versions = %v, unique_within_scope = %v rejected = %v, want %v", c.previous, c.uniqueWithinScope, got, c.wantError)
+				t.Errorf("unique_across_last_versions = %v, unique_within_scope = %v rejected = %v, want %v", c.previous, c.uniqueWithinScope, got, c.wantError)
 			}
 		})
 	}

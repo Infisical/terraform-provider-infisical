@@ -36,6 +36,7 @@ resource "infisical_secret_validation_rule_dynamic_secrets" "dynamic-secrets" {
   name        = "dynamic-secrets-validation-rule-example"
   project_id  = "<project-id>"
   secret_path = "/**" # Supports glob patterns such as /apps/**
+  environment = "dev"
 
   constraints = {
     # A lease is only constrained when its provider is listed here

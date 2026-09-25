@@ -30,12 +30,10 @@ resource "infisical_secret_validation_rule_static_secrets" "static-secrets" {
     }
 
     value_constraints = {
-      min_length = 16
-      max_length = 128
-
-      reuse_prevention = {
-        previous_versions = 10
-      }
+      min_length                  = 16
+      max_length                  = 128
+      unique_across_last_versions = 10
+      unique_within_scope         = true
     }
   }
 }

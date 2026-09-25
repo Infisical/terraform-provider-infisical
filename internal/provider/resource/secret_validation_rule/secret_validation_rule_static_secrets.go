@@ -32,13 +32,13 @@ type staticSecretsConstraintsModel struct {
 // valueConstraintsModel is the shared string constraints plus the uniqueness settings only a stored
 // value can have. Those sit flat on the API's valueConstraints.
 type valueConstraintsModel struct {
-	MinLength         types.Int64  `tfsdk:"min_length"`
-	MaxLength         types.Int64  `tfsdk:"max_length"`
-	RegexPattern      types.String `tfsdk:"regex_pattern"`
-	RequiredPrefix    types.String `tfsdk:"required_prefix"`
-	RequiredSuffix    types.String `tfsdk:"required_suffix"`
-	PreviousVersions  types.Int64  `tfsdk:"previous_versions"`
-	UniqueWithinScope types.Bool   `tfsdk:"unique_within_scope"`
+	MinLength                types.Int64  `tfsdk:"min_length"`
+	MaxLength                types.Int64  `tfsdk:"max_length"`
+	RegexPattern             types.String `tfsdk:"regex_pattern"`
+	RequiredPrefix           types.String `tfsdk:"required_prefix"`
+	RequiredSuffix           types.String `tfsdk:"required_suffix"`
+	UniqueAcrossLastVersions types.Int64  `tfsdk:"unique_across_last_versions"`
+	UniqueWithinScope        types.Bool   `tfsdk:"unique_within_scope"`
 }
 
 // valueConstraintsAttrTypes mirrors valueConstraintsModel, extending the shared string constraints
@@ -46,7 +46,7 @@ type valueConstraintsModel struct {
 var valueConstraintsAttrTypes = func() map[string]attr.Type {
 	result := make(map[string]attr.Type, len(stringConstraintsAttrTypes)+2)
 	maps.Copy(result, stringConstraintsAttrTypes)
-	result["previous_versions"] = types.Int64Type
+	result["unique_across_last_versions"] = types.Int64Type
 	result["unique_within_scope"] = types.BoolType
 
 	return result
@@ -59,7 +59,7 @@ var staticSecretsConstraintsAttrTypes = map[string]attr.Type{
 
 func valueConstraintsAttributes() map[string]schema.Attribute {
 	attributes := stringConstraintsAttributes("secret value", secretConstraintsMaxLength, "")
-	attributes["previous_versions"] = schema.Int64Attribute{
+	attributes["unique_across_last_versions"] = schema.Int64Attribute{
 		Optional:    true,
 		Description: "How many of the secret's own previous versions the new value must differ from. Between 1 and 25. Omit to allow a value that repeats a previous version.",
 		Validators:  []validator.Int64{int64validator.Between(1, 25)},
@@ -190,7 +190,7 @@ func valueConstraintsFromObject(ctx context.Context, object types.Object) (*infi
 			RequiredPrefix: model.RequiredPrefix,
 			RequiredSuffix: model.RequiredSuffix,
 		}),
-		UniqueAcrossLastVersions: int64Pointer(model.PreviousVersions),
+		UniqueAcrossLastVersions: int64Pointer(model.UniqueAcrossLastVersions),
 		UniqueWithinScope:        boolPointer(model.UniqueWithinScope),
 	}
 
@@ -203,9 +203,7 @@ func valueConstraintsToObject(constraints *infisical.SecretValidationRuleValueCo
 	}
 
 	values := stringConstraintsValues(&constraints.SecretValidationRuleStringConstraints)
-	values["previous_versions"] = int64Value(constraints.UniqueAcrossLastVersions)
-	// false means the same as an absent flag, and the configuration can only omit it, so both read
-	// back as null.
+	values["unique_across_last_versions"] = int64Value(constraints.UniqueAcrossLastVersions)
 	uniqueWithinScope := types.BoolNull()
 	if constraints.UniqueWithinScope != nil && *constraints.UniqueWithinScope {
 		uniqueWithinScope = types.BoolValue(true)

@@ -54,7 +54,8 @@ var secretValidationRuleStringConstraintsAttrTypes = map[string]attr.Type{
 var secretValidationRuleValueConstraintsAttrTypes = func() map[string]attr.Type {
 	result := make(map[string]attr.Type, len(secretValidationRuleStringConstraintsAttrTypes)+2)
 	maps.Copy(result, secretValidationRuleStringConstraintsAttrTypes)
-	result["previous_versions"] = types.Int64Type
+	// these are outside because are not available in dynamic-secrets and secret-rotations rules
+	result["unique_across_last_versions"] = types.Int64Type
 	result["unique_within_scope"] = types.BoolType
 
 	return result
@@ -115,7 +116,7 @@ func stringConstraintsDataSourceAttributes(subject string) map[string]schema.Att
 
 func (d *SecretValidationRulesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	valueConstraintsAttributes := stringConstraintsDataSourceAttributes("secret value")
-	valueConstraintsAttributes["previous_versions"] = schema.Int64Attribute{
+	valueConstraintsAttributes["unique_across_last_versions"] = schema.Int64Attribute{
 		Computed:    true,
 		Description: "How many of the secret's own previous versions the new value must differ from. Null when the rule allows a value that repeats a previous version.",
 	}
@@ -375,7 +376,7 @@ func secretValidationRuleConstraintsObject(ctx context.Context, rule infisical.S
 	value := types.ObjectNull(secretValidationRuleValueConstraintsAttrTypes)
 	if rule.ValueConstraints != nil {
 		values := secretValidationRuleStringConstraintsValues(&rule.ValueConstraints.SecretValidationRuleStringConstraints)
-		values["previous_versions"] = secretValidationRuleInt64Value(rule.ValueConstraints.UniqueAcrossLastVersions)
+		values["unique_across_last_versions"] = secretValidationRuleInt64Value(rule.ValueConstraints.UniqueAcrossLastVersions)
 		values["unique_within_scope"] = secretValidationRuleFlagValue(rule.ValueConstraints.UniqueWithinScope)
 
 		valueObject, valueDiags := types.ObjectValue(secretValidationRuleValueConstraintsAttrTypes, values)

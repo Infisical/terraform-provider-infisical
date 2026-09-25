@@ -45,12 +45,10 @@ resource "infisical_secret_validation_rule_static_secrets" "static-secrets" {
     }
 
     value_constraints = {
-      min_length = 16
-      max_length = 128
-
-      reuse_prevention = {
-        previous_versions = 10
-      }
+      min_length                  = 16
+      max_length                  = 128
+      unique_across_last_versions = 10
+      unique_within_scope         = true
     }
   }
 }
@@ -103,10 +101,10 @@ Optional:
 
 - `max_length` (Number) The maximum number of characters the secret value may contain.
 - `min_length` (Number) The minimum number of characters the secret value must contain.
-- `previous_versions` (Number) How many of the secret's own previous versions the new value must differ from. Between 1 and 25. Omit to allow a value that repeats a previous version.
 - `regex_pattern` (String) A regular expression the secret value must match.
 - `required_prefix` (String) A string the secret value must start with.
 - `required_suffix` (String) A string the secret value must end with.
+- `unique_across_last_versions` (Number) How many of the secret's own previous versions the new value must differ from. Between 1 and 25. Omit to allow a value that repeats a previous version.
 - `unique_within_scope` (Boolean) Set to `true` to reject a value that another secret in the rule's scope already holds. Requires blind indexing on the project. Omit to allow a value another secret already holds.
 
 ## Import

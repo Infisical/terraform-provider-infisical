@@ -118,10 +118,10 @@ Read-Only:
 
 - `max_length` (Number) The maximum number of characters the secret value may contain.
 - `min_length` (Number) The minimum number of characters the secret value must contain.
-- `previous_versions` (Number) How many of the secret's own previous versions the new value must differ from. Null when the rule allows a value that repeats a previous version.
 - `regex_pattern` (String) A regular expression the secret value must match.
 - `required_prefix` (String) A string the secret value must start with.
 - `required_suffix` (String) A string the secret value must end with.
+- `unique_across_last_versions` (Number) How many of the secret's own previous versions the new value must differ from. Null when the rule allows a value that repeats a previous version.
 - `unique_within_scope` (Boolean) Whether the rule rejects a value that another secret in the rule's scope already holds. Null when the rule allows a value another secret already holds.
 
 

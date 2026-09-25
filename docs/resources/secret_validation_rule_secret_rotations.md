@@ -36,6 +36,7 @@ resource "infisical_secret_validation_rule_secret_rotations" "secret-rotations" 
   name        = "secret-rotations-validation-rule-example"
   project_id  = "<project-id>"
   secret_path = "/**" # Supports glob patterns such as /apps/**
+  environment = "dev"
 
   constraints = {
     # A rotation is only constrained when its provider is listed here
