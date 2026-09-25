@@ -4523,3 +4523,106 @@ type DeleteAlertResponse struct {
 		ID string `json:"id"`
 	} `json:"alert"`
 }
+
+type SecretValidationRuleEnvironment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type SecretValidationRuleStringConstraints struct {
+	MinLength      *int64  `json:"minLength,omitempty"`
+	MaxLength      *int64  `json:"maxLength,omitempty"`
+	RegexPattern   *string `json:"regexPattern,omitempty"`
+	RequiredPrefix *string `json:"requiredPrefix,omitempty"`
+	RequiredSuffix *string `json:"requiredSuffix,omitempty"`
+}
+
+type SecretValidationRuleValueConstraints struct {
+	SecretValidationRuleStringConstraints
+	UniqueAcrossLastVersions *int64 `json:"uniqueAcrossLastVersions,omitempty"`
+	UniqueWithinScope        *bool  `json:"uniqueWithinScope,omitempty"`
+}
+
+type SecretValidationRule struct {
+	ID          string                           `json:"id"`
+	Name        string                           `json:"name"`
+	Description *string                          `json:"description"`
+	ProjectID   string                           `json:"projectId"`
+	SecretPath  string                           `json:"secretPath"`
+	IsActive    *bool                            `json:"isActive"`
+	CreatedAt   string                           `json:"createdAt"`
+	UpdatedAt   string                           `json:"updatedAt"`
+	Environment *SecretValidationRuleEnvironment `json:"environment"`
+	Type        SecretValidationRuleType         `json:"type"`
+
+	KeyConstraints      *SecretValidationRuleStringConstraints `json:"keyConstraints,omitempty"`
+	ValueConstraints    *SecretValidationRuleValueConstraints  `json:"valueConstraints,omitempty"`
+	Providers           []string                               `json:"providers,omitempty"`
+	PasswordConstraints *SecretValidationRuleStringConstraints `json:"passwordConstraints,omitempty"`
+}
+
+type CreateSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType `json:"-"`
+
+	Name        string
+	ProjectID   string
+	SecretPath  string
+	Description *string
+	Environment *string
+	IsActive    bool
+
+	Constraints map[string]any
+}
+
+type CreateSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type GetSecretValidationRuleByIdRequest struct {
+	Type SecretValidationRuleType `json:"-"`
+	ID   string                   `json:"-"`
+}
+
+type GetSecretValidationRuleByIdResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type UpdateSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType `json:"-"`
+	ID   string                   `json:"-"`
+
+	Name        string
+	Description *string
+	Environment *string
+	SecretPath  string
+	IsActive    bool
+
+	Constraints map[string]any
+}
+
+type UpdateSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type DeleteSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType `json:"-"`
+	ID   string                   `json:"-"`
+}
+
+type DeleteSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type ListSecretValidationRulesRequest struct {
+	Type      SecretValidationRuleType `json:"-"`
+	ProjectID string                   `json:"-"`
+}
+
+type ListAllSecretValidationRulesRequest struct {
+	ProjectID string `json:"-"`
+}
+
+type ListSecretValidationRulesResponse struct {
+	SecretValidationRules []SecretValidationRule `json:"secretValidationRules"`
+}

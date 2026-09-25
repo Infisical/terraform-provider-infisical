@@ -46,6 +46,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Secret Rotations
         secret_rotation_*)
             update_subcategory "$file" "Secret Rotations";;
+
+        # Secret Validation Rules
+        secret_validation_rule_*)
+            update_subcategory "$file" "Secret Validation Rules";;
         
         # Dynamic Secrets
         dynamic_secret_*)
@@ -114,6 +118,10 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
         # Secrets
         secrets|secret_folders|secret_tag|secret_metadata)
             update_subcategory "$file" "Secrets";;
+
+        # Secret Validation Rules
+        secret_validation_rules)
+            update_subcategory "$file" "Secret Validation Rules";;
         
         # Groups
         groups)
