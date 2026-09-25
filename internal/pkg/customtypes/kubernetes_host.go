@@ -173,5 +173,12 @@ func NormalizeKubernetesHost(raw string) string {
 		return trimmed
 	}
 
-	return "https://" + strings.ToLower(parsed.Host)
+	// The API normalizes with WHATWG URL, which drops a port equal to the scheme default. Go
+	// keeps it, and an AKS kubeconfig carries https://host:443, so the two would never agree.
+	host := strings.ToLower(parsed.Host)
+	if parsed.Port() == "443" {
+		host = strings.TrimSuffix(host, ":443")
+	}
+
+	return "https://" + host
 }

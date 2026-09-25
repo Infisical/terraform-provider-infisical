@@ -140,3 +140,40 @@ func TestKeepUnsetStringPreservesNull(t *testing.T) {
 		t.Errorf("expected the API value, got %v", got)
 	}
 }
+
+// An empty response means "unset" only when our value was unset too. A value that was set and
+// came back empty was cleared outside Terraform and has to read as drift.
+func TestKeepUnsetSetReportsAnOutOfBandClear(t *testing.T) {
+	var diags diag.Diagnostics
+
+	populated, _ := types.SetValue(types.StringType, []attr.Value{types.StringValue("infisical")})
+	if got := keepUnsetSet("", populated, &diags); !got.IsNull() {
+		t.Errorf("a cleared allowlist should read as null, got %v", got)
+	}
+
+	empty, _ := types.SetValue(types.StringType, []attr.Value{})
+	if got := keepUnsetSet("", empty, &diags); got.IsNull() {
+		t.Error("an explicitly empty set should stay an empty set, got null")
+	}
+	if got := keepUnsetSet("", types.SetNull(types.StringType), &diags); !got.IsNull() {
+		t.Errorf("a null prior should stay null, got %v", got)
+	}
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestKeepUnsetStringReportsAnOutOfBandClear(t *testing.T) {
+	if got := keepUnsetString("", types.StringValue("my-audience")); !got.IsNull() {
+		t.Errorf("a cleared audience should read as null, got %v", got)
+	}
+	if got := keepUnsetString("", types.StringNull()); !got.IsNull() {
+		t.Errorf("a null prior should stay null, got %v", got)
+	}
+	if got := keepUnsetString("", types.StringValue("")); got.IsNull() {
+		t.Error("an explicitly empty string should stay empty, got null")
+	}
+	if got := keepUnsetString("aud", types.StringNull()); got.ValueString() != "aud" {
+		t.Errorf("expected the API value, got %v", got)
+	}
+}

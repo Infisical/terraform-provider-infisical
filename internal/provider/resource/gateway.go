@@ -155,6 +155,8 @@ func nullAuthBlocks(model *GatewayResourceModel) {
 	model.TokenAuth = types.ObjectNull(authBlockAttrTypes(gatewayTokenAuthSchema()))
 }
 
+const attrHasTokenReviewerJwt = "has_token_reviewer_jwt"
+
 type kubernetesHostValidator struct{}
 
 func (kubernetesHostValidator) Description(_ context.Context) string {
@@ -305,7 +307,7 @@ func gatewayKubernetesAuthSchema() schema.SingleNestedAttribute {
 				Description: "The audience the service account token must carry. Leave empty to skip the audience check.",
 				Optional:    true,
 			},
-			"has_token_reviewer_jwt": schema.BoolAttribute{
+			attrHasTokenReviewerJwt: schema.BoolAttribute{
 				Description: "Whether Infisical holds a token reviewer JWT for this gateway. The JWT itself is never returned, so this is the only way to tell a stored one apart from none.",
 				Computed:    true,
 			},
@@ -747,8 +749,23 @@ func gatewayAuthMethodChanged(ctx context.Context, req resource.UpdateRequest) (
 		if diags.HasError() {
 			return false, diags
 		}
-		if !planned.Equal(stored) {
+		if planned.IsNull() != stored.IsNull() || planned.IsUnknown() {
 			return true, diags
+		}
+		if planned.IsNull() {
+			continue
+		}
+
+		// Skipped because it is computed: it goes unknown on any change, and comparing it would
+		// resend the auth method on a rename, making Infisical redial the cluster for nothing.
+		storedAttrs := stored.Attributes()
+		for name, plannedValue := range planned.Attributes() {
+			if name == attrHasTokenReviewerJwt {
+				continue
+			}
+			if !plannedValue.Equal(storedAttrs[name]) {
+				return true, diags
+			}
 		}
 	}
 
@@ -982,18 +999,23 @@ func (r *GatewayResource) applyGatewayToModel(ctx context.Context, model *Gatewa
 	return diags
 }
 
-// An empty value from the API means unset. Overwriting a null config with "" or an empty set
-// produces "inconsistent result after apply", so the configured form of unset is kept.
+// The API returns "" for both a null and an empty value, so an empty response only means
+// "unset" when ours was unset too, and the configured form of unset is kept to avoid an
+// "inconsistent result after apply". A value that was set and came back empty was cleared
+// outside Terraform, and has to read as drift or nothing will ever put it back.
 func keepUnsetString(apiValue string, prior types.String) types.String {
-	if apiValue == "" {
-		return prior
+	if apiValue != "" {
+		return types.StringValue(apiValue)
 	}
-	return types.StringValue(apiValue)
+	if prior.IsUnknown() || prior.ValueString() != "" {
+		return types.StringNull()
+	}
+	return prior
 }
 
 func keepUnsetSet(csv string, prior types.Set, diags *diag.Diagnostics) types.Set {
 	if csv == "" {
-		if prior.IsNull() || prior.IsUnknown() {
+		if prior.IsNull() || prior.IsUnknown() || len(prior.Elements()) > 0 {
 			return types.SetNull(types.StringType)
 		}
 		return prior
