@@ -64,7 +64,7 @@ resource "infisical_audit_log_stream_sumo_logic" "siem" {
 
 Required:
 
-- `token` (String, Sensitive) The source authentication token, taken from the x-sumo-token header Sumo Logic displays for the source.
+- `token` (String, Sensitive) The source authentication token, taken from the x-sumo-token header Sumo Logic displays for the source. Applies that do not change it leave the stored token alone, so a rotation done in Infisical survives.
 - `url` (String) The HTTP Logs and Metrics Source base URL (e.g. https://endpoint4.collection.sumologic.com/receiver/v1/http).
 
 

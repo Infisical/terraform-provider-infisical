@@ -42,8 +42,12 @@ type credentialField struct {
 	Sensitive bool
 	// Optional fields are Optional+Computed: dropping one from the config keeps the stored
 	// value, matching the API, which leaves omitted credential fields untouched.
-	Optional   bool
-	Validators []validator.String
+	Optional bool
+	// MaskUnchanged sends the redaction sentinel in place of a value that has not changed, so an
+	// unrelated update cannot overwrite a secret rotated outside Terraform. Only set this where
+	// the API swaps the sentinel back for the stored value.
+	MaskUnchanged bool
+	Validators    []validator.String
 }
 
 // AuditLogStreamBaseResource implements every audit log stream provider. Providers differ only
@@ -195,7 +199,7 @@ func (r *AuditLogStreamBaseResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	credentials, diags := r.credentialsToAPI(plan.Credentials)
+	credentials, diags := r.credentialsToAPI(plan.Credentials, types.ObjectNull(r.credentialAttrTypes()))
 	resp.Diagnostics.Append(diags...)
 	filters, diags := auditLogStreamFiltersToAPI(ctx, plan.Filters)
 	resp.Diagnostics.Append(diags...)
@@ -261,7 +265,7 @@ func (r *AuditLogStreamBaseResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	credentials, diags := r.credentialsToAPI(plan.Credentials)
+	credentials, diags := r.credentialsToAPI(plan.Credentials, state.Credentials)
 	resp.Diagnostics.Append(diags...)
 	filters, diags := auditLogStreamFiltersToAPI(ctx, plan.Filters)
 	resp.Diagnostics.Append(diags...)
@@ -388,8 +392,8 @@ func (r *AuditLogStreamBaseResource) knownCredentials(current types.Object) type
 }
 
 // credentialsToAPI builds the request credentials, omitting fields with no configured value so
-// the API keeps whatever it already has.
-func (r *AuditLogStreamBaseResource) credentialsToAPI(credentials types.Object) (map[string]any, diag.Diagnostics) {
+// the API keeps whatever it already has. prior is the state being replaced, or null on create.
+func (r *AuditLogStreamBaseResource) credentialsToAPI(credentials, prior types.Object) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	result := make(map[string]any, len(r.CredentialFields))
 
@@ -398,11 +402,23 @@ func (r *AuditLogStreamBaseResource) credentialsToAPI(credentials types.Object) 
 		return nil, diags
 	}
 
+	priorAttributes := map[string]attr.Value{}
+	if !prior.IsNull() && !prior.IsUnknown() {
+		priorAttributes = prior.Attributes()
+	}
+
 	attributes := credentials.Attributes()
 	for _, field := range r.CredentialFields {
 		value := attributes[field.Name]
 		if value == nil || value.IsNull() || value.IsUnknown() {
 			continue
+		}
+
+		if field.MaskUnchanged {
+			if masked, ok := field.maskUnchanged(value, priorAttributes[field.Name]); ok {
+				result[field.JSONName] = masked
+				continue
+			}
 		}
 
 		converted, err := field.valueToAPI(value)
@@ -420,6 +436,43 @@ func (r *AuditLogStreamBaseResource) credentialsToAPI(credentials types.Object) 
 		return nil, diags
 	}
 	return result, diags
+}
+
+// maskUnchanged substitutes the redaction sentinel for values matching prior state. Header maps are
+// masked per key, so changing one header leaves the rest untouched. Reports false when there is no
+// usable prior value and the real one has to be sent.
+func (f credentialField) maskUnchanged(value, prior attr.Value) (any, bool) {
+	if prior == nil || prior.IsNull() || prior.IsUnknown() {
+		return nil, false
+	}
+
+	if f.Kind != credentialHeaderMap {
+		if !value.Equal(prior) {
+			return nil, false
+		}
+		return infisical.AuditLogStreamRedactedCredential, true
+	}
+
+	headers, ok := value.(types.Map)
+	priorHeaders, priorOk := prior.(types.Map)
+	if !ok || !priorOk {
+		return nil, false
+	}
+
+	priorElements := priorHeaders.Elements()
+	masked := make([]map[string]string, 0, len(headers.Elements()))
+	for key, element := range headers.Elements() {
+		header, ok := element.(types.String)
+		if !ok || header.IsNull() || header.IsUnknown() {
+			return nil, false
+		}
+		text := header.ValueString()
+		if priorValue, present := priorElements[key]; present && priorValue.Equal(element) {
+			text = infisical.AuditLogStreamRedactedCredential
+		}
+		masked = append(masked, map[string]string{"key": key, "value": text})
+	}
+	return masked, true
 }
 
 func (f credentialField) valueToAPI(value attr.Value) (any, error) {

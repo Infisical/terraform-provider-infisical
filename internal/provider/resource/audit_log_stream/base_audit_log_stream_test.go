@@ -242,17 +242,38 @@ func TestAuditLogStreamRejectsProviderMismatch(t *testing.T) {
 	}
 }
 
-func TestAuditLogStreamCustomHeadersRequest(t *testing.T) {
-	r := baseResource(t, NewAuditLogStreamCustomResource)
-	credentials, diags := r.credentialsToAPI(types.ObjectValueMust(map[string]attr.Type{
+// customCredentials builds a credentials object for the custom resource's schema.
+func customCredentials(url string, headers map[string]string) types.Object {
+	elements := make(map[string]attr.Value, len(headers))
+	for key, value := range headers {
+		elements[key] = types.StringValue(value)
+	}
+	return types.ObjectValueMust(map[string]attr.Type{
 		"url":     types.StringType,
 		"headers": types.MapType{ElemType: types.StringType},
 	}, map[string]attr.Value{
-		"url": types.StringValue("https://logs.example.com/ingest"),
-		"headers": types.MapValueMust(types.StringType, map[string]attr.Value{
-			"Authorization": types.StringValue("Bearer token"),
-		}),
-	}))
+		"url":     types.StringValue(url),
+		"headers": types.MapValueMust(types.StringType, elements),
+	})
+}
+
+// sumoLogicCredentials builds a credentials object for the Sumo Logic resource's schema.
+func sumoLogicCredentials(url, token string) types.Object {
+	return types.ObjectValueMust(map[string]attr.Type{
+		"url":   types.StringType,
+		"token": types.StringType,
+	}, map[string]attr.Value{
+		"url":   types.StringValue(url),
+		"token": types.StringValue(token),
+	})
+}
+
+func TestAuditLogStreamCustomHeadersRequest(t *testing.T) {
+	r := baseResource(t, NewAuditLogStreamCustomResource)
+	credentials, diags := r.credentialsToAPI(
+		customCredentials("https://logs.example.com/ingest", map[string]string{"Authorization": "Bearer token"}),
+		types.ObjectNull(r.credentialAttrTypes()),
+	)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -269,7 +290,10 @@ func TestAuditLogStreamCustomHeadersRequest(t *testing.T) {
 // Unset optional credentials are omitted so the API keeps the value it already holds.
 func TestAuditLogStreamOmitsUnsetCredentials(t *testing.T) {
 	r := baseResource(t, NewAuditLogStreamSplunkResource)
-	credentials, diags := r.credentialsToAPI(splunkCredentials("splunk.example.com", "hec-token", types.Int64Null()))
+	credentials, diags := r.credentialsToAPI(
+		splunkCredentials("splunk.example.com", "hec-token", types.Int64Null()),
+		types.ObjectNull(r.credentialAttrTypes()),
+	)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -380,5 +404,85 @@ func TestAuditLogStreamHeaderMapFromAPI(t *testing.T) {
 	}
 	if _, ok := field.valueFromAPI([]any{map[string]any{"key": "A"}}); ok {
 		t.Error("expected a header with no value to be rejected")
+	}
+}
+
+// An update that leaves a Sumo Logic token alone must not resend it, so a token rotated in
+// Infisical is not overwritten.
+func TestAuditLogStreamSumoLogicMasksUnchangedToken(t *testing.T) {
+	r := baseResource(t, NewAuditLogStreamSumoLogicResource)
+	state := sumoLogicCredentials("https://endpoint4.collection.sumologic.com/receiver/v1/http", "tok")
+
+	unchanged, diags := r.credentialsToAPI(state, state)
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	if unchanged["token"] != infisical.AuditLogStreamRedactedCredential {
+		t.Errorf("token = %#v, want the redaction sentinel", unchanged["token"])
+	}
+
+	// A deliberate rotation still has to reach the API.
+	rotated, diags := r.credentialsToAPI(sumoLogicCredentials("https://endpoint4.collection.sumologic.com/receiver/v1/http", "tok-2"), state)
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	if rotated["token"] != "tok-2" {
+		t.Errorf("token = %#v, want the new value", rotated["token"])
+	}
+
+	// On create there is no prior state, so the real token is sent.
+	created, diags := r.credentialsToAPI(state, types.ObjectNull(r.credentialAttrTypes()))
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	if created["token"] != "tok" {
+		t.Errorf("token = %#v, want the real value", created["token"])
+	}
+}
+
+// Custom headers are masked per key: changing one must not resend the others.
+func TestAuditLogStreamCustomMasksUnchangedHeaders(t *testing.T) {
+	r := baseResource(t, NewAuditLogStreamCustomResource)
+	state := customCredentials("https://logs.example.com/ingest", map[string]string{
+		"Authorization": "Bearer token",
+		"X-Tenant":      "acme",
+	})
+	plan := customCredentials("https://logs.example.com/ingest", map[string]string{
+		"Authorization": "Bearer token",
+		"X-Tenant":      "globex",
+	})
+
+	credentials, diags := r.credentialsToAPI(plan, state)
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+
+	headers, ok := credentials["headers"].([]map[string]string)
+	if !ok || len(headers) != 2 {
+		t.Fatalf("headers = %#v", credentials["headers"])
+	}
+	got := map[string]string{}
+	for _, header := range headers {
+		got[header["key"]] = header["value"]
+	}
+	if got["Authorization"] != infisical.AuditLogStreamRedactedCredential {
+		t.Errorf("Authorization = %q, want the redaction sentinel", got["Authorization"])
+	}
+	if got["X-Tenant"] != "globex" {
+		t.Errorf("X-Tenant = %q, want the new value", got["X-Tenant"])
+	}
+}
+
+// The providers whose API rejects the sentinel must keep sending the real secret.
+func TestAuditLogStreamSendsSecretWhereMaskUnsupported(t *testing.T) {
+	r := baseResource(t, NewAuditLogStreamSplunkResource)
+	state := splunkCredentials("splunk.example.com", "hec-token", types.Int64Value(443))
+
+	credentials, diags := r.credentialsToAPI(state, state)
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	if credentials["token"] != "hec-token" {
+		t.Errorf("token = %#v, want the real value", credentials["token"])
 	}
 }

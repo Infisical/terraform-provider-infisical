@@ -69,7 +69,7 @@ resource "infisical_audit_log_stream_custom" "better_stack" {
 
 Required:
 
-- `headers` (Map of String, Sensitive) Request headers to send, keyed by header name. Usually carries the destination's auth token.
+- `headers` (Map of String, Sensitive) Request headers to send, keyed by header name. Usually carries the destination's auth token. Applies leave unchanged header values alone, so a rotation done in Infisical survives.
 - `url` (String) The endpoint that receives batched audit logs as a JSON array. HTTPS is strongly recommended.
 
 

@@ -21,10 +21,11 @@ func NewAuditLogStreamSumoLogicResource() resource.Resource {
 				Validators:  []validator.String{infisicaltf.HttpsUrlValidator},
 			},
 			{
-				Name:        "token",
-				JSONName:    "token",
-				Sensitive:   true,
-				Description: "The source authentication token, taken from the x-sumo-token header Sumo Logic displays for the source.",
+				Name:          "token",
+				JSONName:      "token",
+				Sensitive:     true,
+				MaskUnchanged: true,
+				Description:   "The source authentication token, taken from the x-sumo-token header Sumo Logic displays for the source. Applies that do not change it leave the stored token alone, so a rotation done in Infisical survives.",
 			},
 		},
 	}

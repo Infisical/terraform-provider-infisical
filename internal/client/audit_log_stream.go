@@ -13,6 +13,10 @@ const (
 	operationDeleteAuditLogStream = "CallDeleteAuditLogStream"
 )
 
+// AuditLogStreamRedactedCredential is the sentinel the API substitutes for secrets it will not
+// disclose. Sent back on update, it means "keep the stored value".
+const AuditLogStreamRedactedCredential = "******"
+
 // Audit log stream providers. Each maps to its own API route segment.
 const (
 	AuditLogStreamProviderAzure     = "azure"
