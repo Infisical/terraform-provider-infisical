@@ -2,10 +2,8 @@ package validators
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
-	"regexp/syntax"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
@@ -33,14 +31,6 @@ func (v regexPatternValidator) ValidateString(_ context.Context, req validator.S
 
 	_, err := regexp.Compile(req.ConfigValue.ValueString())
 	if err == nil {
-		return
-	}
-
-	// Other RE2 implementations accept \C (any byte) and \cX (control character), which Go's
-	// regexp does not, so those escapes are not treated as errors.
-	var syntaxErr *syntax.Error
-	if errors.As(err, &syntaxErr) && syntaxErr.Code == syntax.ErrInvalidEscape &&
-		(syntaxErr.Expr == `\C` || syntaxErr.Expr == `\c`) {
 		return
 	}
 

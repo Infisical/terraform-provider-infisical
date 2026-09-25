@@ -122,10 +122,6 @@ func (client Client) UpdateSecretValidationRule(request UpdateSecretValidationRu
 		return SecretValidationRule{}, errors.NewGenericRequestError(operationUpdateSecretValidationRule, err)
 	}
 
-	if response.StatusCode() == http.StatusNotFound {
-		return SecretValidationRule{}, ErrNotFound
-	}
-
 	if response.IsError() {
 		return SecretValidationRule{}, errors.NewAPIErrorWithResponse(operationUpdateSecretValidationRule, response, nil)
 	}

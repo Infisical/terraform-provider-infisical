@@ -1,8 +1,11 @@
 package datasource
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -55,9 +58,7 @@ var secretValidationRuleReusePreventionAttrTypes = map[string]attr.Type{
 
 var secretValidationRuleValueConstraintsAttrTypes = func() map[string]attr.Type {
 	result := make(map[string]attr.Type, len(secretValidationRuleStringConstraintsAttrTypes)+1)
-	for name, attrType := range secretValidationRuleStringConstraintsAttrTypes {
-		result[name] = attrType
-	}
+	maps.Copy(result, secretValidationRuleStringConstraintsAttrTypes)
 	result["reuse_prevention"] = types.ObjectType{AttrTypes: secretValidationRuleReusePreventionAttrTypes}
 
 	return result
@@ -299,6 +300,11 @@ func (d *SecretValidationRulesDataSource) Read(ctx context.Context, req datasour
 		)
 		return
 	}
+
+	// Sort by ID so the list is stable when the API returns rules in a different order.
+	slices.SortFunc(rules, func(a, b infisical.SecretValidationRule) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
 
 	elements := make([]attr.Value, 0, len(rules))
 	for _, rule := range rules {
