@@ -2148,7 +2148,7 @@ type CreateSecretApprovalPolicyRequest struct {
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
-	BypassForMachineIDs  bool                                 `json:"bypassForMachineIdentities"`
+	BypassForMachineIDs  *bool                                `json:"bypassForMachineIdentities,omitempty"`
 }
 
 type CreateSecretApprovalPolicyResponse struct {
@@ -2185,7 +2185,7 @@ type UpdateSecretApprovalPolicyRequest struct {
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
-	BypassForMachineIDs  bool                                 `json:"bypassForMachineIdentities"`
+	BypassForMachineIDs  *bool                                `json:"bypassForMachineIdentities,omitempty"`
 	Environments         []string                             `json:"environments"`
 }
 
