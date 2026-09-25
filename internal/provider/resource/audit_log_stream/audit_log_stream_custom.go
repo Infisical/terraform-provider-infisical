@@ -2,8 +2,10 @@ package resource
 
 import (
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
 func NewAuditLogStreamCustomResource() resource.Resource {
@@ -13,9 +15,11 @@ func NewAuditLogStreamCustomResource() resource.Resource {
 		ResourceTypeName: "_audit_log_stream_custom",
 		CredentialFields: []credentialField{
 			{
-				Name:        "url",
-				JSONName:    "url",
-				Description: "The endpoint that receives batched audit logs as a JSON array. HTTPS is strongly recommended.",
+				Name:     "url",
+				JSONName: "url",
+				Description: "The endpoint that receives batched audit logs as a JSON array. http is accepted for collectors on a " +
+					"trusted private network, but sends audit events and the headers below in the clear and warns at plan time; prefer https.",
+				Validators: []validator.String{infisicaltf.HttpsPreferredUrlValidator},
 			},
 			{
 				Name:          "headers",
