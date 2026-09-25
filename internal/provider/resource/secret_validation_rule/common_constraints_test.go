@@ -134,6 +134,42 @@ func TestMaxLengthAtLeastMinLength(t *testing.T) {
 	}
 }
 
+func TestEmptyPasswordConstraintsRejected(t *testing.T) {
+	resources := ruleResources(t)
+	passwordPath := path.Root("constraints").AtName("password_constraints")
+
+	for _, name := range []string{"dynamic_secrets", "secret_rotations"} {
+		t.Run(name, func(t *testing.T) {
+			s := ruleSchema(t, resources[name])
+
+			attribute, ok := ruleAttribute(t, s, passwordPath).(schema.SingleNestedAttribute)
+			if !ok {
+				t.Fatal("password_constraints is not a single nested attribute")
+			}
+
+			rejected := func(password types.Object) bool {
+				resp := &validator.ObjectResponse{}
+				for _, v := range attribute.Validators {
+					v.ValidateObject(context.Background(), validator.ObjectRequest{
+						Path:           passwordPath,
+						PathExpression: passwordPath.Expression(),
+						ConfigValue:    password,
+						Config:         tfsdk.Config{Schema: s},
+					}, resp)
+				}
+				return resp.Diagnostics.HasError()
+			}
+
+			if !rejected(stringConstraintsObject(t, infisical.SecretValidationRuleStringConstraints{})) {
+				t.Error("an empty password_constraints block passed validation, want it rejected")
+			}
+			if rejected(stringConstraintsObject(t, infisical.SecretValidationRuleStringConstraints{MaxLength: int64Ptr(64)})) {
+				t.Error("a password_constraints block with max_length was rejected, want it accepted")
+			}
+		})
+	}
+}
+
 // The API runs the pattern with RE2, so a pattern Go cannot compile is one Infisical rejects too.
 func TestRegexPatternValidation(t *testing.T) {
 	s := ruleSchema(t, ruleResources(t)["static_secrets"])

@@ -146,6 +146,8 @@ func providerConstraintsAttributes(subject string, providers []string) map[strin
 			Required:    true,
 			Description: "Constraints the generated password must satisfy. These replace any password requirements configured on the resource itself.",
 			Attributes:  stringConstraintsAttributes("generated password", passwordConstraintsMaxLength, passwordRegexNote),
+			// Every field inside is optional, but the API rejects a rule that sets none of them.
+			Validators: []validator.Object{validators.ObjectAtLeastOneAttributeSet()},
 		},
 	}
 }
