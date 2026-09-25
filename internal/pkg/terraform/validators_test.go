@@ -20,6 +20,8 @@ func TestHttpsPreferredUrlValidator(t *testing.T) {
 		{name: "http warns", url: types.StringValue("http://collector.internal:8080/logs"), wantWarning: true},
 		{name: "other schemes are rejected", url: types.StringValue("ftp://logs.example.com"), wantError: true},
 		{name: "no host is rejected", url: types.StringValue("https://"), wantError: true},
+		{name: "https port-only authority is rejected", url: types.StringValue("https://:443"), wantError: true},
+		{name: "http port-only authority is rejected", url: types.StringValue("http://:8080"), wantError: true},
 		{name: "not a url is rejected", url: types.StringValue("logs.example.com"), wantError: true},
 		{name: "null is left to the schema", url: types.StringNull()},
 		{name: "unknown is left to the schema", url: types.StringUnknown()},

@@ -46,7 +46,7 @@ func (v httpsPreferredUrlValidator) ValidateString(_ context.Context, req valida
 
 	value := req.ConfigValue.ValueString()
 	parsed, err := url.Parse(value)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		resp.Diagnostics.AddAttributeError(
 			req.Path,
 			"Invalid URL",
