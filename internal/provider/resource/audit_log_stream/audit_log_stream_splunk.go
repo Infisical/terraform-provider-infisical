@@ -28,7 +28,7 @@ func NewAuditLogStreamSplunkResource() resource.Resource {
 				Name:        "token",
 				JSONName:    "token",
 				Sensitive:   true,
-				Description: "The HTTP Event Collector token. Must be a UUID.",
+				Description: "The HTTP Event Collector token. Must be a UUID. The API requires it on every update, so a token rotated outside Terraform must be mirrored here or the next apply reverts it.",
 			},
 		},
 	}

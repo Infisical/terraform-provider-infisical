@@ -63,7 +63,7 @@ resource "infisical_audit_log_stream_datadog" "observability" {
 
 Required:
 
-- `token` (String, Sensitive) The Datadog API key. Must be 32 hexadecimal characters.
+- `token` (String, Sensitive) The Datadog API key. Must be 32 hexadecimal characters. The API requires it on every update, so a key rotated outside Terraform must be mirrored here or the next apply reverts it.
 - `url` (String) The Datadog log intake URL for your site (e.g. https://http-intake.logs.datadoghq.com/api/v2/logs).
 
 

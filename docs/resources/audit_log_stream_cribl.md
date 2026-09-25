@@ -61,7 +61,7 @@ resource "infisical_audit_log_stream_cribl" "pipeline" {
 
 Required:
 
-- `token` (String, Sensitive) The Cribl Stream HTTP source token.
+- `token` (String, Sensitive) The Cribl Stream HTTP source token. The API requires it on every update, so a token rotated outside Terraform must be mirrored here or the next apply reverts it.
 - `url` (String) The Cribl Stream HTTP source URL.
 
 

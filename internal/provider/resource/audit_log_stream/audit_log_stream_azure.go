@@ -28,7 +28,7 @@ func NewAuditLogStreamAzureResource() resource.Resource {
 				Name:        "client_secret",
 				JSONName:    "clientSecret",
 				Sensitive:   true,
-				Description: "The Entra ID application client secret. Must be 40 characters.",
+				Description: "The Entra ID application client secret. Must be 40 characters. The API requires it on every update, so a secret rotated outside Terraform must be mirrored here or the next apply reverts it.",
 			},
 			{
 				Name:        "dce_url",

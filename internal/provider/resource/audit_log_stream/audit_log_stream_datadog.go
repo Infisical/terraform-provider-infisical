@@ -24,7 +24,7 @@ func NewAuditLogStreamDatadogResource() resource.Resource {
 				Name:        "token",
 				JSONName:    "token",
 				Sensitive:   true,
-				Description: "The Datadog API key. Must be 32 hexadecimal characters.",
+				Description: "The Datadog API key. Must be 32 hexadecimal characters. The API requires it on every update, so a key rotated outside Terraform must be mirrored here or the next apply reverts it.",
 			},
 		},
 	}

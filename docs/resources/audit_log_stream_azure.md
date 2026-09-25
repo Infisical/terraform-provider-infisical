@@ -69,7 +69,7 @@ resource "infisical_audit_log_stream_azure" "sentinel" {
 Required:
 
 - `client_id` (String) The Entra ID application (client) ID.
-- `client_secret` (String, Sensitive) The Entra ID application client secret. Must be 40 characters.
+- `client_secret` (String, Sensitive) The Entra ID application client secret. Must be 40 characters. The API requires it on every update, so a secret rotated outside Terraform must be mirrored here or the next apply reverts it.
 - `clt_name` (String) The custom log table name to write to.
 - `dce_url` (String) The Data Collection Endpoint URL.
 - `dcr_id` (String) The Data Collection Rule immutable ID, in dcr-<32 hex characters> format.

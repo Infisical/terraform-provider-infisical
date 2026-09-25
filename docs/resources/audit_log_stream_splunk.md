@@ -80,7 +80,7 @@ resource "infisical_audit_log_stream_splunk" "secrets_only" {
 Required:
 
 - `hostname` (String) The HTTP Event Collector hostname, without protocol, port or path (e.g. http-inputs-acme.splunkcloud.com).
-- `token` (String, Sensitive) The HTTP Event Collector token. Must be a UUID.
+- `token` (String, Sensitive) The HTTP Event Collector token. Must be a UUID. The API requires it on every update, so a token rotated outside Terraform must be mirrored here or the next apply reverts it.
 
 Optional:
 
