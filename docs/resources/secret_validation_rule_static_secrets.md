@@ -45,12 +45,9 @@ resource "infisical_secret_validation_rule_static_secrets" "static-secrets" {
     }
 
     value_constraints = {
-      min_length = 16
-      max_length = 128
-
-      reuse_prevention = {
-        previous_versions = 10
-      }
+      min_length        = 16
+      max_length        = 128
+      previous_versions = 10
     }
   }
 }
@@ -103,18 +100,11 @@ Optional:
 
 - `max_length` (Number) The maximum number of characters the secret value may contain.
 - `min_length` (Number) The minimum number of characters the secret value must contain.
+- `previous_versions` (Number) How many of the secret's own previous versions the new value must differ from. Between 1 and 25. Omit to allow a value that repeats a previous version.
 - `regex_pattern` (String) A regular expression the secret value must match.
 - `required_prefix` (String) A string the secret value must start with.
 - `required_suffix` (String) A string the secret value must end with.
-- `reuse_prevention` (Attributes) Rejects a value for repeating one already in use. Omit to allow any value the other constraints accept. (see [below for nested schema](#nestedatt--constraints--value_constraints--reuse_prevention))
-
-<a id="nestedatt--constraints--value_constraints--reuse_prevention"></a>
-### Nested Schema for `constraints.value_constraints.reuse_prevention`
-
-Optional:
-
-- `previous_versions` (Number) How many of the secret's own previous versions the new value must differ from. Between 1 and 25.
-- `unique_within_scope` (Boolean) Set to `true` to reject a value that another secret in the rule's scope already holds. Requires blind indexing on the project.
+- `unique_within_scope` (Boolean) Set to `true` to reject a value that another secret in the rule's scope already holds. Requires blind indexing on the project. Omit to allow a value another secret already holds.
 
 ## Import
 

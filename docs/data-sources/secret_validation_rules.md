@@ -118,19 +118,11 @@ Read-Only:
 
 - `max_length` (Number) The maximum number of characters the secret value may contain.
 - `min_length` (Number) The minimum number of characters the secret value must contain.
+- `previous_versions` (Number) How many of the secret's own previous versions the new value must differ from. Null when the rule allows a value that repeats a previous version.
 - `regex_pattern` (String) A regular expression the secret value must match.
 - `required_prefix` (String) A string the secret value must start with.
 - `required_suffix` (String) A string the secret value must end with.
-- `reuse_prevention` (Attributes) How the rule rejects a value for repeating one already in use. Null when the rule allows reuse. (see [below for nested schema](#nestedatt--rules--constraints--value_constraints--reuse_prevention))
-
-<a id="nestedatt--rules--constraints--value_constraints--reuse_prevention"></a>
-### Nested Schema for `rules.constraints.value_constraints.reuse_prevention`
-
-Read-Only:
-
-- `previous_versions` (Number) How many of the secret's own previous versions the new value must differ from.
-- `unique_within_scope` (Boolean) Whether the rule rejects a value that another secret in the rule's scope already holds.
-
+- `unique_within_scope` (Boolean) Whether the rule rejects a value that another secret in the rule's scope already holds. Null when the rule allows a value another secret already holds.
 
 
 

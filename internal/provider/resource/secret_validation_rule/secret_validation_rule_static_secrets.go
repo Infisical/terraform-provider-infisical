@@ -5,6 +5,7 @@ import (
 	"maps"
 
 	infisical "terraform-provider-infisical/internal/client"
+	"terraform-provider-infisical/internal/pkg/validators"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
@@ -66,6 +67,8 @@ func valueConstraintsAttributes() map[string]schema.Attribute {
 	attributes["unique_within_scope"] = schema.BoolAttribute{
 		Optional:    true,
 		Description: "Set to `true` to reject a value that another secret in the rule's scope already holds. Requires blind indexing on the project. Omit to allow a value another secret already holds.",
+		// false means the same as omitting it and reads back as null, so it would diff on every plan.
+		Validators: []validator.Bool{validators.BoolTrueOrNull()},
 	}
 
 	return attributes
@@ -201,7 +204,13 @@ func valueConstraintsToObject(constraints *infisical.SecretValidationRuleValueCo
 
 	values := stringConstraintsValues(&constraints.SecretValidationRuleStringConstraints)
 	values["previous_versions"] = int64Value(constraints.UniqueAcrossLastVersions)
-	values["unique_within_scope"] = boolValue(constraints.UniqueWithinScope)
+	// false means the same as an absent flag, and the configuration can only omit it, so both read
+	// back as null.
+	uniqueWithinScope := types.BoolNull()
+	if constraints.UniqueWithinScope != nil && *constraints.UniqueWithinScope {
+		uniqueWithinScope = types.BoolValue(true)
+	}
+	values["unique_within_scope"] = uniqueWithinScope
 
 	return types.ObjectValue(valueConstraintsAttrTypes, values)
 }

@@ -351,7 +351,7 @@ func secretValidationRuleObject(ctx context.Context, rule infisical.SecretValida
 	object, objectDiags := types.ObjectValue(secretValidationRuleAttrTypes, map[string]attr.Value{
 		"id":          types.StringValue(rule.ID),
 		"name":        types.StringValue(rule.Name),
-		"description": secretValidationRuleStringValue(rule.Description),
+		"description": secretValidationRuleDescriptionValue(rule.Description),
 		"project_id":  types.StringValue(rule.ProjectID),
 		"secret_path": types.StringValue(rule.SecretPath),
 		"is_active":   types.BoolValue(isActive),
@@ -376,7 +376,7 @@ func secretValidationRuleConstraintsObject(ctx context.Context, rule infisical.S
 	if rule.ValueConstraints != nil {
 		values := secretValidationRuleStringConstraintsValues(&rule.ValueConstraints.SecretValidationRuleStringConstraints)
 		values["previous_versions"] = secretValidationRuleInt64Value(rule.ValueConstraints.UniqueAcrossLastVersions)
-		values["unique_within_scope"] = secretValidationRuleBoolValue(rule.ValueConstraints.UniqueWithinScope)
+		values["unique_within_scope"] = secretValidationRuleFlagValue(rule.ValueConstraints.UniqueWithinScope)
 
 		valueObject, valueDiags := types.ObjectValue(secretValidationRuleValueConstraintsAttrTypes, values)
 		diags.Append(valueDiags...)
@@ -434,12 +434,20 @@ func secretValidationRuleInt64Value(value *int64) types.Int64 {
 	return types.Int64Value(*value)
 }
 
-func secretValidationRuleBoolValue(value *bool) types.Bool {
-	if value == nil {
+func secretValidationRuleFlagValue(value *bool) types.Bool {
+	if value == nil || !*value {
 		return types.BoolNull()
 	}
 
-	return types.BoolValue(*value)
+	return types.BoolValue(true)
+}
+
+func secretValidationRuleDescriptionValue(value *string) types.String {
+	if value == nil || *value == "" {
+		return types.StringNull()
+	}
+
+	return types.StringValue(*value)
 }
 
 func secretValidationRuleStringValue(value *string) types.String {

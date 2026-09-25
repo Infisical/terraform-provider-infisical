@@ -343,7 +343,7 @@ func TestPointerHelpers(t *testing.T) {
 		t.Errorf("boolPointer(false) = %v, want a pointer to false", got)
 	}
 
-	if !int64Value(nil).IsNull() || !stringValue(nil).IsNull() || !boolValue(nil).IsNull() {
+	if !int64Value(nil).IsNull() || !stringValue(nil).IsNull() {
 		t.Error("a nil pointer did not read back as null")
 	}
 	if got := int64Value(int64Ptr(5)); got.ValueInt64() != 5 {
@@ -351,8 +351,5 @@ func TestPointerHelpers(t *testing.T) {
 	}
 	if got := stringValue(stringPtr("APP_")); got.ValueString() != "APP_" {
 		t.Errorf("stringValue(APP_) = %v, want APP_", got)
-	}
-	if got := boolValue(boolPtr(false)); got.IsNull() || got.ValueBool() {
-		t.Errorf("boolValue(false) = %v, want false", got)
 	}
 }

@@ -165,6 +165,32 @@ func TestValueConstraintsToObject(t *testing.T) {
 	}
 }
 
+// The configuration can only turn unique_within_scope on or leave it out, so a false the API stores,
+// for a rule made outside Terraform, has to read back as null. Otherwise the rule could never be
+// brought into line with any configuration after an import.
+func TestValueConstraintsToObjectReadsFalseAsNull(t *testing.T) {
+	cases := map[string]struct {
+		uniqueWithinScope *bool
+		want              types.Bool
+	}{
+		"false": {uniqueWithinScope: boolPtr(false), want: types.BoolNull()},
+		"true":  {uniqueWithinScope: boolPtr(true), want: types.BoolValue(true)},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			var model valueConstraintsModel
+			object := valueConstraintsObject(t, &infisical.SecretValidationRuleValueConstraints{UniqueWithinScope: c.uniqueWithinScope})
+			if diags := object.As(context.Background(), &model, basetypes.ObjectAsOptions{}); diags.HasError() {
+				t.Fatalf("reading the value constraints: %v", diags)
+			}
+			if !model.UniqueWithinScope.Equal(c.want) {
+				t.Errorf("unique_within_scope = %v, want %v", model.UniqueWithinScope, c.want)
+			}
+		})
+	}
+}
+
 // Reading a rule back and planning it again has to send the same payload, or every plan after an
 // import would propose an update.
 func TestStaticSecretsConstraintsRoundTrip(t *testing.T) {
@@ -274,7 +300,7 @@ func TestPreviousVersionsValidation(t *testing.T) {
 	}{
 		"previous versions only":   {previous: types.Int64Value(5), uniqueWithinScope: types.BoolNull()},
 		"unique within scope only": {previous: types.Int64Null(), uniqueWithinScope: types.BoolValue(true)},
-		"both":                     {previous: types.Int64Value(25), uniqueWithinScope: types.BoolValue(false)},
+		"both":                     {previous: types.Int64Value(25), uniqueWithinScope: types.BoolValue(true)},
 		"neither":                  {previous: types.Int64Null(), uniqueWithinScope: types.BoolNull()},
 		"zero previous versions":   {previous: types.Int64Value(0), uniqueWithinScope: types.BoolNull(), wantError: true},
 		"too many versions":        {previous: types.Int64Value(26), uniqueWithinScope: types.BoolNull(), wantError: true},
@@ -284,6 +310,43 @@ func TestPreviousVersionsValidation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := withUniqueness(c.previous, c.uniqueWithinScope); got != c.wantError {
 				t.Errorf("previous_versions = %v, unique_within_scope = %v rejected = %v, want %v", c.previous, c.uniqueWithinScope, got, c.wantError)
+			}
+		})
+	}
+}
+
+// false means the same as leaving unique_within_scope out and reads back as null, so a configured
+// false would diff on every plan and is rejected in favor of omitting it.
+func TestUniqueWithinScopeValidation(t *testing.T) {
+	s := ruleSchema(t, ruleResources(t)["static_secrets"])
+	uniqueWithinScope := path.Root("constraints").AtName("value_constraints").AtName("unique_within_scope")
+
+	attribute, ok := ruleAttribute(t, s, uniqueWithinScope).(schema.BoolAttribute)
+	if !ok {
+		t.Fatal("unique_within_scope is not a bool attribute")
+	}
+
+	cases := map[string]struct {
+		value     types.Bool
+		wantError bool
+	}{
+		"true":  {value: types.BoolValue(true)},
+		"null":  {value: types.BoolNull()},
+		"false": {value: types.BoolValue(false), wantError: true},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			resp := &validator.BoolResponse{}
+			for _, v := range attribute.Validators {
+				v.ValidateBool(context.Background(), validator.BoolRequest{
+					Path:           uniqueWithinScope,
+					PathExpression: uniqueWithinScope.Expression(),
+					ConfigValue:    c.value,
+				}, resp)
+			}
+			if got := resp.Diagnostics.HasError(); got != c.wantError {
+				t.Errorf("unique_within_scope = %v rejected = %v, want %v", c.value, got, c.wantError)
 			}
 		})
 	}

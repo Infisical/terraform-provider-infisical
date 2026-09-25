@@ -249,14 +249,6 @@ func boolPointer(value types.Bool) *bool {
 	return &result
 }
 
-func boolValue(value *bool) types.Bool {
-	if value == nil {
-		return types.BoolNull()
-	}
-
-	return types.BoolValue(*value)
-}
-
 func int64Value(value *int64) types.Int64 {
 	if value == nil {
 		return types.Int64Null()
