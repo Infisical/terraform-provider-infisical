@@ -50,7 +50,10 @@ func readGroups(t *testing.T, client *infisical.Client) datasource.ReadResponse 
 	}
 	s := schemaResp.Schema
 
-	objType := s.Type().TerraformType(ctx).(tftypes.Object)
+	objType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatalf("expected the schema to be an object type, got %T", s.Type().TerraformType(ctx))
+	}
 	config := tfsdk.Config{
 		Schema: s,
 		Raw: tftypes.NewValue(objType, map[string]tftypes.Value{
