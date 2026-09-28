@@ -54,6 +54,11 @@ if [ -d "$SOURCE_DIR/secret_approval_policy_resource" ]; then
   cp -f "$SOURCE_DIR/secret_approval_policy_resource/resource.tf" "$EXAMPLES_DIR/infisical_secret_approval_policy/"
 fi
 
+if [ -d "$SOURCE_DIR/secret_folder_resource" ]; then
+  echo "Replacing secret_folder_resource"
+  cp -f "$SOURCE_DIR/secret_folder_resource/project_secret_folder.go" "$DESTINATION_DIR/"
+  cp -f "$SOURCE_DIR/secret_folder_resource/resource.tf" "$EXAMPLES_DIR/infisical_secret_folder/infisical_secret_folder.tf"
+fi
 
 for item in "$DESTINATION_DIR/secret_sync"/* "$SOURCE_DIR/secret_sync"/*/; do
   # Skip if doesn't exist
