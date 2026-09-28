@@ -3,11 +3,8 @@ package resource
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -128,7 +125,6 @@ func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	// Retrieve values from plan
 	var plan projectSecretFolderResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -162,7 +158,6 @@ func (r *projectSecretFolderResource) Create(ctx context.Context, req resource.C
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -175,7 +170,6 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Get current state
 	var state projectSecretFolderResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -188,7 +182,6 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Get the latest data from the API
 	secretFolder, err := r.client.GetSecretFolderByID(infisical.GetSecretFolderByIDRequest{
 		ID: state.ID.ValueString(),
 	})
@@ -227,7 +220,6 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	// Retrieve values from plan
 	var plan projectSecretFolderResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -272,7 +264,6 @@ func (r *projectSecretFolderResource) Update(ctx context.Context, req resource.U
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to delete secret folder",
@@ -303,51 +294,4 @@ func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.D
 		)
 		return
 	}
-
-}
-
-func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-
-	// secret_folder_id
-
-	folder, err := r.client.GetSecretFolderByID(infisical.GetSecretFolderByIDRequest{
-		ID: req.ID,
-	})
-
-	if err != nil {
-		if err == infisical.ErrNotFound {
-			resp.Diagnostics.AddError(
-				"Secrets folder not found",
-				"The secrets folder with the given ID was not found",
-			)
-		} else {
-			resp.Diagnostics.AddError(
-				"Error fetching secrets folder",
-				"Couldn't fetch secrets folder from Infisical, unexpected error: "+err.Error(),
-			)
-		}
-		return
-	}
-
-	// At the moment, the folder path returned by GetByID includes the folder being queried.
-	// We want to be consistent with the create conventions, so we remove the last part
-	parentFolderPath := filepath.Dir(folder.Folder.Path)
-
-	// Remove leading and trailing slashes.
-	trimmedPath := strings.Trim(folder.Folder.Path, "/")
-	var name string
-
-	if trimmedPath != "" {
-		// Split the path and get the last element as the name.
-		pathParts := strings.Split(trimmedPath, "/")
-		name = pathParts[len(pathParts)-1]
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("folder_path"), parentFolderPath)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), folder.Folder.ID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_slug"), folder.Folder.Environment.EnvSlug)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), folder.Folder.ProjectID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("path"), folder.Folder.Path)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), folder.Folder.Description)...)
 }
