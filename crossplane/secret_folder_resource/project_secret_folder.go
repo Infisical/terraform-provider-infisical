@@ -201,6 +201,7 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 		}
 	}
 
+	state.Name = types.StringValue(secretFolder.Folder.Name)
 	state.EnvironmentID = types.StringValue(secretFolder.Folder.EnvID)
 	state.Path = types.StringValue(secretFolder.Folder.Path)
 	state.Description = types.StringValue(secretFolder.Folder.Description)
