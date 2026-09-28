@@ -183,6 +183,11 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Get the latest data from the API
 	secretFolder, err := r.client.GetSecretFolderByID(infisical.GetSecretFolderByIDRequest{
 		ID: state.ID.ValueString(),
