@@ -291,7 +291,7 @@ func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.D
 		ForceDelete: state.ForceDelete.ValueBool(),
 	})
 
-	if err != nil {
+	if err != nil && err != infisical.ErrNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting secret folder",
 			"Couldn't delete secret folder from Infisical, unexpected error: "+err.Error(),

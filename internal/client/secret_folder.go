@@ -119,6 +119,10 @@ func (client Client) DeleteSecretFolder(request DeleteSecretFolderRequest) (Dele
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return DeleteSecretFolderResponse{}, ErrNotFound
+		}
+
 		return DeleteSecretFolderResponse{}, errors.NewAPIErrorWithResponse(operationDeleteSecretFolder, response, nil)
 	}
 
