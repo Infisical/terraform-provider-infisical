@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -50,6 +49,7 @@ type IdentityKubernetesAuthResourceModel struct {
 
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	TokenReviewerMode types.String `tfsdk:"token_reviewer_mode"` // api|gateway (default is api)
+	TemplateID        types.String `tfsdk:"template_id"`
 }
 
 type IdentityKubernetesAuthResourceTrustedIps struct {
@@ -91,18 +91,36 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				Optional:            true,
 			},
 
+			// Computed so a linked template can supply it.
 			"gateway_id": schema.StringAttribute{
-				Optional:    true,
-				Description: "Select a gateway for private cluster access. If not specified, the Internet Gateway will be used.",
+				Optional:      true,
+				Computed:      true,
+				Description:   "Select a gateway for private cluster access. If not specified, the Internet Gateway will be used.",
+				PlanModifiers: []planmodifier.String{nullUnlessTemplateLinked{}},
 			},
 			"token_reviewer_mode": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Choose between Token ('api') or 'gateway' authentication. If using Gateway, the Gateway must be deployed in your Kubernetes cluster.",
+				Description: "Choose between Token ('api') or 'gateway' authentication. If using Gateway, the Gateway must be deployed in your Kubernetes cluster. Defaults to `api`, or to the linked template's mode when `template_id` is set.",
 				Validators: []validator.String{
 					stringvalidator.OneOf(TOKEN_REVIEWER_MODE_API, TOKEN_REVIEWER_MODE_GATEWAY),
 				},
-				Default: stringdefault.StaticString(TOKEN_REVIEWER_MODE_API),
+				// A static default would fight the mode a linked template supplies.
+				PlanModifiers: []planmodifier.String{defaultUnlessTemplateLinked{value: TOKEN_REVIEWER_MODE_API}},
+			},
+			"template_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt`, `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead.",
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(
+						path.MatchRoot("kubernetes_host"),
+						path.MatchRoot("kubernetes_ca_certificate"),
+						path.MatchRoot("token_reviewer_jwt"),
+						path.MatchRoot("token_reviewer_mode"),
+						path.MatchRoot("gateway_id"),
+						path.MatchRoot("allowed_audience"),
+					),
+				},
 			},
 
 			"kubernetes_ca_certificate": schema.StringAttribute{
@@ -191,6 +209,14 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 
 	if newIdentityKubernetesAuth.GatewayID != "" {
 		plan.GatewayID = types.StringValue(newIdentityKubernetesAuth.GatewayID)
+	} else if plan.GatewayID.IsUnknown() {
+		plan.GatewayID = types.StringNull()
+	}
+
+	if newIdentityKubernetesAuth.TemplateID != nil && *newIdentityKubernetesAuth.TemplateID != "" {
+		plan.TemplateID = types.StringValue(*newIdentityKubernetesAuth.TemplateID)
+	} else {
+		plan.TemplateID = types.StringNull()
 	}
 
 	planAccessTokenTrustedIps := make([]IdentityKubernetesAuthResourceTrustedIps, len(newIdentityKubernetesAuth.AccessTokenTrustedIPS))
@@ -312,41 +338,29 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 		return
 	}
 
-	validateTokenReviewerMode(&resp.Diagnostics, &plan)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	var kubernetesHost *string = nil
-	if !plan.KubernetesHost.IsNull() && !plan.KubernetesHost.IsUnknown() && plan.KubernetesHost.ValueString() != "" {
-		host := plan.KubernetesHost.ValueString()
-		kubernetesHost = &host
-	}
-
-	var gatewayID *string = nil
-	if !plan.GatewayID.IsNull() && !plan.GatewayID.IsUnknown() && plan.GatewayID.ValueString() != "" {
-		gId := plan.GatewayID.ValueString()
-		gatewayID = &gId
-	}
-
 	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
 	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
 	allowedNames := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountNames)
-	newIdentityKubernetesAuth, err := r.client.CreateIdentityKubernetesAuth(infisical.CreateIdentityKubernetesAuthRequest{
-		IdentityID:              plan.IdentityID.ValueString(),
-		TokenReviewerMode:       plan.TokenReviewerMode.ValueString(),
-		GatewayID:               gatewayID,
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
-		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		KubernetesHost:          kubernetesHost,
-		CACERT:                  plan.CaCertificate.ValueString(),
-		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
-		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
-		AllowedNames:            strings.Join(allowedNames, ","),
-		AllowedAudience:         plan.AllowedAudience.ValueString(),
-	})
+
+	var newIdentityKubernetesAuth infisical.IdentityKubernetesAuth
+	var err error
+	if !plan.TemplateID.IsNull() {
+		newIdentityKubernetesAuth, err = r.client.CreateIdentityKubernetesAuthFromTemplate(infisical.CreateIdentityKubernetesAuthFromTemplateRequest{
+			IdentityID:              plan.IdentityID.ValueString(),
+			TemplateID:              plan.TemplateID.ValueString(),
+			AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+			AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+			AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+			AccessTokenTrustedIPS:   accessTokenTrustedIps,
+			AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
+			AllowedNames:            strings.Join(allowedNames, ","),
+		})
+	} else {
+		newIdentityKubernetesAuth, err = r.createCustomKubernetesAuth(&resp.Diagnostics, &plan, accessTokenTrustedIps, allowedNamespacpes, allowedNames)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -364,6 +378,41 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 		return
 	}
 
+}
+
+func (r *IdentityKubernetesAuthResource) createCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string) (infisical.IdentityKubernetesAuth, error) {
+	validateTokenReviewerMode(diagnostics, plan)
+	if diagnostics.HasError() {
+		return infisical.IdentityKubernetesAuth{}, nil
+	}
+
+	var kubernetesHost *string = nil
+	if !plan.KubernetesHost.IsNull() && !plan.KubernetesHost.IsUnknown() && plan.KubernetesHost.ValueString() != "" {
+		host := plan.KubernetesHost.ValueString()
+		kubernetesHost = &host
+	}
+
+	var gatewayID *string = nil
+	if !plan.GatewayID.IsNull() && !plan.GatewayID.IsUnknown() && plan.GatewayID.ValueString() != "" {
+		gId := plan.GatewayID.ValueString()
+		gatewayID = &gId
+	}
+
+	return r.client.CreateIdentityKubernetesAuth(infisical.CreateIdentityKubernetesAuthRequest{
+		IdentityID:              plan.IdentityID.ValueString(),
+		TokenReviewerMode:       plan.TokenReviewerMode.ValueString(),
+		GatewayID:               gatewayID,
+		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+		AccessTokenTrustedIPS:   accessTokenTrustedIps,
+		KubernetesHost:          kubernetesHost,
+		CACERT:                  plan.CaCertificate.ValueString(),
+		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
+		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
+		AllowedNames:            strings.Join(allowedNames, ","),
+		AllowedAudience:         plan.AllowedAudience.ValueString(),
+	})
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -435,9 +484,51 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		return
 	}
 
-	validateTokenReviewerMode(&resp.Diagnostics, &plan)
+	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
+	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
+	allowedNames := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountNames)
+
+	var updatedIdentityKubernetesAuth infisical.IdentityKubernetesAuth
+	var err error
+	if !plan.TemplateID.IsNull() {
+		updatedIdentityKubernetesAuth, err = r.client.UpdateIdentityKubernetesAuthFromTemplate(infisical.UpdateIdentityKubernetesAuthFromTemplateRequest{
+			IdentityID:              plan.IdentityID.ValueString(),
+			TemplateID:              plan.TemplateID.ValueString(),
+			AccessTokenTrustedIPS:   accessTokenTrustedIps,
+			AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+			AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+			AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+			AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
+			AllowedNames:            strings.Join(allowedNames, ","),
+		})
+	} else {
+		updatedIdentityKubernetesAuth, err = r.updateCustomKubernetesAuth(&resp.Diagnostics, &plan, accessTokenTrustedIps, allowedNamespacpes, allowedNames)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating identity kubernetes auth",
+			"Couldn't update identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	updateKubernetesAuthStateByApi(ctx, resp.Diagnostics, &plan, &updatedIdentityKubernetesAuth)
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+}
+
+func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string) (infisical.IdentityKubernetesAuth, error) {
+	validateTokenReviewerMode(diagnostics, plan)
+	if diagnostics.HasError() {
+		return infisical.IdentityKubernetesAuth{}, nil
 	}
 
 	var kubernetesHost *string = nil
@@ -458,11 +549,7 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		tokenReviewerJwt = &reviewerJwt
 	}
 
-	accessTokenTrustedIps := tfPlanExpandIpFieldAsApiField(ctx, resp.Diagnostics, plan.AccessTokenTrustedIps)
-
-	allowedNamespacpes := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedNamespaces)
-	allowedNames := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.AllowedServiceAccountNames)
-	updatedIdentityKubernetesAuth, err := r.client.UpdateIdentityKubernetesAuth(infisical.UpdateIdentityKubernetesAuthRequest{
+	return r.client.UpdateIdentityKubernetesAuth(infisical.UpdateIdentityKubernetesAuthRequest{
 		IdentityID:              plan.IdentityID.ValueString(),
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
 		TokenReviewerMode:       plan.TokenReviewerMode.ValueString(),
@@ -476,23 +563,9 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
 		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),
+		// Null unlinks a template this identity was linked to.
+		TemplateID: nil,
 	})
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating identity kubernetes auth",
-			"Couldn't update identity kubernetes auth from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	updateKubernetesAuthStateByApi(ctx, resp.Diagnostics, &plan, &updatedIdentityKubernetesAuth)
-
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
