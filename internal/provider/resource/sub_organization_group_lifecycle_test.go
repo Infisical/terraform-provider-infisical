@@ -470,3 +470,58 @@ func TestSubOrganizationGroupCreateErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
+	s := subOrgGroupTestSchema(t)
+	role := func(isTemporary types.Bool, temporaryRange, startTime types.String) subOrganizationGroupRole {
+		return subOrganizationGroupRole{
+			RoleSlug:                 types.StringValue("admin"),
+			IsTemporary:              isTemporary,
+			TemporaryRange:           temporaryRange,
+			TemporaryAccessStartTime: startTime,
+		}
+	}
+	start := types.StringValue("2026-10-01T09:00:00Z")
+
+	for name, tc := range map[string]struct {
+		role      subOrganizationGroupRole
+		wantError string
+	}{
+		"permanent":                     {role: role(types.BoolValue(false), types.StringNull(), types.StringNull())},
+		"temporary with start time":     {role: role(types.BoolValue(true), types.StringValue("2h"), start)},
+		"is_temporary still unknown":    {role: role(types.BoolUnknown(), types.StringValue("2h"), types.StringNull())},
+		"start time still unknown":      {role: role(types.BoolValue(true), types.StringNull(), types.StringUnknown())},
+		"permanent with range":          {role: role(types.BoolValue(false), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
+		"permanent with start time":     {role: role(types.BoolValue(false), types.StringNull(), start), wantError: "permanent role"},
+		"unset is_temporary with range": {role: role(types.BoolNull(), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
+		"temporary without start time":  {role: role(types.BoolValue(true), types.StringNull(), types.StringNull()), wantError: "temporary_access_start_time is required"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			// Plan and config share a shape, so Plan.Set is a handy way to build the raw config.
+			raw := tfsdk.Plan{Schema: s}
+			if diags := raw.Set(ctx, &subOrganizationGroupResourceModel{
+				ID:        types.StringNull(),
+				GroupID:   types.StringNull(),
+				GroupSlug: types.StringValue("platform"),
+				GroupName: types.StringNull(),
+				Roles:     []subOrganizationGroupRole{tc.role},
+			}); diags.HasError() {
+				t.Fatal(diags)
+			}
+
+			resp := resource.ValidateConfigResponse{}
+			(&subOrganizationGroupResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{Config: tfsdk.Config{Schema: s, Raw: raw.Raw}}, &resp)
+
+			if tc.wantError == "" {
+				if resp.Diagnostics.HasError() {
+					t.Errorf("expected no error, got: %v", resp.Diagnostics)
+				}
+				return
+			}
+			if !resp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(resp.Diagnostics), tc.wantError) {
+				t.Errorf("expected an error containing %q, got: %v", tc.wantError, resp.Diagnostics)
+			}
+		})
+	}
+}

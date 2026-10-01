@@ -19,12 +19,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var (
 	_ resource.Resource                     = &subOrganizationGroupResource{}
 	_ resource.ResourceWithImportState      = &subOrganizationGroupResource{}
 	_ resource.ResourceWithConfigValidators = &subOrganizationGroupResource{}
+	_ resource.ResourceWithValidateConfig   = &subOrganizationGroupResource{}
 )
 
 func NewSubOrganizationGroupResource() resource.Resource {
@@ -121,6 +123,52 @@ func (r *subOrganizationGroupResource) ConfigValidators(_ context.Context) []res
 			path.MatchRoot("group_id"),
 			path.MatchRoot("group_slug"),
 		),
+	}
+}
+
+// Catches role mistakes at plan time. Temporary fields on a permanent role never reach the API,
+// so state would keep them while every refresh clears them and the plan never settles.
+func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var roles types.Set
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("roles"), &roles)...)
+	if resp.Diagnostics.HasError() || roles.IsNull() || roles.IsUnknown() {
+		return
+	}
+
+	for _, element := range roles.Elements() {
+		object, ok := element.(types.Object)
+		if !ok || object.IsUnknown() || object.IsNull() {
+			continue
+		}
+
+		var role subOrganizationGroupRole
+		resp.Diagnostics.Append(object.As(ctx, &role, basetypes.ObjectAsOptions{})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if role.IsTemporary.IsUnknown() {
+			continue
+		}
+
+		rolePath := path.Root("roles").AtSetValue(element)
+		if role.IsTemporary.ValueBool() {
+			if role.TemporaryAccessStartTime.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					rolePath,
+					"Field temporary_access_start_time is required for temporary roles",
+					fmt.Sprintf("Must provide valid ISO timestamp (YYYY-MM-DDTHH:MM:SSZ) for field temporary_access_start_time, role %s", role.RoleSlug.ValueString()),
+				)
+			}
+			continue
+		}
+
+		if !role.TemporaryRange.IsNull() || !role.TemporaryAccessStartTime.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				rolePath,
+				"Temporary fields set on a permanent role",
+				fmt.Sprintf("Role %s isn't temporary, so temporary_range and temporary_access_start_time do nothing. Set is_temporary = true or remove them.", role.RoleSlug.ValueString()),
+			)
+		}
 	}
 }
 
