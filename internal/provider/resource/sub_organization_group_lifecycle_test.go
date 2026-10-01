@@ -30,6 +30,7 @@ const (
 type fakeSubOrgGroupBackend struct {
 	t            *testing.T
 	sessionOrgID string
+	detailsFail  bool
 	rootGroups   map[string]infisical.OrgGroupMembershipGroup
 	links        map[string]infisical.OrgGroupMembership
 }
@@ -88,6 +89,10 @@ func (b *fakeSubOrgGroupBackend) handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/v1/identities/details", func(w http.ResponseWriter, _ *http.Request) {
+		if b.detailsFail {
+			b.apiError(w, http.StatusInternalServerError, "Something went wrong")
+			return
+		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"identityDetails": map[string]any{
 			"organization": map[string]string{"id": b.sessionOrgID, "name": b.sessionOrgID, "slug": b.sessionOrgID},
 		}})
@@ -255,7 +260,6 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 	backend := newFakeSubOrgGroupBackend(t)
 	r := newSubOrgGroupTestResource(t, backend)
 
-	// Linking by slug resolves the group ID from the available groups.
 	state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringUnknown(), types.StringValue("platform"), memberRole()))
 	created := subOrgGroupModel(t, state)
 	if created.GroupID.ValueString() != "g1" || created.ID.ValueString() != "m-g1" || created.GroupName.ValueString() != "Platform" {
@@ -265,7 +269,6 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 		t.Fatal("expected g1 to be linked on the backend")
 	}
 
-	// Update swaps in a temporary role written with an offset, which must reach the API as UTC.
 	updatePlan := tfsdk.Plan{Schema: s, Raw: state.Raw}
 	if diags := updatePlan.SetAttribute(ctx, path.Root("roles"), []subOrganizationGroupRole{
 		memberRole(),
@@ -287,7 +290,6 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 		t.Fatalf("expected 2 roles on the backend, got %d", got)
 	}
 
-	// Refreshing right after the update must not show drift.
 	refreshed := subOrgGroupModel(t, readSubOrgGroup(t, r, updateResp.State))
 	if !refreshed.Roles[1].TemporaryRange.IsNull() || refreshed.Roles[1].TemporaryAccessStartTime.ValueString() != "2026-10-01T11:00:00+02:00" {
 		t.Errorf("expected the configured form to survive a refresh, got %+v", refreshed.Roles[1])
@@ -342,7 +344,6 @@ func TestSubOrganizationGroupDelete(t *testing.T) {
 				delete(backend.links, "g1")
 			}
 			if tc.wantError {
-				// Make the DELETE fail while the link is still there.
 				r = &subOrganizationGroupResource{client: failingDeleteClient(t, backend)}
 			}
 
@@ -379,6 +380,7 @@ func TestSubOrganizationGroupImport(t *testing.T) {
 	for name, tc := range map[string]struct {
 		importID     string
 		sessionOrgID string
+		detailsFail  bool
 		wantGroupID  string
 		wantError    string
 	}{
@@ -386,6 +388,7 @@ func TestSubOrganizationGroupImport(t *testing.T) {
 		"by slug":                  {importID: "platform", wantGroupID: "00000000-0000-4000-8000-000000000001"},
 		"unknown slug":             {importID: "nope", wantError: "Group not found"},
 		"native group in root org": {importID: "platform", sessionOrgID: testRootOrgID, wantError: "belongs to the organization the provider is scoped to"},
+		"session org lookup fails": {importID: "platform", sessionOrgID: testRootOrgID, detailsFail: true, wantError: "Couldn't verify"},
 		"unknown id":               {importID: "00000000-0000-4000-8000-000000000009", wantError: "Group not found"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -399,6 +402,7 @@ func TestSubOrganizationGroupImport(t *testing.T) {
 			if tc.sessionOrgID != "" {
 				backend.sessionOrgID = tc.sessionOrgID
 			}
+			backend.detailsFail = tc.detailsFail
 			r := newSubOrgGroupTestResource(t, backend)
 
 			importState := tfsdk.State{Schema: s}
@@ -418,7 +422,6 @@ func TestSubOrganizationGroupImport(t *testing.T) {
 				t.Fatal(resp.Diagnostics)
 			}
 
-			// Imports only set group_id, so Read has to fill in the rest.
 			imported := subOrgGroupModel(t, readSubOrgGroup(t, r, resp.State))
 			if imported.GroupID.ValueString() != tc.wantGroupID || imported.GroupSlug.ValueString() != "platform" || imported.ID.ValueString() != "m-1" {
 				t.Errorf("unexpected state after import: %+v", imported)
@@ -434,22 +437,24 @@ func TestSubOrganizationGroupCreateErrors(t *testing.T) {
 		groupID      types.String
 		groupSlug    types.String
 		sessionOrgID string
+		detailsFail  bool
 		preLinked    bool
 		wantError    string
 	}{
-		"already linked by slug": {groupID: types.StringUnknown(), groupSlug: types.StringValue("platform"), preLinked: true, wantError: "terraform import"},
-		"already linked by id":   {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), preLinked: true, wantError: "terraform import"},
-		"unknown slug":           {groupID: types.StringUnknown(), groupSlug: types.StringValue("nope"), wantError: "Group not found"},
-		"root scoped by slug":    {groupID: types.StringUnknown(), groupSlug: types.StringValue("platform"), sessionOrgID: testRootOrgID, preLinked: true, wantError: "auth.organization_slug"},
-		"root scoped by id":      {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), sessionOrgID: testRootOrgID, preLinked: true, wantError: "auth.organization_slug"},
+		"already linked by slug":   {groupID: types.StringUnknown(), groupSlug: types.StringValue("platform"), preLinked: true, wantError: "terraform import"},
+		"already linked by id":     {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), preLinked: true, wantError: "terraform import"},
+		"unknown slug":             {groupID: types.StringUnknown(), groupSlug: types.StringValue("nope"), wantError: "Group not found"},
+		"root scoped by slug":      {groupID: types.StringUnknown(), groupSlug: types.StringValue("platform"), sessionOrgID: testRootOrgID, preLinked: true, wantError: "auth.organization_slug"},
+		"session org lookup fails": {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), sessionOrgID: testRootOrgID, detailsFail: true, preLinked: true, wantError: "couldn't tell"},
+		"root scoped by id":        {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), sessionOrgID: testRootOrgID, preLinked: true, wantError: "auth.organization_slug"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			backend := newFakeSubOrgGroupBackend(t)
 			if tc.sessionOrgID != "" {
 				backend.sessionOrgID = tc.sessionOrgID
 			}
+			backend.detailsFail = tc.detailsFail
 			if tc.preLinked {
-				// In the root org every root group already has a native membership.
 				backend.links["g1"] = infisical.OrgGroupMembership{ID: "m-g1", GroupID: "g1", Group: backend.rootGroups["g1"]}
 			}
 			r := newSubOrgGroupTestResource(t, backend)
@@ -458,6 +463,9 @@ func TestSubOrganizationGroupCreateErrors(t *testing.T) {
 			r.Create(context.Background(), resource.CreateRequest{Plan: subOrgGroupCreatePlan(t, s, tc.groupID, tc.groupSlug, memberRole())}, &resp)
 			if !resp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(resp.Diagnostics), tc.wantError) {
 				t.Errorf("expected an error containing %q, got: %v", tc.wantError, resp.Diagnostics)
+			}
+			if tc.detailsFail && strings.Contains(fmt.Sprint(resp.Diagnostics), "terraform import") {
+				t.Error("must not suggest an import when ownership couldn't be verified")
 			}
 		})
 	}

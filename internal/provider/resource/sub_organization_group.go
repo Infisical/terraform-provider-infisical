@@ -242,10 +242,14 @@ func setSubOrganizationGroupComputed(model *subOrganizationGroupResourceModel, m
 }
 
 // True when the group is owned by the session's own org (e.g. provider scoped to root). That's not
-// a link, so this resource shouldn't touch it.
-func (r *subOrganizationGroupResource) isNativeMembership(membership infisical.OrgGroupMembership) bool {
+// a link, so this resource shouldn't touch it. A failed lookup is returned instead of guessed,
+// since the API would happily delete a native membership on destroy.
+func (r *subOrganizationGroupResource) isNativeMembership(membership infisical.OrgGroupMembership) (bool, error) {
 	sessionOrgID, err := r.client.GetSessionOrganizationID()
-	return err == nil && membership.Group.OrgID == sessionOrgID
+	if err != nil {
+		return false, err
+	}
+	return membership.Group.OrgID == sessionOrgID, nil
 }
 
 func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
@@ -258,7 +262,15 @@ func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
 // The group is either native to the session's org or was linked outside Terraform. Only the
 // second one gets the import hint.
 func (r *subOrganizationGroupResource) existingMembershipError(diags *diag.Diagnostics, groupRef string, membership infisical.OrgGroupMembership) {
-	if r.isNativeMembership(membership) {
+	native, err := r.isNativeMembership(membership)
+	if err != nil {
+		diags.AddError(
+			"Group already has a membership in the organization",
+			fmt.Sprintf("Group %s already has a membership in the organization the provider is scoped to, but couldn't tell whether it was linked or belongs to that organization: %s", groupRef, err.Error()),
+		)
+		return
+	}
+	if native {
 		nativeGroupError(diags, groupRef)
 		return
 	}
@@ -488,8 +500,15 @@ func (r *subOrganizationGroupResource) ImportState(ctx context.Context, req reso
 		return
 	}
 
-	// Otherwise Terraform would end up managing (and trying to unlink) a group in its own org.
-	if r.isNativeMembership(membership) {
+	native, err := r.isNativeMembership(membership)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing sub-organization group",
+			"Couldn't verify the group is linked from the root organization, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	if native {
 		nativeGroupError(&resp.Diagnostics, req.ID)
 		return
 	}
