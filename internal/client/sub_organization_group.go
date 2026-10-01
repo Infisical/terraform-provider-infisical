@@ -19,6 +19,24 @@ const (
 	operationDeleteOrgGroupMembership = "CallDeleteOrgGroupMembership"
 )
 
+// GetSessionOrganizationID returns the ID of the organization the session is scoped to: the
+// organization named by auth.organization_slug, or the identity's own organization without it.
+func (client Client) GetSessionOrganizationID() (string, error) {
+	if client.Config.OrganizationSlug == "" {
+		details, err := client.GetIdentityDetails()
+		if err != nil {
+			return "", err
+		}
+		return details.IdentityDetails.Organization.ID, nil
+	}
+
+	organization, err := client.GetOrganizationBySlug(client.Config.OrganizationSlug)
+	if err != nil {
+		return "", err
+	}
+	return organization.ID, nil
+}
+
 // ListAvailableGroups returns the root-organization groups that are not yet linked into the
 // sub-organization the session is scoped to. It is always empty for a root-organization session.
 func (client Client) ListAvailableGroups() ([]AvailableGroup, error) {
@@ -171,7 +189,8 @@ func (client Client) UpdateOrgGroupMembership(request UpdateOrgGroupMembershipRe
 }
 
 // DeleteOrgGroupMembership unlinks a group from the session's organization. It returns
-// ErrNotFound when the group is already gone or no longer linked.
+// ErrNotFound when the group no longer exists; a group that exists but is not linked is
+// answered with a 400 instead.
 func (client Client) DeleteOrgGroupMembership(groupID string) error {
 	response, err := client.Config.HttpClient.
 		R().

@@ -72,3 +72,27 @@ func TestSubOrganizationGroupRolesFromAPIReportsDrift(t *testing.T) {
 		t.Errorf("expected a changed start time to surface, got %s", roles[0].TemporaryAccessStartTime.ValueString())
 	}
 }
+
+// The API rejects any timestamp that is not in UTC, so a start time written with an offset must
+// be converted before it is sent.
+func TestBuildSubOrganizationGroupRolesSendsUTC(t *testing.T) {
+	roles, diags := buildSubOrganizationGroupRoles([]subOrganizationGroupRole{
+		{
+			RoleSlug:                 types.StringValue("admin"),
+			IsTemporary:              types.BoolValue(true),
+			TemporaryRange:           types.StringNull(),
+			TemporaryAccessStartTime: types.StringValue("2026-10-01T11:00:00+02:00"),
+		},
+	})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	start := roles[0].TemporaryAccessStartTime
+	if start.Location() != time.UTC || !start.Equal(time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("expected 2026-10-01T09:00:00Z, got %s", start.Format(time.RFC3339))
+	}
+	if roles[0].TemporaryRange != TEMPORARY_RANGE_DEFAULT {
+		t.Errorf("expected the default range, got %s", roles[0].TemporaryRange)
+	}
+}

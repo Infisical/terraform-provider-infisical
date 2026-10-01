@@ -177,6 +177,8 @@ func buildSubOrganizationGroupRoles(roles []subOrganizationGroupRole) ([]infisic
 			if requestRole.TemporaryRange == "" {
 				requestRole.TemporaryRange = TEMPORARY_RANGE_DEFAULT
 			}
+			// The API only accepts UTC timestamps, so an offset like +02:00 must not reach it.
+			startTime = startTime.UTC()
 			requestRole.TemporaryAccessStartTime = &startTime
 		}
 
@@ -243,8 +245,30 @@ func setSubOrganizationGroupComputed(model *subOrganizationGroupResourceModel, m
 	model.GroupName = types.StringValue(membership.Group.Name)
 }
 
-// alreadyLinkedError points the user at an import when the group is linked outside of this resource.
-func alreadyLinkedError(diags *diag.Diagnostics, groupRef string, membership infisical.OrgGroupMembership) {
+// isNativeMembership reports whether the membership belongs to a group owned by the session's own
+// organization (e.g. a root group while the provider is scoped to the root organization), which is
+// not a link and cannot be managed by this resource.
+func (r *subOrganizationGroupResource) isNativeMembership(membership infisical.OrgGroupMembership) bool {
+	sessionOrgID, err := r.client.GetSessionOrganizationID()
+	return err == nil && membership.Group.OrgID == sessionOrgID
+}
+
+func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
+	diags.AddError(
+		"Group belongs to the organization the provider is scoped to",
+		fmt.Sprintf("Group %s is owned by the organization the provider is scoped to, so there is nothing to link. Groups can only be linked from the root organization into a sub-organization: set auth.organization_slug to the slug of the target sub-organization.", groupRef),
+	)
+}
+
+// existingMembershipError explains why a group that already has a membership in the session's
+// organization can't be linked: it is either native to that organization or linked outside of
+// this resource, in which case the user is pointed at an import.
+func (r *subOrganizationGroupResource) existingMembershipError(diags *diag.Diagnostics, groupRef string, membership infisical.OrgGroupMembership) {
+	if r.isNativeMembership(membership) {
+		nativeGroupError(diags, groupRef)
+		return
+	}
+
 	diags.AddError(
 		"Group is already linked to the sub-organization",
 		fmt.Sprintf("Group %s is already linked to the organization the provider is scoped to. To manage it with Terraform, import it: terraform import <resource address> %s", groupRef, membership.GroupID),
@@ -290,7 +314,7 @@ func (r *subOrganizationGroupResource) Create(ctx context.Context, req resource.
 			}
 
 			if existing, lookupErr := r.client.GetOrgGroupMembershipBySlug(groupSlug); lookupErr == nil {
-				alreadyLinkedError(&resp.Diagnostics, groupRef, existing)
+				r.existingMembershipError(&resp.Diagnostics, groupRef, existing)
 				return
 			}
 
@@ -310,7 +334,7 @@ func (r *subOrganizationGroupResource) Create(ctx context.Context, req resource.
 	})
 	if err != nil {
 		if existing, lookupErr := r.client.GetOrgGroupMembership(groupID); lookupErr == nil {
-			alreadyLinkedError(&resp.Diagnostics, groupRef, existing)
+			r.existingMembershipError(&resp.Diagnostics, groupRef, existing)
 			return
 		}
 
@@ -421,12 +445,20 @@ func (r *subOrganizationGroupResource) Delete(ctx context.Context, req resource.
 	}
 
 	err := r.client.DeleteOrgGroupMembership(state.GroupID.ValueString())
-	if err != nil && !errors.Is(err, infisical.ErrNotFound) {
-		resp.Diagnostics.AddError(
-			"Error deleting sub-organization group",
-			"Couldn't unlink the group from the sub-organization, unexpected error: "+err.Error(),
-		)
+	if err == nil || errors.Is(err, infisical.ErrNotFound) {
+		return
 	}
+
+	// The API answers a group that is no longer linked with a 400 rather than a 404, so confirm
+	// the link is really gone before treating the delete as done.
+	if _, getErr := r.client.GetOrgGroupMembership(state.GroupID.ValueString()); errors.Is(getErr, infisical.ErrNotFound) {
+		return
+	}
+
+	resp.Diagnostics.AddError(
+		"Error deleting sub-organization group",
+		"Couldn't unlink the group from the sub-organization, unexpected error: "+err.Error(),
+	)
 }
 
 // ImportState accepts either the ID or the slug of the linked group.
@@ -439,26 +471,36 @@ func (r *subOrganizationGroupResource) ImportState(ctx context.Context, req reso
 		return
 	}
 
-	groupID := req.ID
-	if _, err := uuid.Parse(req.ID); err != nil {
-		membership, err := r.client.GetOrgGroupMembershipBySlug(req.ID)
-		if err != nil {
-			if errors.Is(err, infisical.ErrNotFound) {
-				resp.Diagnostics.AddError(
-					"Group not found",
-					fmt.Sprintf("No group with slug %s is linked to the organization the provider is scoped to.", req.ID),
-				)
-				return
-			}
+	var membership infisical.OrgGroupMembership
+	var err error
+	if _, parseErr := uuid.Parse(req.ID); parseErr == nil {
+		membership, err = r.client.GetOrgGroupMembership(req.ID)
+	} else {
+		membership, err = r.client.GetOrgGroupMembershipBySlug(req.ID)
+	}
 
+	if err != nil {
+		if errors.Is(err, infisical.ErrNotFound) {
 			resp.Diagnostics.AddError(
-				"Error importing sub-organization group",
-				"Couldn't list the groups linked to the sub-organization, unexpected error: "+err.Error(),
+				"Group not found",
+				fmt.Sprintf("No group %s is linked to the organization the provider is scoped to.", req.ID),
 			)
 			return
 		}
-		groupID = membership.GroupID
+
+		resp.Diagnostics.AddError(
+			"Error importing sub-organization group",
+			"Couldn't read the group's sub-organization membership, unexpected error: "+err.Error(),
+		)
+		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group_id"), groupID)...)
+	// Importing a native membership would let Terraform manage (and try to unlink) a group from
+	// its own organization.
+	if r.isNativeMembership(membership) {
+		nativeGroupError(&resp.Diagnostics, req.ID)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group_id"), membership.GroupID)...)
 }
