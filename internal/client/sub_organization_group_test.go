@@ -107,7 +107,11 @@ func TestGetAvailableGroupBySlug(t *testing.T) {
 
 // The API rejects temporary fields on a permanent role.
 func TestCreateOrgGroupMembershipRequestBody(t *testing.T) {
-	var body map[string]any
+	// Raw fields so the test can tell an omitted key from an empty one.
+	var body struct {
+		GroupID *string                      `json:"groupId"`
+		Roles   []map[string]json.RawMessage `json:"roles"`
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/organizations/memberships/groups/g1", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -134,19 +138,20 @@ func TestCreateOrgGroupMembershipRequestBody(t *testing.T) {
 		t.Errorf("expected membership m1, got %s", membership.ID)
 	}
 
-	roles := body["roles"].([]any)
-	permanent := roles[0].(map[string]any)
+	if len(body.Roles) != 2 {
+		t.Fatalf("expected 2 roles in the body, got %d", len(body.Roles))
+	}
+
 	for _, field := range []string{"temporaryMode", "temporaryRange", "temporaryAccessStartTime"} {
-		if _, ok := permanent[field]; ok {
+		if _, ok := body.Roles[0][field]; ok {
 			t.Errorf("permanent role must not send %s", field)
 		}
 	}
-	if _, ok := body["groupId"]; ok {
+	if body.GroupID != nil {
 		t.Error("groupId belongs in the path, not the body")
 	}
 
-	temporary := roles[1].(map[string]any)
-	if temporary["temporaryAccessStartTime"] != "2026-10-01T09:00:00Z" {
-		t.Errorf("unexpected temporaryAccessStartTime %v", temporary["temporaryAccessStartTime"])
+	if got := string(body.Roles[1]["temporaryAccessStartTime"]); got != `"2026-10-01T09:00:00Z"` {
+		t.Errorf("unexpected temporaryAccessStartTime %s", got)
 	}
 }
