@@ -76,7 +76,7 @@ for file in "$DOCS_DIR/resources/"*.md; do
             update_subcategory "$file" "Approval";;
         
         # Groups
-        group)
+        group|group_assignment)
             update_subcategory "$file" "Groups";;
         
         # KMS
@@ -120,7 +120,7 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
             update_subcategory "$file" "Secrets";;
         
         # Groups
-        groups)
+        groups|group_assignment)
             update_subcategory "$file" "Groups";;
         
         # Projects

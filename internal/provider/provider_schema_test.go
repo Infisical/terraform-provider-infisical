@@ -26,9 +26,15 @@ func TestProviderSchemaIsValid(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"infisical_gateway", "infisical_gateway_enrollment_token"} {
+	for _, name := range []string{"infisical_gateway", "infisical_gateway_enrollment_token", "infisical_group_assignment"} {
 		if _, ok := resp.ResourceSchemas[name]; !ok {
 			t.Errorf("expected %s to be registered on the provider", name)
+		}
+	}
+
+	for _, name := range []string{"infisical_group_assignment"} {
+		if _, ok := resp.DataSourceSchemas[name]; !ok {
+			t.Errorf("expected data source %s to be registered on the provider", name)
 		}
 	}
 }
