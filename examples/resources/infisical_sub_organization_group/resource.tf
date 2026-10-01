@@ -7,8 +7,8 @@ terraform {
   }
 }
 
-# Groups are linked into the organization the provider is scoped to, so this provider
-# must be scoped to the target sub-organization through auth.organization_slug.
+# Groups get linked into whatever org the provider is scoped to, so point it at the
+# sub-org with auth.organization_slug.
 provider "infisical" {
   host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
   auth = {

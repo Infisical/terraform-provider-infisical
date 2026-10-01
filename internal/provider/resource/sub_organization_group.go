@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// Ensure the implementation satisfies the expected interfaces.
 var (
 	_ resource.Resource                     = &subOrganizationGroupResource{}
 	_ resource.ResourceWithImportState      = &subOrganizationGroupResource{}
@@ -32,8 +31,6 @@ func NewSubOrganizationGroupResource() resource.Resource {
 	return &subOrganizationGroupResource{}
 }
 
-// subOrganizationGroupResource links a root-organization group into the sub-organization the
-// provider session is scoped to.
 type subOrganizationGroupResource struct {
 	client *infisical.Client
 }
@@ -177,7 +174,7 @@ func buildSubOrganizationGroupRoles(roles []subOrganizationGroupRole) ([]infisic
 			if requestRole.TemporaryRange == "" {
 				requestRole.TemporaryRange = TEMPORARY_RANGE_DEFAULT
 			}
-			// The API only accepts UTC timestamps, so an offset like +02:00 must not reach it.
+			// The API only takes UTC, an offset like +02:00 gets a 422.
 			startTime = startTime.UTC()
 			requestRole.TemporaryAccessStartTime = &startTime
 		}
@@ -188,9 +185,8 @@ func buildSubOrganizationGroupRoles(roles []subOrganizationGroupRole) ([]infisic
 	return requestRoles, diags
 }
 
-// subOrganizationGroupRolesFromAPI maps the API roles back into the model. Values the user left
-// unset or wrote differently (a defaulted range, a start time with another offset) keep their
-// prior form so they don't show up as drift.
+// Keeps the user's form for values the API fills in or reformats (default range, start time
+// offset), otherwise every plan shows drift.
 func subOrganizationGroupRolesFromAPI(apiRoles []infisical.OrgGroupMembershipRole, priorRoles []subOrganizationGroupRole) []subOrganizationGroupRole {
 	priorBySlug := make(map[string]subOrganizationGroupRole, len(priorRoles))
 	for _, role := range priorRoles {
@@ -245,9 +241,8 @@ func setSubOrganizationGroupComputed(model *subOrganizationGroupResourceModel, m
 	model.GroupName = types.StringValue(membership.Group.Name)
 }
 
-// isNativeMembership reports whether the membership belongs to a group owned by the session's own
-// organization (e.g. a root group while the provider is scoped to the root organization), which is
-// not a link and cannot be managed by this resource.
+// True when the group is owned by the session's own org (e.g. provider scoped to root). That's not
+// a link, so this resource shouldn't touch it.
 func (r *subOrganizationGroupResource) isNativeMembership(membership infisical.OrgGroupMembership) bool {
 	sessionOrgID, err := r.client.GetSessionOrganizationID()
 	return err == nil && membership.Group.OrgID == sessionOrgID
@@ -260,9 +255,8 @@ func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
 	)
 }
 
-// existingMembershipError explains why a group that already has a membership in the session's
-// organization can't be linked: it is either native to that organization or linked outside of
-// this resource, in which case the user is pointed at an import.
+// The group is either native to the session's org or was linked outside Terraform. Only the
+// second one gets the import hint.
 func (r *subOrganizationGroupResource) existingMembershipError(diags *diag.Diagnostics, groupRef string, membership infisical.OrgGroupMembership) {
 	if r.isNativeMembership(membership) {
 		nativeGroupError(diags, groupRef)
@@ -449,8 +443,7 @@ func (r *subOrganizationGroupResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	// The API answers a group that is no longer linked with a 400 rather than a 404, so confirm
-	// the link is really gone before treating the delete as done.
+	// Unlinked groups come back as a 400, not a 404, so double check the link is really gone.
 	if _, getErr := r.client.GetOrgGroupMembership(state.GroupID.ValueString()); errors.Is(getErr, infisical.ErrNotFound) {
 		return
 	}
@@ -461,7 +454,7 @@ func (r *subOrganizationGroupResource) Delete(ctx context.Context, req resource.
 	)
 }
 
-// ImportState accepts either the ID or the slug of the linked group.
+// Takes either the group ID or its slug.
 func (r *subOrganizationGroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -495,8 +488,7 @@ func (r *subOrganizationGroupResource) ImportState(ctx context.Context, req reso
 		return
 	}
 
-	// Importing a native membership would let Terraform manage (and try to unlink) a group from
-	// its own organization.
+	// Otherwise Terraform would end up managing (and trying to unlink) a group in its own org.
 	if r.isNativeMembership(membership) {
 		nativeGroupError(&resp.Diagnostics, req.ID)
 		return

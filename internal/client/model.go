@@ -4443,7 +4443,7 @@ type DeleteSubOrganizationResponse struct {
 	Organization SubOrganization `json:"organization"`
 }
 
-// Sub-organization group links (a root-organization group linked into a sub-organization)
+// Sub-org group links
 
 type AvailableGroup struct {
 	ID   string `json:"id"`
@@ -4481,8 +4481,7 @@ type OrgGroupMembership struct {
 	Roles   []OrgGroupMembershipRole `json:"roles"`
 }
 
-// The API validates each role against two strict variants (permanent and temporary), so the
-// temporary fields must be omitted for a permanent role rather than sent empty.
+// The API rejects temporary fields on a permanent role, even empty ones, so they're omitted.
 type OrgGroupMembershipRoleRequest struct {
 	Role                     string     `json:"role"`
 	IsTemporary              bool       `json:"isTemporary"`

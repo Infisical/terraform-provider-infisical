@@ -27,8 +27,7 @@ func subOrgGroupServer(t *testing.T, mux *http.ServeMux) Client {
 	}}
 }
 
-// A missing link is how Terraform learns the resource is gone, so a 404 must surface as
-// ErrNotFound on both read and delete rather than as an API error.
+// Terraform relies on ErrNotFound to know the link is gone.
 func TestOrgGroupMembershipNotFound(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/organizations/memberships/groups/missing",
@@ -44,8 +43,7 @@ func TestOrgGroupMembershipNotFound(t *testing.T) {
 	}
 }
 
-// A permission error must not be mistaken for a missing link, or Terraform would drop the
-// resource from state.
+// A 403 must not look like a missing link, or Terraform would drop it from state.
 func TestGetOrgGroupMembershipForbidden(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/organizations/memberships/groups/g1",
@@ -107,8 +105,7 @@ func TestGetAvailableGroupBySlug(t *testing.T) {
 	}
 }
 
-// The API validates each role against strict permanent/temporary variants, so a permanent role
-// must not carry temporary fields at all.
+// The API rejects temporary fields on a permanent role.
 func TestCreateOrgGroupMembershipRequestBody(t *testing.T) {
 	var body map[string]any
 	mux := http.NewServeMux()

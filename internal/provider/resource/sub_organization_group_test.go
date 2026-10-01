@@ -11,8 +11,7 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-// Values the API fills in or normalises must keep the form the user wrote, or every plan
-// would show drift.
+// Values the API fills in or reformats keep the user's form, otherwise every plan shows drift.
 func TestSubOrganizationGroupRolesFromAPIKeepsPriorForm(t *testing.T) {
 	start := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
 	apiRoles := []infisical.OrgGroupMembershipRole{
@@ -73,8 +72,7 @@ func TestSubOrganizationGroupRolesFromAPIReportsDrift(t *testing.T) {
 	}
 }
 
-// The API rejects any timestamp that is not in UTC, so a start time written with an offset must
-// be converted before it is sent.
+// The API only takes UTC, so offsets get converted before sending.
 func TestBuildSubOrganizationGroupRolesSendsUTC(t *testing.T) {
 	roles, diags := buildSubOrganizationGroupRoles([]subOrganizationGroupRole{
 		{
