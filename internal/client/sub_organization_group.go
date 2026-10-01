@@ -6,8 +6,8 @@ import (
 	"terraform-provider-infisical/internal/errors"
 )
 
-// These endpoints act on the organization the session is scoped to. Linking a root-org group
-// into a sub-organization therefore requires a session scoped to that sub-organization
+// These endpoints act on the organization the session is scoped to, so linking a root-organization
+// group into a sub-organization requires a session scoped to that sub-organization
 // (auth.organization_slug on the provider).
 
 const (
@@ -19,8 +19,8 @@ const (
 	operationDeleteOrgGroupMembership = "CallDeleteOrgGroupMembership"
 )
 
-// ListAvailableGroups returns the parent-organization groups that can be linked into the
-// sub-organization the session is scoped to.
+// ListAvailableGroups returns the root-organization groups that are not yet linked into the
+// sub-organization the session is scoped to. It is always empty for a root-organization session.
 func (client Client) ListAvailableGroups() ([]AvailableGroup, error) {
 	var responseData ListAvailableGroupsResponse
 	response, err := client.Config.HttpClient.
@@ -40,19 +40,15 @@ func (client Client) ListAvailableGroups() ([]AvailableGroup, error) {
 	return responseData.Groups, nil
 }
 
-// GetAvailableGroup finds a linkable parent-organization group by ID or, when groupID is empty,
-// by slug. It returns ErrNotFound when the group is not in the available list.
-func (client Client) GetAvailableGroup(groupID, groupSlug string) (AvailableGroup, error) {
+// GetAvailableGroupBySlug returns ErrNotFound when no unlinked root-organization group has the slug.
+func (client Client) GetAvailableGroupBySlug(slug string) (AvailableGroup, error) {
 	groups, err := client.ListAvailableGroups()
 	if err != nil {
 		return AvailableGroup{}, err
 	}
 
 	for _, group := range groups {
-		if groupID != "" && group.ID == groupID {
-			return group, nil
-		}
-		if groupID == "" && groupSlug != "" && group.Slug == groupSlug {
+		if group.Slug == slug {
 			return group, nil
 		}
 	}
@@ -80,13 +76,8 @@ func (client Client) CreateOrgGroupMembership(request CreateOrgGroupMembershipRe
 	return responseData.GroupMembership, nil
 }
 
-// GetOrgGroupMembership returns the membership of a group in the session's organization. It
-// returns ErrNotFound when the group is not linked.
+// GetOrgGroupMembership returns ErrNotFound when the group is not linked to the session's organization.
 func (client Client) GetOrgGroupMembership(groupID string) (OrgGroupMembership, error) {
-	if groupID == "" {
-		return OrgGroupMembership{}, ErrNotFound
-	}
-
 	var responseData OrgGroupMembershipResponse
 	response, err := client.Config.HttpClient.
 		R().
@@ -109,14 +100,12 @@ func (client Client) GetOrgGroupMembership(groupID string) (OrgGroupMembership, 
 	return responseData.GroupMembership, nil
 }
 
-// ListOrgGroupMemberships returns every group membership of the session's organization,
-// paginating over the offset until the full set is retrieved.
+// ListOrgGroupMemberships returns every group membership of the session's organization.
 func (client Client) ListOrgGroupMemberships() ([]OrgGroupMembership, error) {
 	const pageSize = 100
-	offset := 0
 	var all []OrgGroupMembership
 
-	for {
+	for offset := 0; ; offset += pageSize {
 		var responseData ListOrgGroupMembershipsResponse
 		response, err := client.Config.HttpClient.
 			R().
@@ -137,26 +126,23 @@ func (client Client) ListOrgGroupMemberships() ([]OrgGroupMembership, error) {
 		}
 
 		all = append(all, responseData.GroupMemberships...)
-		offset += pageSize
 
-		if len(responseData.GroupMemberships) == 0 || offset >= responseData.TotalCount {
-			break
+		if len(responseData.GroupMemberships) == 0 || offset+pageSize >= responseData.TotalCount {
+			return all, nil
 		}
 	}
-
-	return all, nil
 }
 
-// GetOrgGroupMembershipBySlug finds a linked group by its slug. It returns ErrNotFound when no
-// linked group has that slug.
-func (client Client) GetOrgGroupMembershipBySlug(groupSlug string) (OrgGroupMembership, error) {
+// GetOrgGroupMembershipBySlug returns ErrNotFound when no group linked to the session's
+// organization has the slug.
+func (client Client) GetOrgGroupMembershipBySlug(slug string) (OrgGroupMembership, error) {
 	memberships, err := client.ListOrgGroupMemberships()
 	if err != nil {
 		return OrgGroupMembership{}, err
 	}
 
 	for _, membership := range memberships {
-		if membership.Group.Slug == groupSlug {
+		if membership.Group.Slug == slug {
 			return membership, nil
 		}
 	}
@@ -184,8 +170,8 @@ func (client Client) UpdateOrgGroupMembership(request UpdateOrgGroupMembershipRe
 	return responseData.GroupMembership, nil
 }
 
-// DeleteOrgGroupMembership unlinks a group from the session's organization. The API only
-// allows this in a sub-organization the group is linked into, never in the group's own org.
+// DeleteOrgGroupMembership unlinks a group from the session's organization. It returns
+// ErrNotFound when the group is already gone or no longer linked.
 func (client Client) DeleteOrgGroupMembership(groupID string) error {
 	response, err := client.Config.HttpClient.
 		R().
@@ -194,6 +180,10 @@ func (client Client) DeleteOrgGroupMembership(groupID string) error {
 
 	if err != nil {
 		return errors.NewGenericRequestError(operationDeleteOrgGroupMembership, err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return ErrNotFound
 	}
 
 	if response.IsError() {

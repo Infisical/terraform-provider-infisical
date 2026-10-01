@@ -387,7 +387,6 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectUserDataSource,
 		infisicalDatasource.NewOrganizationDataSource,
 		infisicalDatasource.NewGatewayDataSource,
-		infisicalDatasource.NewGroupAssignmentDataSource,
 	}
 }
 
@@ -429,7 +428,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewProjectSecretImportResource,
 		infisicalResource.NewGroupResource,
 		infisicalResource.NewGroupMachineIdentityResource,
-		infisicalResource.NewGroupAssignmentResource,
+		infisicalResource.NewSubOrganizationGroupResource,
 		infisicalResource.NewProjectScopedIdentityResource,
 		appConnectionResource.NewAppConnectionGcpResource,
 		appConnectionResource.NewAppConnectionAwsResource,
