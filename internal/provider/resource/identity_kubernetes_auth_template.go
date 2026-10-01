@@ -10,6 +10,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -89,22 +90,23 @@ func (r *IdentityKubernetesAuthTemplateResource) Schema(_ context.Context, _ res
 				},
 			},
 			"kubernetes_host": schema.StringAttribute{
-				Description: "The host string, host:port pair, or URL to the base of the Kubernetes API server. Required when `token_reviewer_mode` is `api`.",
+				Description: "The host string, host:port pair, or URL to the base of the Kubernetes API server. Required when `token_reviewer_mode` is `api`, and must be omitted when it is `gateway`.",
 				Optional:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
 			},
 			"kubernetes_ca_certificate": schema.StringAttribute{
 				// The API strips the trailing newline that file() always adds.
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The PEM-encoded CA certificate used to validate the Kubernetes API server's TLS certificate.",
+				Description: "The PEM-encoded CA certificate used to validate the Kubernetes API server's TLS certificate. Must be omitted when `token_reviewer_mode` is `gateway`.",
 				Optional:    true,
 			},
 			"verify_tls_certificate": schema.BoolAttribute{
-				Description: "Whether to verify the Kubernetes API server's TLS certificate against `kubernetes_ca_certificate`. Defaults to true when a CA certificate is set, and false otherwise. In `api` mode, true requires a CA certificate and false forbids one.",
+				Description: "Whether to verify the Kubernetes API server's TLS certificate against `kubernetes_ca_certificate`. Defaults to true when a CA certificate is set, and false otherwise. In `api` mode, true requires a CA certificate and false forbids one. In `gateway` mode it cannot be true.",
 				Optional:    true,
 				Computed:    true,
 			},
 			"token_reviewer_jwt": schema.StringAttribute{
-				Description: "A long-lived service account JWT that Infisical uses to call the TokenReview API. If omitted, each identity's own service account token reviews itself. Write-only: Infisical never returns it, so Terraform cannot detect a change made outside this configuration, and an imported template leaves it empty.",
+				Description: "A long-lived service account JWT that Infisical uses to call the TokenReview API. If omitted, each identity's own service account token reviews itself. Must be omitted when `token_reviewer_mode` is `gateway`. Write-only: Infisical never returns it, so Terraform cannot detect a change made outside this configuration, and an imported template leaves it empty.",
 				Optional:    true,
 				Sensitive:   true,
 			},
@@ -116,12 +118,14 @@ func (r *IdentityKubernetesAuthTemplateResource) Schema(_ context.Context, _ res
 				Description: "The ID of the gateway to route Kubernetes API requests through. Mutually exclusive with `gateway_pool_id`.",
 				Optional:    true,
 				Validators: []validator.String{
+					infisicaltf.UuidValidator,
 					stringvalidator.ConflictsWith(path.MatchRoot("gateway_pool_id")),
 				},
 			},
 			"gateway_pool_id": schema.StringAttribute{
 				Description: "The ID of the gateway pool to route Kubernetes API requests through. Mutually exclusive with `gateway_id`.",
 				Optional:    true,
+				Validators:  []validator.String{infisicaltf.UuidValidator},
 			},
 			"allowed_audience": schema.StringAttribute{
 				Description: "The audience claim that service account JWTs must carry to authenticate. Leave empty to skip the audience check.",
@@ -203,6 +207,29 @@ func (r *IdentityKubernetesAuthTemplateResource) ValidateConfig(ctx context.Cont
 				"Gateway is required",
 				`token_reviewer_mode "gateway" needs gateway_id or gateway_pool_id.`,
 			)
+		}
+
+		// The gateway reviews tokens with its own in-cluster service account, so these would be
+		// stored and copied to every linked identity without ever being used. The JWT is a
+		// credential, which makes spreading an unused copy worse than useless.
+		hasCaCertificate := !config.CaCertificate.IsNull() &&
+			(config.CaCertificate.IsUnknown() || strings.TrimSpace(config.CaCertificate.ValueString()) != "")
+		for _, unused := range []struct {
+			attribute  string
+			configured bool
+		}{
+			{"kubernetes_host", isStringConfigured(config.KubernetesHost)},
+			{"kubernetes_ca_certificate", hasCaCertificate},
+			{"token_reviewer_jwt", isStringConfigured(config.TokenReviewerJWT)},
+			{"verify_tls_certificate", !config.VerifyTlsCertificate.IsNull() && (config.VerifyTlsCertificate.IsUnknown() || config.VerifyTlsCertificate.ValueBool())},
+		} {
+			if unused.configured {
+				resp.Diagnostics.AddAttributeError(
+					path.Root(unused.attribute),
+					"Not used in gateway mode",
+					unused.attribute+` has no effect when token_reviewer_mode is "gateway", because the gateway reviews tokens with its own service account. Remove it, or use token_reviewer_mode "api".`,
+				)
+			}
 		}
 	}
 }

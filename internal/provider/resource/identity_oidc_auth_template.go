@@ -11,7 +11,6 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
-	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -88,6 +87,7 @@ func (r *IdentityOidcAuthTemplateResource) Schema(_ context.Context, _ resource.
 				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				// Audiences cross the wire as one comma-separated string.
 				Validators: []validator.List{
+					noNullListElements{},
 					listvalidator.ValueStringsAre(
 						stringvalidator.RegexMatches(
 							regexp.MustCompile(`^[^,\s](?:[^,]*[^,\s])?$`),
@@ -103,6 +103,28 @@ func (r *IdentityOidcAuthTemplateResource) Schema(_ context.Context, _ resource.
 				Optional:    true,
 			},
 		},
+	}
+}
+
+// A null entry has no string to send, so it is refused at plan time rather than at apply.
+type noNullListElements struct{}
+
+func (noNullListElements) Description(_ context.Context) string {
+	return "must not contain null entries"
+}
+
+func (v noNullListElements) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (noNullListElements) ValidateList(_ context.Context, req validator.ListRequest, resp *validator.ListResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	for i, element := range req.ConfigValue.Elements() {
+		if element.IsNull() {
+			resp.Diagnostics.AddAttributeError(req.Path.AtListIndex(i), "Invalid list entry", "Entries must not be null.")
+		}
 	}
 }
 
@@ -155,6 +177,15 @@ func (r *IdentityOidcAuthTemplateResource) Configure(_ context.Context, req reso
 	r.client = client
 }
 
+func stringListValues(ctx context.Context, diagnostics *diag.Diagnostics, list types.List) []string {
+	values := []string{}
+	if list.IsNull() || list.IsUnknown() {
+		return values
+	}
+	diagnostics.Append(list.ElementsAs(ctx, &values, false)...)
+	return values
+}
+
 func applyOidcAuthTemplateToModel(ctx context.Context, model *IdentityOidcAuthTemplateResourceModel, template infisical.IdentityOidcAuthTemplate) diag.Diagnostics {
 	fields := template.TemplateFields
 
@@ -190,7 +221,7 @@ func (r *IdentityOidcAuthTemplateResource) Create(ctx context.Context, req resou
 		return
 	}
 
-	boundAudiences := infisicaltf.StringListToGoStringSlice(ctx, resp.Diagnostics, plan.BoundAudiences)
+	boundAudiences := stringListValues(ctx, &resp.Diagnostics, plan.BoundAudiences)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -266,7 +297,7 @@ func oidcAuthTemplateFieldsPatch(ctx context.Context, diagnostics *diag.Diagnost
 		fields["boundIssuer"] = plan.BoundIssuer.ValueString()
 	}
 	if !plan.BoundAudiences.Equal(state.BoundAudiences) {
-		boundAudiences := infisicaltf.StringListToGoStringSlice(ctx, *diagnostics, plan.BoundAudiences)
+		boundAudiences := stringListValues(ctx, diagnostics, plan.BoundAudiences)
 		fields["boundAudiences"] = strings.Join(boundAudiences, ",")
 	}
 	if strings.TrimSpace(plan.CaCertificate.ValueString()) != strings.TrimSpace(state.CaCertificate.ValueString()) {

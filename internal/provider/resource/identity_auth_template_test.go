@@ -6,6 +6,7 @@ import (
 
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -191,9 +192,8 @@ func TestApplyKubernetesAuthTemplateToModel(t *testing.T) {
 		}
 	})
 
-	// An unset optional must stay null, and a configured empty string must stay "", or either
-	// would diff against its configuration forever.
-	t.Run("empty values keep their configured spelling", func(t *testing.T) {
+	// An unset optional must stay null.
+	t.Run("empty API values keep the prior spelling", func(t *testing.T) {
 		empty := template
 		empty.TemplateFields.KubernetesHost = nil
 		empty.TemplateFields.CaCert = ""
@@ -348,5 +348,67 @@ func TestOidcDiscoveryUrlValidator(t *testing.T) {
 				t.Errorf("expected valid=%v, got diagnostics %v", valid, resp.Diagnostics)
 			}
 		})
+	}
+}
+
+func TestUuidValidator(t *testing.T) {
+	cases := map[string]bool{
+		"3f1c9a8e-2b4d-4c6e-9f10-1a2b3c4d5e6f":  true,
+		"00000000-0000-0000-0000-000000000000":  true,
+		"":                                      false,
+		"3F1C9A8E-2B4D-4C6E-9F10-1A2B3C4D5E6F":  false,
+		"3f1c9a8e2b4d4c6e9f101a2b3c4d5e6f":      false,
+		" 3f1c9a8e-2b4d-4c6e-9f10-1a2b3c4d5e6f": false,
+		"prod-gateway":                          false,
+	}
+
+	for value, valid := range cases {
+		t.Run(value, func(t *testing.T) {
+			resp := &validator.StringResponse{}
+			infisicaltf.UuidValidator.ValidateString(context.Background(), validator.StringRequest{
+				Path:        path.Root("gateway_id"),
+				ConfigValue: types.StringValue(value),
+			}, resp)
+			if resp.Diagnostics.HasError() == valid {
+				t.Errorf("expected valid=%v, got diagnostics %v", valid, resp.Diagnostics)
+			}
+		})
+	}
+
+	// null is how a user leaves the attribute unset, so it must pass.
+	resp := &validator.StringResponse{}
+	infisicaltf.UuidValidator.ValidateString(context.Background(), validator.StringRequest{
+		Path:        path.Root("gateway_id"),
+		ConfigValue: types.StringNull(),
+	}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Errorf("expected null to pass, got %v", resp.Diagnostics)
+	}
+}
+
+// A list that cannot convert must surface its error to the caller, which must then not send a
+// partial value that the API would propagate to every linked identity.
+func TestStringListValuesReportsConversionErrors(t *testing.T) {
+	ctx := context.Background()
+
+	withNull, diags := types.ListValue(types.StringType, []attr.Value{types.StringValue("a"), types.StringNull()})
+	if diags.HasError() {
+		t.Fatalf("expected the list to build, got %v", diags)
+	}
+	var errs diag.Diagnostics
+	stringListValues(ctx, &errs, withNull)
+	if !errs.HasError() {
+		t.Error("expected a null element to be reported, since it cannot become a string")
+	}
+
+	var none diag.Diagnostics
+	if values := stringListValues(ctx, &none, types.ListNull(types.StringType)); none.HasError() || len(values) != 0 {
+		t.Errorf("expected a null list to be empty without error, got %v %v", values, none)
+	}
+
+	audiences, _ := types.ListValue(types.StringType, []attr.Value{types.StringValue("a"), types.StringValue("b")})
+	var ok diag.Diagnostics
+	if values := stringListValues(ctx, &ok, audiences); ok.HasError() || len(values) != 2 || values[1] != "b" {
+		t.Errorf("expected [a b], got %v %v", values, ok)
 	}
 }

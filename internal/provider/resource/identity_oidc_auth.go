@@ -139,6 +139,7 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				Optional:    true,
 				Description: "The ID of an `infisical_identity_oidc_auth_template` to take the identity provider settings from. When set, `oidc_discovery_url`, `bound_issuer`, `bound_audiences` and `oidc_ca_certificate` come from the template and must not be set here, later edits to the template propagate to this identity, and `bound_subject` or `bound_claims` must restrict which workloads can authenticate. Removing it unlinks the template and applies the settings in this configuration instead.",
 				Validators: []validator.String{
+					terraform.UuidValidator,
 					stringvalidator.ConflictsWith(
 						path.MatchRoot("oidc_discovery_url"),
 						path.MatchRoot("bound_issuer"),

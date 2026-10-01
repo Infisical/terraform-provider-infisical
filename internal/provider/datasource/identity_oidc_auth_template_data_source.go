@@ -7,11 +7,13 @@ import (
 
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -49,6 +51,7 @@ func (d *IdentityOidcAuthTemplateDataSource) Schema(_ context.Context, _ datasou
 				Description: "The ID of the auth template.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{infisicaltf.UuidValidator},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the auth template. Names are not unique, so a lookup by a name that several OIDC templates share fails and must use `id` instead.",

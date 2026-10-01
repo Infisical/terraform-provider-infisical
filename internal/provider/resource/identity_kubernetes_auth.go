@@ -112,6 +112,7 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Description: "The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt`, `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead.",
 				Validators: []validator.String{
+					infisicaltf.UuidValidator,
 					stringvalidator.ConflictsWith(
 						path.MatchRoot("kubernetes_host"),
 						path.MatchRoot("kubernetes_ca_certificate"),

@@ -76,11 +76,11 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo" {
 - `allowed_audience` (String) The audience claim that service account JWTs must carry to authenticate. Leave empty to skip the audience check.
 - `gateway_id` (String) The ID of the gateway to route Kubernetes API requests through. Mutually exclusive with `gateway_pool_id`.
 - `gateway_pool_id` (String) The ID of the gateway pool to route Kubernetes API requests through. Mutually exclusive with `gateway_id`.
-- `kubernetes_ca_certificate` (String) The PEM-encoded CA certificate used to validate the Kubernetes API server's TLS certificate.
-- `kubernetes_host` (String) The host string, host:port pair, or URL to the base of the Kubernetes API server. Required when `token_reviewer_mode` is `api`.
-- `token_reviewer_jwt` (String, Sensitive) A long-lived service account JWT that Infisical uses to call the TokenReview API. If omitted, each identity's own service account token reviews itself. Write-only: Infisical never returns it, so Terraform cannot detect a change made outside this configuration, and an imported template leaves it empty.
+- `kubernetes_ca_certificate` (String) The PEM-encoded CA certificate used to validate the Kubernetes API server's TLS certificate. Must be omitted when `token_reviewer_mode` is `gateway`.
+- `kubernetes_host` (String) The host string, host:port pair, or URL to the base of the Kubernetes API server. Required when `token_reviewer_mode` is `api`, and must be omitted when it is `gateway`.
+- `token_reviewer_jwt` (String, Sensitive) A long-lived service account JWT that Infisical uses to call the TokenReview API. If omitted, each identity's own service account token reviews itself. Must be omitted when `token_reviewer_mode` is `gateway`. Write-only: Infisical never returns it, so Terraform cannot detect a change made outside this configuration, and an imported template leaves it empty.
 - `token_reviewer_mode` (String) Who performs the TokenReview. `api` means Infisical calls `kubernetes_host` directly. `gateway` means the TokenReview runs through `gateway_id` or `gateway_pool_id`. Defaults to `api`.
-- `verify_tls_certificate` (Boolean) Whether to verify the Kubernetes API server's TLS certificate against `kubernetes_ca_certificate`. Defaults to true when a CA certificate is set, and false otherwise. In `api` mode, true requires a CA certificate and false forbids one.
+- `verify_tls_certificate` (Boolean) Whether to verify the Kubernetes API server's TLS certificate against `kubernetes_ca_certificate`. Defaults to true when a CA certificate is set, and false otherwise. In `api` mode, true requires a CA certificate and false forbids one. In `gateway` mode it cannot be true.
 
 ### Read-Only
 
