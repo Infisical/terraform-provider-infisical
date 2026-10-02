@@ -102,7 +102,7 @@ func (r *secretApprovalPolicyResource) Schema(_ context.Context, _ resource.Sche
 				Default:     booldefault.StaticBool(true),
 			},
 			"bypass_approvals_for_machine_identities": schema.BoolAttribute{
-				Description:   "Whether machine identities can bypass the approval policy. Defaults to `false` when the policy is created. If removed from the configuration later, the current value is kept instead of being reset.",
+				Description:   "Whether machine identities can bypass the approval policy. If omitted when the policy is created, it defaults to `false`. Removing this attribute later does not reset it: for example, if it is set to `true` and you then delete it from your configuration, the policy keeps `true`. To disable it, set it to `false` explicitly.",
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
