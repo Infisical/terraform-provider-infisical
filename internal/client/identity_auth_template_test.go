@@ -26,7 +26,7 @@ func identityAuthTemplateServer(t *testing.T, handler http.HandlerFunc) Client {
 	}}
 }
 
-// captureRequest records the method, path, query and decoded body of the one request a test sends.
+// capturedRequest records the method, path, query and decoded body of the one request a test sends.
 type capturedRequest struct {
 	Method string
 	Path   string
@@ -34,7 +34,7 @@ type capturedRequest struct {
 	Body   map[string]any
 }
 
-func capturingHandler(t *testing.T, captured *capturedRequest, status int, response string) http.HandlerFunc {
+func capturingHandler(t *testing.T, captured *capturedRequest, response string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		captured.Method = r.Method
 		captured.Path = r.URL.Path
@@ -45,7 +45,7 @@ func capturingHandler(t *testing.T, captured *capturedRequest, status int, respo
 				t.Errorf("request body is not a JSON object: %s", raw)
 			}
 		}
-		jsonResponse(status, response)(w, r)
+		jsonResponse(http.StatusOK, response)(w, r)
 	}
 }
 
@@ -81,7 +81,7 @@ const oidcTemplateResponse = `{
 
 func TestCreateIdentityKubernetesAuthTemplateSendsMethodAndOmitsUnsetFields(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, kubernetesTemplateResponse))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, kubernetesTemplateResponse))
 
 	poolID := "22222222-2222-2222-2222-222222222222"
 	template, err := client.CreateIdentityKubernetesAuthTemplate(CreateIdentityKubernetesAuthTemplateRequest{
@@ -128,7 +128,7 @@ func TestCreateIdentityKubernetesAuthTemplateSendsMethodAndOmitsUnsetFields(t *t
 
 func TestGetIdentityOidcAuthTemplateDecodesFields(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, oidcTemplateResponse))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, oidcTemplateResponse))
 
 	template, err := client.GetIdentityOidcAuthTemplate("33333333-3333-3333-3333-333333333333")
 	if err != nil {
@@ -187,7 +187,7 @@ func TestGetIdentityAuthTemplateFailureIsNotAbsence(t *testing.T) {
 // Both have to survive serialization for the resource's patch to mean what it says.
 func TestUpdateIdentityAuthTemplateSendsOnlyThePatch(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, kubernetesTemplateResponse))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, kubernetesTemplateResponse))
 
 	var cleared *string
 	_, err := client.UpdateIdentityKubernetesAuthTemplate(UpdateIdentityAuthTemplateRequest{
@@ -221,7 +221,7 @@ func TestUpdateIdentityAuthTemplateSendsOnlyThePatch(t *testing.T) {
 
 func TestUpdateIdentityAuthTemplateWithoutFieldChangesOmitsFields(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, oidcTemplateResponse))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, oidcTemplateResponse))
 
 	name := "renamed"
 	if _, err := client.UpdateIdentityOidcAuthTemplate(UpdateIdentityAuthTemplateRequest{
@@ -251,7 +251,7 @@ func TestFindIdentityAuthTemplateByName(t *testing.T) {
 	]`
 
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, list))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, list))
 
 	t.Run("exact match", func(t *testing.T) {
 		template, err := client.GetIdentityKubernetesAuthTemplateByName("prod")
@@ -297,7 +297,7 @@ func TestFindIdentityAuthTemplateByNameListFailureIsNotAbsence(t *testing.T) {
 func TestDeleteIdentityAuthTemplate(t *testing.T) {
 	t.Run("deleted", func(t *testing.T) {
 		var captured capturedRequest
-		client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, `{"message":"Template deleted successfully"}`))
+		client := identityAuthTemplateServer(t, capturingHandler(t, &captured, `{"message":"Template deleted successfully"}`))
 
 		if err := client.DeleteIdentityAuthTemplate("11111111-1111-1111-1111-111111111111"); err != nil {
 			t.Fatalf("expected the delete to succeed, got: %v", err)
@@ -320,7 +320,7 @@ func TestDeleteIdentityAuthTemplate(t *testing.T) {
 // even as null.
 func TestKubernetesAuthFromTemplateRequestCarriesNoManagedFields(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, `{"identityKubernetesAuth":{"id":"x","templateId":"t"}}`))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, `{"identityKubernetesAuth":{"id":"x","templateId":"t"}}`))
 
 	auth, err := client.CreateIdentityKubernetesAuthFromTemplate(CreateIdentityKubernetesAuthFromTemplateRequest{
 		IdentityID:        "identity",
@@ -348,7 +348,7 @@ func TestKubernetesAuthFromTemplateRequestCarriesNoManagedFields(t *testing.T) {
 
 func TestOidcAuthFromTemplateRequestCarriesNoManagedFields(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, `{"identityOidcAuth":{"id":"x","templateId":"t"}}`))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, `{"identityOidcAuth":{"id":"x","templateId":"t"}}`))
 
 	if _, err := client.UpdateIdentityOidcAuthFromTemplate(UpdateIdentityOidcAuthFromTemplateRequest{
 		IdentityID:   "identity",
@@ -371,7 +371,7 @@ func TestOidcAuthFromTemplateRequestCarriesNoManagedFields(t *testing.T) {
 // was linked to.
 func TestCustomAuthUpdatesSendTemplateIdNull(t *testing.T) {
 	var captured capturedRequest
-	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, `{"identityKubernetesAuth":{"id":"x"}}`))
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, `{"identityKubernetesAuth":{"id":"x"}}`))
 
 	if _, err := client.UpdateIdentityKubernetesAuth(UpdateIdentityKubernetesAuthRequest{IdentityID: "identity", TokenReviewerMode: "api"}); err != nil {
 		t.Fatalf("expected the update to succeed, got: %v", err)
@@ -381,7 +381,7 @@ func TestCustomAuthUpdatesSendTemplateIdNull(t *testing.T) {
 	}
 
 	captured = capturedRequest{}
-	client = identityAuthTemplateServer(t, capturingHandler(t, &captured, http.StatusOK, `{"identityOidcAuth":{"id":"x"}}`))
+	client = identityAuthTemplateServer(t, capturingHandler(t, &captured, `{"identityOidcAuth":{"id":"x"}}`))
 	if _, err := client.UpdateIdentityOidcAuth(UpdateIdentityOidcAuthRequest{IdentityID: "identity"}); err != nil {
 		t.Fatalf("expected the update to succeed, got: %v", err)
 	}

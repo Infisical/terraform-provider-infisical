@@ -92,7 +92,13 @@ func (r *IdentityKubernetesAuthTemplateResource) Schema(_ context.Context, _ res
 			"kubernetes_host": schema.StringAttribute{
 				Description: "The host string, host:port pair, or URL to the base of the Kubernetes API server. Required when `token_reviewer_mode` is `api`, and must be omitted when it is `gateway`.",
 				Optional:    true,
-				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 255),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[A-Za-z0-9:./-]+$`),
+						"must only contain letters, numbers, colons, periods, forward slashes and hyphens, so it cannot carry credentials, a query string or whitespace",
+					),
+				},
 			},
 			"kubernetes_ca_certificate": schema.StringAttribute{
 				// The API strips the trailing newline that file() always adds.

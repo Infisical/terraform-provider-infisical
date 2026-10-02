@@ -108,9 +108,9 @@ func TestKubernetesAuthTemplatePatchSendsGatewayFieldsAsAPair(t *testing.T) {
 	plan.GatewayPoolID = types.StringValue("pool-1")
 
 	patch := kubernetesAuthTemplateFieldsPatch(plan, state)
-	gatewayID, present := patch["gatewayId"]
-	if !present || gatewayID.(*string) != nil {
-		t.Errorf("expected gatewayId to be sent as null, got %v (present: %v)", gatewayID, present)
+	gatewayID, isPtr := patch["gatewayId"].(*string)
+	if !isPtr || gatewayID != nil {
+		t.Errorf("expected gatewayId to be sent as null, got %v", patch["gatewayId"])
 	}
 	if poolID, _ := patch["gatewayPoolId"].(*string); poolID == nil || *poolID != "pool-1" {
 		t.Errorf("expected the new pool, got %v", patch["gatewayPoolId"])
@@ -122,9 +122,10 @@ func TestKubernetesAuthTemplatePatchSendsNullToClearTheHost(t *testing.T) {
 	plan := state
 	plan.KubernetesHost = types.StringNull()
 
-	host, present := kubernetesAuthTemplateFieldsPatch(plan, state)["kubernetesHost"]
-	if !present || host.(*string) != nil {
-		t.Errorf("expected kubernetesHost to be sent as null, got %v (present: %v)", host, present)
+	patch := kubernetesAuthTemplateFieldsPatch(plan, state)
+	host, isPtr := patch["kubernetesHost"].(*string)
+	if !isPtr || host != nil {
+		t.Errorf("expected kubernetesHost to be sent as null, got %v", patch["kubernetesHost"])
 	}
 }
 
