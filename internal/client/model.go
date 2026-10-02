@@ -4443,6 +4443,79 @@ type DeleteSubOrganizationResponse struct {
 	Organization SubOrganization `json:"organization"`
 }
 
+// Organization group membership (linking a root-org group into a sub-organization)
+
+type AvailableGroup struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type ListAvailableGroupsResponse struct {
+	Groups []AvailableGroup `json:"groups"`
+}
+
+type OrgGroupMembershipGroup struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Slug  string `json:"slug"`
+	OrgID string `json:"orgId"`
+}
+
+type OrgGroupMembershipRole struct {
+	ID                       string     `json:"id"`
+	Role                     string     `json:"role"`
+	CustomRoleID             *string    `json:"customRoleId"`
+	CustomRoleName           *string    `json:"customRoleName"`
+	CustomRoleSlug           *string    `json:"customRoleSlug"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            *string    `json:"temporaryMode"`
+	TemporaryRange           *string    `json:"temporaryRange"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   *time.Time `json:"temporaryAccessEndTime"`
+	CreatedAt                string     `json:"createdAt"`
+	UpdatedAt                string     `json:"updatedAt"`
+}
+
+type OrgGroupMembership struct {
+	ID        string                   `json:"id"`
+	GroupID   string                   `json:"groupId"`
+	Group     OrgGroupMembershipGroup  `json:"group"`
+	Roles     []OrgGroupMembershipRole `json:"roles"`
+	CreatedAt string                   `json:"createdAt"`
+	UpdatedAt string                   `json:"updatedAt"`
+}
+
+// OrgGroupMembershipRoleRequest is one entry of the roles array. The API validates the array
+// against two strict variants (permanent and temporary), so the temporary fields are omitted
+// entirely for a permanent role rather than sent empty.
+type OrgGroupMembershipRoleRequest struct {
+	Role                     string     `json:"role"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            string     `json:"temporaryMode,omitempty"`
+	TemporaryRange           string     `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type CreateOrgGroupMembershipRequest struct {
+	GroupID string                          `json:"-"`
+	Roles   []OrgGroupMembershipRoleRequest `json:"roles"`
+}
+
+type UpdateOrgGroupMembershipRequest struct {
+	GroupID string                          `json:"-"`
+	Roles   []OrgGroupMembershipRoleRequest `json:"roles"`
+}
+
+type OrgGroupMembershipResponse struct {
+	GroupMembership OrgGroupMembership `json:"groupMembership"`
+}
+
+type ListOrgGroupMembershipsResponse struct {
+	GroupMemberships []OrgGroupMembership `json:"groupMemberships"`
+	TotalCount       int                  `json:"totalCount"`
+}
+
 type IdentityTlsCertAuth struct {
 	ID                           string                  `json:"id"`
 	AccessTokenTTL               int64                   `json:"accessTokenTTL"`
