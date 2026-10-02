@@ -89,12 +89,14 @@ func NewSecretValidationRuleStaticSecretsResource() resource.Resource {
 						path.MatchRelative().AtParent().AtName("key_constraints"),
 						path.MatchRelative().AtParent().AtName("value_constraints"),
 					),
+					validators.ObjectAtLeastOneAttributeSet(),
 				},
 			},
 			"value_constraints": schema.SingleNestedAttribute{
 				Optional:    true,
 				Description: "Constraints enforced on the secret value when a secret is created or updated. Omit to leave values unconstrained.",
 				Attributes:  valueConstraintsAttributes(),
+				Validators:  []validator.Object{validators.ObjectAtLeastOneAttributeSet()},
 			},
 		},
 

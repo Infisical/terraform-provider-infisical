@@ -274,6 +274,66 @@ func TestStaticSecretsRequiresKeyOrValueConstraints(t *testing.T) {
 	}
 }
 
+// An empty `{}` still counts as a present block for AtLeastOneOf, but the API rejects a constraint
+// block that sets nothing, so each block has to set at least one attribute when it is present.
+func TestEmptyStaticSecretsConstraintsRejected(t *testing.T) {
+	ctx := context.Background()
+	s := ruleSchema(t, ruleResources(t)["static_secrets"])
+
+	key := stringConstraintsObject(t, infisical.SecretValidationRuleStringConstraints{RequiredPrefix: stringPtr("APP_")})
+	value := valueConstraintsObject(t, &infisical.SecretValidationRuleValueConstraints{UniqueAcrossLastVersions: int64Ptr(3)})
+	emptyKey := stringConstraintsObject(t, infisical.SecretValidationRuleStringConstraints{})
+	emptyValue := valueConstraintsObject(t, &infisical.SecretValidationRuleValueConstraints{})
+
+	// Each case pairs the block under test with a valid sibling, so only the block itself can fail.
+	cases := map[string]struct {
+		emptyKey, emptyValue types.Object
+		block                func(key, value types.Object) types.Object
+	}{
+		"key_constraints": {
+			emptyKey:   emptyKey,
+			emptyValue: value,
+			block:      func(key, _ types.Object) types.Object { return key },
+		},
+		"value_constraints": {
+			emptyKey:   key,
+			emptyValue: emptyValue,
+			block:      func(_, value types.Object) types.Object { return value },
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			blockPath := path.Root("constraints").AtName(name)
+
+			attribute, ok := ruleAttribute(t, s, blockPath).(schema.SingleNestedAttribute)
+			if !ok {
+				t.Fatalf("%s is not a single nested attribute", name)
+			}
+
+			rejected := func(key, value types.Object) bool {
+				resp := &validator.ObjectResponse{}
+				for _, v := range attribute.Validators {
+					v.ValidateObject(ctx, validator.ObjectRequest{
+						Path:           blockPath,
+						PathExpression: blockPath.Expression(),
+						ConfigValue:    c.block(key, value),
+						Config:         ruleConfig(t, s, ruleModel(staticSecretsConstraintsObject(t, key, value))),
+					}, resp)
+				}
+				return resp.Diagnostics.HasError()
+			}
+
+			if !rejected(c.emptyKey, c.emptyValue) {
+				t.Errorf("an empty %s block passed validation, want it rejected", name)
+			}
+			if rejected(key, value) {
+				t.Errorf("a %s block with an attribute set was rejected, want it accepted", name)
+			}
+		})
+	}
+}
+
 // unique_across_last_versions has to stay in the range the API allows. Omitting it, or setting only
 // unique_within_scope, is valid because both fields are optional on their own.
 func TestUniqueAcrossLastVersionsValidation(t *testing.T) {
