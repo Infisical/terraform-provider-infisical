@@ -70,7 +70,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
 ### Optional
 
 - `allow_self_approval` (Boolean) Whether to allow the  approvers to approve their own changes
-- `bypass_approvals_for_machine_identities` (Boolean) Whether machine identities can bypass the policy. If not set, the Infisical default is used on creation and the current value is left unchanged on update
+- `bypass_approvals_for_machine_identities` (Boolean) Whether machine identities can bypass the approval policy. If omitted when the policy is created, it defaults to `false`. Removing this attribute later does not reset it: for example, if it is set to `true` and you then delete it from your configuration, the policy keeps `true`. To disable it, set it to `false` explicitly.
 - `bypassers` (Attributes Set) The bypassers who can bypass the approval policy (see [below for nested schema](#nestedatt--bypassers))
 - `enforcement_level` (String) The enforcement level of the policy. This can either be hard or soft
 - `environment_slug` (String) (DEPRECATED, Use environment_slugs instead) The environment to apply the secret approval policy to
