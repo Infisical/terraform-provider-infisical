@@ -16,6 +16,7 @@ import (
 	externalKmsResource "terraform-provider-infisical/internal/provider/resource/external_kms"
 	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
+	secretValidationRuleResource "terraform-provider-infisical/internal/provider/resource/secret_validation_rule"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
@@ -387,6 +388,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectUserDataSource,
 		infisicalDatasource.NewOrganizationDataSource,
 		infisicalDatasource.NewGatewayDataSource,
+		infisicalDatasource.NewSecretValidationRulesDataSource,
 	}
 }
 
@@ -486,6 +488,9 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationLdapPasswordResource,
 		secretRotationResource.NewSecretRotationDatadogApiKeyResource,
 		secretRotationResource.NewSecretRotationAuth0ClientSecretResource,
+		secretValidationRuleResource.NewSecretValidationRuleStaticSecretsResource,
+		secretValidationRuleResource.NewSecretValidationRuleDynamicSecretsResource,
+		secretValidationRuleResource.NewSecretValidationRuleSecretRotationsResource,
 		infisicalResource.NewProjectTemplateResource,
 		infisicalResource.NewKMSKeyResource,
 		infisicalResource.NewCertManagerInternalCAResource,
