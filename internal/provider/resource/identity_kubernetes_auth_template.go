@@ -212,16 +212,19 @@ func (r *IdentityKubernetesAuthTemplateResource) ValidateConfig(ctx context.Cont
 		// The gateway reviews tokens with its own in-cluster service account, so these would be
 		// stored and copied to every linked identity without ever being used. The JWT is a
 		// credential, which makes spreading an unused copy worse than useless.
-		hasCaCertificate := !config.CaCertificate.IsNull() &&
-			(config.CaCertificate.IsUnknown() || strings.TrimSpace(config.CaCertificate.ValueString()) != "")
+		hasKnownString := func(value types.String) bool {
+			return !value.IsNull() && !value.IsUnknown() && value.ValueString() != ""
+		}
+		hasCaCertificate := !config.CaCertificate.IsNull() && !config.CaCertificate.IsUnknown() &&
+			strings.TrimSpace(config.CaCertificate.ValueString()) != ""
 		for _, unused := range []struct {
 			attribute  string
 			configured bool
 		}{
-			{"kubernetes_host", isStringConfigured(config.KubernetesHost)},
+			{"kubernetes_host", hasKnownString(config.KubernetesHost)},
 			{"kubernetes_ca_certificate", hasCaCertificate},
-			{"token_reviewer_jwt", isStringConfigured(config.TokenReviewerJWT)},
-			{"verify_tls_certificate", !config.VerifyTlsCertificate.IsNull() && (config.VerifyTlsCertificate.IsUnknown() || config.VerifyTlsCertificate.ValueBool())},
+			{"token_reviewer_jwt", hasKnownString(config.TokenReviewerJWT)},
+			{"verify_tls_certificate", !config.VerifyTlsCertificate.IsNull() && !config.VerifyTlsCertificate.IsUnknown() && config.VerifyTlsCertificate.ValueBool()},
 		} {
 			if unused.configured {
 				resp.Diagnostics.AddAttributeError(
