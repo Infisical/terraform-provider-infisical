@@ -4580,8 +4580,8 @@ type CreateSecretValidationRuleResponse struct {
 }
 
 type GetSecretValidationRuleByIdRequest struct {
-	Type SecretValidationRuleType `json:"-"`
-	ID   string                   `json:"-"`
+	Type SecretValidationRuleType
+	ID   string
 }
 
 type GetSecretValidationRuleByIdResponse struct {
@@ -4589,8 +4589,8 @@ type GetSecretValidationRuleByIdResponse struct {
 }
 
 type UpdateSecretValidationRuleRequest struct {
-	Type SecretValidationRuleType `json:"-"`
-	ID   string                   `json:"-"`
+	Type SecretValidationRuleType
+	ID   string
 
 	Name        string
 	Description *string
@@ -4606,8 +4606,8 @@ type UpdateSecretValidationRuleResponse struct {
 }
 
 type DeleteSecretValidationRuleRequest struct {
-	Type SecretValidationRuleType `json:"-"`
-	ID   string                   `json:"-"`
+	Type SecretValidationRuleType
+	ID   string
 }
 
 type DeleteSecretValidationRuleResponse struct {
@@ -4615,12 +4615,12 @@ type DeleteSecretValidationRuleResponse struct {
 }
 
 type ListSecretValidationRulesRequest struct {
-	Type      SecretValidationRuleType `json:"-"`
-	ProjectID string                   `json:"-"`
+	Type      SecretValidationRuleType
+	ProjectID string
 }
 
 type ListAllSecretValidationRulesRequest struct {
-	ProjectID string `json:"-"`
+	ProjectID string
 }
 
 type ListSecretValidationRulesResponse struct {
