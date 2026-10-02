@@ -487,14 +487,16 @@ func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
 		role      subOrganizationGroupRole
 		wantError string
 	}{
-		"permanent":                     {role: role(types.BoolValue(false), types.StringNull(), types.StringNull())},
-		"temporary with start time":     {role: role(types.BoolValue(true), types.StringValue("2h"), start)},
-		"is_temporary still unknown":    {role: role(types.BoolUnknown(), types.StringValue("2h"), types.StringNull())},
-		"start time still unknown":      {role: role(types.BoolValue(true), types.StringNull(), types.StringUnknown())},
-		"permanent with range":          {role: role(types.BoolValue(false), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
-		"permanent with start time":     {role: role(types.BoolValue(false), types.StringNull(), start), wantError: "permanent role"},
-		"unset is_temporary with range": {role: role(types.BoolNull(), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
-		"temporary without start time":  {role: role(types.BoolValue(true), types.StringNull(), types.StringNull()), wantError: "temporary_access_start_time is required"},
+		"permanent":                         {role: role(types.BoolValue(false), types.StringNull(), types.StringNull())},
+		"temporary with start time":         {role: role(types.BoolValue(true), types.StringValue("2h"), start)},
+		"is_temporary still unknown":        {role: role(types.BoolUnknown(), types.StringValue("2h"), types.StringNull())},
+		"start time still unknown":          {role: role(types.BoolValue(true), types.StringNull(), types.StringUnknown())},
+		"permanent with unknown range":      {role: role(types.BoolValue(false), types.StringUnknown(), types.StringNull())},
+		"permanent with unknown start time": {role: role(types.BoolValue(false), types.StringNull(), types.StringUnknown())},
+		"permanent with range":              {role: role(types.BoolValue(false), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
+		"permanent with start time":         {role: role(types.BoolValue(false), types.StringNull(), start), wantError: "permanent role"},
+		"unset is_temporary with range":     {role: role(types.BoolNull(), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
+		"temporary without start time":      {role: role(types.BoolValue(true), types.StringNull(), types.StringNull()), wantError: "temporary_access_start_time is required"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
@@ -523,5 +525,18 @@ func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
 				t.Errorf("expected an error containing %q, got: %v", tc.wantError, resp.Diagnostics)
 			}
 		})
+	}
+}
+
+// Values that were unknown at plan time are only known at apply, so the builder rejects them there.
+func TestBuildSubOrganizationGroupRolesRejectsTemporaryFieldsOnPermanentRole(t *testing.T) {
+	_, diags := buildSubOrganizationGroupRoles([]subOrganizationGroupRole{{
+		RoleSlug:                 types.StringValue("member"),
+		IsTemporary:              types.BoolValue(false),
+		TemporaryRange:           types.StringValue("2h"),
+		TemporaryAccessStartTime: types.StringNull(),
+	}})
+	if !diags.HasError() || !strings.Contains(fmt.Sprint(diags), "permanent role") {
+		t.Errorf("expected the permanent role to be rejected, got: %v", diags)
 	}
 }

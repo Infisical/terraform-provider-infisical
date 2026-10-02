@@ -162,14 +162,20 @@ func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req r
 			continue
 		}
 
-		if !role.TemporaryRange.IsNull() || !role.TemporaryAccessStartTime.IsNull() {
-			resp.Diagnostics.AddAttributeError(
-				rolePath,
-				"Temporary fields set on a permanent role",
-				fmt.Sprintf("Role %s isn't temporary, so temporary_range and temporary_access_start_time do nothing. Set is_temporary = true or remove them.", role.RoleSlug.ValueString()),
-			)
+		if isKnownAndSet(role.TemporaryRange) || isKnownAndSet(role.TemporaryAccessStartTime) {
+			resp.Diagnostics.AddAttributeError(rolePath, permanentRoleTemporaryFieldsSummary, permanentRoleTemporaryFieldsDetail(role))
 		}
 	}
+}
+
+func isKnownAndSet(value types.String) bool {
+	return !value.IsNull() && !value.IsUnknown()
+}
+
+const permanentRoleTemporaryFieldsSummary = "Temporary fields set on a permanent role"
+
+func permanentRoleTemporaryFieldsDetail(role subOrganizationGroupRole) string {
+	return fmt.Sprintf("Role %s isn't temporary, so temporary_range and temporary_access_start_time do nothing. Set is_temporary = true or remove them.", role.RoleSlug.ValueString())
 }
 
 func (r *subOrganizationGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -197,6 +203,11 @@ func buildSubOrganizationGroupRoles(roles []subOrganizationGroupRole) ([]infisic
 		requestRole := infisical.OrgGroupMembershipRoleRequest{
 			Role:        role.RoleSlug.ValueString(),
 			IsTemporary: role.IsTemporary.ValueBool(),
+		}
+
+		if !requestRole.IsTemporary && (!role.TemporaryRange.IsNull() || !role.TemporaryAccessStartTime.IsNull()) {
+			diags.AddError(permanentRoleTemporaryFieldsSummary, permanentRoleTemporaryFieldsDetail(role))
+			continue
 		}
 
 		if requestRole.IsTemporary {
