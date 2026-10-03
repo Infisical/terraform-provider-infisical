@@ -38,13 +38,21 @@ func (client Client) GetIdentityKubernetesAuth(request GetIdentityKubernetesAuth
 }
 
 func (client Client) CreateIdentityKubernetesAuth(request CreateIdentityKubernetesAuthRequest) (IdentityKubernetesAuth, error) {
+	return client.createIdentityKubernetesAuth(request.IdentityID, request)
+}
+
+func (client Client) CreateIdentityKubernetesAuthFromTemplate(request CreateIdentityKubernetesAuthFromTemplateRequest) (IdentityKubernetesAuth, error) {
+	return client.createIdentityKubernetesAuth(request.IdentityID, request)
+}
+
+func (client Client) createIdentityKubernetesAuth(identityID string, request any) (IdentityKubernetesAuth, error) {
 	var body CreateIdentityKubernetesAuthResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post("api/v1/auth/kubernetes-auth/identities/" + request.IdentityID)
+		Post("api/v1/auth/kubernetes-auth/identities/" + identityID)
 
 	if err != nil {
 		return IdentityKubernetesAuth{}, errors.NewGenericRequestError(operationCreateIdentityKubernetesAuth, err)
@@ -58,13 +66,21 @@ func (client Client) CreateIdentityKubernetesAuth(request CreateIdentityKubernet
 }
 
 func (client Client) UpdateIdentityKubernetesAuth(request UpdateIdentityKubernetesAuthRequest) (IdentityKubernetesAuth, error) {
+	return client.updateIdentityKubernetesAuth(request.IdentityID, request)
+}
+
+func (client Client) UpdateIdentityKubernetesAuthFromTemplate(request UpdateIdentityKubernetesAuthFromTemplateRequest) (IdentityKubernetesAuth, error) {
+	return client.updateIdentityKubernetesAuth(request.IdentityID, request)
+}
+
+func (client Client) updateIdentityKubernetesAuth(identityID string, request any) (IdentityKubernetesAuth, error) {
 	var body UpdateIdentityKubernetesAuthResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch("api/v1/auth/kubernetes-auth/identities/" + request.IdentityID)
+		Patch("api/v1/auth/kubernetes-auth/identities/" + identityID)
 
 	if err != nil {
 		return IdentityKubernetesAuth{}, errors.NewGenericRequestError(operationUpdateIdentityKubernetesAuth, err)

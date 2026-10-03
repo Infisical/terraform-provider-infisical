@@ -13,13 +13,21 @@ const (
 )
 
 func (client Client) CreateIdentityOidcAuth(request CreateIdentityOidcAuthRequest) (IdentityOidcAuth, error) {
+	return client.createIdentityOidcAuth(request.IdentityID, request)
+}
+
+func (client Client) CreateIdentityOidcAuthFromTemplate(request CreateIdentityOidcAuthFromTemplateRequest) (IdentityOidcAuth, error) {
+	return client.createIdentityOidcAuth(request.IdentityID, request)
+}
+
+func (client Client) createIdentityOidcAuth(identityID string, request any) (IdentityOidcAuth, error) {
 	var body CreateIdentityOidcAuthResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post("api/v1/auth/oidc-auth/identities/" + request.IdentityID)
+		Post("api/v1/auth/oidc-auth/identities/" + identityID)
 
 	if err != nil {
 		return IdentityOidcAuth{}, errors.NewGenericRequestError(operationCreateIdentityOidcAuth, err)
@@ -58,13 +66,21 @@ func (client Client) GetIdentityOidcAuth(request GetIdentityOidcAuthRequest) (Id
 }
 
 func (client Client) UpdateIdentityOidcAuth(request UpdateIdentityOidcAuthRequest) (IdentityOidcAuth, error) {
+	return client.updateIdentityOidcAuth(request.IdentityID, request)
+}
+
+func (client Client) UpdateIdentityOidcAuthFromTemplate(request UpdateIdentityOidcAuthFromTemplateRequest) (IdentityOidcAuth, error) {
+	return client.updateIdentityOidcAuth(request.IdentityID, request)
+}
+
+func (client Client) updateIdentityOidcAuth(identityID string, request any) (IdentityOidcAuth, error) {
 	var body UpdateIdentityOidcAuthResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch("api/v1/auth/oidc-auth/identities/" + request.IdentityID)
+		Patch("api/v1/auth/oidc-auth/identities/" + identityID)
 
 	if err != nil {
 		return IdentityOidcAuth{}, errors.NewGenericRequestError(operationUpdateIdentityOidcAuth, err)
