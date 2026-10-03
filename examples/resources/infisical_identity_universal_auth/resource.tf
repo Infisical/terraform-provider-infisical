@@ -26,9 +26,9 @@ resource "infisical_identity" "example" {
 resource "infisical_identity_universal_auth" "example" {
   identity_id = infisical_identity.example.id
 
-  access_token_ttl              = 2592000
-  access_token_max_ttl          = 2592000
-  access_token_num_uses_limit   = 0
-  access_token_trusted_ips      = [{ ip_address = "0.0.0.0/0" }]
-  client_secret_trusted_ips     = [{ ip_address = "0.0.0.0/0" }]
+  access_token_ttl            = 2592000
+  access_token_max_ttl        = 2592000
+  access_token_num_uses_limit = 0
+  access_token_trusted_ips    = [{ ip_address = "0.0.0.0/0" }]
+  client_secret_trusted_ips   = [{ ip_address = "0.0.0.0/0" }]
 }
