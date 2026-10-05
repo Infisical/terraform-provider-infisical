@@ -210,6 +210,8 @@ type IdentityKubernetesAuth struct {
 	TokenReviewerMode          string                  `json:"tokenReviewMode"`
 	GatewayID                  string                  `json:"gatewayId"`
 	TemplateID                 *string                 `json:"templateId"`
+	// A JWT copied from a linked template reads back as "", so this is the only sign one is stored.
+	IsTokenReviewerJwtTemplateSourced bool `json:"isTokenReviewerJwtTemplateSourced"`
 }
 
 type IdentityOidcAuth struct {
@@ -1790,6 +1792,24 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	GatewayID               *string                        `json:"gatewayId"`
 	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
 	TemplateID *string `json:"templateId"`
+	// Leaves tokenReviewerJwt out of the request, which keeps the stored JWT. A nil TokenReviewerJwt
+	// is sent as null, which clears it.
+	KeepTokenReviewerJwt bool `json:"-"`
+}
+
+func (request UpdateIdentityKubernetesAuthRequest) MarshalJSON() ([]byte, error) {
+	type plain UpdateIdentityKubernetesAuthRequest
+	body, err := json.Marshal(plain(request))
+	if err != nil || !request.KeepTokenReviewerJwt {
+		return body, err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, err
+	}
+	delete(fields, "tokenReviewerJwt")
+	return json.Marshal(fields)
 }
 
 // The API rejects every template-managed connection field on a templated attach, even as null,
@@ -1803,6 +1823,12 @@ type CreateIdentityKubernetesAuthFromTemplateRequest struct {
 	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
 	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+// unlinkIdentityAuthTemplateRequest unlinks a template and changes nothing else: the API leaves
+// every field the request omits as it is, so the identity keeps the settings copied onto it.
+type unlinkIdentityAuthTemplateRequest struct {
+	TemplateID *string `json:"templateId"`
 }
 
 type UpdateIdentityKubernetesAuthFromTemplateRequest struct {

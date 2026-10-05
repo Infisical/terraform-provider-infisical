@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -98,4 +99,53 @@ func (m useStateForUnknownUnlessTemplateLinked) PlanModifyList(ctx context.Conte
 		return
 	}
 	resp.PlanValue = req.StateValue
+}
+
+// isUnlinkingTemplate reports whether this plan removes a linked template: state holds a
+// template_id and the configuration no longer sets one.
+func isUnlinkingTemplate(ctx context.Context, config tfsdk.Config, state tfsdk.State, diagnostics *diag.Diagnostics) bool {
+	if state.Raw.IsNull() {
+		return false
+	}
+	var configured, stored types.String
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("template_id"), &configured)...)
+	diagnostics.Append(state.GetAttribute(ctx, path.Root("template_id"), &stored)...)
+	return configured.IsNull() && !stored.IsNull()
+}
+
+// clearWhenUnlinking plans an unset attribute as empty on the apply that removes template_id.
+// Removing it hands the settings back to the configuration, so a setting the configuration leaves
+// out is cleared, and the plan shows that instead of quietly keeping the template's value. To keep
+// a value after unlinking, set it in the configuration. Outside an unlink the attribute behaves as
+// it always has.
+type clearWhenUnlinking struct{}
+
+func (m clearWhenUnlinking) Description(_ context.Context) string {
+	return "Clears the value when template_id is removed and the configuration does not set it."
+}
+
+func (m clearWhenUnlinking) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m clearWhenUnlinking) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if !req.ConfigValue.IsNull() || !isUnlinkingTemplate(ctx, req.Config, req.State, &resp.Diagnostics) {
+		return
+	}
+	resp.PlanValue = types.StringValue("")
+}
+
+func (m clearWhenUnlinking) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
+	if !req.ConfigValue.IsNull() || !isUnlinkingTemplate(ctx, req.Config, req.State, &resp.Diagnostics) {
+		return
+	}
+	empty, diags := types.ListValue(req.PlanValue.ElementType(ctx), []attr.Value{})
+	resp.Diagnostics.Append(diags...)
+	resp.PlanValue = empty
+}
+
+// unchangedOrDefaulted is true when an attribute will not change: the plan matches state, or the
+// plan is unknown only because the configuration leaves the attribute to the API, which keeps it.
+func unchangedOrDefaulted(planned, stored attr.Value) bool {
+	return planned.Equal(stored) || planned.IsUnknown()
 }

@@ -15,6 +15,7 @@ const (
 	operationUpdateIdentityAuthTemplate        = "CallUpdateIdentityAuthTemplate"
 	operationDeleteIdentityAuthTemplate        = "CallDeleteIdentityAuthTemplate"
 	operationListIdentityAuthTemplatesByMethod = "CallListIdentityAuthTemplatesByMethod"
+	operationUnlinkIdentityAuthTemplateUsage   = "CallUnlinkIdentityAuthTemplateUsage"
 )
 
 const (
@@ -265,6 +266,31 @@ func (client Client) DeleteIdentityAuthTemplate(templateID string) error {
 
 	if response.IsError() {
 		return errors.NewAPIErrorWithResponse(operationDeleteIdentityAuthTemplate, response, nil)
+	}
+
+	return nil
+}
+
+// UnlinkIdentityAuthTemplateUsage unlinks identities from a template through the template's
+// delete-usage endpoint, which needs UnlinkTemplates on auth templates rather than EditAuth on the
+// identity. Only the link is removed: each identity keeps the settings copied onto it.
+func (client Client) UnlinkIdentityAuthTemplateUsage(templateID string, identityIDs []string) error {
+	response, err := client.Config.HttpClient.
+		R().
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(map[string][]string{"identityIds": identityIDs}).
+		Post("api/v1/identity-templates/" + url.PathEscape(templateID) + "/delete-usage")
+
+	if err != nil {
+		return errors.NewGenericRequestError(operationUnlinkIdentityAuthTemplateUsage, err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	if response.IsError() {
+		return errors.NewAPIErrorWithResponse(operationUnlinkIdentityAuthTemplateUsage, response, nil)
 	}
 
 	return nil

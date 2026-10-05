@@ -50,6 +50,8 @@ type IdentityKubernetesAuthResourceModel struct {
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	TokenReviewerMode types.String `tfsdk:"token_reviewer_mode"` // api|gateway (default is api)
 	TemplateID        types.String `tfsdk:"template_id"`
+
+	HasTemplateSourcedTokenReviewerJWT types.Bool `tfsdk:"has_template_sourced_token_reviewer_jwt"`
 }
 
 type IdentityKubernetesAuthResourceTrustedIps struct {
@@ -81,9 +83,13 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			// Computed so a linked template can supply it, and read back while linked so that
+			// removing template_id can tell a kept host from a changed one.
 			"kubernetes_host": schema.StringAttribute{
-				Description: "The host string, host:port pair, or URL to the base of the Kubernetes API server. This can usually be obtained by running `kubectl cluster-info`.",
-				Optional:    true,
+				Description:   "The host string, host:port pair, or URL to the base of the Kubernetes API server. This can usually be obtained by running `kubectl cluster-info`.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{nullUnlessTemplateLinked{}},
 			},
 			"token_reviewer_jwt": schema.StringAttribute{
 				Description:         "A long-lived service account JWT token for Infisical to access the TokenReview API to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5.",
@@ -110,7 +116,7 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"template_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt`, `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead.",
+				Description: "The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt`, `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead: a connection setting the configuration leaves out is cleared, and the plan shows it. To unlink and keep the template's settings, set them here to the template's values (for example from the `infisical_identity_kubernetes_auth_template` data source); an unlink that changes nothing else then only needs the `unlink-templates` permission on auth templates, or `edit-auth` on the identity. A token reviewer JWT copied from the template is kept unless `token_reviewer_jwt` is set to a new value, or to `\"\"` to remove it.",
 				Validators: []validator.String{
 					infisicaltf.UuidValidator,
 					stringvalidator.ConflictsWith(
@@ -130,6 +136,11 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				MarkdownDescription: "The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{clearWhenUnlinking{}},
+			},
+			"has_template_sourced_token_reviewer_jwt": schema.BoolAttribute{
+				Description: "Whether this identity holds a token reviewer JWT copied from an auth template. That JWT is write-only and reads back as empty, so this is the only sign it is there. It is kept after `template_id` is removed unless `token_reviewer_jwt` replaces it, or is set to `\"\"` to remove it.",
+				Computed:    true,
 			},
 			"allowed_service_account_names": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -138,9 +149,10 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 			},
 			"allowed_audience": schema.StringAttribute{
-				Description: "An optional audience claim that the service account JWT token must have to authenticate with Infisical.",
-				Optional:    true,
-				Computed:    true,
+				Description:   "An optional audience claim that the service account JWT token must have to authenticate with Infisical.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{clearWhenUnlinking{}},
 			},
 			"allowed_namespaces": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -216,9 +228,22 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 
 	if newIdentityKubernetesAuth.TemplateID != nil && *newIdentityKubernetesAuth.TemplateID != "" {
 		plan.TemplateID = types.StringValue(*newIdentityKubernetesAuth.TemplateID)
+		// The template owns the host while linked, so state follows the API. Unlinked, the
+		// configured spelling is kept, as it always was.
+		plan.KubernetesHost = types.StringNull()
+		if newIdentityKubernetesAuth.KubernetesHost != "" {
+			plan.KubernetesHost = types.StringValue(newIdentityKubernetesAuth.KubernetesHost)
+		}
 	} else {
 		plan.TemplateID = types.StringNull()
+		if plan.KubernetesHost.IsUnknown() {
+			plan.KubernetesHost = types.StringNull()
+			if newIdentityKubernetesAuth.KubernetesHost != "" {
+				plan.KubernetesHost = types.StringValue(newIdentityKubernetesAuth.KubernetesHost)
+			}
+		}
 	}
+	plan.HasTemplateSourcedTokenReviewerJWT = types.BoolValue(newIdentityKubernetesAuth.IsTokenReviewerJwtTemplateSourced)
 
 	planAccessTokenTrustedIps := make([]IdentityKubernetesAuthResourceTrustedIps, len(newIdentityKubernetesAuth.AccessTokenTrustedIPS))
 	for i, el := range newIdentityKubernetesAuth.AccessTokenTrustedIPS {
@@ -491,7 +516,9 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 
 	var updatedIdentityKubernetesAuth infisical.IdentityKubernetesAuth
 	var err error
-	if !plan.TemplateID.IsNull() {
+	if kubernetesAuthUnlinksOnly(plan, state) {
+		updatedIdentityKubernetesAuth, err = r.unlinkTemplateOnly(state)
+	} else if !plan.TemplateID.IsNull() {
 		updatedIdentityKubernetesAuth, err = r.client.UpdateIdentityKubernetesAuthFromTemplate(infisical.UpdateIdentityKubernetesAuthFromTemplateRequest{
 			IdentityID:              plan.IdentityID.ValueString(),
 			TemplateID:              plan.TemplateID.ValueString(),
@@ -503,7 +530,10 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 			AllowedNames:            strings.Join(allowedNames, ","),
 		})
 	} else {
-		updatedIdentityKubernetesAuth, err = r.updateCustomKubernetesAuth(&resp.Diagnostics, &plan, accessTokenTrustedIps, allowedNamespacpes, allowedNames)
+		// An unset JWT keeps one copied from a template: it reads back
+		// as empty, so leaving it out of the configuration cannot mean "remove it". "" removes it.
+		keepTemplateJwt := plan.TokenReviewerJWT.IsNull() && state.HasTemplateSourcedTokenReviewerJWT.ValueBool()
+		updatedIdentityKubernetesAuth, err = r.updateCustomKubernetesAuth(&resp.Diagnostics, &plan, accessTokenTrustedIps, allowedNamespacpes, allowedNames, keepTemplateJwt)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -526,7 +556,7 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 	}
 }
 
-func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string) (infisical.IdentityKubernetesAuth, error) {
+func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string, keepTokenReviewerJwt bool) (infisical.IdentityKubernetesAuth, error) {
 	validateTokenReviewerMode(diagnostics, plan)
 	if diagnostics.HasError() {
 		return infisical.IdentityKubernetesAuth{}, nil
@@ -565,8 +595,68 @@ func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics 
 		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),
 		// Null unlinks a template this identity was linked to.
-		TemplateID: nil,
+		TemplateID:           nil,
+		KeepTokenReviewerJwt: keepTokenReviewerJwt,
 	})
+}
+
+// kubernetesAuthUnlinksOnly reports whether the plan removes template_id and changes nothing else,
+// which the configuration expresses by setting the template's values (or leaving to the API what
+// it keeps). Such a plan needs only the link removed, not an edit of the auth configuration.
+func kubernetesAuthUnlinksOnly(plan, state IdentityKubernetesAuthResourceModel) bool {
+	if state.TemplateID.IsNull() || !plan.TemplateID.IsNull() {
+		return false
+	}
+
+	// A configured JWT replaces the stored one and "" removes it; both are edits.
+	if !plan.TokenReviewerJWT.IsNull() {
+		return false
+	}
+
+	return plan.KubernetesHost.Equal(state.KubernetesHost) &&
+		!plan.CaCertificate.IsUnknown() &&
+		strings.TrimSpace(plan.CaCertificate.ValueString()) == strings.TrimSpace(state.CaCertificate.ValueString()) &&
+		plan.TokenReviewerMode.Equal(state.TokenReviewerMode) &&
+		plan.GatewayID.Equal(state.GatewayID) &&
+		plan.AllowedAudience.Equal(state.AllowedAudience) &&
+		allowlistUnchanged(plan.AllowedNamespaces, state.AllowedNamespaces) &&
+		allowlistUnchanged(plan.AllowedServiceAccountNames, state.AllowedServiceAccountNames) &&
+		// Unset TTLs and trusted IPs are left out of an update, so the API keeps them.
+		unchangedOrDefaulted(plan.AccessTokenTTL, state.AccessTokenTTL) &&
+		unchangedOrDefaulted(plan.AccessTokenMaxTTL, state.AccessTokenMaxTTL) &&
+		unchangedOrDefaulted(plan.AccessTokenNumUsesLimit, state.AccessTokenNumUsesLimit) &&
+		unchangedOrDefaulted(plan.AccessTokenTrustedIps, state.AccessTokenTrustedIps)
+}
+
+// allowlistUnchanged is true when an update would leave an allowlist as it is. An unknown one, which
+// is what an unset allowlist plans as on any change, is sent as empty: that only clears something
+// when state holds entries.
+func allowlistUnchanged(planned, stored types.List) bool {
+	if planned.IsUnknown() {
+		return !stored.IsUnknown() && len(stored.Elements()) == 0
+	}
+	return planned.Equal(stored)
+}
+
+// unlinkTemplateOnly removes the template link and nothing else. It goes through the template's
+// delete-usage endpoint first, which needs only unlink-templates, so a role scoped to unlinking can
+// do it. That endpoint also requires the template to exist and the org's plan to include
+// templates, so on any failure it falls back to the identity's own update endpoint, which needs
+// edit-auth and has neither requirement. Either way the identity keeps the settings copied onto it.
+func (r *IdentityKubernetesAuthResource) unlinkTemplateOnly(state IdentityKubernetesAuthResourceModel) (infisical.IdentityKubernetesAuth, error) {
+	identityID := state.IdentityID.ValueString()
+
+	usageErr := r.client.UnlinkIdentityAuthTemplateUsage(state.TemplateID.ValueString(), []string{identityID})
+	if usageErr != nil {
+		if _, err := r.client.UnlinkIdentityKubernetesAuthTemplate(identityID); err != nil {
+			return infisical.IdentityKubernetesAuth{}, fmt.Errorf(
+				"unlinking needs unlink-templates on auth templates or edit-auth on the identity; the template's delete-usage endpoint failed (%w) and so did the identity's update endpoint (%w)",
+				usageErr, err,
+			)
+		}
+	}
+
+	return r.client.GetIdentityKubernetesAuth(infisical.GetIdentityKubernetesAuthRequest{IdentityID: identityID})
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

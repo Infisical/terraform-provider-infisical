@@ -413,3 +413,132 @@ func TestStringListValuesReportsConversionErrors(t *testing.T) {
 		t.Errorf("expected [a b], got %v %v", values, ok)
 	}
 }
+
+func linkedKubernetesAuthState(t *testing.T) IdentityKubernetesAuthResourceModel {
+	namespaces, diags := types.ListValue(types.StringType, []attr.Value{types.StringValue("ns")})
+	if diags.HasError() {
+		t.Fatalf("expected the list to build, got %v", diags)
+	}
+	return IdentityKubernetesAuthResourceModel{
+		IdentityID:                         types.StringValue("identity"),
+		TemplateID:                         types.StringValue("template"),
+		KubernetesHost:                     types.StringValue("https://example.com"),
+		CaCertificate:                      customtypes.NewTrimmedStringValue(""),
+		TokenReviewerJWT:                   types.StringNull(),
+		TokenReviewerMode:                  types.StringValue(TOKEN_REVIEWER_MODE_API),
+		GatewayID:                          types.StringNull(),
+		AllowedAudience:                    types.StringValue("aud"),
+		AllowedNamespaces:                  namespaces,
+		AllowedServiceAccountNames:         types.ListValueMust(types.StringType, []attr.Value{}),
+		AccessTokenTTL:                     types.Int64Value(2592000),
+		AccessTokenMaxTTL:                  types.Int64Value(2592000),
+		AccessTokenNumUsesLimit:            types.Int64Value(0),
+		AccessTokenTrustedIps:              types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"ip_address": types.StringType}}),
+		HasTemplateSourcedTokenReviewerJWT: types.BoolValue(true),
+	}
+}
+
+// Only an unlink that changes nothing else may go through delete-usage, which a role scoped to
+// unlinking can call; anything more is an edit of the auth configuration and needs edit-auth.
+func TestKubernetesAuthUnlinksOnly(t *testing.T) {
+	state := linkedKubernetesAuthState(t)
+	unlinked := func(change func(*IdentityKubernetesAuthResourceModel)) IdentityKubernetesAuthResourceModel {
+		plan := state
+		plan.TemplateID = types.StringNull()
+		change(&plan)
+		return plan
+	}
+
+	cases := map[string]struct {
+		plan IdentityKubernetesAuthResourceModel
+		want bool
+	}{
+		"template values copied into config": {unlinked(func(*IdentityKubernetesAuthResourceModel) {}), true},
+		"unset TTLs left to the API":         {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.AccessTokenTTL = types.Int64Unknown() }), true},
+		"still linked":                       {state, false},
+		"host changed": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
+			p.KubernetesHost = types.StringValue("https://other.example.com")
+		}), false},
+		"host cleared":     {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.KubernetesHost = types.StringNull() }), false},
+		"audience cleared": {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.AllowedAudience = types.StringValue("") }), false},
+		"CA added": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
+			p.CaCertificate = customtypes.NewTrimmedStringValue("CA")
+		}), false},
+		"JWT replaced":                  {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.TokenReviewerJWT = types.StringValue("eyJ.new") }), false},
+		"JWT removed with empty string": {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.TokenReviewerJWT = types.StringValue("") }), false},
+		"TTL changed":                   {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.AccessTokenTTL = types.Int64Value(60) }), false},
+		// An unknown allowlist is sent as empty, which clears the entries state holds.
+		"namespaces unknown": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
+			p.AllowedNamespaces = types.ListUnknown(types.StringType)
+		}), false},
+		// The same with nothing in state clears nothing: an unset allowlist on an identity without one.
+		"service account names unknown and empty": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
+			p.AllowedServiceAccountNames = types.ListUnknown(types.StringType)
+		}), true},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := kubernetesAuthUnlinksOnly(tc.plan, state); got != tc.want {
+				t.Errorf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+
+	// The CA is compared the way the API stores it, without the newline file() adds.
+	withCa := state
+	withCa.CaCertificate = customtypes.NewTrimmedStringValue("CA")
+	plan := withCa
+	plan.TemplateID = types.StringNull()
+	plan.CaCertificate = customtypes.NewTrimmedStringValue("CA\n")
+	if !kubernetesAuthUnlinksOnly(plan, withCa) {
+		t.Error("expected a trailing newline on the CA not to count as a change")
+	}
+}
+
+func TestOidcAuthUnlinksOnly(t *testing.T) {
+	audiences, _ := types.ListValue(types.StringType, []attr.Value{types.StringValue("a2"), types.StringValue("a3")})
+	state := IdentityOidcAuthResourceModel{
+		IdentityID:              types.StringValue("identity"),
+		TemplateID:              types.StringValue("template"),
+		OidcDiscoveryUrl:        types.StringValue("https://issuer.example.com"),
+		BoundIssuer:             types.StringValue("https://issuer.example.com"),
+		BoundAudiences:          audiences,
+		CaCertificate:           types.StringValue(""),
+		BoundSubject:            types.StringValue("repo:org/repo:ref:refs/heads/main"),
+		BoundClaims:             types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		ClaimMetadataMapping:    types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		AccessTokenTTL:          types.Int64Value(2592000),
+		AccessTokenMaxTTL:       types.Int64Value(2592000),
+		AccessTokenNumUsesLimit: types.Int64Value(0),
+		AccessTokenTrustedIps:   types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"ip_address": types.StringType}}),
+	}
+	unlinked := func(change func(*IdentityOidcAuthResourceModel)) IdentityOidcAuthResourceModel {
+		plan := state
+		plan.TemplateID = types.StringNull()
+		change(&plan)
+		return plan
+	}
+
+	cases := map[string]struct {
+		plan IdentityOidcAuthResourceModel
+		want bool
+	}{
+		"template values copied into config": {unlinked(func(*IdentityOidcAuthResourceModel) {}), true},
+		"still linked":                       {state, false},
+		// What Thiago saw: audiences left out are now planned as cleared, which is a change.
+		"audiences cleared": {unlinked(func(p *IdentityOidcAuthResourceModel) {
+			p.BoundAudiences = types.ListValueMust(types.StringType, []attr.Value{})
+		}), false},
+		"issuer changed":  {unlinked(func(p *IdentityOidcAuthResourceModel) { p.BoundIssuer = types.StringValue("https://other.example.com") }), false},
+		"subject changed": {unlinked(func(p *IdentityOidcAuthResourceModel) { p.BoundSubject = types.StringValue("other") }), false},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := oidcAuthUnlinksOnly(tc.plan, state); got != tc.want {
+				t.Errorf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}

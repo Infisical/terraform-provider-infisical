@@ -389,3 +389,92 @@ func TestCustomAuthUpdatesSendTemplateIdNull(t *testing.T) {
 		t.Errorf("expected templateId to be sent as null, got %v (present: %v)", value, present)
 	}
 }
+
+// delete-usage needs only unlink-templates, which is what lets a role scoped to unlinking do it.
+func TestUnlinkIdentityAuthTemplateUsage(t *testing.T) {
+	var captured capturedRequest
+	client := identityAuthTemplateServer(t, capturingHandler(t, &captured, `[]`))
+
+	if err := client.UnlinkIdentityAuthTemplateUsage("11111111-1111-1111-1111-111111111111", []string{"identity"}); err != nil {
+		t.Fatalf("expected the unlink to succeed, got: %v", err)
+	}
+	if captured.Method != http.MethodPost || captured.Path != "/api/v1/identity-templates/11111111-1111-1111-1111-111111111111/delete-usage" {
+		t.Errorf("expected POST on delete-usage, got %s %s", captured.Method, captured.Path)
+	}
+	ids, _ := captured.Body["identityIds"].([]any)
+	if len(ids) != 1 || ids[0] != "identity" {
+		t.Errorf("expected the one identity, got %v", captured.Body)
+	}
+
+	gone := identityAuthTemplateServer(t, jsonResponse(http.StatusNotFound, `{"message":"Template not found"}`))
+	if err := gone.UnlinkIdentityAuthTemplateUsage("missing", []string{"identity"}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound for a 404, got: %v", err)
+	}
+}
+
+// The fallback unlink must carry nothing but templateId: null, since every key it sends is a
+// change, and an unlink-only plan changes nothing else.
+func TestUnlinkThroughIdentityUpdateSendsOnlyTheLink(t *testing.T) {
+	cases := map[string]struct {
+		response string
+		unlink   func(Client) error
+	}{
+		"kubernetes": {`{"identityKubernetesAuth":{"id":"x"}}`, func(c Client) error {
+			_, err := c.UnlinkIdentityKubernetesAuthTemplate("identity")
+			return err
+		}},
+		"oidc": {`{"identityOidcAuth":{"id":"x"}}`, func(c Client) error {
+			_, err := c.UnlinkIdentityOidcAuthTemplate("identity")
+			return err
+		}},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			var captured capturedRequest
+			client := identityAuthTemplateServer(t, capturingHandler(t, &captured, tc.response))
+			if err := tc.unlink(client); err != nil {
+				t.Fatalf("expected the unlink to succeed, got: %v", err)
+			}
+			if captured.Method != http.MethodPatch {
+				t.Errorf("expected PATCH, got %s", captured.Method)
+			}
+			if value, present := captured.Body["templateId"]; !present || value != nil || len(captured.Body) != 1 {
+				t.Errorf("expected exactly {templateId: null}, got %v", captured.Body)
+			}
+		})
+	}
+}
+
+// A template-sourced JWT reads back as empty, so the request has to be able to leave it alone:
+// omitting the key keeps it, null removes it.
+func TestUpdateKubernetesAuthTokenReviewerJwtStates(t *testing.T) {
+	newJwt := "eyJ.new"
+	cases := map[string]struct {
+		request     UpdateIdentityKubernetesAuthRequest
+		wantPresent bool
+		want        any
+	}{
+		"keep omits the key": {UpdateIdentityKubernetesAuthRequest{IdentityID: "i", KeepTokenReviewerJwt: true}, false, nil},
+		"nil clears it":      {UpdateIdentityKubernetesAuthRequest{IdentityID: "i"}, true, nil},
+		"value replaces it":  {UpdateIdentityKubernetesAuthRequest{IdentityID: "i", TokenReviewerJwt: &newJwt}, true, newJwt},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			var captured capturedRequest
+			client := identityAuthTemplateServer(t, capturingHandler(t, &captured, `{"identityKubernetesAuth":{"id":"x"}}`))
+			if _, err := client.UpdateIdentityKubernetesAuth(tc.request); err != nil {
+				t.Fatalf("expected the update to succeed, got: %v", err)
+			}
+			value, present := captured.Body["tokenReviewerJwt"]
+			if present != tc.wantPresent || value != tc.want {
+				t.Errorf("expected tokenReviewerJwt present=%v value=%v, got present=%v value=%v", tc.wantPresent, tc.want, present, value)
+			}
+			// Keeping the JWT must not drop anything else, the unlink above all.
+			if _, present := captured.Body["templateId"]; !present {
+				t.Error("expected templateId to still be sent")
+			}
+		})
+	}
+}

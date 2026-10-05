@@ -73,6 +73,13 @@ func (client Client) UpdateIdentityOidcAuthFromTemplate(request UpdateIdentityOi
 	return client.updateIdentityOidcAuth(request.IdentityID, request)
 }
 
+// UnlinkIdentityOidcAuthTemplate unlinks the identity from its template through the identity's own
+// update endpoint, which needs EditAuth on the identity. The settings copied from the template stay
+// on the identity.
+func (client Client) UnlinkIdentityOidcAuthTemplate(identityID string) (IdentityOidcAuth, error) {
+	return client.updateIdentityOidcAuth(identityID, unlinkIdentityAuthTemplateRequest{TemplateID: nil})
+}
+
 func (client Client) updateIdentityOidcAuth(identityID string, request any) (IdentityOidcAuth, error) {
 	var body UpdateIdentityOidcAuthResponse
 	response, err := client.Config.HttpClient.

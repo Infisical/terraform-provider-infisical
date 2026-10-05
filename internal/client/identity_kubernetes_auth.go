@@ -73,6 +73,13 @@ func (client Client) UpdateIdentityKubernetesAuthFromTemplate(request UpdateIden
 	return client.updateIdentityKubernetesAuth(request.IdentityID, request)
 }
 
+// UnlinkIdentityKubernetesAuthTemplate unlinks the identity from its template through the
+// identity's own update endpoint, which needs EditAuth on the identity. The settings copied from
+// the template stay on the identity.
+func (client Client) UnlinkIdentityKubernetesAuthTemplate(identityID string) (IdentityKubernetesAuth, error) {
+	return client.updateIdentityKubernetesAuth(identityID, unlinkIdentityAuthTemplateRequest{TemplateID: nil})
+}
+
 func (client Client) updateIdentityKubernetesAuth(identityID string, request any) (IdentityKubernetesAuth, error) {
 	var body UpdateIdentityKubernetesAuthResponse
 	response, err := client.Config.HttpClient.
