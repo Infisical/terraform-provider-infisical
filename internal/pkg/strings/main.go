@@ -6,6 +6,12 @@ import (
 )
 
 func StringSplitAndTrim(input string, separator string) []string {
+	// strings.Split returns a one-element slice holding "" for an empty input, which surfaces in
+	// Terraform state as a list containing an empty string rather than the empty list the user configured.
+	if strings.TrimSpace(input) == "" {
+		return []string{}
+	}
+
 	splittedStrings := strings.Split(input, separator)
 	for i, s := range splittedStrings {
 		splittedStrings[i] = strings.TrimSpace(s)

@@ -97,5 +97,6 @@ resource "infisical_cert_manager_application_profile" "platform_web_server" {
     challenge_password          = "change-me-scep-secret"
     include_ca_cert_in_response = true
     allow_cert_based_renewal    = true
+    sign_ra_with_ca             = false
   }
 }

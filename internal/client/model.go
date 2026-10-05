@@ -2146,6 +2146,7 @@ type SecretApprovalPolicy struct {
 	RequiredApprovals    int64                             `json:"approvals"`
 	EnforcementLevel     string                            `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                              `json:"allowedSelfApprovals"`
+	BypassForMachineIDs  bool                              `json:"bypassForMachineIdentities"`
 	DeletedAt            *string                           `json:"deletedAt"`
 }
 
@@ -2172,6 +2173,7 @@ type CreateSecretApprovalPolicyRequest struct {
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
+	BypassForMachineIDs  *bool                                `json:"bypassForMachineIdentities,omitempty"`
 }
 
 type CreateSecretApprovalPolicyResponse struct {
@@ -2208,6 +2210,7 @@ type UpdateSecretApprovalPolicyRequest struct {
 	RequiredApprovals    int64                                `json:"approvals"`
 	EnforcementLevel     string                               `json:"enforcementLevel"`
 	AllowedSelfApprovals bool                                 `json:"allowedSelfApprovals"`
+	BypassForMachineIDs  *bool                                `json:"bypassForMachineIdentities,omitempty"`
 	Environments         []string                             `json:"environments"`
 }
 
@@ -3027,6 +3030,7 @@ type KMSKey struct {
 	ID                  string    `json:"id"`
 	Description         string    `json:"description"`
 	IsDisabled          bool      `json:"isDisabled"`
+	IsExportable        *bool     `json:"isExportable"`
 	OrgId               string    `json:"orgId"`
 	Name                string    `json:"name"`
 	CreatedAt           time.Time `json:"createdAt"`
@@ -3043,6 +3047,7 @@ type CreateKMSKeyRequest struct {
 	Description         string `json:"description,omitempty"`
 	KeyUsage            string `json:"keyUsage,omitempty"`
 	EncryptionAlgorithm string `json:"encryptionAlgorithm,omitempty"`
+	IsExportable        *bool  `json:"isExportable,omitempty"`
 }
 
 type CreateKMSKeyResponse struct {
@@ -3960,6 +3965,7 @@ type PkiApplicationScepEnrollmentState struct {
 	ChallengeType                 string    `json:"challengeType"`
 	IncludeCaCertInResponse       bool      `json:"includeCaCertInResponse"`
 	AllowCertBasedRenewal         bool      `json:"allowCertBasedRenewal"`
+	SignRaWithCa                  bool      `json:"signRaWithCa"`
 	DynamicChallengeExpiryMinutes *int      `json:"dynamicChallengeExpiryMinutes,omitempty"`
 	DynamicChallengeMaxPending    *int      `json:"dynamicChallengeMaxPending,omitempty"`
 	ScepEndpointUrl               string    `json:"scepEndpointUrl"`
@@ -4085,6 +4091,7 @@ type SetPkiApplicationScepEnrollmentRequest struct {
 	ChallengePassword             string `json:"challengePassword,omitempty"`
 	IncludeCaCertInResponse       *bool  `json:"includeCaCertInResponse,omitempty"`
 	AllowCertBasedRenewal         *bool  `json:"allowCertBasedRenewal,omitempty"`
+	SignRaWithCa                  *bool  `json:"signRaWithCa,omitempty"`
 	DynamicChallengeExpiryMinutes *int   `json:"dynamicChallengeExpiryMinutes,omitempty"`
 	DynamicChallengeMaxPending    *int   `json:"dynamicChallengeMaxPending,omitempty"`
 }
@@ -4308,6 +4315,104 @@ type RemoveCertManagerIdentityResponse struct {
 type Gateway struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+const (
+	GatewayAuthMethodAws        = "aws"
+	GatewayAuthMethodGcp        = "gcp"
+	GatewayAuthMethodKubernetes = "kubernetes"
+	GatewayAuthMethodToken      = "token"
+	GatewayAuthMethodIdentity   = "identity"
+)
+
+const (
+	GatewayGcpAuthTypeGce = "gce"
+	GatewayGcpAuthTypeIam = "iam"
+)
+
+const (
+	GatewayKubernetesTokenReviewModeApi     = "api"
+	GatewayKubernetesTokenReviewModeGateway = "gateway"
+)
+
+// Flattened union: Method says which fields carry a value.
+type GatewayAuthMethodConfig struct {
+	ID string `json:"id"`
+
+	StsEndpoint          string `json:"stsEndpoint"`
+	AllowedPrincipalArns string `json:"allowedPrincipalArns"`
+	AllowedAccountIds    string `json:"allowedAccountIds"`
+
+	Type                   string `json:"type"`
+	AllowedServiceAccounts string `json:"allowedServiceAccounts"`
+	AllowedProjects        string `json:"allowedProjects"`
+	AllowedZones           string `json:"allowedZones"`
+
+	KubernetesHost       string  `json:"kubernetesHost"`
+	TokenReviewMode      string  `json:"tokenReviewMode"`
+	GatewayID            *string `json:"gatewayId"`
+	GatewayPoolID        *string `json:"gatewayPoolId"`
+	AllowedNamespaces    string  `json:"allowedNamespaces"`
+	AllowedNames         string  `json:"allowedNames"`
+	AllowedAudience      string  `json:"allowedAudience"`
+	VerifyTlsCertificate bool    `json:"verifyTlsCertificate"`
+	CaCertificate        string  `json:"caCertificate"`
+	HasTokenReviewerJwt  bool    `json:"hasTokenReviewerJwt"`
+
+	IdentityID   string  `json:"identityId"`
+	IdentityName *string `json:"identityName"`
+}
+
+type GatewayAuthMethod struct {
+	Method string                  `json:"method"`
+	Config GatewayAuthMethodConfig `json:"config"`
+}
+
+// Pointers so an explicitly empty allowlist is sent rather than defaulted server-side.
+type GatewayAuthMethodInput struct {
+	Method string `json:"method"`
+
+	StsEndpoint          *string `json:"stsEndpoint,omitempty"`
+	AllowedPrincipalArns *string `json:"allowedPrincipalArns,omitempty"`
+	AllowedAccountIds    *string `json:"allowedAccountIds,omitempty"`
+
+	Type                   *string `json:"type,omitempty"`
+	AllowedServiceAccounts *string `json:"allowedServiceAccounts,omitempty"`
+	AllowedProjects        *string `json:"allowedProjects,omitempty"`
+	AllowedZones           *string `json:"allowedZones,omitempty"`
+
+	KubernetesHost       *string `json:"kubernetesHost,omitempty"`
+	CaCertificate        *string `json:"caCertificate,omitempty"`
+	TokenReviewerJwt     *string `json:"tokenReviewerJwt,omitempty"`
+	TokenReviewMode      *string `json:"tokenReviewMode,omitempty"`
+	GatewayID            *string `json:"gatewayId,omitempty"`
+	GatewayPoolID        *string `json:"gatewayPoolId,omitempty"`
+	AllowedNamespaces    *string `json:"allowedNamespaces,omitempty"`
+	AllowedNames         *string `json:"allowedNames,omitempty"`
+	AllowedAudience      *string `json:"allowedAudience,omitempty"`
+	VerifyTlsCertificate *bool   `json:"verifyTlsCertificate,omitempty"`
+}
+
+type GatewayDetails struct {
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	AuthMethod GatewayAuthMethod `json:"authMethod"`
+}
+
+type CreateGatewayRequest struct {
+	Name       string                 `json:"name"`
+	AuthMethod GatewayAuthMethodInput `json:"authMethod"`
+}
+
+type UpdateGatewayRequest struct {
+	ID         string                  `json:"-"`
+	Name       *string                 `json:"name,omitempty"`
+	AuthMethod *GatewayAuthMethodInput `json:"authMethod,omitempty"`
+}
+
+type MintGatewayEnrollmentTokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt string `json:"expiresAt"`
 }
 
 // Organization
@@ -4547,4 +4652,107 @@ type DeleteAlertResponse struct {
 	Alert struct {
 		ID string `json:"id"`
 	} `json:"alert"`
+}
+
+type SecretValidationRuleEnvironment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type SecretValidationRuleStringConstraints struct {
+	MinLength      *int64  `json:"minLength,omitempty"`
+	MaxLength      *int64  `json:"maxLength,omitempty"`
+	RegexPattern   *string `json:"regexPattern,omitempty"`
+	RequiredPrefix *string `json:"requiredPrefix,omitempty"`
+	RequiredSuffix *string `json:"requiredSuffix,omitempty"`
+}
+
+type SecretValidationRuleValueConstraints struct {
+	SecretValidationRuleStringConstraints
+	UniqueAcrossLastVersions *int64 `json:"uniqueAcrossLastVersions,omitempty"`
+	UniqueWithinScope        *bool  `json:"uniqueWithinScope,omitempty"`
+}
+
+type SecretValidationRule struct {
+	ID          string                           `json:"id"`
+	Name        string                           `json:"name"`
+	Description *string                          `json:"description"`
+	ProjectID   string                           `json:"projectId"`
+	SecretPath  string                           `json:"secretPath"`
+	IsActive    *bool                            `json:"isActive"`
+	CreatedAt   string                           `json:"createdAt"`
+	UpdatedAt   string                           `json:"updatedAt"`
+	Environment *SecretValidationRuleEnvironment `json:"environment"`
+	Type        SecretValidationRuleType         `json:"type"`
+
+	KeyConstraints      *SecretValidationRuleStringConstraints `json:"keyConstraints,omitempty"`
+	ValueConstraints    *SecretValidationRuleValueConstraints  `json:"valueConstraints,omitempty"`
+	Providers           []string                               `json:"providers,omitempty"`
+	PasswordConstraints *SecretValidationRuleStringConstraints `json:"passwordConstraints,omitempty"`
+}
+
+type CreateSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType `json:"-"`
+
+	Name        string
+	ProjectID   string
+	SecretPath  string
+	Description *string
+	Environment *string
+	IsActive    bool
+
+	Constraints map[string]any
+}
+
+type CreateSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type GetSecretValidationRuleByIdRequest struct {
+	Type SecretValidationRuleType
+	ID   string
+}
+
+type GetSecretValidationRuleByIdResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type UpdateSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType
+	ID   string
+
+	Name        string
+	Description *string
+	Environment *string
+	SecretPath  string
+	IsActive    bool
+
+	Constraints map[string]any
+}
+
+type UpdateSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type DeleteSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType
+	ID   string
+}
+
+type DeleteSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type ListSecretValidationRulesRequest struct {
+	Type      SecretValidationRuleType
+	ProjectID string
+}
+
+type ListAllSecretValidationRulesRequest struct {
+	ProjectID string
+}
+
+type ListSecretValidationRulesResponse struct {
+	SecretValidationRules []SecretValidationRule `json:"secretValidationRules"`
 }

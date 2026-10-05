@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -19,7 +20,8 @@ import (
 )
 
 var (
-	_ resource.Resource = &certManagerApplicationProfileResource{}
+	_ resource.Resource               = &certManagerApplicationProfileResource{}
+	_ resource.ResourceWithModifyPlan = &certManagerApplicationProfileResource{}
 )
 
 func NewCertManagerApplicationProfileResource() resource.Resource {
@@ -65,6 +67,7 @@ type certManagerApplicationProfileScepConfig struct {
 	ChallengePassword             types.String `tfsdk:"challenge_password"`
 	IncludeCaCertInResponse       types.Bool   `tfsdk:"include_ca_cert_in_response"`
 	AllowCertBasedRenewal         types.Bool   `tfsdk:"allow_cert_based_renewal"`
+	SignRaWithCa                  types.Bool   `tfsdk:"sign_ra_with_ca"`
 	DynamicChallengeExpiryMinutes types.Int64  `tfsdk:"dynamic_challenge_expiry_minutes"`
 	DynamicChallengeMaxPending    types.Int64  `tfsdk:"dynamic_challenge_max_pending"`
 	ScepEndpointUrl               types.String `tfsdk:"scep_endpoint_url"`
@@ -199,6 +202,14 @@ func (r *certManagerApplicationProfileResource) Schema(_ context.Context, _ reso
 						Optional:    true,
 						Computed:    true,
 					},
+					"sign_ra_with_ca": schema.BoolAttribute{
+						Description: "Sign the RA certificate with the profile's CA instead of self-signing it, so it chains to the CA root. Required by strict clients such as Apple and Microsoft Intune. Only supported for internal CAs. Cannot be changed once SCEP enrollment is configured. To change it, remove scep_config (or the whole resource) to disable SCEP enrollment in one apply, then add scep_config back with the new value in a subsequent apply. Defaults to false.",
+						Optional:    true,
+						Computed:    true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
+					},
 					"dynamic_challenge_expiry_minutes": schema.Int64Attribute{
 						Description: "Expiry of a dynamic challenge in minutes (1-1440). Only used when challenge_type is dynamic.",
 						Optional:    true,
@@ -246,6 +257,51 @@ func (r *certManagerApplicationProfileResource) Configure(_ context.Context, req
 		return
 	}
 	r.client = client
+}
+
+func signRaWithCaPath() path.Path {
+	return path.Root("scep_config").AtName("sign_ra_with_ca")
+}
+
+func signRaWithCaChanged(prior, plan types.Bool) bool {
+	if prior.IsNull() || prior.IsUnknown() || plan.IsNull() || plan.IsUnknown() {
+		return false
+	}
+	return prior.ValueBool() != plan.ValueBool()
+}
+
+func (r *certManagerApplicationProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var priorApp, planApp, priorProfile, planProfile types.String
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("application_id"), &priorApp)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("application_id"), &planApp)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("profile_id"), &priorProfile)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("profile_id"), &planProfile)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !priorApp.Equal(planApp) || !priorProfile.Equal(planProfile) {
+		return
+	}
+
+	var priorSign, planSign types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, signRaWithCaPath(), &priorSign)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, signRaWithCaPath(), &planSign)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if signRaWithCaChanged(priorSign, planSign) {
+		resp.Diagnostics.AddAttributeError(
+			signRaWithCaPath(),
+			"Invalid sign_ra_with_ca change",
+			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
+		)
+	}
 }
 
 func (r *certManagerApplicationProfileResource) applyEnrollment(
@@ -376,6 +432,10 @@ func (r *certManagerApplicationProfileResource) applyEnrollment(
 			v := plan.ScepConfig.AllowCertBasedRenewal.ValueBool()
 			setReq.AllowCertBasedRenewal = &v
 		}
+		if !plan.ScepConfig.SignRaWithCa.IsNull() && !plan.ScepConfig.SignRaWithCa.IsUnknown() {
+			v := plan.ScepConfig.SignRaWithCa.ValueBool()
+			setReq.SignRaWithCa = &v
+		}
 		if !plan.ScepConfig.DynamicChallengeExpiryMinutes.IsNull() && !plan.ScepConfig.DynamicChallengeExpiryMinutes.IsUnknown() {
 			v := int(plan.ScepConfig.DynamicChallengeExpiryMinutes.ValueInt64())
 			setReq.DynamicChallengeExpiryMinutes = &v
@@ -467,6 +527,7 @@ func (r *certManagerApplicationProfileResource) refresh(model *certManagerApplic
 		model.ScepConfig.ChallengeType = types.StringValue(enrollment.Scep.ChallengeType)
 		model.ScepConfig.IncludeCaCertInResponse = types.BoolValue(enrollment.Scep.IncludeCaCertInResponse)
 		model.ScepConfig.AllowCertBasedRenewal = types.BoolValue(enrollment.Scep.AllowCertBasedRenewal)
+		model.ScepConfig.SignRaWithCa = types.BoolValue(enrollment.Scep.SignRaWithCa)
 		if enrollment.Scep.DynamicChallengeExpiryMinutes != nil {
 			model.ScepConfig.DynamicChallengeExpiryMinutes = types.Int64Value(int64(*enrollment.Scep.DynamicChallengeExpiryMinutes))
 		} else {
@@ -591,6 +652,16 @@ func (r *certManagerApplicationProfileResource) Update(ctx context.Context, req 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if prior.ScepConfig != nil && plan.ScepConfig != nil &&
+		signRaWithCaChanged(prior.ScepConfig.SignRaWithCa, plan.ScepConfig.SignRaWithCa) {
+		resp.Diagnostics.AddAttributeError(
+			signRaWithCaPath(),
+			"Invalid sign_ra_with_ca change",
+			"sign_ra_with_ca cannot be changed once SCEP enrollment is configured. Remove the scep_config block and apply to disable SCEP enrollment, then add it back with the new value.",
+		)
 		return
 	}
 
