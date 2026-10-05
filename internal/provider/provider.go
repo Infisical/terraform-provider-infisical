@@ -378,6 +378,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewSecretTagDataSource,
 		infisicalDatasource.NewSecretFolderDataSource,
 		infisicalDatasource.NewGroupsDataSource,
+		infisicalDatasource.NewIdentitiesSearchDataSource,
 		infisicalDatasource.NewIdentityDetailsDataSource,
 		infisicalDatasource.NewIdentityDataSource,
 		infisicalDatasource.NewKMSKeyDataSource,
