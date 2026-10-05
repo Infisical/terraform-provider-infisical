@@ -81,6 +81,11 @@ func NewTrimmedStringValue(value string) TrimmedStringValue {
 	return TrimmedStringValue{StringValue: basetypes.NewStringValue(value)}
 }
 
+// NewTrimmedStringNull returns a null TrimmedStringValue.
+func NewTrimmedStringNull() TrimmedStringValue {
+	return TrimmedStringValue{StringValue: basetypes.NewStringNull()}
+}
+
 func (v TrimmedStringValue) Type(_ context.Context) attr.Type {
 	return TrimmedStringType{}
 }

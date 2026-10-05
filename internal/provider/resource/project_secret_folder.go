@@ -201,6 +201,7 @@ func (r *projectSecretFolderResource) Read(ctx context.Context, req resource.Rea
 		}
 	}
 
+	state.Name = types.StringValue(secretFolder.Folder.Name)
 	state.EnvironmentID = types.StringValue(secretFolder.Folder.EnvID)
 	state.Path = types.StringValue(secretFolder.Folder.Path)
 	state.Description = types.StringValue(secretFolder.Folder.Description)
@@ -290,7 +291,7 @@ func (r *projectSecretFolderResource) Delete(ctx context.Context, req resource.D
 		ForceDelete: state.ForceDelete.ValueBool(),
 	})
 
-	if err != nil {
+	if err != nil && err != infisical.ErrNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting secret folder",
 			"Couldn't delete secret folder from Infisical, unexpected error: "+err.Error(),

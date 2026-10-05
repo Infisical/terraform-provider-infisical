@@ -36,6 +36,7 @@ resource "infisical_secret_approval_policy" "prod-policy" {
       type     = "user"
       username = "name@infisical.com"
   }]
-  required_approvals = 1
-  enforcement_level  = "hard"
+  required_approvals                      = 1
+  enforcement_level                       = "hard"
+  bypass_approvals_for_machine_identities = false
 }
