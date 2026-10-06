@@ -504,7 +504,7 @@ func TestOidcAuthUnlinksOnly(t *testing.T) {
 		OidcDiscoveryUrl:        types.StringValue("https://issuer.example.com"),
 		BoundIssuer:             types.StringValue("https://issuer.example.com"),
 		BoundAudiences:          audiences,
-		CaCertificate:           types.StringValue(""),
+		CaCertificate:           customtypes.NewTrimmedStringValue(""),
 		BoundSubject:            types.StringValue("repo:org/repo:ref:refs/heads/main"),
 		BoundClaims:             types.MapValueMust(types.StringType, map[string]attr.Value{}),
 		ClaimMetadataMapping:    types.MapValueMust(types.StringType, map[string]attr.Value{}),
@@ -540,5 +540,28 @@ func TestOidcAuthUnlinksOnly(t *testing.T) {
 				t.Errorf("expected %v, got %v", tc.want, got)
 			}
 		})
+	}
+}
+
+// The CA is compared the way the API stores it, without the newline file() adds, so a CA restated
+// from file() is still an unlink-only plan.
+func TestOidcAuthUnlinksOnlyIgnoresCaTrailingNewline(t *testing.T) {
+	state := IdentityOidcAuthResourceModel{
+		TemplateID:            types.StringValue("template"),
+		OidcDiscoveryUrl:      types.StringValue("https://issuer.example.com"),
+		BoundIssuer:           types.StringValue("https://issuer.example.com"),
+		BoundAudiences:        types.ListValueMust(types.StringType, []attr.Value{}),
+		CaCertificate:         customtypes.NewTrimmedStringValue("CA"),
+		BoundSubject:          types.StringValue("s"),
+		BoundClaims:           types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		ClaimMetadataMapping:  types.MapValueMust(types.StringType, map[string]attr.Value{}),
+		AccessTokenTrustedIps: types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"ip_address": types.StringType}}),
+	}
+	plan := state
+	plan.TemplateID = types.StringNull()
+	plan.CaCertificate = customtypes.NewTrimmedStringValue("CA\n")
+
+	if !oidcAuthUnlinksOnly(plan, state) {
+		t.Error("expected a trailing newline on the CA not to count as a change")
 	}
 }

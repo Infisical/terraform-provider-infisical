@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"terraform-provider-infisical/internal/pkg/terraform"
@@ -37,20 +38,20 @@ type IdentityOidcAuthResource struct {
 
 // IdentityOidcAuthResourceSourceModel describes the data source data model.
 type IdentityOidcAuthResourceModel struct {
-	ID                      types.String `tfsdk:"id"`
-	IdentityID              types.String `tfsdk:"identity_id"`
-	OidcDiscoveryUrl        types.String `tfsdk:"oidc_discovery_url"`
-	CaCertificate           types.String `tfsdk:"oidc_ca_certificate"`
-	BoundIssuer             types.String `tfsdk:"bound_issuer"`
-	BoundAudiences          types.List   `tfsdk:"bound_audiences"`
-	BoundClaims             types.Map    `tfsdk:"bound_claims"`
-	ClaimMetadataMapping    types.Map    `tfsdk:"claim_metadata_mapping"`
-	BoundSubject            types.String `tfsdk:"bound_subject"`
-	AccessTokenTrustedIps   types.List   `tfsdk:"access_token_trusted_ips"`
-	AccessTokenTTL          types.Int64  `tfsdk:"access_token_ttl"`
-	AccessTokenMaxTTL       types.Int64  `tfsdk:"access_token_max_ttl"`
-	AccessTokenNumUsesLimit types.Int64  `tfsdk:"access_token_num_uses_limit"`
-	TemplateID              types.String `tfsdk:"template_id"`
+	ID                      types.String                   `tfsdk:"id"`
+	IdentityID              types.String                   `tfsdk:"identity_id"`
+	OidcDiscoveryUrl        types.String                   `tfsdk:"oidc_discovery_url"`
+	CaCertificate           customtypes.TrimmedStringValue `tfsdk:"oidc_ca_certificate"`
+	BoundIssuer             types.String                   `tfsdk:"bound_issuer"`
+	BoundAudiences          types.List                     `tfsdk:"bound_audiences"`
+	BoundClaims             types.Map                      `tfsdk:"bound_claims"`
+	ClaimMetadataMapping    types.Map                      `tfsdk:"claim_metadata_mapping"`
+	BoundSubject            types.String                   `tfsdk:"bound_subject"`
+	AccessTokenTrustedIps   types.List                     `tfsdk:"access_token_trusted_ips"`
+	AccessTokenTTL          types.Int64                    `tfsdk:"access_token_ttl"`
+	AccessTokenMaxTTL       types.Int64                    `tfsdk:"access_token_max_ttl"`
+	AccessTokenNumUsesLimit types.Int64                    `tfsdk:"access_token_num_uses_limit"`
+	TemplateID              types.String                   `tfsdk:"template_id"`
 }
 
 var (
@@ -129,6 +130,7 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"oidc_ca_certificate": schema.StringAttribute{
+				CustomType:          customtypes.TrimmedStringType{},
 				Description:         "The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints",
 				MarkdownDescription: "The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints",
 				Optional:            true,
@@ -249,7 +251,7 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 	plan.OidcDiscoveryUrl = types.StringValue(newIdentityOidcAuth.OidcDiscoveryUrl)
 	plan.BoundIssuer = types.StringValue(newIdentityOidcAuth.BoundIssuer)
 	plan.BoundSubject = types.StringValue(newIdentityOidcAuth.BoundSubject)
-	plan.CaCertificate = types.StringValue(newIdentityOidcAuth.CACERT)
+	plan.CaCertificate = customtypes.NewTrimmedStringValue(newIdentityOidcAuth.CACERT)
 
 	if newIdentityOidcAuth.TemplateID != nil && *newIdentityOidcAuth.TemplateID != "" {
 		plan.TemplateID = types.StringValue(*newIdentityOidcAuth.TemplateID)
