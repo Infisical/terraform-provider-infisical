@@ -9,8 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func strPtr(s string) *string { return &s }
-
 // Values the API fills in or reformats keep the user's form, otherwise every plan shows drift.
 func TestSubOrganizationGroupRolesFromAPIKeepsPriorForm(t *testing.T) {
 	start := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
