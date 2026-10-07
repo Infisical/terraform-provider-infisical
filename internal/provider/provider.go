@@ -380,6 +380,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewGroupsDataSource,
 		infisicalDatasource.NewIdentityDetailsDataSource,
 		infisicalDatasource.NewIdentityDataSource,
+		infisicalDatasource.NewIdentitiesListDataSource,
 		infisicalDatasource.NewKMSKeyDataSource,
 		infisicalDatasource.NewSecretMetadataDataSource,
 		infisicalDatasource.NewProjectIdentityDataSource,
@@ -388,7 +389,6 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectUserDataSource,
 		infisicalDatasource.NewOrganizationDataSource,
 		infisicalDatasource.NewGatewayDataSource,
-		infisicalDatasource.NewIdentityUniversalAuthDataSource,
 		infisicalDatasource.NewProjectUsersListDataSource,
 		infisicalDatasource.NewSecretValidationRulesDataSource,
 	}

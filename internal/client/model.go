@@ -1524,6 +1524,49 @@ type SearchIdentitiesResponse struct {
 	TotalCount int           `json:"totalCount"`
 }
 
+const (
+	SearchIdentitiesScopeOrganization = "organization"
+	SearchIdentitiesScopeProject      = "project"
+)
+
+type SearchIdentitiesV2Request struct {
+	Scope  []string `json:"scope"`
+	Limit  int      `json:"limit"`
+	Offset int      `json:"offset"`
+}
+
+type SearchIdentitiesV2Role struct {
+	ID             string  `json:"id"`
+	Role           string  `json:"role"`
+	CustomRoleID   *string `json:"customRoleId"`
+	CustomRoleSlug *string `json:"customRoleSlug"`
+	IsTemporary    bool    `json:"isTemporary"`
+}
+
+// SearchIdentitiesV2Membership is one identity membership returned by the v2 search.
+// Organization identities appear through their organization membership, and
+// project identities through their project membership, so each identity appears once.
+type SearchIdentitiesV2Membership struct {
+	ID         string                   `json:"id"`
+	IdentityID string                   `json:"identityId"`
+	Scope      string                   `json:"scope"`
+	OrgID      string                   `json:"orgId"`
+	ProjectID  *string                  `json:"projectId"`
+	Roles      []SearchIdentitiesV2Role `json:"roles"`
+	Identity   struct {
+		ID                  string   `json:"id"`
+		Name                string   `json:"name"`
+		HasDeleteProtection bool     `json:"hasDeleteProtection"`
+		OrgID               string   `json:"orgId"`
+		AuthMethods         []string `json:"authMethods"`
+	} `json:"identity"`
+}
+
+type SearchIdentitiesV2Response struct {
+	Identities []SearchIdentitiesV2Membership `json:"identities"`
+	TotalCount int                            `json:"totalCount"`
+}
+
 type IdentityAuthTrustedIpRequest struct {
 	IPAddress string `json:"ipAddress"`
 }
