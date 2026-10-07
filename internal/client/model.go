@@ -2617,37 +2617,57 @@ type CheckDuplicateDestinationResponse struct {
 }
 
 type CertificateSync struct {
-	ID                string                 `json:"id"`
-	Name              string                 `json:"name"`
-	Description       string                 `json:"description"`
-	Destination       string                 `json:"destination"`
-	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
-	ConnectionID      string                 `json:"connectionId"`
-	ApplicationID     string                 `json:"applicationId"`
-	SyncOptions       map[string]interface{} `json:"syncOptions"`
-	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	ID                string                  `json:"id"`
+	Name              string                  `json:"name"`
+	Description       string                  `json:"description"`
+	Destination       string                  `json:"destination"`
+	IsAutoSyncEnabled bool                    `json:"isAutoSyncEnabled"`
+	ConnectionID      string                  `json:"connectionId"`
+	ApplicationID     string                  `json:"applicationId"`
+	SyncOptions       map[string]interface{}  `json:"syncOptions"`
+	DestinationConfig map[string]interface{}  `json:"destinationConfig"`
+	Filters           *CertificateSyncFilters `json:"filters"`
+}
+
+type CertificateSyncFilters struct {
+	ProfileIDs          []string                        `json:"profileIds,omitempty"`
+	CertificateOrderIDs []string                        `json:"certificateOrderIds,omitempty"`
+	Metadata            []CertificateSyncMetadataFilter `json:"metadata,omitempty"`
+}
+
+type CertificateSyncMetadataFilter struct {
+	Key   string  `json:"key"`
+	Value *string `json:"value,omitempty"`
+}
+
+type CertificateSyncCredentials struct {
+	ExportPassword string `json:"exportPassword,omitempty"`
 }
 
 type CreateCertificateSyncRequest struct {
-	App               CertificateSyncApp     `json:"-"`
-	Name              string                 `json:"name"`
-	Description       string                 `json:"description"`
-	ConnectionID      string                 `json:"connectionId"`
-	ApplicationID     string                 `json:"applicationId"`
-	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
-	SyncOptions       map[string]interface{} `json:"syncOptions"`
-	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	App               CertificateSyncApp          `json:"-"`
+	Name              string                      `json:"name"`
+	Description       string                      `json:"description"`
+	ConnectionID      string                      `json:"connectionId"`
+	ApplicationID     string                      `json:"applicationId"`
+	IsAutoSyncEnabled bool                        `json:"isAutoSyncEnabled"`
+	SyncOptions       map[string]interface{}      `json:"syncOptions"`
+	DestinationConfig map[string]interface{}      `json:"destinationConfig"`
+	Filters           *CertificateSyncFilters     `json:"filters,omitempty"`
+	Credentials       *CertificateSyncCredentials `json:"credentials,omitempty"`
 }
 
 type UpdateCertificateSyncRequest struct {
-	App               CertificateSyncApp     `json:"-"`
-	ID                string                 `json:"-"`
-	Name              string                 `json:"name"`
-	Description       string                 `json:"description"`
-	ConnectionID      string                 `json:"connectionId"`
-	IsAutoSyncEnabled bool                   `json:"isAutoSyncEnabled"`
-	SyncOptions       map[string]interface{} `json:"syncOptions"`
-	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	App               CertificateSyncApp          `json:"-"`
+	ID                string                      `json:"-"`
+	Name              string                      `json:"name"`
+	Description       string                      `json:"description"`
+	ConnectionID      string                      `json:"connectionId"`
+	IsAutoSyncEnabled bool                        `json:"isAutoSyncEnabled"`
+	SyncOptions       map[string]interface{}      `json:"syncOptions"`
+	DestinationConfig map[string]interface{}      `json:"destinationConfig"`
+	Filters           *CertificateSyncFilters     `json:"filters,omitempty"`
+	Credentials       *CertificateSyncCredentials `json:"credentials,omitempty"`
 }
 
 type GetCertificateSyncByIdRequest struct {
@@ -2660,9 +2680,26 @@ type DeleteCertificateSyncRequest struct {
 }
 
 type CertificateSyncCertificate struct {
-	ID                string `json:"id"`
-	CertificateSyncID string `json:"pkiSyncId"`
-	CertificateID     string `json:"certificateId"`
+	ID                 string                       `json:"id"`
+	CertificateSyncID  string                       `json:"pkiSyncId"`
+	CertificateID      string                       `json:"certificateId"`
+	CertificateOrderID string                       `json:"certificateOrderId"`
+	SyncMetadata       *CertificateSyncSyncMetadata `json:"syncMetadata"`
+}
+
+type CertificateSyncSyncMetadata struct {
+	IsDefault bool `json:"isDefault"`
+}
+
+type SetCertificateSyncDefaultCertificateRequest struct {
+	App               CertificateSyncApp `json:"-"`
+	CertificateSyncID string             `json:"-"`
+	CertificateID     string             `json:"certificateId"`
+}
+
+type ClearCertificateSyncDefaultCertificateRequest struct {
+	App               CertificateSyncApp
+	CertificateSyncID string
 }
 
 type AddCertificateSyncCertificatesRequest struct {
@@ -3510,6 +3547,7 @@ type Certificate struct {
 	Id                        string                       `json:"id"`
 	ProjectId                 string                       `json:"projectId"`
 	ProfileId                 string                       `json:"profileId"`
+	OrderId                   string                       `json:"orderId,omitempty"`
 	ApplicationId             string                       `json:"applicationId,omitempty"`
 	Status                    string                       `json:"status"` // pending, issued, failed
 	CommonName                string                       `json:"commonName"`

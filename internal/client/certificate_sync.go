@@ -10,7 +10,19 @@ import (
 type CertificateSyncApp string
 
 const (
-	CertificateSyncAppAWSCertificateManager CertificateSyncApp = "aws-certificate-manager"
+	CertificateSyncAppAWSCertificateManager       CertificateSyncApp = "aws-certificate-manager"
+	CertificateSyncAppAWSElasticLoadBalancer      CertificateSyncApp = "aws-elastic-load-balancer"
+	CertificateSyncAppAWSSecretsManager           CertificateSyncApp = "aws-secrets-manager"
+	CertificateSyncAppAzureKeyVault               CertificateSyncApp = "azure-key-vault"
+	CertificateSyncAppChef                        CertificateSyncApp = "chef"
+	CertificateSyncAppCloudflareCustomCertificate CertificateSyncApp = "cloudflare-custom-certificate"
+	CertificateSyncAppF5BigIp                     CertificateSyncApp = "f5-big-ip"
+	CertificateSyncAppGCPCertificateManager       CertificateSyncApp = "gcp-certificate-manager"
+	CertificateSyncAppKempLoadMaster              CertificateSyncApp = "kemp-loadmaster"
+	CertificateSyncAppLinuxServer                 CertificateSyncApp = "linux-server"
+	CertificateSyncAppNetScaler                   CertificateSyncApp = "netscaler"
+	CertificateSyncAppNutanixPrismCentral         CertificateSyncApp = "nutanix-prism-central"
+	CertificateSyncAppWindowsServer               CertificateSyncApp = "windows-server"
 )
 
 const (
@@ -21,6 +33,8 @@ const (
 	operationAddCertificateSyncCertificates   = "CallAddCertificateSyncCertificates"
 	operationListCertificateSyncCertificates  = "CallListCertificateSyncCertificates"
 	operationRemoveCertificateSyncCertificate = "CallRemoveCertificateSyncCertificates"
+	operationSetCertificateSyncDefault        = "CallSetCertificateSyncDefaultCertificate"
+	operationClearCertificateSyncDefault      = "CallClearCertificateSyncDefaultCertificate"
 )
 
 // Each sync destination gets its own URL prefix, so the destination is part of the path.
@@ -184,6 +198,49 @@ func (client Client) RemoveCertificateSyncCertificates(request RemoveCertificate
 
 	if response.IsError() {
 		return errors.NewAPIErrorWithResponse(operationRemoveCertificateSyncCertificate, response, nil)
+	}
+
+	return nil
+}
+
+func certificateSyncDefaultCertificateURL(app CertificateSyncApp, certificateSyncID string) string {
+	return fmt.Sprintf("%s/%s/certificates/default", certificateSyncBaseURL(app), url.PathEscape(certificateSyncID))
+}
+
+func (client Client) SetCertificateSyncDefaultCertificate(request SetCertificateSyncDefaultCertificateRequest) error {
+	response, err := client.Config.HttpClient.
+		R().
+		SetHeader("User-Agent", USER_AGENT).
+		SetBody(request).
+		Post(certificateSyncDefaultCertificateURL(request.App, request.CertificateSyncID))
+
+	if err != nil {
+		return errors.NewGenericRequestError(operationSetCertificateSyncDefault, err)
+	}
+
+	if response.IsError() {
+		return errors.NewAPIErrorWithResponse(operationSetCertificateSyncDefault, response, nil)
+	}
+
+	return nil
+}
+
+func (client Client) ClearCertificateSyncDefaultCertificate(request ClearCertificateSyncDefaultCertificateRequest) error {
+	response, err := client.Config.HttpClient.
+		R().
+		SetHeader("User-Agent", USER_AGENT).
+		Delete(certificateSyncDefaultCertificateURL(request.App, request.CertificateSyncID))
+
+	if err != nil {
+		return errors.NewGenericRequestError(operationClearCertificateSyncDefault, err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return nil
+	}
+
+	if response.IsError() {
+		return errors.NewAPIErrorWithResponse(operationClearCertificateSyncDefault, response, nil)
 	}
 
 	return nil
