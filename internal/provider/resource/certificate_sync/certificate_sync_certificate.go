@@ -96,7 +96,13 @@ func (r *CertificateSyncCertificateResource) ModifyPlan(ctx context.Context, req
 	var plan, state CertificateSyncCertificateResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() || plan.CertificateID.IsUnknown() || plan.CertificateID.Equal(state.CertificateID) {
+	if resp.Diagnostics.HasError() || plan.CertificateID.Equal(state.CertificateID) {
+		return
+	}
+
+	// An ID only known after apply belongs to a newly issued certificate, which is always a new order.
+	if plan.CertificateID.IsUnknown() {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("certificate_id"))
 		return
 	}
 
