@@ -209,6 +209,9 @@ type IdentityKubernetesAuth struct {
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
 	TokenReviewerMode          string                  `json:"tokenReviewMode"`
 	GatewayID                  string                  `json:"gatewayId"`
+	TemplateID                 *string                 `json:"templateId"`
+	// A JWT copied from a linked template reads back as "", so this is the only sign one is stored.
+	IsTokenReviewerJwtTemplateSourced bool `json:"isTokenReviewerJwtTemplateSourced"`
 }
 
 type IdentityOidcAuth struct {
@@ -227,6 +230,7 @@ type IdentityOidcAuth struct {
 	ClaimMetadataMapping    map[string]string       `json:"claimMetadataMapping"`
 	BoundSubject            string                  `json:"boundSubject"`
 	CACERT                  string                  `json:"caCert"`
+	TemplateID              *string                 `json:"templateId"`
 }
 
 type IdentityTokenAuth struct {
@@ -1811,6 +1815,56 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
 	TokenReviewerMode       string                         `json:"tokenReviewMode"`
 	GatewayID               *string                        `json:"gatewayId"`
+	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
+	TemplateID *string `json:"templateId"`
+	// Leaves tokenReviewerJwt out of the request, which keeps the stored JWT. A nil TokenReviewerJwt
+	// is sent as null, which clears it.
+	KeepTokenReviewerJwt bool `json:"-"`
+}
+
+func (request UpdateIdentityKubernetesAuthRequest) MarshalJSON() ([]byte, error) {
+	type plain UpdateIdentityKubernetesAuthRequest
+	body, err := json.Marshal(plain(request))
+	if err != nil || !request.KeepTokenReviewerJwt {
+		return body, err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, err
+	}
+	delete(fields, "tokenReviewerJwt")
+	return json.Marshal(fields)
+}
+
+// The API rejects every template-managed connection field on a templated attach, even as null,
+// so a template-linked kubernetes auth is written with its own request types that cannot carry them.
+type CreateIdentityKubernetesAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	AllowedNamespaces       string                         `json:"allowedNamespaces"`
+	AllowedNames            string                         `json:"allowedNames"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+// unlinkIdentityAuthTemplateRequest unlinks a template and changes nothing else: the API leaves
+// every field the request omits as it is, so the identity keeps the settings copied onto it.
+type unlinkIdentityAuthTemplateRequest struct {
+	TemplateID *string `json:"templateId"`
+}
+
+type UpdateIdentityKubernetesAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	AllowedNamespaces       string                         `json:"allowedNamespaces"`
+	AllowedNames            string                         `json:"allowedNames"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type CreateIdentityOidcAuthResponse struct {
@@ -1858,6 +1912,34 @@ type UpdateIdentityOidcAuthRequest struct {
 	CACERT                  string                         `json:"caCert"`
 	BoundIssuer             string                         `json:"boundIssuer"`
 	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
+	TemplateID *string `json:"templateId"`
+}
+
+// The API rejects every template-managed provider field on a templated attach, even as null, so a
+// template-linked OIDC auth is written with its own request types that cannot carry them.
+type CreateIdentityOidcAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityOidcAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
 	BoundClaims             map[string]string              `json:"boundClaims"`
 	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
 	BoundSubject            string                         `json:"boundSubject"`
