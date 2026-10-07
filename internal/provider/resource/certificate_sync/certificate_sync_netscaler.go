@@ -47,7 +47,7 @@ func NewCertificateSyncNetScalerResource() resource.Resource {
 			"vserver_name": schema.StringAttribute{
 				Optional:    true,
 				Description: "The name of the NetScaler SSL vServer to bind synced certificates to. Leave unset to sync certificates without binding them to a vServer.",
-				Validators:  []validator.String{stringvalidator.LengthAtMost(127)},
+				Validators:  []validator.String{notBlank(), stringvalidator.LengthAtMost(127)},
 			},
 		},
 		SyncOptionsAttributes: map[string]schema.Attribute{

@@ -44,9 +44,8 @@ resource "infisical_certificate_sync_windows_server" "example" {
   connection_id  = "<winrm-app-connection-id>"
 
   destination_config = {
-    destination_path        = "C:\\certs"
-    ssl_enabled             = true
-    ssl_reject_unauthorized = true
+    destination_path = "C:\\certs"
+    # host, port and the ssl_* settings pick the target per sync and are only valid with an LDAP connection
   }
 
   sync_options = {

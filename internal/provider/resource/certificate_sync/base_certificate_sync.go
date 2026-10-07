@@ -445,7 +445,7 @@ func (r *CertificateSyncBaseResource) Create(ctx context.Context, req resource.C
 
 	orders := newCertificateOrderResolver(r.client, nil)
 
-	filters, diags := certificateFiltersForRequest(ctx, plan.CertificateFilters, orders)
+	filters, diags := certificateFiltersForRequest(ctx, plan.CertificateFilters, orders, plan.ApplicationID.ValueString())
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -643,7 +643,7 @@ func (r *CertificateSyncBaseResource) Update(ctx context.Context, req resource.U
 
 	// An omitted block leaves the list unmanaged, so the API's filters are only replaced when the configured block changed.
 	if !plan.CertificateFilters.IsNull() && !plan.CertificateFilters.Equal(state.CertificateFilters) {
-		request.Filters, diags = certificateFiltersForRequest(ctx, plan.CertificateFilters, orders)
+		request.Filters, diags = certificateFiltersForRequest(ctx, plan.CertificateFilters, orders, plan.ApplicationID.ValueString())
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return

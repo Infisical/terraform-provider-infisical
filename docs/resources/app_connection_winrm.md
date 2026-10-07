@@ -37,7 +37,7 @@ resource "infisical_app_connection_winrm" "app-connection-winrm" {
   method = "username-password"
   credentials = {
     host                    = "windows-host.example.com"
-    port                    = 5985
+    port                    = 5986
     username                = "EXAMPLE\\administrator"
     password                = "<password>"
     ssl_enabled             = true
@@ -45,7 +45,7 @@ resource "infisical_app_connection_winrm" "app-connection-winrm" {
     # ssl_certificate       = file("ca.pem") # CA used to verify a self-signed HTTPS listener
   }
   # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
-  # gateway_id   = "<gateway-id>" # Optional, route through a specific Infisical Gateway instead of the Internet Gateway
+  gateway_id  = "<gateway-id>" # Required, WinRM connections reach the host through a gateway
   description = "I am a test app connection"
 }
 ```
@@ -56,13 +56,13 @@ resource "infisical_app_connection_winrm" "app-connection-winrm" {
 ### Required
 
 - `credentials` (Attributes) The credentials for the Windows (WinRM) App Connection (see [below for nested schema](#nestedatt--credentials))
+- `gateway_id` (String) The Gateway ID to use for the app connection. Windows (WinRM) connections can only reach the host through a gateway.
 - `method` (String) The method used to authenticate with Windows (WinRM). Possible values are: username-password
 - `name` (String) The name of the Windows (WinRM) App Connection to create. Must be slug-friendly
 
 ### Optional
 
 - `description` (String) An optional description for the Windows (WinRM) App Connection.
-- `gateway_id` (String) The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.
 - `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only

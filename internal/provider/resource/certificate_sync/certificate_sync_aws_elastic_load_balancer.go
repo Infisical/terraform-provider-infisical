@@ -95,6 +95,7 @@ func NewCertificateSyncAwsElasticLoadBalancerResource() resource.Resource {
 		},
 		SyncOptionsAttributes: map[string]schema.Attribute{
 			"certificate_name_schema": schema.StringAttribute{
+				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The naming scheme for synced certificates. Available placeholders: {{certificateId}}, {{shortCertificateId}}, {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}. Without a placeholder, or when unset, the sync holds only one certificate.",

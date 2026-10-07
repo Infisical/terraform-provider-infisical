@@ -79,11 +79,32 @@ func (r *CertificateSyncCertificateResource) Schema(_ context.Context, _ resourc
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"certificate_id": schema.StringAttribute{
-				Required:      true,
-				Description:   "The ID of the certificate to associate with the certificate sync.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The ID of the certificate to associate with the certificate sync. Changing it to a renewal of the same certificate updates in place; any other change replaces the association.",
 			},
 		},
+	}
+}
+
+// ModifyPlan replaces the association only when certificate_id moves to a different certificate
+// order. Replacing on a renewal would delete the order, briefly detaching the renewed certificate.
+func (r *CertificateSyncCertificateResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	var plan, state CertificateSyncCertificateResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() || plan.CertificateID.IsUnknown() || plan.CertificateID.Equal(state.CertificateID) {
+		return
+	}
+
+	orders := newCertificateOrderResolver(r.client, nil)
+	planOrder, planErr := orders.orderOf(plan.CertificateID.ValueString())
+	stateOrder, stateErr := orders.orderOf(state.CertificateID.ValueString())
+	if planErr != nil || stateErr != nil || planOrder != stateOrder {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("certificate_id"))
 	}
 }
 

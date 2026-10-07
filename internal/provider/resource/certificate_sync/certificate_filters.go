@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -67,10 +70,12 @@ func certificateFiltersSchema() schema.SingleNestedAttribute {
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
 							Required:    true,
+							Validators:  []validator.String{notBlank(), noSurroundingWhitespace()},
 							Description: "The metadata key the certificate must carry.",
 						},
 						"value": schema.StringAttribute{
 							Optional:    true,
+							Validators:  []validator.String{noSurroundingWhitespace()},
 							Description: "The value the key must have. Leave unset to match any value.",
 						},
 					},
@@ -89,7 +94,14 @@ func emptyCertificateFilters() types.Object {
 }
 
 func hasAnyCertificateFilter(filters *infisical.CertificateSyncFilters) bool {
-	return filters != nil && (len(filters.CertificateOrderIDs) > 0 || len(filters.ProfileIDs) > 0 || len(filters.Metadata) > 0)
+	return filters != nil && (filters.CertificateOrderIDs != nil || filters.ProfileIDs != nil || filters.Metadata != nil)
+}
+
+func derefStrings(values *[]string) []string {
+	if values == nil {
+		return nil
+	}
+	return *values
 }
 
 func validateCertificateFilters(ctx context.Context, filters types.Object) diag.Diagnostics {
@@ -123,8 +135,10 @@ func stringsFromSet(ctx context.Context, set types.Set) ([]string, diag.Diagnost
 	return values, diags
 }
 
-func setOrNull(prior types.Set, values []string) types.Set {
-	if len(values) == 0 && prior.IsNull() {
+// setFromApi returns null when the API leaves the field out, since an absent filter means no condition
+// while an empty one matches nothing.
+func setFromApi(present bool, values []string) types.Set {
+	if !present {
 		return types.SetNull(types.StringType)
 	}
 	elements := make([]attr.Value, 0, len(values))
@@ -136,7 +150,7 @@ func setOrNull(prior types.Set, values []string) types.Set {
 
 // certificateFiltersForRequest builds the API payload, translating certificate IDs into the
 // certificate orders the API stores. A null block returns nil, which leaves the filters out.
-func certificateFiltersForRequest(ctx context.Context, filters types.Object, orders *certificateOrderResolver) (*infisical.CertificateSyncFilters, diag.Diagnostics) {
+func certificateFiltersForRequest(ctx context.Context, filters types.Object, orders *certificateOrderResolver, applicationID string) (*infisical.CertificateSyncFilters, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if filters.IsNull() || filters.IsUnknown() {
 		return nil, diags
@@ -149,44 +163,58 @@ func certificateFiltersForRequest(ctx context.Context, filters types.Object, ord
 	}
 
 	request := &infisical.CertificateSyncFilters{}
+	certificateIDsPath := path.Root(attrCertificateFilters).AtName("certificate_ids")
 
-	certificateIDs, d := stringsFromSet(ctx, model.CertificateIDs)
-	diags.Append(d...)
-	seenOrders := map[string]bool{}
-	for _, certificateID := range certificateIDs {
-		orderID, err := orders.orderOf(certificateID)
-		if err != nil {
-			if err == infisical.ErrNotFound {
+	if !model.CertificateIDs.IsNull() && !model.CertificateIDs.IsUnknown() {
+		certificateIDs, d := stringsFromSet(ctx, model.CertificateIDs)
+		diags.Append(d...)
+		orderIDs := []string{}
+		seenOrders := map[string]bool{}
+		for _, certificateID := range certificateIDs {
+			ref, err := orders.refOf(certificateID)
+			if err != nil {
+				if err == infisical.ErrNotFound {
+					diags.AddAttributeError(certificateIDsPath, "Certificate not found", fmt.Sprintf("Certificate %q does not exist in Infisical.", certificateID))
+					continue
+				}
+				diags.AddError("Error looking up certificate", fmt.Sprintf("Couldn't look up certificate %q: %s", certificateID, err.Error()))
+				continue
+			}
+			if ref.ApplicationID != "" && applicationID != "" && ref.ApplicationID != applicationID {
 				diags.AddAttributeError(
-					path.Root(attrCertificateFilters).AtName("certificate_ids"),
-					"Certificate not found",
-					fmt.Sprintf("Certificate %q does not exist in Infisical.", certificateID),
+					certificateIDsPath,
+					"Certificate belongs to another application",
+					fmt.Sprintf("Certificate %q belongs to a different application than the certificate sync, so the sync would never hold it.", certificateID),
 				)
 				continue
 			}
-			diags.AddError("Error looking up certificate", fmt.Sprintf("Couldn't look up certificate %q: %s", certificateID, err.Error()))
-			continue
+			if !seenOrders[ref.OrderID] {
+				seenOrders[ref.OrderID] = true
+				orderIDs = append(orderIDs, ref.OrderID)
+			}
 		}
-		if !seenOrders[orderID] {
-			seenOrders[orderID] = true
-			request.CertificateOrderIDs = append(request.CertificateOrderIDs, orderID)
-		}
+		request.CertificateOrderIDs = &orderIDs
 	}
 
-	request.ProfileIDs, d = stringsFromSet(ctx, model.ProfileIDs)
-	diags.Append(d...)
+	if !model.ProfileIDs.IsNull() && !model.ProfileIDs.IsUnknown() {
+		profileIDs, d := stringsFromSet(ctx, model.ProfileIDs)
+		diags.Append(d...)
+		request.ProfileIDs = &profileIDs
+	}
 
 	if !model.Metadata.IsNull() && !model.Metadata.IsUnknown() {
 		var metadata []certificateMetadataFilterModel
 		diags.Append(model.Metadata.ElementsAs(ctx, &metadata, false)...)
+		filtersList := []infisical.CertificateSyncMetadataFilter{}
 		for _, pair := range metadata {
 			filter := infisical.CertificateSyncMetadataFilter{Key: pair.Key.ValueString()}
 			if !pair.Value.IsNull() {
 				value := pair.Value.ValueString()
 				filter.Value = &value
 			}
-			request.Metadata = append(request.Metadata, filter)
+			filtersList = append(filtersList, filter)
 		}
+		request.Metadata = &filtersList
 	}
 
 	return request, diags
@@ -209,8 +237,9 @@ func certificateFiltersFromApi(ctx context.Context, prior types.Object, api *inf
 		return prior, diags
 	}
 
+	apiOrderIDs := derefStrings(api.CertificateOrderIDs)
 	apiOrders := map[string]bool{}
-	for _, orderID := range api.CertificateOrderIDs {
+	for _, orderID := range apiOrderIDs {
 		apiOrders[orderID] = true
 	}
 
@@ -235,7 +264,7 @@ func certificateFiltersFromApi(ctx context.Context, prior types.Object, api *inf
 	}
 
 	missingOrders := []string{}
-	for _, orderID := range api.CertificateOrderIDs {
+	for _, orderID := range apiOrderIDs {
 		if !coveredOrders[orderID] {
 			missingOrders = append(missingOrders, orderID)
 		}
@@ -259,14 +288,14 @@ func certificateFiltersFromApi(ctx context.Context, prior types.Object, api *inf
 		certificateIDs = append(certificateIDs, current.CertificateID)
 	}
 
-	certificateIDSet := setOrNull(model.CertificateIDs, certificateIDs)
-	profileIDSet := setOrNull(model.ProfileIDs, api.ProfileIDs)
+	certificateIDSet := setFromApi(api.CertificateOrderIDs != nil, certificateIDs)
+	profileIDSet := setFromApi(api.ProfileIDs != nil, derefStrings(api.ProfileIDs))
 
 	metadataType := types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}
 	metadataSet := types.SetNull(metadataType)
-	if len(api.Metadata) > 0 || !model.Metadata.IsNull() {
-		elements := make([]attr.Value, 0, len(api.Metadata))
-		for _, pair := range api.Metadata {
+	if api.Metadata != nil {
+		elements := make([]attr.Value, 0, len(*api.Metadata))
+		for _, pair := range *api.Metadata {
 			value := types.StringNull()
 			if pair.Value != nil {
 				value = types.StringValue(*pair.Value)
@@ -296,27 +325,33 @@ type privateStateSetter interface {
 	SetKey(ctx context.Context, key string, value []byte) diag.Diagnostics
 }
 
+// certificateRef is what the resolver caches per certificate: its order and its application.
+type certificateRef struct {
+	OrderID       string `json:"o"`
+	ApplicationID string `json:"a,omitempty"`
+}
+
 // certificateOrderResolver maps certificate IDs to their certificate orders. A certificate never
 // changes order, so lookups are cached in private state and only new IDs reach the API.
 type certificateOrderResolver struct {
 	client *infisical.Client
-	cache  map[string]string
+	cache  map[string]certificateRef
 	dirty  bool
 }
 
-func newCertificateOrderResolver(client *infisical.Client, cache map[string]string) *certificateOrderResolver {
+func newCertificateOrderResolver(client *infisical.Client, cache map[string]certificateRef) *certificateOrderResolver {
 	if cache == nil {
-		cache = map[string]string{}
+		cache = map[string]certificateRef{}
 	}
 	return &certificateOrderResolver{client: client, cache: cache, dirty: true}
 }
 
 func loadCertificateOrderResolver(ctx context.Context, client *infisical.Client, private privateStateGetter) (*certificateOrderResolver, diag.Diagnostics) {
 	raw, diags := private.GetKey(ctx, privateKeyCertificateOrders)
-	cache := map[string]string{}
+	cache := map[string]certificateRef{}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &cache); err != nil {
-			cache = map[string]string{}
+			cache = map[string]certificateRef{}
 		}
 	}
 	resolver := newCertificateOrderResolver(client, cache)
@@ -324,26 +359,36 @@ func loadCertificateOrderResolver(ctx context.Context, client *infisical.Client,
 	return resolver, diags
 }
 
-func (o *certificateOrderResolver) orderOf(certificateID string) (string, error) {
-	if orderID, ok := o.cache[certificateID]; ok {
-		return orderID, nil
+func (o *certificateOrderResolver) refOf(certificateID string) (certificateRef, error) {
+	if ref, ok := o.cache[certificateID]; ok && ref.ApplicationID != "" {
+		return ref, nil
 	}
 	response, err := o.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateID})
 	if err != nil {
-		return "", err
+		return certificateRef{}, err
 	}
 	if response.Certificate.OrderId == "" {
-		return "", fmt.Errorf("certificate %q has no certificate order", certificateID)
+		return certificateRef{}, fmt.Errorf("certificate %q has no certificate order", certificateID)
 	}
-	o.remember(certificateID, response.Certificate.OrderId)
-	return response.Certificate.OrderId, nil
+	ref := certificateRef{OrderID: response.Certificate.OrderId, ApplicationID: response.Certificate.ApplicationId}
+	o.cache[certificateID] = ref
+	o.dirty = true
+	return ref, nil
+}
+
+func (o *certificateOrderResolver) orderOf(certificateID string) (string, error) {
+	if ref, ok := o.cache[certificateID]; ok {
+		return ref.OrderID, nil
+	}
+	ref, err := o.refOf(certificateID)
+	return ref.OrderID, err
 }
 
 func (o *certificateOrderResolver) remember(certificateID, orderID string) {
-	if o.cache[certificateID] == orderID {
+	if o.cache[certificateID].OrderID == orderID {
 		return
 	}
-	o.cache[certificateID] = orderID
+	o.cache[certificateID] = certificateRef{OrderID: orderID}
 	o.dirty = true
 }
 
@@ -435,4 +480,19 @@ func listCertificateSyncCertificates(client *infisical.Client, certificateSyncID
 			return certificates, nil
 		}
 	}
+}
+
+var (
+	nonBlankPattern  = regexp.MustCompile(`\S`)
+	untrimmedPattern = regexp.MustCompile(`^(\S(.*\S)?)?$`)
+)
+
+// notBlank rejects values the API would trim to nothing, which would read back as null and never settle.
+func notBlank() validator.String {
+	return stringvalidator.RegexMatches(nonBlankPattern, "must not be empty or only whitespace")
+}
+
+// noSurroundingWhitespace rejects values the API would trim, which would read back changed on every refresh.
+func noSurroundingWhitespace() validator.String {
+	return stringvalidator.RegexMatches(untrimmedPattern, "must not start or end with whitespace")
 }

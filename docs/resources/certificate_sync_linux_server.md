@@ -45,9 +45,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
 
   destination_config = {
     destination_path = "/etc/ssl/infisical"
-    host             = "server01.corp.example.com" # Optional, overrides the SSH connection's host
-    port             = 22
-    ssh_host_keys    = "<output of ssh-keyscan server01.corp.example.com>"
+    # host, port and ssh_host_keys pick the target per sync and are only valid with an LDAP connection
   }
 
   sync_options = {

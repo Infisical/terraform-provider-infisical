@@ -44,7 +44,7 @@ resource "infisical_certificate_sync_certificate" "example" {
 
 ### Required
 
-- `certificate_id` (String) The ID of the certificate to associate with the certificate sync.
+- `certificate_id` (String) The ID of the certificate to associate with the certificate sync. Changing it to a renewal of the same certificate updates in place; any other change replaces the association.
 - `certificate_sync_id` (String) The ID of the certificate sync to associate the certificate with.
 
 ### Read-Only

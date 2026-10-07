@@ -110,7 +110,7 @@ func NewCertificateSyncF5BigIpResource() resource.Resource {
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The F5 BIG-IP partition to sync certificates to. Defaults to the `Common` partition when unset.",
-				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
+				Validators:  []validator.String{notBlank(), stringvalidator.LengthBetween(1, 255)},
 			},
 			"profile_type": schema.StringAttribute{
 				Optional:    true,
@@ -121,7 +121,7 @@ func NewCertificateSyncF5BigIpResource() resource.Resource {
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The name of the SSL profile to bind synced certificates to. Required when `profile_type` is `client-ssl` or `server-ssl`, and not allowed otherwise.",
-				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
+				Validators:  []validator.String{notBlank(), stringvalidator.LengthBetween(1, 255)},
 			},
 			"create_profile_if_missing": schema.BoolAttribute{
 				Optional:    true,
@@ -133,7 +133,7 @@ func NewCertificateSyncF5BigIpResource() resource.Resource {
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The parent profile a newly created SSL profile inherits from. Only allowed when `create_profile_if_missing` is `true`.",
-				Validators:  []validator.String{stringvalidator.LengthBetween(1, 511)},
+				Validators:  []validator.String{notBlank(), stringvalidator.LengthBetween(1, 511)},
 			},
 		},
 		SyncOptionsAttributes: map[string]schema.Attribute{

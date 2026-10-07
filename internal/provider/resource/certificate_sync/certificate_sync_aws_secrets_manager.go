@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -84,6 +85,7 @@ func NewCertificateSyncAwsSecretsManagerResource() resource.Resource {
 				Description: "The AWS region to sync certificates to (e.g. us-east-1).",
 			},
 			"kms_key_id": schema.StringAttribute{
+				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				Description: "The ID or ARN of the KMS key used to encrypt the secrets. Leave unset to use the AWS managed key.",
 			},

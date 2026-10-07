@@ -119,6 +119,7 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 				},
 			},
 			"host": schema.StringAttribute{
+				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The hostname or IP address of the server to sync to. Only valid with an LDAP connection, which picks the host per sync.",
@@ -143,6 +144,7 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The PEM-encoded CA certificate used to verify a self-signed WinRM HTTPS listener. Only valid with an LDAP connection, which picks the host per sync.",
 				Validators: []validator.String{
+					notBlank(),
 					stringvalidator.LengthAtMost(8192),
 				},
 			},
@@ -161,6 +163,7 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 							CustomType:  customtypes.TrimmedStringType{},
 							Description: "The Windows user or group to grant access to (e.g. DOMAIN\\svc-account or BUILTIN\\Administrators).",
 							Validators: []validator.String{
+								notBlank(),
 								stringvalidator.LengthBetween(1, 256),
 							},
 						},

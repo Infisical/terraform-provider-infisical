@@ -65,6 +65,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				},
 			},
 			"host": schema.StringAttribute{
+				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The hostname or IP address of the server to sync to. Only valid with an LDAP connection, which picks the host per sync.",
@@ -81,17 +82,20 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The trusted SSH host keys of the server, as produced by `ssh-keyscan <host>`. The sync refuses to connect when the server presents a different key, and at least one RSA or ECDSA key must be included. Only valid with an LDAP connection, which picks the host per sync.",
 				Validators: []validator.String{
+					notBlank(),
 					stringvalidator.LengthAtMost(8192),
 				},
 			},
 		},
 		SyncOptionsAttributes: mergeHostAttributes(certificateSyncHostExportOptionsAttributes(linuxServerDefaultExportFormat), map[string]schema.Attribute{
 			"file_mode": schema.StringAttribute{
+				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The octal file mode applied to delivered certificate files (e.g. 0644).",
 			},
 			"private_key_file_mode": schema.StringAttribute{
+				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The octal file mode applied to delivered private key files (e.g. 0600).",
@@ -101,6 +105,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The Linux user that should own the delivered files.",
 				Validators: []validator.String{
+					notBlank(),
 					stringvalidator.LengthAtMost(32),
 				},
 			},
@@ -109,6 +114,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The Linux group that should own the delivered files.",
 				Validators: []validator.String{
+					notBlank(),
 					stringvalidator.LengthAtMost(32),
 				},
 			},

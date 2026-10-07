@@ -110,6 +110,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 			CustomType:  customtypes.TrimmedStringType{},
 			Description: "The alias of the private key entry in a PKCS#12 or JKS keystore, using only letters, digits, dots (.), dashes (-), and underscores (_). Only valid when `export_format` is `pkcs12` or `jks`, and defaults to the certificate's file base name.",
 			Validators: []validator.String{
+				notBlank(),
 				stringvalidator.LengthBetween(1, 128),
 			},
 		},
@@ -122,6 +123,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 			CustomType:  customtypes.TrimmedStringType{},
 			Description: "A command run on the server to check the health of the delivered certificates.",
 			Validators: []validator.String{
+				notBlank(),
 				stringvalidator.LengthAtMost(hostCommandMaxLength),
 			},
 		},
@@ -130,6 +132,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 			CustomType:  customtypes.TrimmedStringType{},
 			Description: "A command run on the server after certificates are delivered, for example to reload a service.",
 			Validators: []validator.String{
+				notBlank(),
 				stringvalidator.LengthAtMost(hostCommandMaxLength),
 			},
 		},

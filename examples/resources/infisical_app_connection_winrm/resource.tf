@@ -22,7 +22,7 @@ resource "infisical_app_connection_winrm" "app-connection-winrm" {
   method = "username-password"
   credentials = {
     host                    = "windows-host.example.com"
-    port                    = 5985
+    port                    = 5986
     username                = "EXAMPLE\\administrator"
     password                = "<password>"
     ssl_enabled             = true
@@ -30,6 +30,6 @@ resource "infisical_app_connection_winrm" "app-connection-winrm" {
     # ssl_certificate       = file("ca.pem") # CA used to verify a self-signed HTTPS listener
   }
   # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
-  # gateway_id   = "<gateway-id>" # Optional, route through a specific Infisical Gateway instead of the Internet Gateway
+  gateway_id  = "<gateway-id>" # Required, WinRM connections reach the host through a gateway
   description = "I am a test app connection"
 }

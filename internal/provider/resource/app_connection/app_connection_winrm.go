@@ -88,6 +88,7 @@ func NewAppConnectionWinRMResource() resource.Resource {
 		AppConnectionName: "Windows (WinRM)",
 		ResourceTypeName:  "_app_connection_winrm",
 		SupportsGateway:   true,
+		RequiresGateway:   true,
 		AllowedMethods:    []string{WinRMAppConnectionUsernamePasswordMethod},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{

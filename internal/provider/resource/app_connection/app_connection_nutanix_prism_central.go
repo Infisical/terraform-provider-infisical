@@ -74,12 +74,12 @@ func buildNutanixPrismCentralCredentials(credentials AppConnectionNutanixPrismCe
 			return nil, diags
 		}
 
-		if !isNutanixPrismCentralApiKey(credentials.ApiKey.ValueString()) {
+		if !isNutanixPrismCentralApiKey(strings.TrimSpace(credentials.ApiKey.ValueString())) {
 			diags.AddError(errorSummary, "API key must be a 32-character lowercase hexadecimal string")
 			return nil, diags
 		}
 
-		credentialsConfig["apiKey"] = credentials.ApiKey.ValueString()
+		credentialsConfig["apiKey"] = strings.TrimSpace(credentials.ApiKey.ValueString())
 	} else {
 		if credentials.Username.IsNull() || credentials.Username.ValueString() == "" {
 			diags.AddError(errorSummary, "Username field must be defined in basic-auth method")

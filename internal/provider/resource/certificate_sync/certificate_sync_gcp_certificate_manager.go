@@ -17,7 +17,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -92,18 +94,21 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 		AppConnection:    infisical.AppConnectionAppGCP,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"gcp_project_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of the GCP project to sync certificates to.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+				Description:   "The ID of the GCP project to sync certificates to.",
 			},
 			"location": schema.StringAttribute{
-				Required:    true,
-				Description: "The Certificate Manager location to create certificates in, either global or a region ID such as us-central1.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+				Description:   "The Certificate Manager location to create certificates in, either global or a region ID such as us-central1.",
 			},
 			"scope": schema.StringAttribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "The scope of the synced certificates: default, edge-cache, all-regions or client-auth. Defaults to default.",
-				Default:     stringdefault.StaticString(gcpCertificateManagerScopeDefault),
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:      true,
+				Computed:      true,
+				Description:   "The scope of the synced certificates: default, edge-cache, all-regions or client-auth. Defaults to default.",
+				Default:       stringdefault.StaticString(gcpCertificateManagerScopeDefault),
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						gcpCertificateManagerScopeDefault,
@@ -122,6 +127,7 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 						Description: "The name of the certificate map to add the certificates to.",
 					},
 					"hostname": schema.StringAttribute{
+						Validators:  []validator.String{notBlank()},
 						Optional:    true,
 						Description: "The hostname of the certificate map entry, such as www.example.com or *.example.com. Leave unset to use the primary entry.",
 					},

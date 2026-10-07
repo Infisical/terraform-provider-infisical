@@ -2629,10 +2629,11 @@ type CertificateSync struct {
 	Filters           *CertificateSyncFilters `json:"filters"`
 }
 
+// CertificateSyncFilters uses pointers because the API treats an empty list (match nothing) differently from an absent one (no condition).
 type CertificateSyncFilters struct {
-	ProfileIDs          []string                        `json:"profileIds,omitempty"`
-	CertificateOrderIDs []string                        `json:"certificateOrderIds,omitempty"`
-	Metadata            []CertificateSyncMetadataFilter `json:"metadata,omitempty"`
+	ProfileIDs          *[]string                        `json:"profileIds,omitempty"`
+	CertificateOrderIDs *[]string                        `json:"certificateOrderIds,omitempty"`
+	Metadata            *[]CertificateSyncMetadataFilter `json:"metadata,omitempty"`
 }
 
 type CertificateSyncMetadataFilter struct {
