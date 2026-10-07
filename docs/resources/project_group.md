@@ -3,12 +3,12 @@
 page_title: "infisical_project_group Resource - terraform-provider-infisical"
 subcategory: "Projects"
 description: |-
-  Create project groups & save to Infisical. Only Machine Identity authentication is supported for this data source
+  Add an existing group to a project and assign it project roles. Exactly one of group_id or group_name must be set. This resource does not create groups; to create a group, use the infisical_group resource. Destroying this resource removes the group from the project; the group itself is left untouched. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_project_group (Resource)
 
-Create project groups & save to Infisical. Only Machine Identity authentication is supported for this data source
+Add an existing group to a project and assign it project roles. Exactly one of `group_id` or `group_name` must be set. This resource does not create groups; to create a group, use the `infisical_group` resource. Destroying this resource removes the group from the project; the group itself is left untouched. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 

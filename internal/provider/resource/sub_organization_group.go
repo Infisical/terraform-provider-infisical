@@ -58,7 +58,8 @@ func (r *subOrganizationGroupResource) Metadata(_ context.Context, req resource.
 
 func (r *subOrganizationGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Link a group from the root organization into a sub-organization and assign it organization roles there. " +
+		Description: "Link an existing group from the root organization into a sub-organization and assign it organization roles there. " +
+			"This resource does not create groups; to create a group, use the `infisical_group` resource. " +
 			"The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization through `auth.organization_slug`. " +
 			"The machine identity needs the `Link Group` permission on sub-organizations in the root organization, and permission to manage groups in the sub-organization. " +
 			"Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. " +

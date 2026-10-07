@@ -3,12 +3,12 @@
 page_title: "infisical_sub_organization_group Resource - terraform-provider-infisical"
 subcategory: "Groups"
 description: |-
-  Link a group from the root organization into a sub-organization and assign it organization roles there. The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization through auth.organization_slug. The machine identity needs the Link Group permission on sub-organizations in the root organization, and permission to manage groups in the sub-organization. Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. Only Machine Identity authentication is supported for this resource.
+  Link an existing group from the root organization into a sub-organization and assign it organization roles there. This resource does not create groups; to create a group, use the infisical_group resource. The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization through auth.organization_slug. The machine identity needs the Link Group permission on sub-organizations in the root organization, and permission to manage groups in the sub-organization. Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_sub_organization_group (Resource)
 
-Link a group from the root organization into a sub-organization and assign it organization roles there. The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization through `auth.organization_slug`. The machine identity needs the `Link Group` permission on sub-organizations in the root organization, and permission to manage groups in the sub-organization. Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. Only Machine Identity authentication is supported for this resource.
+Link an existing group from the root organization into a sub-organization and assign it organization roles there. This resource does not create groups; to create a group, use the `infisical_group` resource. The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization through `auth.organization_slug`. The machine identity needs the `Link Group` permission on sub-organizations in the root organization, and permission to manage groups in the sub-organization. Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
