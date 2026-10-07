@@ -8,6 +8,7 @@ import (
 const (
 	operationGetIdentity      = "CallGetIdentity"
 	operationSearchIdentities = "CallSearchIdentities"
+	operationListIdentitiesV2 = "CallListIdentitiesV2"
 	operationCreateIdentity   = "CallCreateIdentity"
 	operationUpdateIdentity   = "CallUpdateIdentity"
 	operationDeleteIdentity   = "CallDeleteIdentity"
@@ -77,6 +78,42 @@ func (client Client) SearchIdentitiesByName(name string) (SearchIdentitiesRespon
 	}
 
 	return body, nil
+}
+
+// ListIdentitiesV2 returns every identity in the caller's organization that is in one
+// of the given scopes ("organization" and/or "project"). It reads all pages of the v2
+// search endpoint.
+func (client Client) ListIdentitiesV2(scope []string) ([]SearchIdentitiesV2Membership, error) {
+	identities := []SearchIdentitiesV2Membership{}
+
+	for offset := 0; ; offset += searchIdentitiesPageSize {
+		var body SearchIdentitiesV2Response
+
+		response, err := client.Config.HttpClient.
+			R().
+			SetResult(&body).
+			SetHeader("User-Agent", USER_AGENT).
+			SetBody(SearchIdentitiesV2Request{
+				Scope:  scope,
+				Limit:  searchIdentitiesPageSize,
+				Offset: offset,
+			}).
+			Post("api/v2/identities/search")
+
+		if err != nil {
+			return nil, errors.NewGenericRequestError(operationListIdentitiesV2, err)
+		}
+
+		if response.IsError() {
+			return nil, errors.NewAPIErrorWithResponse(operationListIdentitiesV2, response, nil)
+		}
+
+		identities = append(identities, body.Identities...)
+
+		if len(body.Identities) < searchIdentitiesPageSize || len(identities) >= body.TotalCount {
+			return identities, nil
+		}
+	}
 }
 
 func (client Client) CreateIdentity(request CreateIdentityRequest) (CreateIdentityResponse, error) {

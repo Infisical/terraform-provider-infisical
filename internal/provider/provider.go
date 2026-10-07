@@ -380,6 +380,7 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewGroupsDataSource,
 		infisicalDatasource.NewIdentityDetailsDataSource,
 		infisicalDatasource.NewIdentityDataSource,
+		infisicalDatasource.NewIdentitiesListDataSource,
 		infisicalDatasource.NewKMSKeyDataSource,
 		infisicalDatasource.NewSecretMetadataDataSource,
 		infisicalDatasource.NewProjectIdentityDataSource,
