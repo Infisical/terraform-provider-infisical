@@ -389,6 +389,8 @@ func (p *infisicalProvider) DataSources(_ context.Context) []func() datasource.D
 		infisicalDatasource.NewProjectUserDataSource,
 		infisicalDatasource.NewOrganizationDataSource,
 		infisicalDatasource.NewGatewayDataSource,
+		infisicalDatasource.NewIdentityKubernetesAuthTemplateDataSource,
+		infisicalDatasource.NewIdentityOidcAuthTemplateDataSource,
 		infisicalDatasource.NewProjectUsersListDataSource,
 		infisicalDatasource.NewSecretValidationRulesDataSource,
 	}
@@ -422,6 +424,8 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewIdentityTlsCertAuthResource,
 		infisicalResource.NewIdentityTokenAuthResource,
 		infisicalResource.NewIdentityTokenAuthTokenResource,
+		infisicalResource.NewIdentityKubernetesAuthTemplateResource,
+		infisicalResource.NewIdentityOidcAuthTemplateResource,
 		infisicalResource.NewIntegrationGcpSecretManagerResource,
 		infisicalResource.NewIntegrationAwsParameterStoreResource,
 		infisicalResource.NewIntegrationAwsSecretsManagerResource,
