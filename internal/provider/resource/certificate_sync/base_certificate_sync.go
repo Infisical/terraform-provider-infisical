@@ -793,10 +793,10 @@ func validateDefaultCertificateInFilters(ctx context.Context, defaultCertificate
 		}
 	}
 
-	diags.AddAttributeError(
+	diags.AddAttributeWarning(
 		path.Root(attrDefaultCertificateID),
-		"Invalid default certificate",
-		"default_certificate_id must be one of the IDs in certificate_filters.certificate_ids.",
+		"Default certificate not in certificate_ids",
+		"default_certificate_id is not one of the IDs in certificate_filters.certificate_ids. This is fine when it is a renewal of one of them; otherwise setting the default fails at apply.",
 	)
 	return diags
 }
