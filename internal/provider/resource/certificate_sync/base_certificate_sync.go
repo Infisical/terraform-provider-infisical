@@ -335,7 +335,7 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 		attributes[attrDefaultCertificateID] = schema.StringAttribute{
 			Optional: true,
 			Description: "The ID of the certificate to set as the default certificate on every listener. The load balancer serves it when a client's SNI matches no other certificate. " +
-				"It must be one of the certificates the sync holds. Leave unset to keep the listeners' existing default unmanaged.",
+				"It must be one of the certificates the sync holds. Leave unset to leave the listeners' default unmanaged; removing it later stops managing the default without changing it.",
 		}
 	}
 
@@ -491,7 +491,10 @@ func (r *CertificateSyncBaseResource) Create(ctx context.Context, req resource.C
 	}
 
 	if r.SupportsDefaultCertificate && !plan.DefaultCertificateID.IsNull() {
-		resp.Diagnostics.Append(r.setDefaultCertificate(certificateSync.ID, plan.DefaultCertificateID.ValueString(), orders)...)
+		// An error would taint the new sync and force a recreate; the next refresh sees the unset default and retries it.
+		for _, d := range r.setDefaultCertificate(certificateSync.ID, plan.DefaultCertificateID.ValueString(), orders).Errors() {
+			resp.Diagnostics.AddWarning("Default certificate not set: "+d.Summary(), d.Detail())
+		}
 	}
 
 	resp.Diagnostics.Append(orders.save(ctx, resp.Private)...)
@@ -674,18 +677,9 @@ func (r *CertificateSyncBaseResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	if r.SupportsDefaultCertificate && !plan.DefaultCertificateID.Equal(state.DefaultCertificateID) {
-		if plan.DefaultCertificateID.IsNull() {
-			err := r.client.ClearCertificateSyncDefaultCertificate(infisical.ClearCertificateSyncDefaultCertificateRequest{
-				App:               r.App,
-				CertificateSyncID: state.ID.ValueString(),
-			})
-			if err != nil {
-				resp.Diagnostics.AddError("Error clearing default certificate", "Couldn't clear the default certificate, unexpected error: "+err.Error())
-			}
-		} else {
-			resp.Diagnostics.Append(r.setDefaultCertificate(state.ID.ValueString(), plan.DefaultCertificateID.ValueString(), orders)...)
-		}
+	// An unset default stops managing it rather than clearing the listeners' current default.
+	if r.SupportsDefaultCertificate && !plan.DefaultCertificateID.IsNull() && !plan.DefaultCertificateID.Equal(state.DefaultCertificateID) {
+		resp.Diagnostics.Append(r.setDefaultCertificate(state.ID.ValueString(), plan.DefaultCertificateID.ValueString(), orders)...)
 	}
 
 	resp.Diagnostics.Append(orders.save(ctx, resp.Private)...)

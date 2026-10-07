@@ -34,7 +34,6 @@ const (
 	operationListCertificateSyncCertificates  = "CallListCertificateSyncCertificates"
 	operationRemoveCertificateSyncCertificate = "CallRemoveCertificateSyncCertificates"
 	operationSetCertificateSyncDefault        = "CallSetCertificateSyncDefaultCertificate"
-	operationClearCertificateSyncDefault      = "CallClearCertificateSyncDefaultCertificate"
 )
 
 // Each sync destination gets its own URL prefix, so the destination is part of the path.
@@ -220,27 +219,6 @@ func (client Client) SetCertificateSyncDefaultCertificate(request SetCertificate
 
 	if response.IsError() {
 		return errors.NewAPIErrorWithResponse(operationSetCertificateSyncDefault, response, nil)
-	}
-
-	return nil
-}
-
-func (client Client) ClearCertificateSyncDefaultCertificate(request ClearCertificateSyncDefaultCertificateRequest) error {
-	response, err := client.Config.HttpClient.
-		R().
-		SetHeader("User-Agent", USER_AGENT).
-		Delete(certificateSyncDefaultCertificateURL(request.App, request.CertificateSyncID))
-
-	if err != nil {
-		return errors.NewGenericRequestError(operationClearCertificateSyncDefault, err)
-	}
-
-	if response.StatusCode() == http.StatusNotFound {
-		return nil
-	}
-
-	if response.IsError() {
-		return errors.NewAPIErrorWithResponse(operationClearCertificateSyncDefault, response, nil)
 	}
 
 	return nil

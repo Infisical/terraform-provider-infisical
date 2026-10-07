@@ -80,7 +80,7 @@ resource "infisical_certificate_sync_aws_elastic_load_balancer" "example" {
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
 - `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
-- `default_certificate_id` (String) The ID of the certificate to set as the default certificate on every listener. The load balancer serves it when a client's SNI matches no other certificate. It must be one of the certificates the sync holds. Leave unset to keep the listeners' existing default unmanaged.
+- `default_certificate_id` (String) The ID of the certificate to set as the default certificate on every listener. The load balancer serves it when a client's SNI matches no other certificate. It must be one of the certificates the sync holds. Leave unset to leave the listeners' default unmanaged; removing it later stops managing the default without changing it.
 - `description` (String) An optional description for the AWS Elastic Load Balancer sync.
 
 ### Read-Only

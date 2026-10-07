@@ -2697,11 +2697,6 @@ type SetCertificateSyncDefaultCertificateRequest struct {
 	CertificateID     string             `json:"certificateId"`
 }
 
-type ClearCertificateSyncDefaultCertificateRequest struct {
-	App               CertificateSyncApp
-	CertificateSyncID string
-}
-
 type AddCertificateSyncCertificatesRequest struct {
 	CertificateSyncID string   `json:"-"`
 	CertificateIDs    []string `json:"certificateIds"`
