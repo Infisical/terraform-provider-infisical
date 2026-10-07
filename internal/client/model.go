@@ -209,6 +209,9 @@ type IdentityKubernetesAuth struct {
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
 	TokenReviewerMode          string                  `json:"tokenReviewMode"`
 	GatewayID                  string                  `json:"gatewayId"`
+	TemplateID                 *string                 `json:"templateId"`
+	// A JWT copied from a linked template reads back as "", so this is the only sign one is stored.
+	IsTokenReviewerJwtTemplateSourced bool `json:"isTokenReviewerJwtTemplateSourced"`
 }
 
 type IdentityOidcAuth struct {
@@ -227,6 +230,7 @@ type IdentityOidcAuth struct {
 	ClaimMetadataMapping    map[string]string       `json:"claimMetadataMapping"`
 	BoundSubject            string                  `json:"boundSubject"`
 	CACERT                  string                  `json:"caCert"`
+	TemplateID              *string                 `json:"templateId"`
 }
 
 type IdentityTokenAuth struct {
@@ -775,6 +779,31 @@ type UpdateProjectUserResponse struct {
 		CreatedAt                time.Time `json:"createdAt"`
 		UpdatedAt                time.Time `json:"updatedAt"`
 	} `json:"roles"`
+}
+
+type GetProjectMembershipsRequest struct {
+	ProjectID string `json:"projectId"`
+}
+
+type ProjectMembershipUser struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	PublicKey string `json:"publicKey"`
+}
+
+type ProjectMembershipItem struct {
+	ID        string                `json:"id"`
+	UserID    string                `json:"userId"`
+	ProjectID string                `json:"projectId"`
+	User      ProjectMembershipUser `json:"user"`
+	Roles     []ProjectMemberRole   `json:"roles"`
+}
+
+type GetProjectMembershipsResponse struct {
+	Memberships []ProjectMembershipItem `json:"memberships"`
 }
 
 type DeleteProjectUserRequest struct {
@@ -1786,6 +1815,56 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
 	TokenReviewerMode       string                         `json:"tokenReviewMode"`
 	GatewayID               *string                        `json:"gatewayId"`
+	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
+	TemplateID *string `json:"templateId"`
+	// Leaves tokenReviewerJwt out of the request, which keeps the stored JWT. A nil TokenReviewerJwt
+	// is sent as null, which clears it.
+	KeepTokenReviewerJwt bool `json:"-"`
+}
+
+func (request UpdateIdentityKubernetesAuthRequest) MarshalJSON() ([]byte, error) {
+	type plain UpdateIdentityKubernetesAuthRequest
+	body, err := json.Marshal(plain(request))
+	if err != nil || !request.KeepTokenReviewerJwt {
+		return body, err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, err
+	}
+	delete(fields, "tokenReviewerJwt")
+	return json.Marshal(fields)
+}
+
+// The API rejects every template-managed connection field on a templated attach, even as null,
+// so a template-linked kubernetes auth is written with its own request types that cannot carry them.
+type CreateIdentityKubernetesAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	AllowedNamespaces       string                         `json:"allowedNamespaces"`
+	AllowedNames            string                         `json:"allowedNames"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+// unlinkIdentityAuthTemplateRequest unlinks a template and changes nothing else: the API leaves
+// every field the request omits as it is, so the identity keeps the settings copied onto it.
+type unlinkIdentityAuthTemplateRequest struct {
+	TemplateID *string `json:"templateId"`
+}
+
+type UpdateIdentityKubernetesAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	AllowedNamespaces       string                         `json:"allowedNamespaces"`
+	AllowedNames            string                         `json:"allowedNames"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type CreateIdentityOidcAuthResponse struct {
@@ -1833,6 +1912,34 @@ type UpdateIdentityOidcAuthRequest struct {
 	CACERT                  string                         `json:"caCert"`
 	BoundIssuer             string                         `json:"boundIssuer"`
 	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
+	TemplateID *string `json:"templateId"`
+}
+
+// The API rejects every template-managed provider field on a templated attach, even as null, so a
+// template-linked OIDC auth is written with its own request types that cannot carry them.
+type CreateIdentityOidcAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityOidcAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
 	BoundClaims             map[string]string              `json:"boundClaims"`
 	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
 	BoundSubject            string                         `json:"boundSubject"`
@@ -4693,4 +4800,107 @@ type DeleteAlertResponse struct {
 	Alert struct {
 		ID string `json:"id"`
 	} `json:"alert"`
+}
+
+type SecretValidationRuleEnvironment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type SecretValidationRuleStringConstraints struct {
+	MinLength      *int64  `json:"minLength,omitempty"`
+	MaxLength      *int64  `json:"maxLength,omitempty"`
+	RegexPattern   *string `json:"regexPattern,omitempty"`
+	RequiredPrefix *string `json:"requiredPrefix,omitempty"`
+	RequiredSuffix *string `json:"requiredSuffix,omitempty"`
+}
+
+type SecretValidationRuleValueConstraints struct {
+	SecretValidationRuleStringConstraints
+	UniqueAcrossLastVersions *int64 `json:"uniqueAcrossLastVersions,omitempty"`
+	UniqueWithinScope        *bool  `json:"uniqueWithinScope,omitempty"`
+}
+
+type SecretValidationRule struct {
+	ID          string                           `json:"id"`
+	Name        string                           `json:"name"`
+	Description *string                          `json:"description"`
+	ProjectID   string                           `json:"projectId"`
+	SecretPath  string                           `json:"secretPath"`
+	IsActive    *bool                            `json:"isActive"`
+	CreatedAt   string                           `json:"createdAt"`
+	UpdatedAt   string                           `json:"updatedAt"`
+	Environment *SecretValidationRuleEnvironment `json:"environment"`
+	Type        SecretValidationRuleType         `json:"type"`
+
+	KeyConstraints      *SecretValidationRuleStringConstraints `json:"keyConstraints,omitempty"`
+	ValueConstraints    *SecretValidationRuleValueConstraints  `json:"valueConstraints,omitempty"`
+	Providers           []string                               `json:"providers,omitempty"`
+	PasswordConstraints *SecretValidationRuleStringConstraints `json:"passwordConstraints,omitempty"`
+}
+
+type CreateSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType `json:"-"`
+
+	Name        string
+	ProjectID   string
+	SecretPath  string
+	Description *string
+	Environment *string
+	IsActive    bool
+
+	Constraints map[string]any
+}
+
+type CreateSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type GetSecretValidationRuleByIdRequest struct {
+	Type SecretValidationRuleType
+	ID   string
+}
+
+type GetSecretValidationRuleByIdResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type UpdateSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType
+	ID   string
+
+	Name        string
+	Description *string
+	Environment *string
+	SecretPath  string
+	IsActive    bool
+
+	Constraints map[string]any
+}
+
+type UpdateSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type DeleteSecretValidationRuleRequest struct {
+	Type SecretValidationRuleType
+	ID   string
+}
+
+type DeleteSecretValidationRuleResponse struct {
+	SecretValidationRule SecretValidationRule `json:"secretValidationRule"`
+}
+
+type ListSecretValidationRulesRequest struct {
+	Type      SecretValidationRuleType
+	ProjectID string
+}
+
+type ListAllSecretValidationRulesRequest struct {
+	ProjectID string
+}
+
+type ListSecretValidationRulesResponse struct {
+	SecretValidationRules []SecretValidationRule `json:"secretValidationRules"`
 }

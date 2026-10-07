@@ -1,0 +1,1 @@
+terraform import infisical_identity_oidc_auth_template.example <template_id>
