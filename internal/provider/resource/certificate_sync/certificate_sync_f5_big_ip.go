@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -101,10 +102,11 @@ func validateF5BigIpDestinationConfig(ctx context.Context, config CertificateSyn
 
 func NewCertificateSyncF5BigIpResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppF5BigIp,
-		SyncName:         "F5 BIG-IP",
-		ResourceTypeName: "_certificate_sync_f5_big_ip",
-		AppConnection:    infisical.AppConnectionAppF5BigIp,
+		App:                 infisical.CertificateSyncAppF5BigIp,
+		SyncName:            "F5 BIG-IP",
+		ResourceTypeName:    "_certificate_sync_f5_big_ip",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9._-]{1,255}$`), requirement: "1-255 letters, digits, periods, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppF5BigIp,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"partition": schema.StringAttribute{
 				Optional:    true,

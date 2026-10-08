@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -34,10 +35,11 @@ var certificateSyncCloudflareCustomCertificateSyncOptionsAttrTypes = map[string]
 
 func NewCertificateSyncCloudflareCustomCertificateResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppCloudflareCustomCertificate,
-		SyncName:         "Cloudflare Custom SSL Certificate",
-		ResourceTypeName: "_certificate_sync_cloudflare_custom_certificate",
-		AppConnection:    infisical.AppConnectionAppCloudflare,
+		App:                 infisical.CertificateSyncAppCloudflareCustomCertificate,
+		SyncName:            "Cloudflare Custom SSL Certificate",
+		ResourceTypeName:    "_certificate_sync_cloudflare_custom_certificate",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9_-]{1,255}$`), requireIdentifier: true, requirement: "1-255 letters, digits, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppCloudflare,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"zone_id": schema.StringAttribute{
 				Required:    true,

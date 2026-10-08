@@ -35,7 +35,7 @@ resource "infisical_certificate_sync_aws_certificate_manager" "example" {
   }
 
   sync_options = {
-    certificate_name_schema = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    certificate_name_schema = "Infisical-{{certificateId}}" # Must include {{certificateId}}; {{shortCertificateId}} is not supported here
     can_remove_certificates = true
     include_root_ca         = false
     preserve_arn            = true

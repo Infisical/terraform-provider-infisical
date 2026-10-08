@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -75,10 +76,11 @@ func awsSecretsManagerFieldMappingFromMap(m map[string]interface{}, key string, 
 
 func NewCertificateSyncAwsSecretsManagerResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppAWSSecretsManager,
-		SyncName:         "AWS Secrets Manager",
-		ResourceTypeName: "_certificate_sync_aws_secrets_manager",
-		AppConnection:    infisical.AppConnectionAppAWS,
+		App:                 infisical.CertificateSyncAppAWSSecretsManager,
+		SyncName:            "AWS Secrets Manager",
+		ResourceTypeName:    "_certificate_sync_aws_secrets_manager",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[\w-]+$`), minLength: 1, maxLength: 512, requireIdentifier: true, requirement: "1-512 letters, digits, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppAWS,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,
@@ -157,6 +159,15 @@ func NewCertificateSyncAwsSecretsManagerResource() resource.Resource {
 					},
 				},
 			},
+		},
+
+		ValidateConfigFunc: func(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
+			validateFieldMappingsUnique(ctx, config.SyncOptions, map[string]string{
+				"certificate":       awsSecretsManagerDefaultCertificateField,
+				"private_key":       awsSecretsManagerDefaultPrivateKeyField,
+				"certificate_chain": awsSecretsManagerDefaultCertificateChainField,
+				"ca_certificate":    awsSecretsManagerDefaultCaCertificateField,
+			}, diags)
 		},
 
 		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {

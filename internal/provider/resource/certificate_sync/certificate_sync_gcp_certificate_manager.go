@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -31,19 +30,16 @@ const (
 	gcpCertificateManagerScopeAllRegions = "all-regions"
 	gcpCertificateManagerScopeClientAuth = "client-auth"
 
-	gcpCertificateManagerGlobalLocation                = "global"
-	gcpCertificateManagerMaxUserLabels                 = 62
-	gcpCertificateManagerMaxCertificatesPerMapEntry    = 4
-	gcpCertificateManagerManagedByLabelKey             = "managed-by"
-	gcpCertificateManagerCertificateIDLabelKey         = "infisical-certificate-id"
-	gcpCertificateManagerCertificateIDPlaceholder      = "{{certificateId}}"
-	gcpCertificateManagerShortCertificateIDPlaceholder = "{{shortCertificateId}}"
+	gcpCertificateManagerGlobalLocation             = "global"
+	gcpCertificateManagerMaxUserLabels              = 62
+	gcpCertificateManagerMaxCertificatesPerMapEntry = 4
+	gcpCertificateManagerManagedByLabelKey          = "managed-by"
+	gcpCertificateManagerCertificateIDLabelKey      = "infisical-certificate-id"
 )
 
 var (
 	gcpCertificateManagerLabelKeyPattern   = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
 	gcpCertificateManagerLabelValuePattern = regexp.MustCompile(`^[a-z0-9_-]{0,63}$`)
-	gcpCertificateManagerLeadingLetter     = regexp.MustCompile(`^[a-z]`)
 )
 
 type CertificateSyncGcpCertificateManagerCertificateMapBindingModel struct {
@@ -88,10 +84,11 @@ var certificateSyncGcpCertificateManagerSyncOptionsAttrTypes = map[string]attr.T
 
 func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppGCPCertificateManager,
-		SyncName:         "GCP Certificate Manager",
-		ResourceTypeName: "_certificate_sync_gcp_certificate_manager",
-		AppConnection:    infisical.AppConnectionAppGCP,
+		App:                 infisical.CertificateSyncAppGCPCertificateManager,
+		SyncName:            "GCP Certificate Manager",
+		ResourceTypeName:    "_certificate_sync_gcp_certificate_manager",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`), requireIdentifier: true, requirement: "1-63 lowercase letters, digits or hyphens, starting with a letter (prefix the schema, for example \"infisical-{{certificateId}}\")"},
+		AppConnection:       infisical.AppConnectionAppGCP,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"gcp_project_id": schema.StringAttribute{
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -176,24 +173,6 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 		},
 
 		ValidateConfigFunc: func(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
-			if !config.SyncOptions.IsNull() && !config.SyncOptions.IsUnknown() {
-				var syncOptions CertificateSyncGcpCertificateManagerSyncOptionsModel
-				diags.Append(config.SyncOptions.As(ctx, &syncOptions, basetypes.ObjectAsOptions{})...)
-				if diags.HasError() {
-					return
-				}
-				if !syncOptions.CertificateNameSchema.IsNull() && !syncOptions.CertificateNameSchema.IsUnknown() {
-					nameSchema := strings.TrimSpace(syncOptions.CertificateNameSchema.ValueString())
-					namePath := path.Root(attrSyncOptions).AtName("certificate_name_schema")
-					if !strings.Contains(nameSchema, gcpCertificateManagerCertificateIDPlaceholder) && !strings.Contains(nameSchema, gcpCertificateManagerShortCertificateIDPlaceholder) {
-						diags.AddAttributeError(namePath, "Invalid certificate name schema", "The certificate name schema must include the {{certificateId}} or {{shortCertificateId}} placeholder.")
-					}
-					if !gcpCertificateManagerLeadingLetter.MatchString(nameSchema) {
-						diags.AddAttributeError(namePath, "Invalid certificate name schema", `The certificate name schema must start with a lowercase letter, for example "infisical-{{certificateId}}".`)
-					}
-				}
-			}
-
 			if config.DestinationConfig.IsNull() || config.DestinationConfig.IsUnknown() {
 				return
 			}
@@ -226,16 +205,11 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 				diags.AddAttributeError(destinationPath.AtName("certificate_map_binding"), "Invalid certificate map binding", `A certificate map binding requires the "default" scope.`)
 			}
 
-			if config.CertificateFilters.IsNull() || config.CertificateFilters.IsUnknown() {
-				return
-			}
-			var filters certificateFiltersModel
-			diags.Append(config.CertificateFilters.As(ctx, &filters, basetypes.ObjectAsOptions{})...)
-			if diags.HasError() {
-				return
-			}
-			if !filters.CertificateIDs.IsNull() && !filters.CertificateIDs.IsUnknown() && len(filters.CertificateIDs.Elements()) > gcpCertificateManagerMaxCertificatesPerMapEntry {
-				diags.AddAttributeError(path.Root(attrCertificateFilters).AtName("certificate_ids"), "Too many certificates", fmt.Sprintf("A certificate map binding supports up to %d certificates, which is the GCP limit for one certificate map entry.", gcpCertificateManagerMaxCertificatesPerMapEntry))
+			if locationKnown && scopeKnown {
+				enforceCertificateCap(ctx, certificateCap{
+					max:    gcpCertificateManagerMaxCertificatesPerMapEntry,
+					reason: "a certificate map binding holds at most that many certificates in one map entry",
+				}, config.CertificateFilters, diags)
 			}
 		},
 

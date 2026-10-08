@@ -50,7 +50,7 @@ resource "infisical_certificate_sync_aws_certificate_manager" "example" {
   }
 
   sync_options = {
-    certificate_name_schema = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    certificate_name_schema = "Infisical-{{certificateId}}" # Must include {{certificateId}}; {{shortCertificateId}} is not supported here
     can_remove_certificates = true
     include_root_ca         = false
     preserve_arn            = true
@@ -96,7 +96,7 @@ Required:
 
 Required:
 
-- `certificate_name_schema` (String) The naming scheme for synced certificates. Must include the {{certificateId}} or {{shortCertificateId}} placeholder. Available placeholders: {{certificateId}}, {{shortCertificateId}}, {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.
+- `certificate_name_schema` (String) The naming scheme for synced certificates. Must include the {{certificateId}} placeholder; {{shortCertificateId}} is not supported for this destination. Names may contain letters, digits, spaces, hyphens and underscores (1-256 characters). Other placeholders: {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.
 
 Optional:
 

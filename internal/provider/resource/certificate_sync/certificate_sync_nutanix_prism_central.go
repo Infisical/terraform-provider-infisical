@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -22,23 +21,6 @@ type CertificateSyncNutanixPrismCentralDestinationConfigModel struct {
 var certificateSyncNutanixPrismCentralDestinationConfigAttrTypes = map[string]attr.Type{
 	"cluster_id":   types.StringType,
 	"cluster_name": types.StringType,
-}
-
-func validateNutanixPrismCentralCertificateFilters(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
-	if config.CertificateFilters.IsNull() || config.CertificateFilters.IsUnknown() {
-		return
-	}
-
-	var filters certificateFiltersModel
-	diags.Append(config.CertificateFilters.As(ctx, &filters, objectAsOptions)...)
-	if diags.HasError() || filters.CertificateIDs.IsNull() || filters.CertificateIDs.IsUnknown() {
-		return
-	}
-
-	if len(filters.CertificateIDs.Elements()) > 1 {
-		diags.AddAttributeError(path.Root(attrCertificateFilters), "Too many certificates",
-			"A Nutanix Prism Central cluster holds a single certificate, so certificate_ids can list at most one certificate.")
-	}
 }
 
 func NewCertificateSyncNutanixPrismCentralResource() resource.Resource {
@@ -60,7 +42,7 @@ func NewCertificateSyncNutanixPrismCentralResource() resource.Resource {
 			},
 		},
 
-		ValidateConfigFunc: validateNutanixPrismCentralCertificateFilters,
+		MaxCertificates: 1,
 
 		ReadDestinationConfigFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			var destinationConfig CertificateSyncNutanixPrismCentralDestinationConfigModel

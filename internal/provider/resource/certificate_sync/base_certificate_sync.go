@@ -124,6 +124,8 @@ func setOptionalInt64(m map[string]interface{}, key string, value types.Int64) {
 	m[key] = value.ValueInt64()
 }
 
+const exportPasswordMaxLength = 1024
+
 const (
 	attrID                      = "id"
 	attrConnectionID            = "connection_id"
@@ -163,6 +165,11 @@ type CertificateSyncBaseResource struct {
 
 	SupportsDefaultCertificate bool
 	SupportsExportPassword     bool
+
+	// CertificateNameRule mirrors the backend's rule for certificate_name_schema.
+	CertificateNameRule *certificateNameRule
+	// MaxCertificates caps how many certificates the destination holds, 0 meaning no fixed cap.
+	MaxCertificates int
 
 	// ValidateConfigFunc runs destination-specific plan-time checks against the configuration.
 	ValidateConfigFunc func(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics)
@@ -345,6 +352,8 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 			Sensitive:   true,
 			Description: "The password protecting the exported PKCS#12 or Java KeyStore file. Required when `export_format` is `pkcs12` or `jks`, unless `export_password_wo` is set. Stored in state.",
 			Validators: []validator.String{
+				notBlank(),
+				stringvalidator.LengthAtMost(exportPasswordMaxLength),
 				stringvalidator.ConflictsWith(path.MatchRoot(attrExportPasswordWO)),
 				stringvalidator.ConflictsWith(path.MatchRoot(attrExportPasswordWOVersion)),
 			},
@@ -355,6 +364,8 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 			Sensitive:   true,
 			Description: "The keystore export password as a write-only value that is never stored in state. Requires Terraform 1.11 or higher.",
 			Validators: []validator.String{
+				notBlank(),
+				stringvalidator.LengthAtMost(exportPasswordMaxLength),
 				stringvalidator.AlsoRequires(path.MatchRoot(attrExportPasswordWOVersion)),
 			},
 		}
@@ -403,6 +414,8 @@ func (r *CertificateSyncBaseResource) ValidateConfig(ctx context.Context, req re
 	if r.SupportsDefaultCertificate {
 		resp.Diagnostics.Append(validateDefaultCertificateInFilters(ctx, config.DefaultCertificateID, config.CertificateFilters)...)
 	}
+
+	r.validateCertificateNamesAndCap(ctx, config, &resp.Diagnostics)
 
 	if r.ValidateConfigFunc != nil {
 		r.ValidateConfigFunc(ctx, config, &resp.Diagnostics)

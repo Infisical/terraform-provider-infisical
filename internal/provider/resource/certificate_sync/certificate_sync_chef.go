@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -83,10 +84,11 @@ func chefFieldMappingFromMap(m map[string]interface{}, key, def string) types.St
 
 func NewCertificateSyncChefResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppChef,
-		SyncName:         "Chef",
-		ResourceTypeName: "_certificate_sync_chef",
-		AppConnection:    infisical.AppConnectionAppChef,
+		App:                 infisical.CertificateSyncAppChef,
+		SyncName:            "Chef",
+		ResourceTypeName:    "_certificate_sync_chef",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9_-]+$`), minLength: 1, maxLength: 255, requireIdentifier: true, requirement: "1-255 letters, digits, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppChef,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"data_bag_name": schema.StringAttribute{
 				Required:    true,
@@ -142,6 +144,15 @@ func NewCertificateSyncChefResource() resource.Resource {
 					"ca_certificate":    chefFieldMappingAttribute("The field name that holds the CA certificate. Defaults to `ca_certificate`.", chefDefaultFieldCaCertificate),
 				},
 			},
+		},
+
+		ValidateConfigFunc: func(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
+			validateFieldMappingsUnique(ctx, config.SyncOptions, map[string]string{
+				"certificate":       chefDefaultFieldCertificate,
+				"private_key":       chefDefaultFieldPrivateKey,
+				"certificate_chain": chefDefaultFieldCertificateChain,
+				"ca_certificate":    chefDefaultFieldCaCertificate,
+			}, diags)
 		},
 
 		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {

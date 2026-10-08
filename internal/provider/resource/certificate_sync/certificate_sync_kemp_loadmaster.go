@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
@@ -79,10 +80,11 @@ func validateKempLoadMasterDestinationConfig(ctx context.Context, config Certifi
 
 func NewCertificateSyncKempLoadMasterResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppKempLoadMaster,
-		SyncName:         "Kemp LoadMaster",
-		ResourceTypeName: "_certificate_sync_kemp_loadmaster",
-		AppConnection:    infisical.AppConnectionAppKempLoadMaster,
+		App:                 infisical.CertificateSyncAppKempLoadMaster,
+		SyncName:            "Kemp LoadMaster",
+		ResourceTypeName:    "_certificate_sync_kemp_loadmaster",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9._-]{1,251}$`), requireIdentifier: true, requirement: "1-251 letters, digits, periods, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppKempLoadMaster,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"virtual_service_id": schema.StringAttribute{
 				Optional:    true,
@@ -124,7 +126,10 @@ func NewCertificateSyncKempLoadMasterResource() resource.Resource {
 			},
 		},
 
-		ValidateConfigFunc: validateKempLoadMasterDestinationConfig,
+		ValidateConfigFunc: func(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
+			validateKempLoadMasterDestinationConfig(ctx, config, diags)
+			validateKempLoadMasterCaNameSchema(ctx, config, diags)
+		},
 
 		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			var syncOptions CertificateSyncKempLoadMasterSyncOptionsModel
@@ -181,5 +186,22 @@ func NewCertificateSyncKempLoadMasterResource() resource.Resource {
 				"virtual_service_id": optionalTrimmedStringFromMap(certificateSync.DestinationConfig, "virtualServiceId"),
 			})
 		},
+	}
+}
+
+var kempLoadMasterNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,251}$`)
+
+// validateKempLoadMasterCaNameSchema mirrors the backend check, which fills {{fingerprint}} and
+// {{commonName}} with stand-in values before matching the Kemp naming rule.
+func validateKempLoadMasterCaNameSchema(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
+	schema, known, set := stringAttribute(ctx, config.SyncOptions, "ca_certificate_name_schema")
+	if !known || !set {
+		return
+	}
+	compiled := strings.ReplaceAll(strings.TrimSpace(schema), "{{fingerprint}}", strings.Repeat("0", 24))
+	compiled = strings.ReplaceAll(compiled, "{{commonName}}", "common-name")
+	if !kempLoadMasterNamePattern.MatchString(compiled) {
+		diags.AddAttributeError(path.Root(attrSyncOptions).AtName("ca_certificate_name_schema"), "Invalid CA certificate name schema",
+			"With placeholders filled in it must be 1-251 letters, digits, periods, hyphens or underscores. Available placeholders: {{fingerprint}}, {{commonName}}.")
 	}
 }

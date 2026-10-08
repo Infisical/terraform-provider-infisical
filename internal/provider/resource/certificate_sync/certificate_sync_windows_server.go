@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -106,6 +107,7 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 		App:                    infisical.CertificateSyncAppWindowsServer,
 		SyncName:               "Windows Server",
 		ResourceTypeName:       "_certificate_sync_windows_server",
+		CertificateNameRule:    &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9._-]{1,200}$`), requirement: "a single file name of 1-200 letters, digits, periods, hyphens or underscores"},
 		AppConnection:          infisical.AppConnectionAppWinRM,
 		AdditionalConnections:  []infisical.AppConnectionApp{infisical.AppConnectionAppLdap},
 		SupportsExportPassword: true,

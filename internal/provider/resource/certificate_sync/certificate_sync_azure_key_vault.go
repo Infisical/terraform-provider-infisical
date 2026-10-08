@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -38,10 +39,11 @@ var certificateSyncAzureKeyVaultSyncOptionsAttrTypes = map[string]attr.Type{
 
 func NewCertificateSyncAzureKeyVaultResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppAzureKeyVault,
-		SyncName:         "Azure Key Vault",
-		ResourceTypeName: "_certificate_sync_azure_key_vault",
-		AppConnection:    infisical.AppConnectionAppAzureKeyVault,
+		App:                 infisical.CertificateSyncAppAzureKeyVault,
+		SyncName:            "Azure Key Vault",
+		ResourceTypeName:    "_certificate_sync_azure_key_vault",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9-]{1,127}$`), requireIdentifier: true, requirement: "1-127 letters, digits or hyphens"},
+		AppConnection:       infisical.AppConnectionAppAzureKeyVault,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vault_base_url": schema.StringAttribute{
 				Required:    true,

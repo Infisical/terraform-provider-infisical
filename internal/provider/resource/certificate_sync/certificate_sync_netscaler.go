@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -39,10 +40,11 @@ var certificateSyncNetScalerSyncOptionsAttrTypes = map[string]attr.Type{
 
 func NewCertificateSyncNetScalerResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppNetScaler,
-		SyncName:         "NetScaler",
-		ResourceTypeName: "_certificate_sync_netscaler",
-		AppConnection:    infisical.AppConnectionAppNetScaler,
+		App:                 infisical.CertificateSyncAppNetScaler,
+		SyncName:            "NetScaler",
+		ResourceTypeName:    "_certificate_sync_netscaler",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9._-]{1,63}$`), requirement: "1-63 letters, digits, periods, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppNetScaler,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"vserver_name": schema.StringAttribute{
 				Optional:    true,

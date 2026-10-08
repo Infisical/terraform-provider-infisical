@@ -3,12 +3,15 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -60,6 +63,7 @@ func NewCertificateSyncAwsElasticLoadBalancerResource() resource.Resource {
 		App:                        infisical.CertificateSyncAppAWSElasticLoadBalancer,
 		SyncName:                   "AWS Elastic Load Balancer",
 		ResourceTypeName:           "_certificate_sync_aws_elastic_load_balancer",
+		CertificateNameRule:        &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9\s_-]{1,256}$`), requireLiteralCertificateID: true, requirement: "1-256 letters, digits, spaces, hyphens or underscores"},
 		AppConnection:              infisical.AppConnectionAppAWS,
 		SupportsDefaultCertificate: true,
 		DestinationConfigAttributes: map[string]schema.Attribute{
@@ -98,7 +102,7 @@ func NewCertificateSyncAwsElasticLoadBalancerResource() resource.Resource {
 				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The naming scheme for synced certificates. Available placeholders: {{certificateId}}, {{shortCertificateId}}, {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}. Without a placeholder, or when unset, the sync holds only one certificate.",
+				Description: "The naming scheme for certificates imported into ACM for the listeners. When set, it must include the {{certificateId}} placeholder; {{shortCertificateId}} is not supported for this destination. Names may contain letters, digits, spaces, hyphens and underscores (1-256 characters). When unset, the sync holds only one certificate.",
 			},
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
@@ -119,6 +123,8 @@ func NewCertificateSyncAwsElasticLoadBalancerResource() resource.Resource {
 				Default:     booldefault.StaticBool(true),
 			},
 		},
+
+		ValidateConfigFunc: validateAwsElasticLoadBalancerListeners,
 
 		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
 			var syncOptions CertificateSyncAwsElasticLoadBalancerSyncOptionsModel
@@ -235,5 +241,54 @@ func NewCertificateSyncAwsElasticLoadBalancerResource() resource.Resource {
 			diags.Append(objDiags...)
 			return obj, diags
 		},
+	}
+}
+
+// validateAwsElasticLoadBalancerListeners checks that every listener belongs to the configured load
+// balancer and region; the sync only uses the listener ARNs, so a stray one gets the certificates.
+func validateAwsElasticLoadBalancerListeners(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
+	if config.DestinationConfig.IsNull() || config.DestinationConfig.IsUnknown() {
+		return
+	}
+	var destinationConfig CertificateSyncAwsElasticLoadBalancerDestinationConfigModel
+	diags.Append(config.DestinationConfig.As(ctx, &destinationConfig, objectAsOptions)...)
+	if diags.HasError() || destinationConfig.LoadBalancerArn.IsUnknown() || destinationConfig.LoadBalancerArn.IsNull() || destinationConfig.Listeners.IsUnknown() {
+		return
+	}
+
+	destinationPath := path.Root(attrDestinationConfig)
+	loadBalancerArn := destinationConfig.LoadBalancerArn.ValueString()
+	arnParts := strings.SplitN(loadBalancerArn, ":", 6)
+	if len(arnParts) != 6 || arnParts[0] != "arn" || arnParts[2] != "elasticloadbalancing" || !strings.HasPrefix(arnParts[5], "loadbalancer/") {
+		diags.AddAttributeError(destinationPath.AtName("load_balancer_arn"), "Invalid load balancer ARN",
+			"load_balancer_arn must be an Elastic Load Balancing load balancer ARN, for example arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/50dc6c495c0c9188.")
+		return
+	}
+	if !destinationConfig.Region.IsUnknown() && !destinationConfig.Region.IsNull() && arnParts[3] != destinationConfig.Region.ValueString() {
+		diags.AddAttributeError(destinationPath.AtName("load_balancer_arn"), "Load balancer region mismatch",
+			fmt.Sprintf("load_balancer_arn is in %s but aws_region is %s.", arnParts[3], destinationConfig.Region.ValueString()))
+	}
+
+	var listeners []CertificateSyncAwsElasticLoadBalancerListenerModel
+	diags.Append(destinationConfig.Listeners.ElementsAs(ctx, &listeners, false)...)
+	if diags.HasError() {
+		return
+	}
+	listenerPrefix := strings.Replace(loadBalancerArn, ":loadbalancer/", ":listener/", 1) + "/"
+	seen := map[string]bool{}
+	for i, listener := range listeners {
+		if listener.ListenerArn.IsUnknown() || listener.ListenerArn.IsNull() {
+			continue
+		}
+		arn := listener.ListenerArn.ValueString()
+		listenerPath := destinationPath.AtName("listeners").AtListIndex(i).AtName("listener_arn")
+		if !strings.HasPrefix(arn, listenerPrefix) {
+			diags.AddAttributeError(listenerPath, "Listener not on this load balancer",
+				fmt.Sprintf("Listener %q does not belong to load balancer %q. The sync attaches certificates to every listener ARN given, so a listener from another load balancer would receive them.", arn, loadBalancerArn))
+		}
+		if seen[arn] {
+			diags.AddAttributeError(listenerPath, "Duplicate listener", fmt.Sprintf("Listener %q is listed more than once.", arn))
+		}
+		seen[arn] = true
 	}
 }
