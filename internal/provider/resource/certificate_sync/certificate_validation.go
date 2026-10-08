@@ -161,11 +161,12 @@ func enforceCertificateCap(ctx context.Context, limit certificateCap, filters ty
 			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s, so certificate_filters can only use certificate_ids. Remove profile_ids and metadata.", limit.max, limit.reason),
 		)
 	}
+	// A warning, since IDs of a certificate and its renewal share one order and count once in the backend.
 	if !model.CertificateIDs.IsNull() && !model.CertificateIDs.IsUnknown() && len(model.CertificateIDs.Elements()) > limit.max {
-		diags.AddAttributeError(
+		diags.AddAttributeWarning(
 			path.Root(attrCertificateFilters).AtName("certificate_ids"),
 			"Too many certificates",
-			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s.", limit.max, limit.reason),
+			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s. Apply fails unless the extra IDs are renewals of the same certificate.", limit.max, limit.reason),
 		)
 	}
 }
