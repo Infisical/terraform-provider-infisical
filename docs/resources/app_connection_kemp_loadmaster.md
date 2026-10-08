@@ -39,7 +39,7 @@ resource "infisical_app_connection_kemp_loadmaster" "app-connection-kemp-loadmas
     hostname                = "loadmaster.example.com"
     username                = "<username>"
     password                = "<password>"
-    port                    = 443
+    port                    = 8443
     ssl_reject_unauthorized = true
     # ssl_certificate       = file("ca.pem") # CA used to verify a self-signed TLS certificate
   }

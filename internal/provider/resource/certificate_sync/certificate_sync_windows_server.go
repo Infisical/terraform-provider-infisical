@@ -122,27 +122,27 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The hostname or IP address of the server to sync to. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "The hostname or IP address of the server to sync to. Required with an LDAP connection and not allowed with any other connection type. The LDAP connection must have a gateway.",
 			},
 			"port": schema.Int64Attribute{
 				Optional:    true,
-				Description: "The WinRM port to reach the server on. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "The WinRM port to reach the server on. Only valid with an LDAP connection.",
 				Validators: []validator.Int64{
 					int64validator.Between(1, 65535),
 				},
 			},
 			"ssl_enabled": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Whether to reach the server over HTTPS WinRM instead of HTTP with NTLM message encryption. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "Whether to reach the server over HTTPS WinRM instead of HTTP with NTLM message encryption. Only valid with an LDAP connection.",
 			},
 			"ssl_reject_unauthorized": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Whether to verify the server's WinRM certificate when using HTTPS. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "Whether to verify the server's WinRM certificate when using HTTPS. Only valid with an LDAP connection.",
 			},
 			"ssl_certificate": schema.StringAttribute{
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The PEM-encoded CA certificate used to verify a self-signed WinRM HTTPS listener. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "The PEM-encoded CA certificate used to verify a self-signed WinRM HTTPS listener. Only valid with an LDAP connection.",
 				Validators: []validator.String{
 					notBlank(),
 					stringvalidator.LengthAtMost(8192),

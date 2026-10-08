@@ -121,7 +121,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 		"health_check_command": schema.StringAttribute{
 			Optional:    true,
 			CustomType:  customtypes.TrimmedStringType{},
-			Description: "A command run on the server to check the health of the delivered certificates.",
+			Description: "A command run on the server to check the health of the delivered certificates. Requires a gateway on the connection. Available variables: `{{certificateFiles}}`, `{{certificateDirectory}}`, `{{certificatePath}}`, `{{commonName}}`, `{{exportPassword}}`. Using `{{certificatePath}}` or `{{commonName}}` limits the sync to one certificate.",
 			Validators: []validator.String{
 				notBlank(),
 				stringvalidator.LengthAtMost(hostCommandMaxLength),
@@ -130,7 +130,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 		"post_sync_command": schema.StringAttribute{
 			Optional:    true,
 			CustomType:  customtypes.TrimmedStringType{},
-			Description: "A command run on the server after certificates are delivered, for example to reload a service.",
+			Description: "A command run on the server after certificates are delivered, for example to reload a service. Requires a gateway on the connection. Available variables: `{{certificateFiles}}`, `{{certificateDirectory}}`, `{{certificatePath}}`, `{{commonName}}`, `{{exportPassword}}`. Using `{{certificatePath}}` or `{{commonName}}` limits the sync to one certificate.",
 			Validators: []validator.String{
 				notBlank(),
 				stringvalidator.LengthAtMost(hostCommandMaxLength),

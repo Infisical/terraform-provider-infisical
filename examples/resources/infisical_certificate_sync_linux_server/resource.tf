@@ -30,7 +30,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
 
   destination_config = {
     destination_path = "/etc/ssl/infisical"
-    # host, port and ssh_host_keys pick the target per sync and are only valid with an LDAP connection
+    # host is required with an LDAP connection; host, port and ssh_host_keys are rejected with any other connection
   }
 
   sync_options = {
@@ -43,7 +43,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
     private_key_file_mode   = "0600"
     owner                   = "tomcat"
     group                   = "tomcat"
-    post_sync_command       = "systemctl reload tomcat"
+    post_sync_command       = "systemctl reload tomcat" # Requires a gateway on the connection
   }
 
   export_password_wo         = var.keystore_password

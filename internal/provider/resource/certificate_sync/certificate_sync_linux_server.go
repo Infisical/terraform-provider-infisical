@@ -68,11 +68,11 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				Validators:  []validator.String{notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The hostname or IP address of the server to sync to. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "The hostname or IP address of the server to sync to. Required with an LDAP connection and not allowed with any other connection type.",
 			},
 			"port": schema.Int64Attribute{
 				Optional:    true,
-				Description: "The SSH port to reach the server on. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "The SSH port to reach the server on. Only valid with an LDAP connection.",
 				Validators: []validator.Int64{
 					int64validator.Between(1, 65535),
 				},
@@ -80,7 +80,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 			"ssh_host_keys": schema.StringAttribute{
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The trusted SSH host keys of the server, as produced by `ssh-keyscan <host>`. The sync refuses to connect when the server presents a different key, and at least one RSA or ECDSA key must be included. Only valid with an LDAP connection, which picks the host per sync.",
+				Description: "The trusted SSH host keys of the server, as produced by `ssh-keyscan <host>`. The sync refuses to connect when the server presents a different key, and at least one RSA or ECDSA key must be included. Only valid with an LDAP connection.",
 				Validators: []validator.String{
 					notBlank(),
 					stringvalidator.LengthAtMost(8192),

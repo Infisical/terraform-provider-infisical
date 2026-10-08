@@ -45,7 +45,7 @@ resource "infisical_certificate_sync_windows_server" "example" {
 
   destination_config = {
     destination_path = "C:\\certs"
-    # host, port and the ssl_* settings pick the target per sync and are only valid with an LDAP connection
+    # host is required with an LDAP connection; host, port and the ssl_* settings are rejected with any other connection
   }
 
   sync_options = {
@@ -104,11 +104,11 @@ Required:
 
 Optional:
 
-- `host` (String) The hostname or IP address of the server to sync to. Only valid with an LDAP connection, which picks the host per sync.
-- `port` (Number) The WinRM port to reach the server on. Only valid with an LDAP connection, which picks the host per sync.
-- `ssl_certificate` (String) The PEM-encoded CA certificate used to verify a self-signed WinRM HTTPS listener. Only valid with an LDAP connection, which picks the host per sync.
-- `ssl_enabled` (Boolean) Whether to reach the server over HTTPS WinRM instead of HTTP with NTLM message encryption. Only valid with an LDAP connection, which picks the host per sync.
-- `ssl_reject_unauthorized` (Boolean) Whether to verify the server's WinRM certificate when using HTTPS. Only valid with an LDAP connection, which picks the host per sync.
+- `host` (String) The hostname or IP address of the server to sync to. Required with an LDAP connection and not allowed with any other connection type. The LDAP connection must have a gateway.
+- `port` (Number) The WinRM port to reach the server on. Only valid with an LDAP connection.
+- `ssl_certificate` (String) The PEM-encoded CA certificate used to verify a self-signed WinRM HTTPS listener. Only valid with an LDAP connection.
+- `ssl_enabled` (Boolean) Whether to reach the server over HTTPS WinRM instead of HTTP with NTLM message encryption. Only valid with an LDAP connection.
+- `ssl_reject_unauthorized` (Boolean) Whether to verify the server's WinRM certificate when using HTTPS. Only valid with an LDAP connection.
 
 
 <a id="nestedatt--sync_options"></a>
@@ -124,13 +124,13 @@ Optional:
 - `combine_certificate_chain` (Boolean) Whether to write the leaf certificate followed by the chain into a single PEM file instead of a separate chain file. Defaults to `false`.
 - `export_format` (String) The file format to deliver certificates in. Supported values: `pem`, `pkcs12`, `jks`. Defaults to `pkcs12`.
 - `file_access_rules` (Attributes List) Access rules granted on the delivered files to Windows users or groups, up to 20. (see [below for nested schema](#nestedatt--sync_options--file_access_rules))
-- `health_check_command` (String) A command run on the server to check the health of the delivered certificates.
+- `health_check_command` (String) A command run on the server to check the health of the delivered certificates. Requires a gateway on the connection. Available variables: `{{certificateFiles}}`, `{{certificateDirectory}}`, `{{certificatePath}}`, `{{commonName}}`, `{{exportPassword}}`. Using `{{certificatePath}}` or `{{commonName}}` limits the sync to one certificate.
 - `include_private_key` (Boolean) Whether to deliver the certificate's private key alongside the certificate. Defaults to `true`.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the delivered certificate chain. Defaults to `false`.
 - `include_truststore` (Boolean) Whether to also deliver a `<name>.truststore.jks` file holding the chain and root CA as trusted certificates. Only valid when `export_format` is `jks`.
 - `keystore_alias` (String) The alias of the private key entry in a PKCS#12 or JKS keystore, using only letters, digits, dots (.), dashes (-), and underscores (_). Only valid when `export_format` is `pkcs12` or `jks`, and defaults to the certificate's file base name.
 - `pem_certificate_extension` (String) The file extension of PEM certificate and chain files. Supported values: `pem`, `crt`. Defaults to `pem`.
-- `post_sync_command` (String) A command run on the server after certificates are delivered, for example to reload a service.
+- `post_sync_command` (String) A command run on the server after certificates are delivered, for example to reload a service. Requires a gateway on the connection. Available variables: `{{certificateFiles}}`, `{{certificateDirectory}}`, `{{certificatePath}}`, `{{commonName}}`, `{{exportPassword}}`. Using `{{certificatePath}}` or `{{commonName}}` limits the sync to one certificate.
 
 <a id="nestedatt--sync_options--file_access_rules"></a>
 ### Nested Schema for `sync_options.file_access_rules`

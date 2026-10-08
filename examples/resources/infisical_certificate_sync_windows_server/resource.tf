@@ -30,7 +30,7 @@ resource "infisical_certificate_sync_windows_server" "example" {
 
   destination_config = {
     destination_path = "C:\\certs"
-    # host, port and the ssl_* settings pick the target per sync and are only valid with an LDAP connection
+    # host is required with an LDAP connection; host, port and the ssl_* settings are rejected with any other connection
   }
 
   sync_options = {

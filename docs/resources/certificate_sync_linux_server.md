@@ -45,7 +45,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
 
   destination_config = {
     destination_path = "/etc/ssl/infisical"
-    # host, port and ssh_host_keys pick the target per sync and are only valid with an LDAP connection
+    # host is required with an LDAP connection; host, port and ssh_host_keys are rejected with any other connection
   }
 
   sync_options = {
@@ -58,7 +58,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
     private_key_file_mode   = "0600"
     owner                   = "tomcat"
     group                   = "tomcat"
-    post_sync_command       = "systemctl reload tomcat"
+    post_sync_command       = "systemctl reload tomcat" # Requires a gateway on the connection
   }
 
   export_password_wo         = var.keystore_password
@@ -103,9 +103,9 @@ Required:
 
 Optional:
 
-- `host` (String) The hostname or IP address of the server to sync to. Only valid with an LDAP connection, which picks the host per sync.
-- `port` (Number) The SSH port to reach the server on. Only valid with an LDAP connection, which picks the host per sync.
-- `ssh_host_keys` (String) The trusted SSH host keys of the server, as produced by `ssh-keyscan <host>`. The sync refuses to connect when the server presents a different key, and at least one RSA or ECDSA key must be included. Only valid with an LDAP connection, which picks the host per sync.
+- `host` (String) The hostname or IP address of the server to sync to. Required with an LDAP connection and not allowed with any other connection type.
+- `port` (Number) The SSH port to reach the server on. Only valid with an LDAP connection.
+- `ssh_host_keys` (String) The trusted SSH host keys of the server, as produced by `ssh-keyscan <host>`. The sync refuses to connect when the server presents a different key, and at least one RSA or ECDSA key must be included. Only valid with an LDAP connection.
 
 
 <a id="nestedatt--sync_options"></a>
@@ -122,14 +122,14 @@ Optional:
 - `export_format` (String) The file format to deliver certificates in. Supported values: `pem`, `pkcs12`, `jks`. Defaults to `pem`.
 - `file_mode` (String) The octal file mode applied to delivered certificate files (e.g. 0644).
 - `group` (String) The Linux group that should own the delivered files.
-- `health_check_command` (String) A command run on the server to check the health of the delivered certificates.
+- `health_check_command` (String) A command run on the server to check the health of the delivered certificates. Requires a gateway on the connection. Available variables: `{{certificateFiles}}`, `{{certificateDirectory}}`, `{{certificatePath}}`, `{{commonName}}`, `{{exportPassword}}`. Using `{{certificatePath}}` or `{{commonName}}` limits the sync to one certificate.
 - `include_private_key` (Boolean) Whether to deliver the certificate's private key alongside the certificate. Defaults to `true`.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the delivered certificate chain. Defaults to `false`.
 - `include_truststore` (Boolean) Whether to also deliver a `<name>.truststore.jks` file holding the chain and root CA as trusted certificates. Only valid when `export_format` is `jks`.
 - `keystore_alias` (String) The alias of the private key entry in a PKCS#12 or JKS keystore, using only letters, digits, dots (.), dashes (-), and underscores (_). Only valid when `export_format` is `pkcs12` or `jks`, and defaults to the certificate's file base name.
 - `owner` (String) The Linux user that should own the delivered files.
 - `pem_certificate_extension` (String) The file extension of PEM certificate and chain files. Supported values: `pem`, `crt`. Defaults to `pem`.
-- `post_sync_command` (String) A command run on the server after certificates are delivered, for example to reload a service.
+- `post_sync_command` (String) A command run on the server after certificates are delivered, for example to reload a service. Requires a gateway on the connection. Available variables: `{{certificateFiles}}`, `{{certificateDirectory}}`, `{{certificatePath}}`, `{{commonName}}`, `{{exportPassword}}`. Using `{{certificatePath}}` or `{{commonName}}` limits the sync to one certificate.
 - `private_key_file_mode` (String) The octal file mode applied to delivered private key files (e.g. 0600).
 
 

@@ -10,6 +10,23 @@ description: |-
 
 Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. The attachment follows the certificate across renewals. Deprecated: use `certificate_filters.certificate_ids` on the certificate sync resource instead.
 
+## Migrating to certificate_filters
+
+1. Add the certificate IDs to `certificate_filters.certificate_ids` on the certificate sync resource.
+2. Replace each `infisical_certificate_sync_certificate` block with a `removed` block that keeps the attachment in Infisical (Terraform 1.7 or higher):
+
+```terraform
+removed {
+  from = infisical_certificate_sync_certificate.example
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+3. Run `terraform plan` and confirm the certificate sync's certificates are unchanged.
+
 ## Example Usage
 
 ```terraform
