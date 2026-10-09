@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -16,6 +17,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ resource.Resource                = &SecretRotationBaseResource{}
+	_ resource.ResourceWithConfigure   = &SecretRotationBaseResource{}
+	_ resource.ResourceWithImportState = &SecretRotationBaseResource{}
 )
 
 type RotateAtUtc struct {
@@ -54,8 +62,8 @@ type SecretRotationBaseResourceModel struct {
 	Environment         types.String `tfsdk:"environment"`
 	SecretPath          types.String `tfsdk:"secret_path"`
 
-	RotationInterval types.Int32 `tfsdk:"rotation_interval"`
-	RotateAtUtc      RotateAtUtc `tfsdk:"rotate_at_utc"`
+	RotationInterval types.Int32  `tfsdk:"rotation_interval"`
+	RotateAtUtc      *RotateAtUtc `tfsdk:"rotate_at_utc"`
 
 	Parameters          types.Object `tfsdk:"parameters"`
 	SecretsMapping      types.Object `tfsdk:"secrets_mapping"`
@@ -319,6 +327,10 @@ func (r *SecretRotationBaseResource) Read(ctx context.Context, req resource.Read
 	state.SecretPath = types.StringValue(secretRotation.SecretFolder.Path)
 
 	state.RotationInterval = types.Int32Value(secretRotation.RotationInterval)
+	// RotateAtUtc is nil when the resource is imported
+	if state.RotateAtUtc == nil {
+		state.RotateAtUtc = &RotateAtUtc{}
+	}
 	if secretRotation.RotateAtUtc != nil {
 		state.RotateAtUtc.Hours = types.Int64Value(secretRotation.RotateAtUtc.Hours)
 		state.RotateAtUtc.Minutes = types.Int64Value(secretRotation.RotateAtUtc.Minutes)
@@ -463,4 +475,9 @@ func (r *SecretRotationBaseResource) Delete(ctx context.Context, req resource.De
 			"Couldn't delete secret rotation from Infisical, unexpected error: "+err.Error(),
 		)
 	}
+}
+
+// ImportState imports the secret rotation using its ID.
+func (r *SecretRotationBaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
