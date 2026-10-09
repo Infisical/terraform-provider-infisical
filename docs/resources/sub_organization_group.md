@@ -97,6 +97,7 @@ resource "infisical_sub_organization_group" "linked" {
 
 - `group_name` (String) The name of the linked group.
 - `membership_id` (String) The ID of the group's membership in the sub-organization.
+- `organization_id` (String) The ID of the sub-organization the group is linked into.
 
 <a id="nestedatt--roles"></a>
 ### Nested Schema for `roles`

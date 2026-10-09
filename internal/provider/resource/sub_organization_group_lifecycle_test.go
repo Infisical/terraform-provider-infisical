@@ -214,11 +214,12 @@ func subOrgGroupCreatePlan(t *testing.T, s schema.Schema, groupID, groupSlug typ
 	t.Helper()
 	plan := tfsdk.Plan{Schema: s}
 	if diags := plan.Set(context.Background(), &subOrganizationGroupResourceModel{
-		MembershipID: types.StringUnknown(),
-		GroupID:      groupID,
-		GroupSlug:    groupSlug,
-		GroupName:    types.StringUnknown(),
-		Roles:        roles,
+		MembershipID:   types.StringUnknown(),
+		OrganizationID: types.StringUnknown(),
+		GroupID:        groupID,
+		GroupSlug:      groupSlug,
+		GroupName:      types.StringUnknown(),
+		Roles:          roles,
 	}); diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -262,7 +263,7 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 
 	state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringUnknown(), types.StringValue("platform"), memberRole()))
 	created := subOrgGroupModel(t, state)
-	if created.GroupID.ValueString() != "g1" || created.MembershipID.ValueString() != "m-g1" || created.GroupName.ValueString() != "Platform" {
+	if created.GroupID.ValueString() != "g1" || created.MembershipID.ValueString() != "m-g1" || created.GroupName.ValueString() != "Platform" || created.OrganizationID.ValueString() != testSubOrgID {
 		t.Errorf("unexpected state after create: %+v", created)
 	}
 	if _, linked := backend.links["g1"]; !linked {
@@ -306,25 +307,27 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 }
 
 // The membership API is scoped to the session's organization. Linking in the sub-org and then
-// pointing the provider at the root org must not refresh from, patch or remove the group's own
-// root-org membership.
-func TestSubOrganizationGroupRefusesProviderScopedToRootOrg(t *testing.T) {
+// pointing the provider at the root org, or at another sub-org the group is also linked into, must
+// not refresh from, patch or remove that other membership.
+func TestSubOrganizationGroupRefusesProviderScopedToWrongOrg(t *testing.T) {
 	ctx := context.Background()
 	s := subOrgGroupTestSchema(t)
 
 	for name, tc := range map[string]struct {
-		detailsFail bool
-		wantError   string
+		sessionOrgID string
+		detailsFail  bool
+		wantError    string
 	}{
-		"root scoped":              {wantError: "auth.organization_slug"},
-		"session org lookup fails": {detailsFail: true, wantError: "couldn't verify"},
+		"root org":                 {sessionOrgID: testRootOrgID, wantError: "belongs to the organization the provider is scoped to"},
+		"other sub-org":            {sessionOrgID: "other-sub-org", wantError: "different sub-organization"},
+		"session org lookup fails": {sessionOrgID: testRootOrgID, detailsFail: true, wantError: "couldn't verify"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			backend := newFakeSubOrgGroupBackend(t)
 			r := newSubOrgGroupTestResource(t, backend)
 
 			state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringValue("g1"), types.StringUnknown(), memberRole()))
-			backend.sessionOrgID = testRootOrgID
+			backend.sessionOrgID = tc.sessionOrgID
 			backend.detailsFail = tc.detailsFail
 
 			readResp := resource.ReadResponse{State: state}
@@ -484,7 +487,7 @@ func TestSubOrganizationGroupImport(t *testing.T) {
 			}
 
 			imported := subOrgGroupModel(t, readSubOrgGroup(t, r, resp.State))
-			if imported.GroupID.ValueString() != tc.wantGroupID || imported.GroupSlug.ValueString() != "platform" || imported.MembershipID.ValueString() != "m-1" {
+			if imported.GroupID.ValueString() != tc.wantGroupID || imported.GroupSlug.ValueString() != "platform" || imported.MembershipID.ValueString() != "m-1" || imported.OrganizationID.ValueString() != testSubOrgID {
 				t.Errorf("unexpected state after import: %+v", imported)
 			}
 		})
@@ -506,7 +509,7 @@ func TestSubOrganizationGroupCreateErrors(t *testing.T) {
 		"already linked by id":     {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), preLinked: true, wantError: "terraform import"},
 		"unknown slug":             {groupID: types.StringUnknown(), groupSlug: types.StringValue("nope"), wantError: "Group not found"},
 		"root scoped by slug":      {groupID: types.StringUnknown(), groupSlug: types.StringValue("platform"), sessionOrgID: testRootOrgID, preLinked: true, wantError: "auth.organization_slug"},
-		"session org lookup fails": {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), sessionOrgID: testRootOrgID, detailsFail: true, preLinked: true, wantError: "couldn't tell"},
+		"session org lookup fails": {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), sessionOrgID: testRootOrgID, detailsFail: true, preLinked: true, wantError: "Couldn't determine the organization"},
 		"root scoped by id":        {groupID: types.StringValue("g1"), groupSlug: types.StringUnknown(), sessionOrgID: testRootOrgID, preLinked: true, wantError: "auth.organization_slug"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -573,11 +576,12 @@ func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
 			// Plan and config share a shape, so Plan.Set is a handy way to build the raw config.
 			raw := tfsdk.Plan{Schema: s}
 			if diags := raw.Set(ctx, &subOrganizationGroupResourceModel{
-				MembershipID: types.StringNull(),
-				GroupID:      types.StringNull(),
-				GroupSlug:    types.StringValue("platform"),
-				GroupName:    types.StringNull(),
-				Roles:        tc.roles,
+				MembershipID:   types.StringNull(),
+				OrganizationID: types.StringNull(),
+				GroupID:        types.StringNull(),
+				GroupSlug:      types.StringValue("platform"),
+				GroupName:      types.StringNull(),
+				Roles:          tc.roles,
 			}); diags.HasError() {
 				t.Fatal(diags)
 			}

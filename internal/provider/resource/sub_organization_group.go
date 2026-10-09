@@ -38,11 +38,12 @@ type subOrganizationGroupResource struct {
 }
 
 type subOrganizationGroupResourceModel struct {
-	MembershipID types.String               `tfsdk:"membership_id"`
-	GroupID      types.String               `tfsdk:"group_id"`
-	GroupSlug    types.String               `tfsdk:"group_slug"`
-	GroupName    types.String               `tfsdk:"group_name"`
-	Roles        []subOrganizationGroupRole `tfsdk:"roles"`
+	MembershipID   types.String               `tfsdk:"membership_id"`
+	OrganizationID types.String               `tfsdk:"organization_id"`
+	GroupID        types.String               `tfsdk:"group_id"`
+	GroupSlug      types.String               `tfsdk:"group_slug"`
+	GroupName      types.String               `tfsdk:"group_name"`
+	Roles          []subOrganizationGroupRole `tfsdk:"roles"`
 }
 
 type subOrganizationGroupRole struct {
@@ -84,6 +85,11 @@ func (r *subOrganizationGroupResource) Schema(_ context.Context, _ resource.Sche
 			},
 			"group_name": schema.StringAttribute{
 				Description:   "The name of the linked group.",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"organization_id": schema.StringAttribute{
+				Description:   "The ID of the sub-organization the group is linked into.",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -344,29 +350,49 @@ func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
 	)
 }
 
-var errProviderScopedToGroupOrg = errors.New("provider is scoped to the organization that owns the group")
+var (
+	errProviderScopedToGroupOrg = errors.New("provider is scoped to the organization that owns the group")
+	errProviderScopedToOtherOrg = errors.New("provider is scoped to a different sub-organization")
+)
 
-func (r *subOrganizationGroupResource) getLinkedMembership(groupID string) (infisical.OrgGroupMembership, error) {
+// Returns the membership and the ID of the organization the session is on. expectedOrgID is the
+// sub-organization recorded in state, empty when there's nothing to compare against yet.
+func (r *subOrganizationGroupResource) getLinkedMembership(groupID, expectedOrgID string) (infisical.OrgGroupMembership, string, error) {
 	membership, err := r.client.GetOrgGroupMembership(groupID)
 	if err != nil {
-		return membership, err
+		return membership, "", err
 	}
 
-	native, err := r.isNativeMembership(membership)
+	sessionOrgID, err := r.client.GetSessionOrganizationID()
 	if err != nil {
-		return membership, fmt.Errorf("couldn't verify the membership is a sub-organization link: %w", err)
+		return membership, "", fmt.Errorf("couldn't verify the membership is a sub-organization link: %w", err)
 	}
-	if native {
-		return membership, errProviderScopedToGroupOrg
+	if membership.Group.OrgID == sessionOrgID {
+		return membership, sessionOrgID, errProviderScopedToGroupOrg
 	}
-	return membership, nil
+	if expectedOrgID != "" && sessionOrgID != expectedOrgID {
+		return membership, sessionOrgID, errProviderScopedToOtherOrg
+	}
+	return membership, sessionOrgID, nil
 }
 
-func wrongScopeError(diags *diag.Diagnostics, groupRef string) {
-	diags.AddError(
-		"Provider is not scoped to the sub-organization",
-		fmt.Sprintf("Group %s belongs to the organization the provider is scoped to, so the membership found there is the group's own, not the sub-organization link this resource manages. Set auth.organization_slug to the slug of the sub-organization the group was linked into.", groupRef),
-	)
+// Reports a membership lookup that landed in the wrong organization. False for any other error.
+func reportScopeError(diags *diag.Diagnostics, err error, model subOrganizationGroupResourceModel) bool {
+	switch {
+	case errors.Is(err, errProviderScopedToGroupOrg):
+		diags.AddError(
+			"Provider is not scoped to the sub-organization",
+			fmt.Sprintf("Group %s belongs to the organization the provider is scoped to, so the membership found there is the group's own, not the sub-organization link this resource manages. Set auth.organization_slug to the slug of the sub-organization the group was linked into.", model.GroupID.ValueString()),
+		)
+	case errors.Is(err, errProviderScopedToOtherOrg):
+		diags.AddError(
+			"Provider is scoped to a different sub-organization",
+			fmt.Sprintf("Group %s was linked into sub-organization %s, but the provider is scoped to another organization. Set auth.organization_slug to the slug of the sub-organization the group was linked into.", model.GroupID.ValueString(), model.OrganizationID.ValueString()),
+		)
+	default:
+		return false
+	}
+	return true
 }
 
 // The group is either native to the session's org or was linked outside Terraform. Only the
@@ -409,6 +435,15 @@ func (r *subOrganizationGroupResource) Create(ctx context.Context, req resource.
 	roles, diags := buildSubOrganizationGroupRoles(plan.Roles)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	sessionOrgID, err := r.client.GetSessionOrganizationID()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error linking group to sub-organization",
+			"Couldn't determine the organization the provider is scoped to, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
@@ -462,6 +497,7 @@ func (r *subOrganizationGroupResource) Create(ctx context.Context, req resource.
 	}
 
 	setSubOrganizationGroupComputed(&plan, membership)
+	plan.OrganizationID = types.StringValue(sessionOrgID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -481,14 +517,13 @@ func (r *subOrganizationGroupResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	membership, err := r.getLinkedMembership(state.GroupID.ValueString())
+	membership, sessionOrgID, err := r.getLinkedMembership(state.GroupID.ValueString(), state.OrganizationID.ValueString())
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		if errors.Is(err, errProviderScopedToGroupOrg) {
-			wrongScopeError(&resp.Diagnostics, state.GroupID.ValueString())
+		if reportScopeError(&resp.Diagnostics, err, state) {
 			return
 		}
 
@@ -500,6 +535,7 @@ func (r *subOrganizationGroupResource) Read(ctx context.Context, req resource.Re
 	}
 
 	setSubOrganizationGroupComputed(&state, membership)
+	state.OrganizationID = types.StringValue(sessionOrgID)
 	state.Roles = subOrganizationGroupRolesFromAPI(membership.Roles, state.Roles)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -532,10 +568,10 @@ func (r *subOrganizationGroupResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	if _, err := r.getLinkedMembership(state.GroupID.ValueString()); err != nil {
+	_, sessionOrgID, err := r.getLinkedMembership(state.GroupID.ValueString(), state.OrganizationID.ValueString())
+	if err != nil {
 		switch {
-		case errors.Is(err, errProviderScopedToGroupOrg):
-			wrongScopeError(&resp.Diagnostics, state.GroupID.ValueString())
+		case reportScopeError(&resp.Diagnostics, err, state):
 		case errors.Is(err, infisical.ErrNotFound):
 			resp.Diagnostics.AddError(
 				"Group is no longer linked to the sub-organization",
@@ -563,6 +599,7 @@ func (r *subOrganizationGroupResource) Update(ctx context.Context, req resource.
 	}
 
 	setSubOrganizationGroupComputed(&plan, membership)
+	plan.OrganizationID = types.StringValue(sessionOrgID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -582,11 +619,10 @@ func (r *subOrganizationGroupResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	if _, err := r.getLinkedMembership(state.GroupID.ValueString()); err != nil {
+	if _, _, err := r.getLinkedMembership(state.GroupID.ValueString(), state.OrganizationID.ValueString()); err != nil {
 		switch {
 		case errors.Is(err, infisical.ErrNotFound):
-		case errors.Is(err, errProviderScopedToGroupOrg):
-			wrongScopeError(&resp.Diagnostics, state.GroupID.ValueString())
+		case reportScopeError(&resp.Diagnostics, err, state):
 		default:
 			resp.Diagnostics.AddError(
 				"Error deleting sub-organization group",
@@ -646,7 +682,7 @@ func (r *subOrganizationGroupResource) ImportState(ctx context.Context, req reso
 		return
 	}
 
-	native, err := r.isNativeMembership(membership)
+	sessionOrgID, err := r.client.GetSessionOrganizationID()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error importing sub-organization group",
@@ -654,10 +690,11 @@ func (r *subOrganizationGroupResource) ImportState(ctx context.Context, req reso
 		)
 		return
 	}
-	if native {
+	if membership.Group.OrgID == sessionOrgID {
 		nativeGroupError(&resp.Diagnostics, req.ID)
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group_id"), membership.GroupID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_id"), sessionOrgID)...)
 }
