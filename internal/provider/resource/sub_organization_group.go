@@ -38,11 +38,11 @@ type subOrganizationGroupResource struct {
 }
 
 type subOrganizationGroupResourceModel struct {
-	ID        types.String               `tfsdk:"id"`
-	GroupID   types.String               `tfsdk:"group_id"`
-	GroupSlug types.String               `tfsdk:"group_slug"`
-	GroupName types.String               `tfsdk:"group_name"`
-	Roles     []subOrganizationGroupRole `tfsdk:"roles"`
+	MembershipID types.String               `tfsdk:"membership_id"`
+	GroupID      types.String               `tfsdk:"group_id"`
+	GroupSlug    types.String               `tfsdk:"group_slug"`
+	GroupName    types.String               `tfsdk:"group_name"`
+	Roles        []subOrganizationGroupRole `tfsdk:"roles"`
 }
 
 type subOrganizationGroupRole struct {
@@ -65,7 +65,7 @@ func (r *subOrganizationGroupResource) Schema(_ context.Context, _ resource.Sche
 			"Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. " +
 			"Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
+			"membership_id": schema.StringAttribute{
 				Description:   "The ID of the group's membership in the sub-organization.",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -295,7 +295,7 @@ func subOrganizationGroupRolesFromAPI(apiRoles []infisical.OrgGroupMembershipRol
 }
 
 func setSubOrganizationGroupComputed(model *subOrganizationGroupResourceModel, membership infisical.OrgGroupMembership) {
-	model.ID = types.StringValue(membership.ID)
+	model.MembershipID = types.StringValue(membership.ID)
 	model.GroupID = types.StringValue(membership.GroupID)
 	model.GroupSlug = types.StringValue(membership.Group.Slug)
 	model.GroupName = types.StringValue(membership.Group.Name)

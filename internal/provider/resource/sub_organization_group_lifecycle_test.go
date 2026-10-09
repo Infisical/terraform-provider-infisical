@@ -214,11 +214,11 @@ func subOrgGroupCreatePlan(t *testing.T, s schema.Schema, groupID, groupSlug typ
 	t.Helper()
 	plan := tfsdk.Plan{Schema: s}
 	if diags := plan.Set(context.Background(), &subOrganizationGroupResourceModel{
-		ID:        types.StringUnknown(),
-		GroupID:   groupID,
-		GroupSlug: groupSlug,
-		GroupName: types.StringUnknown(),
-		Roles:     roles,
+		MembershipID: types.StringUnknown(),
+		GroupID:      groupID,
+		GroupSlug:    groupSlug,
+		GroupName:    types.StringUnknown(),
+		Roles:        roles,
 	}); diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -262,7 +262,7 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 
 	state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringUnknown(), types.StringValue("platform"), memberRole()))
 	created := subOrgGroupModel(t, state)
-	if created.GroupID.ValueString() != "g1" || created.ID.ValueString() != "m-g1" || created.GroupName.ValueString() != "Platform" {
+	if created.GroupID.ValueString() != "g1" || created.MembershipID.ValueString() != "m-g1" || created.GroupName.ValueString() != "Platform" {
 		t.Errorf("unexpected state after create: %+v", created)
 	}
 	if _, linked := backend.links["g1"]; !linked {
@@ -423,7 +423,7 @@ func TestSubOrganizationGroupImport(t *testing.T) {
 			}
 
 			imported := subOrgGroupModel(t, readSubOrgGroup(t, r, resp.State))
-			if imported.GroupID.ValueString() != tc.wantGroupID || imported.GroupSlug.ValueString() != "platform" || imported.ID.ValueString() != "m-1" {
+			if imported.GroupID.ValueString() != tc.wantGroupID || imported.GroupSlug.ValueString() != "platform" || imported.MembershipID.ValueString() != "m-1" {
 				t.Errorf("unexpected state after import: %+v", imported)
 			}
 		})
@@ -503,11 +503,11 @@ func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
 			// Plan and config share a shape, so Plan.Set is a handy way to build the raw config.
 			raw := tfsdk.Plan{Schema: s}
 			if diags := raw.Set(ctx, &subOrganizationGroupResourceModel{
-				ID:        types.StringNull(),
-				GroupID:   types.StringNull(),
-				GroupSlug: types.StringValue("platform"),
-				GroupName: types.StringNull(),
-				Roles:     []subOrganizationGroupRole{tc.role},
+				MembershipID: types.StringNull(),
+				GroupID:      types.StringNull(),
+				GroupSlug:    types.StringValue("platform"),
+				GroupName:    types.StringNull(),
+				Roles:        []subOrganizationGroupRole{tc.role},
 			}); diags.HasError() {
 				t.Fatal(diags)
 			}

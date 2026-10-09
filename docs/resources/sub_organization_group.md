@@ -96,7 +96,7 @@ resource "infisical_sub_organization_group" "linked" {
 ### Read-Only
 
 - `group_name` (String) The name of the linked group.
-- `id` (String) The ID of the group's membership in the sub-organization.
+- `membership_id` (String) The ID of the group's membership in the sub-organization.
 
 <a id="nestedatt--roles"></a>
 ### Nested Schema for `roles`
