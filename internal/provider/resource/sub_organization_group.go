@@ -62,7 +62,7 @@ func (r *subOrganizationGroupResource) Schema(_ context.Context, _ resource.Sche
 	resp.Schema = schema.Schema{
 		Description: "Link an existing group from the root organization into a sub-organization and assign it organization roles there. " +
 			"This resource does not create groups; to create a group, use the `infisical_group` resource. " +
-			"The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization through `auth.organization_slug`. " +
+			"The group is linked into the organization the provider is scoped to, so the provider must be scoped to the target sub-organization, either through `auth.organization_slug` or with an `auth.token` minted for that sub-organization. " +
 			"The machine identity needs the `Link Group` permission on sub-organizations in the root organization, and permission to manage groups in the sub-organization. " +
 			"Destroying this resource unlinks the group from the sub-organization; the group itself is left untouched in the root organization. " +
 			"Only Machine Identity authentication is supported for this resource.",
@@ -397,7 +397,7 @@ func (r *subOrganizationGroupResource) isNativeMembership(membership infisical.O
 func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
 	diags.AddError(
 		"Group belongs to the organization the provider is scoped to",
-		fmt.Sprintf("Group %s is owned by the organization the provider is scoped to, so there is nothing to link. Groups can only be linked from the root organization into a sub-organization: set auth.organization_slug to the slug of the target sub-organization.", groupRef),
+		fmt.Sprintf("Group %s is owned by the organization the provider is scoped to, so there is nothing to link. Groups can only be linked from the root organization into a sub-organization: set auth.organization_slug to the slug of the target sub-organization, or use a token scoped to it.", groupRef),
 	)
 }
 
@@ -436,12 +436,12 @@ func reportScopeError(diags *diag.Diagnostics, err error, model subOrganizationG
 	case errors.Is(err, errProviderScopedToGroupOrg):
 		diags.AddError(
 			"Provider is not scoped to the sub-organization",
-			fmt.Sprintf("Group %s belongs to the organization the provider is scoped to, so the membership found there is the group's own, not the sub-organization link this resource manages. Set auth.organization_slug to the slug of the sub-organization the group was linked into.", model.GroupID.ValueString()),
+			fmt.Sprintf("Group %s belongs to the organization the provider is scoped to, so the membership found there is the group's own, not the sub-organization link this resource manages. Scope the provider to the sub-organization the group was linked into, through auth.organization_slug or a token minted for it.", model.GroupID.ValueString()),
 		)
 	case errors.Is(err, errProviderScopedToOtherOrg):
 		diags.AddError(
 			"Provider is scoped to a different sub-organization",
-			fmt.Sprintf("Group %s was linked into sub-organization %s, but the provider is scoped to another organization. Set auth.organization_slug to the slug of the sub-organization the group was linked into.", model.GroupID.ValueString(), model.OrganizationID.ValueString()),
+			fmt.Sprintf("Group %s was linked into sub-organization %s, but the provider is scoped to another organization. Scope the provider to that sub-organization, through auth.organization_slug or a token minted for it.", model.GroupID.ValueString(), model.OrganizationID.ValueString()),
 		)
 	default:
 		return false
@@ -525,7 +525,7 @@ func (r *subOrganizationGroupResource) Create(ctx context.Context, req resource.
 
 			resp.Diagnostics.AddError(
 				"Group not found",
-				fmt.Sprintf("No root-organization group with slug %s is available to link. Check that the group exists in the root organization and that the provider is scoped to a sub-organization through auth.organization_slug.", groupSlug),
+				fmt.Sprintf("No root-organization group with slug %s is available to link. Check that the group exists in the root organization and that the provider is scoped to a sub-organization, through auth.organization_slug or a token minted for it.", groupSlug),
 			)
 			return
 		}

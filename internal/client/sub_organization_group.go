@@ -1,13 +1,16 @@
 package infisicalclient
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"terraform-provider-infisical/internal/errors"
 )
 
 // These endpoints act on whatever org the session is scoped to, so linking into a sub-org needs
-// auth.organization_slug pointing at it.
+// the session scoped to it: auth.organization_slug on a login, or an auth.token minted for it.
 
 const (
 	operationListAvailableGroups      = "CallListAvailableGroups"
@@ -18,8 +21,15 @@ const (
 	operationDeleteOrgGroupMembership = "CallDeleteOrgGroupMembership"
 )
 
-// The org from auth.organization_slug, or the identity's own org when it's not set.
+// The org the API scopes this session's calls to. The access token's orgId claim is the source of
+// truth: a token minted for a sub-org carries that sub-org whether it came from a login with
+// auth.organization_slug or was handed in through auth.token. Tokens without the claim fall back
+// to resolving auth.organization_slug, then to the identity's own org.
 func (client Client) GetSessionOrganizationID() (string, error) {
+	if orgID := accessTokenOrgID(client.Config.HttpClient.Token); orgID != "" {
+		return orgID, nil
+	}
+
 	if client.Config.OrganizationSlug == "" {
 		details, err := client.GetIdentityDetails()
 		if err != nil {
@@ -33,6 +43,29 @@ func (client Client) GetSessionOrganizationID() (string, error) {
 		return "", err
 	}
 	return organization.ID, nil
+}
+
+// Reads the orgId claim out of a machine identity access token without verifying it. The API
+// verifies the signature on every call; this only mirrors which org it scopes those calls to.
+// Empty for anything that isn't a JWT carrying the claim.
+func accessTokenOrgID(token string) string {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return ""
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+	if err != nil {
+		return ""
+	}
+
+	var claims struct {
+		OrgID string `json:"orgId"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+	return claims.OrgID
 }
 
 // Root groups not linked to the current sub-org yet. Always empty when scoped to the root org.

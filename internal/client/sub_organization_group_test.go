@@ -1,6 +1,7 @@
 package infisicalclient
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -153,5 +154,51 @@ func TestCreateOrgGroupMembershipRequestBody(t *testing.T) {
 
 	if got := string(body.Roles[1]["temporaryAccessStartTime"]); got != `"2026-10-01T09:00:00Z"` {
 		t.Errorf("unexpected temporaryAccessStartTime %s", got)
+	}
+}
+
+func fakeJWT(t *testing.T, payload string) string {
+	t.Helper()
+	enc := base64.RawURLEncoding.EncodeToString
+	return enc([]byte(`{"alg":"HS256","typ":"JWT"}`)) + "." + enc([]byte(payload)) + ".sig"
+}
+
+func TestAccessTokenOrgID(t *testing.T) {
+	for name, tc := range map[string]struct {
+		token string
+		want  string
+	}{
+		"sub-org scoped token": {token: fakeJWT(t, `{"identityId":"i1","orgId":"sub-org","rootOrgId":"root-org"}`), want: "sub-org"},
+		"root scoped token":    {token: fakeJWT(t, `{"identityId":"i1","orgId":"root-org","rootOrgId":"root-org"}`), want: "root-org"},
+		"token without claim":  {token: fakeJWT(t, `{"identityId":"i1"}`), want: ""},
+		"padded payload":       {token: "h." + base64.URLEncoding.EncodeToString([]byte(`{"orgId":"sub-org"}`)) + ".s", want: "sub-org"},
+		"opaque token":         {token: "st.abc.def.ghi", want: ""},
+		"empty":                {token: "", want: ""},
+		"payload not base64":   {token: "h.%%%.s", want: ""},
+		"payload not json":     {token: "h." + base64.RawURLEncoding.EncodeToString([]byte("nope")) + ".s", want: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := accessTokenOrgID(tc.token); got != tc.want {
+				t.Errorf("accessTokenOrgID(%q) = %q, want %q", tc.token, got, tc.want)
+			}
+		})
+	}
+}
+
+// Identity details always report the root org, so a token scoped to a sub-org must win over it.
+func TestGetSessionOrganizationIDPrefersTokenScope(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/identities/details",
+		jsonResponse(http.StatusOK, `{"identityDetails":{"organization":{"id":"root-org","name":"Root","slug":"root"}}}`))
+	client := subOrgGroupServer(t, mux)
+
+	client.Config.HttpClient.SetAuthToken(fakeJWT(t, `{"orgId":"sub-org","rootOrgId":"root-org"}`))
+	if got, err := client.GetSessionOrganizationID(); err != nil || got != "sub-org" {
+		t.Errorf("expected the token's org, got %q, %v", got, err)
+	}
+
+	client.Config.HttpClient.SetAuthToken("opaque-token")
+	if got, err := client.GetSessionOrganizationID(); err != nil || got != "root-org" {
+		t.Errorf("expected the identity's org without a claim, got %q, %v", got, err)
 	}
 }

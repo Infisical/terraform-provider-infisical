@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -29,11 +30,12 @@ const (
 // Fake backend that answers like the real API, quirks included (a 400 for an already unlinked
 // group, "already a member" for a duplicate link).
 type fakeSubOrgGroupBackend struct {
-	t            *testing.T
-	sessionOrgID string
-	detailsFail  bool
-	rootGroups   map[string]infisical.OrgGroupMembershipGroup
-	links        map[string]infisical.OrgGroupMembership
+	t             *testing.T
+	sessionOrgID  string
+	identityOrgID string
+	detailsFail   bool
+	rootGroups    map[string]infisical.OrgGroupMembershipGroup
+	links         map[string]infisical.OrgGroupMembership
 }
 
 func newFakeSubOrgGroupBackend(t *testing.T) *fakeSubOrgGroupBackend {
@@ -94,8 +96,12 @@ func (b *fakeSubOrgGroupBackend) handler() http.Handler {
 			b.apiError(w, http.StatusInternalServerError, "Something went wrong")
 			return
 		}
+		orgID := b.identityOrgID
+		if orgID == "" {
+			orgID = b.sessionOrgID
+		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"identityDetails": map[string]any{
-			"organization": map[string]string{"id": b.sessionOrgID, "name": b.sessionOrgID, "slug": b.sessionOrgID},
+			"organization": map[string]string{"id": orgID, "name": orgID, "slug": orgID},
 		}})
 	})
 
@@ -189,6 +195,13 @@ func newSubOrgGroupTestResource(t *testing.T, backend *fakeSubOrgGroupBackend) *
 		HttpClient:            resty.New().SetBaseURL(server.URL),
 		IsMachineIdentityAuth: true,
 	}}}
+}
+
+// An unsigned stand-in for a machine identity access token scoped to orgID.
+func fakeAccessToken(orgID string) string {
+	enc := base64.RawURLEncoding.EncodeToString
+	payload := fmt.Sprintf(`{"identityId":"i1","orgId":%q,"rootOrgId":%q}`, orgID, testRootOrgID)
+	return enc([]byte(`{"alg":"HS256","typ":"JWT"}`)) + "." + enc([]byte(payload)) + ".sig"
 }
 
 func subOrgGroupTestSchema(t *testing.T) schema.Schema {
@@ -304,6 +317,85 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 	}
 	if _, linked := backend.links["g1"]; linked {
 		t.Error("expected g1 to be unlinked after delete")
+	}
+}
+
+// A token minted for the sub-org (auth.token with no organization_slug) scopes every call to the
+// sub-org, but GET /identities/details still reports the root org. The resource must follow the
+// token, or Create records the root org and every later Read/Update/Delete refuses the membership.
+func TestSubOrganizationGroupFollowsTokenScope(t *testing.T) {
+	ctx := context.Background()
+	s := subOrgGroupTestSchema(t)
+	backend := newFakeSubOrgGroupBackend(t)
+	backend.identityOrgID = testRootOrgID
+	r := newSubOrgGroupTestResource(t, backend)
+	r.client.Config.HttpClient.SetAuthToken(fakeAccessToken(testSubOrgID))
+
+	state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringValue("g1"), types.StringUnknown(), memberRole()))
+	if got := subOrgGroupModel(t, state).OrganizationID.ValueString(); got != testSubOrgID {
+		t.Fatalf("expected organization_id %q after create, got %q", testSubOrgID, got)
+	}
+
+	state = readSubOrgGroup(t, r, state)
+	if got := subOrgGroupModel(t, state).OrganizationID.ValueString(); got != testSubOrgID {
+		t.Errorf("expected organization_id %q after read, got %q", testSubOrgID, got)
+	}
+
+	updatePlan := tfsdk.Plan{Schema: s, Raw: state.Raw}
+	if diags := updatePlan.SetAttribute(ctx, path.Root("roles"), []subOrganizationGroupRole{{
+		RoleSlug:                 types.StringValue("admin"),
+		IsTemporary:              types.BoolValue(false),
+		TemporaryRange:           types.StringNull(),
+		TemporaryAccessStartTime: types.StringNull(),
+	}}); diags.HasError() {
+		t.Fatal(diags)
+	}
+	updateResp := resource.UpdateResponse{State: state}
+	r.Update(ctx, resource.UpdateRequest{Plan: updatePlan, State: state}, &updateResp)
+	if updateResp.Diagnostics.HasError() {
+		t.Fatal(updateResp.Diagnostics)
+	}
+	if roles := backend.links["g1"].Roles; len(roles) != 1 || roles[0].Role != "admin" {
+		t.Errorf("expected the update to reach the backend, got roles: %+v", roles)
+	}
+
+	importState := tfsdk.State{Schema: s}
+	if diags := importState.Set(ctx, &subOrganizationGroupResourceModel{}); diags.HasError() {
+		t.Fatal(diags)
+	}
+	importResp := resource.ImportStateResponse{State: importState}
+	r.ImportState(ctx, resource.ImportStateRequest{ID: "platform"}, &importResp)
+	if importResp.Diagnostics.HasError() {
+		t.Fatal(importResp.Diagnostics)
+	}
+	var importedOrgID string
+	if diags := importResp.State.GetAttribute(ctx, path.Root("organization_id"), &importedOrgID); diags.HasError() {
+		t.Fatal(diags)
+	}
+	if importedOrgID != testSubOrgID {
+		t.Errorf("expected import to record organization_id %q, got %q", testSubOrgID, importedOrgID)
+	}
+
+	deleteResp := resource.DeleteResponse{State: updateResp.State}
+	r.Delete(ctx, resource.DeleteRequest{State: updateResp.State}, &deleteResp)
+	if deleteResp.Diagnostics.HasError() {
+		t.Fatal(deleteResp.Diagnostics)
+	}
+	if _, linked := backend.links["g1"]; linked {
+		t.Error("expected g1 to be unlinked after delete")
+	}
+
+	r.client.Config.HttpClient.SetAuthToken(fakeAccessToken(testRootOrgID))
+	r.client.Config.OrganizationSlug = testSubOrgID
+	createResp := resource.CreateResponse{State: tfsdk.State{Schema: s}}
+	r.Create(ctx, resource.CreateRequest{Plan: subOrgGroupCreatePlan(t, s, types.StringValue("g2"), types.StringUnknown(), memberRole())}, &createResp)
+	if createResp.Diagnostics.HasError() {
+		t.Fatal(createResp.Diagnostics)
+	}
+	readResp := resource.ReadResponse{State: createResp.State}
+	r.Read(ctx, resource.ReadRequest{State: createResp.State}, &readResp)
+	if !readResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(readResp.Diagnostics), "belongs to the organization the provider is scoped to") {
+		t.Errorf("expected a root-scoped token to be refused on read, got: %v", readResp.Diagnostics)
 	}
 }
 
