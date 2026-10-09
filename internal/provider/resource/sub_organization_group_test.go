@@ -79,6 +79,12 @@ func TestBuildSubOrganizationGroupRolesSendsUTC(t *testing.T) {
 			TemporaryRange:           types.StringNull(),
 			TemporaryAccessStartTime: types.StringValue("2026-10-01T11:00:00+02:00"),
 		},
+		{
+			RoleSlug:                 types.StringValue("member"),
+			IsTemporary:              types.BoolValue(false),
+			TemporaryRange:           types.StringNull(),
+			TemporaryAccessStartTime: types.StringNull(),
+		},
 	})
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)

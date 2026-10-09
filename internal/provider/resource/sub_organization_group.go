@@ -88,7 +88,7 @@ func (r *subOrganizationGroupResource) Schema(_ context.Context, _ resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"roles": schema.SetNestedAttribute{
-				Description: "The organization roles assigned to the group within the sub-organization.",
+				Description: "The organization roles assigned to the group within the sub-organization. At least one role must be permanent.",
 				Required:    true,
 				Validators:  []validator.Set{setvalidator.SizeAtLeast(1)},
 				NestedObject: schema.NestedAttributeObject{
@@ -128,7 +128,8 @@ func (r *subOrganizationGroupResource) ConfigValidators(_ context.Context) []res
 }
 
 // Catches role mistakes at plan time. Temporary fields on a permanent role never reach the API,
-// so state would keep them while every refresh clears them and the plan never settles.
+// so state would keep them while every refresh clears them and the plan never settles. The API
+// also refuses a role set with no permanent role, and that's better caught here than as a 400 at apply.
 func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var roles types.Set
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("roles"), &roles)...)
@@ -136,9 +137,13 @@ func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req r
 		return
 	}
 
+	hasPermanentRole := false
+	// A role whose is_temporary isn't known yet might turn out permanent, so hold off on that check.
+	undecided := false
 	for _, element := range roles.Elements() {
 		object, ok := element.(types.Object)
 		if !ok || object.IsUnknown() || object.IsNull() {
+			undecided = true
 			continue
 		}
 
@@ -148,6 +153,7 @@ func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req r
 			return
 		}
 		if role.IsTemporary.IsUnknown() {
+			undecided = true
 			continue
 		}
 
@@ -163,9 +169,15 @@ func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req r
 			continue
 		}
 
+		hasPermanentRole = true
 		if isKnownAndSet(role.TemporaryRange) || isKnownAndSet(role.TemporaryAccessStartTime) {
 			resp.Diagnostics.AddAttributeError(rolePath, permanentRoleTemporaryFieldsSummary, permanentRoleTemporaryFieldsDetail(role))
 		}
+	}
+
+	// An empty set is already reported by the SizeAtLeast validator.
+	if !hasPermanentRole && !undecided && len(roles.Elements()) > 0 {
+		resp.Diagnostics.AddAttributeError(path.Root("roles"), noPermanentRoleSummary, noPermanentRoleDetail)
 	}
 }
 
@@ -174,6 +186,11 @@ func isKnownAndSet(value types.String) bool {
 }
 
 const permanentRoleTemporaryFieldsSummary = "Temporary fields set on a permanent role"
+
+const (
+	noPermanentRoleSummary = "Group must have at least one permanent role"
+	noPermanentRoleDetail  = "Every role is temporary. The sub-organization requires at least one role with is_temporary = false."
+)
 
 func permanentRoleTemporaryFieldsDetail(role subOrganizationGroupRole) string {
 	return fmt.Sprintf("Role %s isn't temporary, so temporary_range and temporary_access_start_time do nothing. Set is_temporary = true or remove them.", role.RoleSlug.ValueString())
@@ -200,10 +217,14 @@ func buildSubOrganizationGroupRoles(roles []subOrganizationGroupRole) ([]infisic
 	var diags diag.Diagnostics
 	requestRoles := make([]infisical.OrgGroupMembershipRoleRequest, 0, len(roles))
 
+	hasPermanentRole := false
 	for _, role := range roles {
 		requestRole := infisical.OrgGroupMembershipRoleRequest{
 			Role:        role.RoleSlug.ValueString(),
 			IsTemporary: role.IsTemporary.ValueBool(),
+		}
+		if !requestRole.IsTemporary {
+			hasPermanentRole = true
 		}
 
 		if !requestRole.IsTemporary && (!role.TemporaryRange.IsNull() || !role.TemporaryAccessStartTime.IsNull()) {
@@ -240,6 +261,10 @@ func buildSubOrganizationGroupRoles(roles []subOrganizationGroupRole) ([]infisic
 		}
 
 		requestRoles = append(requestRoles, requestRole)
+	}
+
+	if !hasPermanentRole {
+		diags.AddError(noPermanentRoleSummary, noPermanentRoleDetail)
 	}
 
 	return requestRoles, diags

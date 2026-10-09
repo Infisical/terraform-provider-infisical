@@ -482,21 +482,30 @@ func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
 		}
 	}
 	start := types.StringValue("2026-10-01T09:00:00Z")
+	permanent := subOrganizationGroupRole{
+		RoleSlug:                 types.StringValue("member"),
+		IsTemporary:              types.BoolValue(false),
+		TemporaryRange:           types.StringNull(),
+		TemporaryAccessStartTime: types.StringNull(),
+	}
 
 	for name, tc := range map[string]struct {
-		role      subOrganizationGroupRole
+		roles     []subOrganizationGroupRole
 		wantError string
 	}{
-		"permanent":                         {role: role(types.BoolValue(false), types.StringNull(), types.StringNull())},
-		"temporary with start time":         {role: role(types.BoolValue(true), types.StringValue("2h"), start)},
-		"is_temporary still unknown":        {role: role(types.BoolUnknown(), types.StringValue("2h"), types.StringNull())},
-		"start time still unknown":          {role: role(types.BoolValue(true), types.StringNull(), types.StringUnknown())},
-		"permanent with unknown range":      {role: role(types.BoolValue(false), types.StringUnknown(), types.StringNull())},
-		"permanent with unknown start time": {role: role(types.BoolValue(false), types.StringNull(), types.StringUnknown())},
-		"permanent with range":              {role: role(types.BoolValue(false), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
-		"permanent with start time":         {role: role(types.BoolValue(false), types.StringNull(), start), wantError: "permanent role"},
-		"unset is_temporary with range":     {role: role(types.BoolNull(), types.StringValue("2h"), types.StringNull()), wantError: "permanent role"},
-		"temporary without start time":      {role: role(types.BoolValue(true), types.StringNull(), types.StringNull()), wantError: "temporary_access_start_time is required"},
+		"permanent":                         {roles: []subOrganizationGroupRole{role(types.BoolValue(false), types.StringNull(), types.StringNull())}},
+		"unset is_temporary":                {roles: []subOrganizationGroupRole{role(types.BoolNull(), types.StringNull(), types.StringNull())}},
+		"temporary with start time":         {roles: []subOrganizationGroupRole{role(types.BoolValue(true), types.StringValue("2h"), start), permanent}},
+		"is_temporary still unknown":        {roles: []subOrganizationGroupRole{role(types.BoolUnknown(), types.StringValue("2h"), types.StringNull())}},
+		"start time still unknown":          {roles: []subOrganizationGroupRole{role(types.BoolValue(true), types.StringNull(), types.StringUnknown()), permanent}},
+		"permanent with unknown range":      {roles: []subOrganizationGroupRole{role(types.BoolValue(false), types.StringUnknown(), types.StringNull())}},
+		"permanent with unknown start time": {roles: []subOrganizationGroupRole{role(types.BoolValue(false), types.StringNull(), types.StringUnknown())}},
+		"permanent with range":              {roles: []subOrganizationGroupRole{role(types.BoolValue(false), types.StringValue("2h"), types.StringNull())}, wantError: "permanent role"},
+		"permanent with start time":         {roles: []subOrganizationGroupRole{role(types.BoolValue(false), types.StringNull(), start)}, wantError: "permanent role"},
+		"unset is_temporary with range":     {roles: []subOrganizationGroupRole{role(types.BoolNull(), types.StringValue("2h"), types.StringNull())}, wantError: "permanent role"},
+		"temporary without start time":      {roles: []subOrganizationGroupRole{role(types.BoolValue(true), types.StringNull(), types.StringNull()), permanent}, wantError: "temporary_access_start_time is required"},
+		"only temporary roles":              {roles: []subOrganizationGroupRole{role(types.BoolValue(true), types.StringValue("2h"), start)}, wantError: "at least one permanent role"},
+		"only temporary roles, one unknown": {roles: []subOrganizationGroupRole{role(types.BoolValue(true), types.StringValue("2h"), start), role(types.BoolUnknown(), types.StringNull(), types.StringNull())}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
@@ -507,7 +516,7 @@ func TestSubOrganizationGroupValidateConfigRoles(t *testing.T) {
 				GroupID:      types.StringNull(),
 				GroupSlug:    types.StringValue("platform"),
 				GroupName:    types.StringNull(),
-				Roles:        []subOrganizationGroupRole{tc.role},
+				Roles:        tc.roles,
 			}); diags.HasError() {
 				t.Fatal(diags)
 			}
@@ -538,5 +547,18 @@ func TestBuildSubOrganizationGroupRolesRejectsTemporaryFieldsOnPermanentRole(t *
 	}})
 	if !diags.HasError() || !strings.Contains(fmt.Sprint(diags), "permanent role") {
 		t.Errorf("expected the permanent role to be rejected, got: %v", diags)
+	}
+}
+
+func TestBuildSubOrganizationGroupRolesRejectsOnlyTemporaryRoles(t *testing.T) {
+	start := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	_, diags := buildSubOrganizationGroupRoles([]subOrganizationGroupRole{{
+		RoleSlug:                 types.StringValue("admin"),
+		IsTemporary:              types.BoolValue(true),
+		TemporaryRange:           types.StringValue("2h"),
+		TemporaryAccessStartTime: types.StringValue(start.Format(time.RFC3339)),
+	}})
+	if !diags.HasError() || !strings.Contains(fmt.Sprint(diags), "at least one permanent role") {
+		t.Errorf("expected the all-temporary role set to be rejected, got: %v", diags)
 	}
 }

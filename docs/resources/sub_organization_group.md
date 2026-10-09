@@ -86,7 +86,7 @@ resource "infisical_sub_organization_group" "linked" {
 
 ### Required
 
-- `roles` (Attributes Set) The organization roles assigned to the group within the sub-organization. (see [below for nested schema](#nestedatt--roles))
+- `roles` (Attributes Set) The organization roles assigned to the group within the sub-organization. At least one role must be permanent. (see [below for nested schema](#nestedatt--roles))
 
 ### Optional
 
