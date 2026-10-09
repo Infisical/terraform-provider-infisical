@@ -26,7 +26,7 @@ func TestProviderSchemaIsValid(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"infisical_gateway", "infisical_gateway_enrollment_token"} {
+	for _, name := range []string{"infisical_gateway", "infisical_gateway_enrollment_token", "infisical_sub_organization_group"} {
 		if _, ok := resp.ResourceSchemas[name]; !ok {
 			t.Errorf("expected %s to be registered on the provider", name)
 		}

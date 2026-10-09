@@ -4593,6 +4593,72 @@ type DeleteSubOrganizationResponse struct {
 	Organization SubOrganization `json:"organization"`
 }
 
+// Sub-org group links
+
+type AvailableGroup struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type ListAvailableGroupsResponse struct {
+	Groups []AvailableGroup `json:"groups"`
+}
+
+type OrgGroupMembershipGroup struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Slug  string `json:"slug"`
+	OrgID string `json:"orgId"`
+}
+
+type OrgGroupMembershipRole struct {
+	ID                       string     `json:"id"`
+	Role                     string     `json:"role"`
+	CustomRoleID             *string    `json:"customRoleId"`
+	CustomRoleSlug           *string    `json:"customRoleSlug"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            *string    `json:"temporaryMode"`
+	TemporaryRange           *string    `json:"temporaryRange"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   *time.Time `json:"temporaryAccessEndTime"`
+}
+
+type OrgGroupMembership struct {
+	ID      string                   `json:"id"`
+	GroupID string                   `json:"groupId"`
+	Group   OrgGroupMembershipGroup  `json:"group"`
+	Roles   []OrgGroupMembershipRole `json:"roles"`
+}
+
+// The API rejects temporary fields on a permanent role, even empty ones, so they're omitted.
+type OrgGroupMembershipRoleRequest struct {
+	Role                     string     `json:"role"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            string     `json:"temporaryMode,omitempty"`
+	TemporaryRange           string     `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type CreateOrgGroupMembershipRequest struct {
+	GroupID string                          `json:"-"`
+	Roles   []OrgGroupMembershipRoleRequest `json:"roles"`
+}
+
+type UpdateOrgGroupMembershipRequest struct {
+	GroupID string                          `json:"-"`
+	Roles   []OrgGroupMembershipRoleRequest `json:"roles"`
+}
+
+type OrgGroupMembershipResponse struct {
+	GroupMembership OrgGroupMembership `json:"groupMembership"`
+}
+
+type ListOrgGroupMembershipsResponse struct {
+	GroupMemberships []OrgGroupMembership `json:"groupMemberships"`
+	TotalCount       int                  `json:"totalCount"`
+}
+
 type IdentityTlsCertAuth struct {
 	ID                           string                  `json:"id"`
 	AccessTokenTTL               int64                   `json:"accessTokenTTL"`
