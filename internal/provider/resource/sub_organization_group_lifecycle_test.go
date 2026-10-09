@@ -305,6 +305,67 @@ func TestSubOrganizationGroupLifecycle(t *testing.T) {
 	}
 }
 
+// The membership API is scoped to the session's organization. Linking in the sub-org and then
+// pointing the provider at the root org must not refresh from, patch or remove the group's own
+// root-org membership.
+func TestSubOrganizationGroupRefusesProviderScopedToRootOrg(t *testing.T) {
+	ctx := context.Background()
+	s := subOrgGroupTestSchema(t)
+
+	for name, tc := range map[string]struct {
+		detailsFail bool
+		wantError   string
+	}{
+		"root scoped":              {wantError: "auth.organization_slug"},
+		"session org lookup fails": {detailsFail: true, wantError: "couldn't verify"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			backend := newFakeSubOrgGroupBackend(t)
+			r := newSubOrgGroupTestResource(t, backend)
+
+			state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringValue("g1"), types.StringUnknown(), memberRole()))
+			backend.sessionOrgID = testRootOrgID
+			backend.detailsFail = tc.detailsFail
+
+			readResp := resource.ReadResponse{State: state}
+			r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
+			if !readResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(readResp.Diagnostics), tc.wantError) {
+				t.Errorf("Read: expected an error containing %q, got: %v", tc.wantError, readResp.Diagnostics)
+			}
+			if readResp.State.Raw.IsNull() {
+				t.Error("Read must not drop the resource from state")
+			}
+
+			updatePlan := tfsdk.Plan{Schema: s, Raw: state.Raw}
+			if diags := updatePlan.SetAttribute(ctx, path.Root("roles"), []subOrganizationGroupRole{{
+				RoleSlug:                 types.StringValue("admin"),
+				IsTemporary:              types.BoolValue(false),
+				TemporaryRange:           types.StringNull(),
+				TemporaryAccessStartTime: types.StringNull(),
+			}}); diags.HasError() {
+				t.Fatal(diags)
+			}
+			updateResp := resource.UpdateResponse{State: state}
+			r.Update(ctx, resource.UpdateRequest{Plan: updatePlan, State: state}, &updateResp)
+			if !updateResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(updateResp.Diagnostics), tc.wantError) {
+				t.Errorf("Update: expected an error containing %q, got: %v", tc.wantError, updateResp.Diagnostics)
+			}
+			if roles := backend.links["g1"].Roles; len(roles) != 1 || roles[0].Role != "member" {
+				t.Errorf("Update must not touch the membership, got roles: %+v", roles)
+			}
+
+			deleteResp := resource.DeleteResponse{State: state}
+			r.Delete(ctx, resource.DeleteRequest{State: state}, &deleteResp)
+			if !deleteResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(deleteResp.Diagnostics), tc.wantError) {
+				t.Errorf("Delete: expected an error containing %q, got: %v", tc.wantError, deleteResp.Diagnostics)
+			}
+			if _, linked := backend.links["g1"]; !linked {
+				t.Error("Delete must not remove the membership")
+			}
+		})
+	}
+}
+
 // Someone unlinks the group in the UI: refresh drops it so the next plan re-creates the link.
 func TestSubOrganizationGroupReadDropsExternallyUnlinkedGroup(t *testing.T) {
 	s := subOrgGroupTestSchema(t)

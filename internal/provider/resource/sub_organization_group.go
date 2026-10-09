@@ -344,6 +344,31 @@ func nativeGroupError(diags *diag.Diagnostics, groupRef string) {
 	)
 }
 
+var errProviderScopedToGroupOrg = errors.New("provider is scoped to the organization that owns the group")
+
+func (r *subOrganizationGroupResource) getLinkedMembership(groupID string) (infisical.OrgGroupMembership, error) {
+	membership, err := r.client.GetOrgGroupMembership(groupID)
+	if err != nil {
+		return membership, err
+	}
+
+	native, err := r.isNativeMembership(membership)
+	if err != nil {
+		return membership, fmt.Errorf("couldn't verify the membership is a sub-organization link: %w", err)
+	}
+	if native {
+		return membership, errProviderScopedToGroupOrg
+	}
+	return membership, nil
+}
+
+func wrongScopeError(diags *diag.Diagnostics, groupRef string) {
+	diags.AddError(
+		"Provider is not scoped to the sub-organization",
+		fmt.Sprintf("Group %s belongs to the organization the provider is scoped to, so the membership found there is the group's own, not the sub-organization link this resource manages. Set auth.organization_slug to the slug of the sub-organization the group was linked into.", groupRef),
+	)
+}
+
 // The group is either native to the session's org or was linked outside Terraform. Only the
 // second one gets the import hint.
 func (r *subOrganizationGroupResource) existingMembershipError(diags *diag.Diagnostics, groupRef string, membership infisical.OrgGroupMembership) {
@@ -456,10 +481,14 @@ func (r *subOrganizationGroupResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	membership, err := r.client.GetOrgGroupMembership(state.GroupID.ValueString())
+	membership, err := r.getLinkedMembership(state.GroupID.ValueString())
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
+			return
+		}
+		if errors.Is(err, errProviderScopedToGroupOrg) {
+			wrongScopeError(&resp.Diagnostics, state.GroupID.ValueString())
 			return
 		}
 
@@ -503,6 +532,24 @@ func (r *subOrganizationGroupResource) Update(ctx context.Context, req resource.
 		return
 	}
 
+	if _, err := r.getLinkedMembership(state.GroupID.ValueString()); err != nil {
+		switch {
+		case errors.Is(err, errProviderScopedToGroupOrg):
+			wrongScopeError(&resp.Diagnostics, state.GroupID.ValueString())
+		case errors.Is(err, infisical.ErrNotFound):
+			resp.Diagnostics.AddError(
+				"Group is no longer linked to the sub-organization",
+				fmt.Sprintf("Group %s has no membership in the organization the provider is scoped to. Run a plan with refresh to recreate the link.", state.GroupID.ValueString()),
+			)
+		default:
+			resp.Diagnostics.AddError(
+				"Error updating sub-organization group",
+				"Couldn't read the group's sub-organization membership, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
 	membership, err := r.client.UpdateOrgGroupMembership(infisical.UpdateOrgGroupMembershipRequest{
 		GroupID: state.GroupID.ValueString(),
 		Roles:   roles,
@@ -532,6 +579,20 @@ func (r *subOrganizationGroupResource) Delete(ctx context.Context, req resource.
 	var state subOrganizationGroupResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if _, err := r.getLinkedMembership(state.GroupID.ValueString()); err != nil {
+		switch {
+		case errors.Is(err, infisical.ErrNotFound):
+		case errors.Is(err, errProviderScopedToGroupOrg):
+			wrongScopeError(&resp.Diagnostics, state.GroupID.ValueString())
+		default:
+			resp.Diagnostics.AddError(
+				"Error deleting sub-organization group",
+				"Couldn't read the group's sub-organization membership, unexpected error: "+err.Error(),
+			)
+		}
 		return
 	}
 
