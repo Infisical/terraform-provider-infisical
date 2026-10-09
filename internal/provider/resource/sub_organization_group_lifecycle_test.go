@@ -317,11 +317,13 @@ func TestSubOrganizationGroupRefusesProviderScopedToWrongOrg(t *testing.T) {
 	for name, tc := range map[string]struct {
 		sessionOrgID string
 		detailsFail  bool
+		unlinked     bool
 		wantError    string
 	}{
-		"root org":                 {sessionOrgID: testRootOrgID, wantError: "belongs to the organization the provider is scoped to"},
-		"other sub-org":            {sessionOrgID: "other-sub-org", wantError: "different sub-organization"},
-		"session org lookup fails": {sessionOrgID: testRootOrgID, detailsFail: true, wantError: "couldn't verify"},
+		"root org":                        {sessionOrgID: testRootOrgID, wantError: "belongs to the organization the provider is scoped to"},
+		"other sub-org, also linked":      {sessionOrgID: "other-sub-org", wantError: "different sub-organization"},
+		"other sub-org, not linked there": {sessionOrgID: "other-sub-org", unlinked: true, wantError: "different sub-organization"},
+		"session org lookup fails":        {sessionOrgID: testRootOrgID, detailsFail: true, wantError: "couldn't verify"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			backend := newFakeSubOrgGroupBackend(t)
@@ -330,6 +332,12 @@ func TestSubOrganizationGroupRefusesProviderScopedToWrongOrg(t *testing.T) {
 			state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringValue("g1"), types.StringUnknown(), memberRole()))
 			backend.sessionOrgID = tc.sessionOrgID
 			backend.detailsFail = tc.detailsFail
+			// The fake has one membership table for every org, so hide the link to act as an org it isn't linked in.
+			saved := backend.links["g1"]
+			if tc.unlinked {
+				delete(backend.links, "g1")
+				t.Cleanup(func() { backend.links["g1"] = saved })
+			}
 
 			readResp := resource.ReadResponse{State: state}
 			r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
@@ -354,8 +362,8 @@ func TestSubOrganizationGroupRefusesProviderScopedToWrongOrg(t *testing.T) {
 			if !updateResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(updateResp.Diagnostics), tc.wantError) {
 				t.Errorf("Update: expected an error containing %q, got: %v", tc.wantError, updateResp.Diagnostics)
 			}
-			if roles := backend.links["g1"].Roles; len(roles) != 1 || roles[0].Role != "member" {
-				t.Errorf("Update must not touch the membership, got roles: %+v", roles)
+			if roles := saved.Roles; !tc.unlinked && (len(backend.links["g1"].Roles) != 1 || backend.links["g1"].Roles[0].Role != roles[0].Role) {
+				t.Errorf("Update must not touch the membership, got roles: %+v", backend.links["g1"].Roles)
 			}
 
 			deleteResp := resource.DeleteResponse{State: state}
@@ -363,7 +371,7 @@ func TestSubOrganizationGroupRefusesProviderScopedToWrongOrg(t *testing.T) {
 			if !deleteResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(deleteResp.Diagnostics), tc.wantError) {
 				t.Errorf("Delete: expected an error containing %q, got: %v", tc.wantError, deleteResp.Diagnostics)
 			}
-			if _, linked := backend.links["g1"]; !linked {
+			if _, linked := backend.links["g1"]; !linked && !tc.unlinked {
 				t.Error("Delete must not remove the membership")
 			}
 		})

@@ -409,14 +409,17 @@ var (
 // Returns the membership and the ID of the organization the session is on. expectedOrgID is the
 // sub-organization recorded in state, empty when there's nothing to compare against yet.
 func (r *subOrganizationGroupResource) getLinkedMembership(groupID, expectedOrgID string) (infisical.OrgGroupMembership, string, error) {
-	membership, err := r.client.GetOrgGroupMembership(groupID)
-	if err != nil {
-		return membership, "", err
-	}
-
 	sessionOrgID, err := r.client.GetSessionOrganizationID()
 	if err != nil {
-		return membership, "", fmt.Errorf("couldn't verify the membership is a sub-organization link: %w", err)
+		return infisical.OrgGroupMembership{}, "", fmt.Errorf("couldn't verify the membership is a sub-organization link: %w", err)
+	}
+
+	membership, err := r.client.GetOrgGroupMembership(groupID)
+	if err != nil {
+		if errors.Is(err, infisical.ErrNotFound) && expectedOrgID != "" && sessionOrgID != expectedOrgID {
+			return membership, sessionOrgID, errProviderScopedToOtherOrg
+		}
+		return membership, sessionOrgID, err
 	}
 	if membership.Group.OrgID == sessionOrgID {
 		return membership, sessionOrgID, errProviderScopedToGroupOrg
