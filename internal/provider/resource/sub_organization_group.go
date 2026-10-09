@@ -27,6 +27,7 @@ var (
 	_ resource.ResourceWithImportState      = &subOrganizationGroupResource{}
 	_ resource.ResourceWithConfigValidators = &subOrganizationGroupResource{}
 	_ resource.ResourceWithValidateConfig   = &subOrganizationGroupResource{}
+	_ resource.ResourceWithModifyPlan       = &subOrganizationGroupResource{}
 )
 
 func NewSubOrganizationGroupResource() resource.Resource {
@@ -78,10 +79,11 @@ func (r *subOrganizationGroupResource) Schema(_ context.Context, _ resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			},
 			"group_slug": schema.StringAttribute{
-				Description:   "The slug of the root-organization group to link. Exactly one of `group_id` or `group_slug` must be set.",
+				Description: "The slug of the root-organization group to link. Exactly one of `group_id` or `group_slug` must be set. " +
+					"Pointing it at a different group replaces the link. If the linked group's slug is renamed in the root organization, update this to the new slug and the link is kept.",
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"group_name": schema.StringAttribute{
 				Description:   "The name of the linked group.",
@@ -185,6 +187,55 @@ func (r *subOrganizationGroupResource) ValidateConfig(ctx context.Context, req r
 	if !hasPermanentRole && !undecided && len(roles.Elements()) > 0 {
 		resp.Diagnostics.AddAttributeError(path.Root("roles"), noPermanentRoleSummary, noPermanentRoleDetail)
 	}
+}
+
+// group_slug can't simply RequiresReplace: a slug renamed in the root organization drifts from
+// config, and replacing would unlink the group and then fail to find the old slug, leaving the
+// sub-organization without access. So a changed slug is resolved here. The same group under a new
+// slug updates in place, a different group replaces, and a slug that resolves to nothing stops the
+// plan before anything is unlinked.
+func (r *subOrganizationGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var configSlug, stateSlug, stateGroupID types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("group_slug"), &configSlug)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("group_slug"), &stateSlug)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("group_id"), &stateGroupID)...)
+	if resp.Diagnostics.HasError() || configSlug.IsNull() || configSlug.IsUnknown() || configSlug.ValueString() == stateSlug.ValueString() {
+		return
+	}
+
+	slug := configSlug.ValueString()
+	slugPath := path.Root("group_slug")
+
+	membership, err := r.client.GetOrgGroupMembershipBySlug(slug)
+	if err == nil {
+		if membership.GroupID == stateGroupID.ValueString() {
+			return
+		}
+		r.existingMembershipError(&resp.Diagnostics, slug, membership)
+		return
+	}
+	if !errors.Is(err, infisical.ErrNotFound) {
+		resp.Diagnostics.AddAttributeError(slugPath, "Error resolving group_slug", "Couldn't list the groups linked to the sub-organization, unexpected error: "+err.Error())
+		return
+	}
+
+	if _, err := r.client.GetAvailableGroupBySlug(slug); err == nil {
+		resp.RequiresReplace = append(resp.RequiresReplace, slugPath)
+		return
+	} else if !errors.Is(err, infisical.ErrNotFound) {
+		resp.Diagnostics.AddAttributeError(slugPath, "Error resolving group_slug", "Couldn't list the root-organization groups available for linking, unexpected error: "+err.Error())
+		return
+	}
+
+	resp.Diagnostics.AddAttributeError(
+		slugPath,
+		"Group not found",
+		fmt.Sprintf("No root-organization group with slug %s is linked or available to link, so the existing link to group %s is left alone. If that group's slug was renamed, set group_slug to its current slug %s.", slug, stateGroupID.ValueString(), stateSlug.ValueString()),
+	)
 }
 
 func isKnownAndSet(value types.String) bool {

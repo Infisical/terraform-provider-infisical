@@ -91,7 +91,7 @@ resource "infisical_sub_organization_group" "linked" {
 ### Optional
 
 - `group_id` (String) The ID of the root-organization group to link. Exactly one of `group_id` or `group_slug` must be set.
-- `group_slug` (String) The slug of the root-organization group to link. Exactly one of `group_id` or `group_slug` must be set.
+- `group_slug` (String) The slug of the root-organization group to link. Exactly one of `group_id` or `group_slug` must be set. Pointing it at a different group replaces the link. If the linked group's slug is renamed in the root organization, update this to the new slug and the link is kept.
 
 ### Read-Only
 

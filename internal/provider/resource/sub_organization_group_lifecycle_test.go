@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 const (
@@ -366,6 +367,95 @@ func TestSubOrganizationGroupRefusesProviderScopedToWrongOrg(t *testing.T) {
 				t.Error("Delete must not remove the membership")
 			}
 		})
+	}
+}
+
+// A renamed root-org slug must not turn into unlink-then-fail. Only a slug that resolves to a
+// different, linkable group replaces the link.
+func TestSubOrganizationGroupModifyPlanSlugChange(t *testing.T) {
+	ctx := context.Background()
+	s := subOrgGroupTestSchema(t)
+
+	for name, tc := range map[string]struct {
+		configSlug  string
+		renameTo    string
+		refresh     bool
+		linkOther   bool
+		wantReplace bool
+		wantError   string
+	}{
+		"unchanged":                       {configSlug: "platform"},
+		"renamed, config already updated": {configSlug: "platform-eng", renameTo: "platform-eng"},
+		"renamed, config still old":       {configSlug: "platform", renameTo: "platform-eng", refresh: true, wantError: "set group_slug to its current slug platform-eng"},
+		"another available group":         {configSlug: "security", wantReplace: true},
+		"another already linked group":    {configSlug: "security", linkOther: true, wantError: "terraform import"},
+		"unknown slug":                    {configSlug: "nope", wantError: "Group not found"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			backend := newFakeSubOrgGroupBackend(t)
+			r := newSubOrgGroupTestResource(t, backend)
+
+			state := createSubOrgGroup(t, r, subOrgGroupCreatePlan(t, s, types.StringUnknown(), types.StringValue("platform"), memberRole()))
+			if tc.renameTo != "" {
+				group := backend.rootGroups["g1"]
+				group.Slug = tc.renameTo
+				backend.rootGroups["g1"] = group
+				link := backend.links["g1"]
+				link.Group = group
+				backend.links["g1"] = link
+			}
+			if tc.refresh {
+				state = readSubOrgGroup(t, r, state)
+				if slug := subOrgGroupModel(t, state).GroupSlug.ValueString(); slug != tc.renameTo {
+					t.Fatalf("expected refresh to pick up the renamed slug, got %s", slug)
+				}
+			}
+			if tc.linkOther {
+				backend.links["g2"] = infisical.OrgGroupMembership{ID: "m-g2", GroupID: "g2", Group: backend.rootGroups["g2"]}
+			}
+
+			plan := tfsdk.Plan{Schema: s, Raw: state.Raw}
+			if diags := plan.SetAttribute(ctx, path.Root("group_slug"), tc.configSlug); diags.HasError() {
+				t.Fatal(diags)
+			}
+			resp := resource.ModifyPlanResponse{Plan: plan}
+			r.ModifyPlan(ctx, resource.ModifyPlanRequest{Config: tfsdk.Config{Schema: s, Raw: plan.Raw}, State: state, Plan: plan}, &resp)
+
+			if tc.wantError != "" {
+				if !resp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(resp.Diagnostics), tc.wantError) {
+					t.Errorf("expected an error containing %q, got: %v", tc.wantError, resp.Diagnostics)
+				}
+			} else if resp.Diagnostics.HasError() {
+				t.Errorf("expected no error, got: %v", resp.Diagnostics)
+			}
+			if gotReplace := len(resp.RequiresReplace) > 0; gotReplace != tc.wantReplace {
+				t.Errorf("wantReplace=%t, got RequiresReplace=%v", tc.wantReplace, resp.RequiresReplace)
+			}
+		})
+	}
+}
+
+// Create and destroy plans have no prior state or no planned state; neither should hit the API.
+func TestSubOrganizationGroupModifyPlanSkipsCreateAndDestroy(t *testing.T) {
+	ctx := context.Background()
+	s := subOrgGroupTestSchema(t)
+	backend := newFakeSubOrgGroupBackend(t)
+	backend.detailsFail = true
+	r := &subOrganizationGroupResource{client: failingDeleteClient(t, backend)}
+	null := tftypes.NewValue(s.Type().TerraformType(ctx), nil)
+
+	plan := subOrgGroupCreatePlan(t, s, types.StringUnknown(), types.StringValue("platform"), memberRole())
+	createResp := resource.ModifyPlanResponse{Plan: plan}
+	r.ModifyPlan(ctx, resource.ModifyPlanRequest{Config: tfsdk.Config{Schema: s, Raw: plan.Raw}, State: tfsdk.State{Schema: s, Raw: null}, Plan: plan}, &createResp)
+	if createResp.Diagnostics.HasError() || len(createResp.RequiresReplace) > 0 {
+		t.Errorf("create plan: unexpected diagnostics %v or replace %v", createResp.Diagnostics, createResp.RequiresReplace)
+	}
+
+	state := tfsdk.State{Schema: s, Raw: plan.Raw}
+	destroyResp := resource.ModifyPlanResponse{Plan: tfsdk.Plan{Schema: s, Raw: null}}
+	r.ModifyPlan(ctx, resource.ModifyPlanRequest{Config: tfsdk.Config{Schema: s, Raw: null}, State: state, Plan: tfsdk.Plan{Schema: s, Raw: null}}, &destroyResp)
+	if destroyResp.Diagnostics.HasError() || len(destroyResp.RequiresReplace) > 0 {
+		t.Errorf("destroy plan: unexpected diagnostics %v or replace %v", destroyResp.Diagnostics, destroyResp.RequiresReplace)
 	}
 }
 
