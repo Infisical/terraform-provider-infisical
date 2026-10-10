@@ -38,8 +38,19 @@ resource "infisical_certificate_sync_aws_certificate_manager" "example" {
   application_id = "<cert-manager-application-id>"
   connection_id  = "<app-connection-id>"
 
+  # Omit certificate_filters to choose the synced certificates outside Terraform.
+  # Fields are combined: a certificate must match every field that is set.
+  certificate_filters = {
+    certificate_ids = [
+      infisical_cert_manager_certificate.api.id,
+      infisical_cert_manager_certificate.www.id,
+    ]
+    # profile_ids = ["<certificate-profile-id>"]
+    # metadata    = [{ key = "env", value = "prod" }]
+  }
+
   sync_options = {
-    certificate_name_schema = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    certificate_name_schema = "Infisical-{{certificateId}}" # Must include {{certificateId}}; {{shortCertificateId}} is not supported here
     can_remove_certificates = true
     include_root_ca         = false
     preserve_arn            = true
@@ -65,6 +76,7 @@ resource "infisical_certificate_sync_aws_certificate_manager" "example" {
 ### Optional
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
+- `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
 - `description` (String) An optional description for the AWS Certificate Manager sync.
 
 ### Read-Only
@@ -84,13 +96,34 @@ Required:
 
 Required:
 
-- `certificate_name_schema` (String) The naming scheme for synced certificates. Must include the {{certificateId}} or {{shortCertificateId}} placeholder. Available placeholders: {{certificateId}}, {{shortCertificateId}}, {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.
+- `certificate_name_schema` (String) The naming scheme for synced certificates. Must include the {{certificateId}} placeholder; {{shortCertificateId}} is not supported for this destination. Names may contain letters, digits, spaces, hyphens and underscores (1-256 characters). Other placeholders: {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.
 
 Optional:
 
 - `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from AWS Certificate Manager when they are no longer managed in Infisical.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain.
 - `preserve_arn` (Boolean) Whether to preserve the AWS Certificate Manager ARN when a certificate is renewed, reimporting into the existing certificate instead of creating a new one.
+
+
+<a id="nestedatt--certificate_filters"></a>
+### Nested Schema for `certificate_filters`
+
+Optional:
+
+- `certificate_ids` (Set of String) The IDs of the certificates to sync. A certificate keeps syncing across renewals, so an ID that has since been renewed still selects the renewed certificate and does not show as drift.
+- `metadata` (Attributes Set) Sync certificates carrying every one of these metadata pairs. (see [below for nested schema](#nestedatt--certificate_filters--metadata))
+- `profile_ids` (Set of String) Sync certificates issued from any one of these certificate profiles.
+
+<a id="nestedatt--certificate_filters--metadata"></a>
+### Nested Schema for `certificate_filters.metadata`
+
+Required:
+
+- `key` (String) The metadata key the certificate must carry.
+
+Optional:
+
+- `value` (String) The value the key must have. Leave unset to match any value.
 
 ## Import
 

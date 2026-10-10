@@ -41,6 +41,13 @@ const (
 	AppConnectionAppCircleCI              AppConnectionApp = "circleci"
 	AppConnectionAppDigiCert              AppConnectionApp = "digicert"
 	AppConnectionAppAuth0                 AppConnectionApp = "auth0"
+	AppConnectionAppChef                  AppConnectionApp = "chef"
+	AppConnectionAppF5BigIp               AppConnectionApp = "f5-big-ip"
+	AppConnectionAppKempLoadMaster        AppConnectionApp = "kemp-loadmaster"
+	AppConnectionAppNetScaler             AppConnectionApp = "netscaler"
+	AppConnectionAppNutanixPrismCentral   AppConnectionApp = "nutanix-prism-central"
+	AppConnectionAppSSH                   AppConnectionApp = "ssh"
+	AppConnectionAppWinRM                 AppConnectionApp = "winrm"
 )
 
 const (

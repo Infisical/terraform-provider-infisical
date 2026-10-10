@@ -15,21 +15,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// certificateSyncCertificatesPageSize is the max page size accepted by the list certificates endpoint.
-const certificateSyncCertificatesPageSize = 100
+const deprecationMessage = "Use the certificate_filters.certificate_ids attribute on the certificate sync resource instead. " +
+	"To migrate without detaching certificates, add the IDs to certificate_filters and drop this resource from state with a removed block that sets destroy = false."
 
-// renewalGuidance is shared by the Read warning and the Create error so both explain the same
-// thing: Infisical attaches the renewed certificate to the sync and drops the superseded one, and
-// it refuses to sync certificates that have been renewed, revoked, or expired. The provider does
-// not fetch the certificate to work out which of those applies, so one message covers all three.
-const renewalGuidance = "This usually means the certificate was renewed: Infisical associates the renewed certificate with the sync " +
-	"and drops the superseded one. Certificates that have been renewed, revoked, or expired cannot be synced. " +
-	"Update certificate_id to the renewed certificate before applying. Referencing the resource that performs the renewal " +
-	"keeps the ID in step automatically."
-
-// CertificateSyncCertificateResource attaches one certificate to one certificate sync. Modelling a
-// single association per resource (rather than a list of certificate IDs on the sync) means attaching
-// or detaching one certificate leaves the others untouched in both the plan and the API call.
+// CertificateSyncCertificateResource is deprecated; it matches by certificate order to survive renewals.
 type CertificateSyncCertificateResource struct {
 	client *infisical.Client
 }
@@ -76,9 +65,8 @@ func (r *CertificateSyncCertificateResource) ImportState(ctx context.Context, re
 func (r *CertificateSyncCertificateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. " +
-			"Only a currently valid certificate can be synced: certificates that have been renewed, revoked, or expired are rejected. " +
-			"Because Infisical attaches the renewed certificate and drops the superseded one when a certificate is renewed, pinning a literal " +
-			"certificate ID will break at the next renewal. Reference the resource that issues or renews the certificate instead so the ID stays in step automatically.",
+			"The attachment follows the certificate across renewals. Deprecated: use `certificate_filters.certificate_ids` on the certificate sync resource instead.",
+		DeprecationMessage: deprecationMessage,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description:   "The ID of the certificate association.",
@@ -91,11 +79,38 @@ func (r *CertificateSyncCertificateResource) Schema(_ context.Context, _ resourc
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"certificate_id": schema.StringAttribute{
-				Required:      true,
-				Description:   "The ID of the certificate to associate with the certificate sync.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:    true,
+				Description: "The ID of the certificate to associate with the certificate sync. Changing it to a renewal of the same certificate updates in place; any other change replaces the association.",
 			},
 		},
+	}
+}
+
+// ModifyPlan replaces the association only when certificate_id moves to a different certificate
+// order. Replacing on a renewal would delete the order, briefly detaching the renewed certificate.
+func (r *CertificateSyncCertificateResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	var plan, state CertificateSyncCertificateResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() || plan.CertificateID.Equal(state.CertificateID) {
+		return
+	}
+
+	// An ID only known after apply belongs to a newly issued certificate, which is always a new order.
+	if plan.CertificateID.IsUnknown() {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("certificate_id"))
+		return
+	}
+
+	orders := newCertificateOrderResolver(r.client, nil)
+	planOrder, planErr := orders.orderOf(plan.CertificateID.ValueString())
+	stateOrder, stateErr := orders.orderOf(state.CertificateID.ValueString())
+	if planErr != nil || stateErr != nil || planOrder != stateOrder {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("certificate_id"))
 	}
 }
 
@@ -116,33 +131,22 @@ func (r *CertificateSyncCertificateResource) Configure(_ context.Context, req re
 	r.client = client
 }
 
-// findAssociation pages through the sync's certificates and returns the association ID for the
-// given certificate ID, or an empty string when the certificate is not associated.
+// findAssociation returns the association holding the current certificate in the same certificate
+// order as certificateID, or an empty string when the order is not attached.
 func (r *CertificateSyncCertificateResource) findAssociation(certificateSyncID, certificateID string) (string, error) {
-	offset := 0
-	for {
-		page, err := r.client.ListCertificateSyncCertificates(infisical.ListCertificateSyncCertificatesRequest{
-			CertificateSyncID: certificateSyncID,
-			Offset:            offset,
-			Limit:             certificateSyncCertificatesPageSize,
-		})
-		if err != nil {
-			return "", err
-		}
-
-		for _, cert := range page.Certificates {
-			if cert.CertificateID == certificateID {
-				return cert.ID, nil
-			}
-		}
-
-		// Advance by how many items came back rather than by the limit we asked for: if a page
-		// returns fewer items than requested, advancing by the limit would skip the difference.
-		offset += len(page.Certificates)
-		if len(page.Certificates) == 0 || offset >= page.TotalCount {
+	orderID, err := newCertificateOrderResolver(r.client, nil).orderOf(certificateID)
+	if err != nil {
+		if err == infisical.ErrNotFound {
 			return "", nil
 		}
+		return "", err
 	}
+
+	current, err := newLinkedCertificates(r.client, certificateSyncID).byOrder(orderID)
+	if err != nil || current == nil {
+		return "", err
+	}
+	return current.ID, nil
 }
 
 func (r *CertificateSyncCertificateResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -168,15 +172,15 @@ func (r *CertificateSyncCertificateResource) Create(ctx context.Context, req res
 		resp.Diagnostics.AddError(
 			"Error adding certificate to certificate sync",
 			fmt.Sprintf(
-				"Couldn't add certificate %q to certificate sync %q. %s\n\nOriginal error: %s",
-				plan.CertificateID.ValueString(), plan.CertificateSyncID.ValueString(), renewalGuidance, err.Error(),
+				"Couldn't add certificate %q to certificate sync %q. Revoked or expired certificates cannot be synced.\n\nOriginal error: %s",
+				plan.CertificateID.ValueString(), plan.CertificateSyncID.ValueString(), err.Error(),
 			),
 		)
 		return
 	}
 
-	// The add response should echo the created association. If it does not, resolve the ID via
-	// a lookup so a successful create never persists an empty computed ID.
+	// The add response only lists newly linked certificates, so an order that was already attached
+	// comes back empty and is resolved through a lookup instead.
 	associationID := ""
 	for _, cert := range added {
 		if cert.CertificateID == plan.CertificateID.ValueString() {
@@ -237,16 +241,13 @@ func (r *CertificateSyncCertificateResource) Read(ctx context.Context, req resou
 		return
 	}
 
-	// The sync still exists but the certificate is no longer attached to it. Warn rather than
-	// error: erroring during refresh would break `terraform plan` and `terraform destroy`. The
-	// resource is dropped from state so Terraform plans a re-create, which fails loudly if the
-	// pinned certificate is no longer syncable.
+	// Warn rather than error: erroring during refresh would break `terraform plan` and `terraform destroy`.
 	if associationID == "" {
 		resp.Diagnostics.AddWarning(
 			"Certificate is no longer attached to the certificate sync",
 			fmt.Sprintf(
-				"Certificate %q is no longer attached to certificate sync %q. %s",
-				state.CertificateID.ValueString(), state.CertificateSyncID.ValueString(), renewalGuidance,
+				"Certificate %q is no longer attached to certificate sync %q. Terraform will attach it again.",
+				state.CertificateID.ValueString(), state.CertificateSyncID.ValueString(),
 			),
 		)
 		resp.State.RemoveResource(ctx)

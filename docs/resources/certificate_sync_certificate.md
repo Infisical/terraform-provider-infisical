@@ -3,12 +3,29 @@
 page_title: "infisical_certificate_sync_certificate Resource - terraform-provider-infisical"
 subcategory: "Certificate Syncs"
 description: |-
-  Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. Only a currently valid certificate can be synced: certificates that have been renewed, revoked, or expired are rejected. Because Infisical attaches the renewed certificate and drops the superseded one when a certificate is renewed, pinning a literal certificate ID will break at the next renewal. Reference the resource that issues or renews the certificate instead so the ID stays in step automatically.
+  Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. The attachment follows the certificate across renewals. Deprecated: use certificate_filters.certificate_ids on the certificate sync resource instead.
 ---
 
 # infisical_certificate_sync_certificate (Resource)
 
-Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. Only a currently valid certificate can be synced: certificates that have been renewed, revoked, or expired are rejected. Because Infisical attaches the renewed certificate and drops the superseded one when a certificate is renewed, pinning a literal certificate ID will break at the next renewal. Reference the resource that issues or renews the certificate instead so the ID stays in step automatically.
+Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. The attachment follows the certificate across renewals. Deprecated: use `certificate_filters.certificate_ids` on the certificate sync resource instead.
+
+## Migrating to certificate_filters
+
+1. Add the certificate IDs to `certificate_filters.certificate_ids` on the certificate sync resource.
+2. Replace each `infisical_certificate_sync_certificate` block with a `removed` block that keeps the attachment in Infisical (Terraform 1.7 or higher):
+
+```terraform
+removed {
+  from = infisical_certificate_sync_certificate.example
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+3. Run `terraform plan` and confirm the certificate sync's certificates are unchanged.
 
 ## Example Usage
 
@@ -32,16 +49,7 @@ provider "infisical" {
   }
 }
 
-# Attach a certificate to a certificate sync so it is synced to the destination.
-# The certificate must belong to the same application as the certificate sync.
-#
-# Only a currently valid certificate can be synced. Certificates that have been renewed,
-# revoked, or expired are rejected by Infisical. When a certificate is renewed, Infisical
-# attaches the renewed certificate to the sync and drops the superseded one, so a literal
-# certificate ID will stop working at the next renewal.
-#
-# Reference the resource that issues or renews the certificate so the ID stays in step
-# automatically, rather than hardcoding it:
+# Deprecated: list certificates in certificate_filters on the sync, then drop this with a removed block.
 resource "infisical_certificate_sync_certificate" "example" {
   certificate_sync_id = infisical_certificate_sync_aws_certificate_manager.example.id
   certificate_id      = infisical_cert_manager_certificate.example.id
@@ -53,7 +61,7 @@ resource "infisical_certificate_sync_certificate" "example" {
 
 ### Required
 
-- `certificate_id` (String) The ID of the certificate to associate with the certificate sync.
+- `certificate_id` (String) The ID of the certificate to associate with the certificate sync. Changing it to a renewal of the same certificate updates in place; any other change replaces the association.
 - `certificate_sync_id` (String) The ID of the certificate sync to associate the certificate with.
 
 ### Read-Only
