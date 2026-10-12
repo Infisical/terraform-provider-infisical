@@ -80,7 +80,7 @@ for file in "$DOCS_DIR/resources/"*.md; do
             update_subcategory "$file" "Approval";;
         
         # Groups
-        group)
+        group|sub_organization_group)
             update_subcategory "$file" "Groups";;
         
         # KMS
@@ -136,7 +136,7 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
             update_subcategory "$file" "Projects";;
 
         # Identities
-        identity|identity_details)
+        identity|identity_details|identities_list|identity_*_auth_template)
             update_subcategory "$file" "Identities";;
 
         # Organization

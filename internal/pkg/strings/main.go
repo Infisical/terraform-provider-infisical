@@ -37,3 +37,13 @@ func NormalizeJSON(input string) (string, error) {
 func StringToPtr(s string) *string {
 	return &s
 }
+
+func Filter[T any](slice []T, filter func(T) bool) []T {
+	result := make([]T, 0, len(slice))
+	for _, item := range slice {
+		if filter(item) {
+			result = append(result, item)
+		}
+	}
+	return result
+}

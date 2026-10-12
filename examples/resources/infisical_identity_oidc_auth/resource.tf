@@ -30,3 +30,18 @@ resource "infisical_identity_oidc_auth" "oidc-auth" {
   bound_audiences    = ["sample-audience"]
   bound_subject      = "<>"
 }
+
+# Using an auth template for the identity provider settings. oidc_discovery_url, bound_issuer,
+# bound_audiences and oidc_ca_certificate come from the template, and bound_subject or
+# bound_claims must still restrict which workloads can authenticate.
+resource "infisical_identity" "machine-identity-2" {
+  name   = "machine-identity-2"
+  role   = "admin"
+  org_id = "<>"
+}
+
+resource "infisical_identity_oidc_auth" "oidc-auth-from-template" {
+  identity_id   = infisical_identity.machine-identity-2.id
+  template_id   = "<your-oidc-auth-template-id>"
+  bound_subject = "<>"
+}

@@ -6,12 +6,15 @@ import (
 	"strconv"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 	pkg "terraform-provider-infisical/internal/pkg/modifiers"
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -19,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -34,20 +38,25 @@ type IdentityOidcAuthResource struct {
 
 // IdentityOidcAuthResourceSourceModel describes the data source data model.
 type IdentityOidcAuthResourceModel struct {
-	ID                      types.String `tfsdk:"id"`
-	IdentityID              types.String `tfsdk:"identity_id"`
-	OidcDiscoveryUrl        types.String `tfsdk:"oidc_discovery_url"`
-	CaCertificate           types.String `tfsdk:"oidc_ca_certificate"`
-	BoundIssuer             types.String `tfsdk:"bound_issuer"`
-	BoundAudiences          types.List   `tfsdk:"bound_audiences"`
-	BoundClaims             types.Map    `tfsdk:"bound_claims"`
-	ClaimMetadataMapping    types.Map    `tfsdk:"claim_metadata_mapping"`
-	BoundSubject            types.String `tfsdk:"bound_subject"`
-	AccessTokenTrustedIps   types.List   `tfsdk:"access_token_trusted_ips"`
-	AccessTokenTTL          types.Int64  `tfsdk:"access_token_ttl"`
-	AccessTokenMaxTTL       types.Int64  `tfsdk:"access_token_max_ttl"`
-	AccessTokenNumUsesLimit types.Int64  `tfsdk:"access_token_num_uses_limit"`
+	ID                      types.String                   `tfsdk:"id"`
+	IdentityID              types.String                   `tfsdk:"identity_id"`
+	OidcDiscoveryUrl        types.String                   `tfsdk:"oidc_discovery_url"`
+	CaCertificate           customtypes.TrimmedStringValue `tfsdk:"oidc_ca_certificate"`
+	BoundIssuer             types.String                   `tfsdk:"bound_issuer"`
+	BoundAudiences          types.List                     `tfsdk:"bound_audiences"`
+	BoundClaims             types.Map                      `tfsdk:"bound_claims"`
+	ClaimMetadataMapping    types.Map                      `tfsdk:"claim_metadata_mapping"`
+	BoundSubject            types.String                   `tfsdk:"bound_subject"`
+	AccessTokenTrustedIps   types.List                     `tfsdk:"access_token_trusted_ips"`
+	AccessTokenTTL          types.Int64                    `tfsdk:"access_token_ttl"`
+	AccessTokenMaxTTL       types.Int64                    `tfsdk:"access_token_max_ttl"`
+	AccessTokenNumUsesLimit types.Int64                    `tfsdk:"access_token_num_uses_limit"`
+	TemplateID              types.String                   `tfsdk:"template_id"`
 }
+
+var (
+	_ resource.ResourceWithValidateConfig = &IdentityOidcAuthResource{}
+)
 
 type IdentityOidcAuthResourceTrustedIps struct {
 	IpAddress types.String `tfsdk:"ip_address"`
@@ -73,20 +82,26 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			// Optional and computed so a linked template can supply it; required otherwise, which
+			// ValidateConfig enforces.
 			"oidc_discovery_url": schema.StringAttribute{
-				Description: "The URL used to retrieve the OpenID Connect configuration from the identity provider.",
-				Required:    true,
+				Description:   "The URL used to retrieve the OpenID Connect configuration from the identity provider. Required unless `template_id` is set.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{useStateForUnknownUnlessTemplateLinked{}},
 			},
 			"bound_issuer": schema.StringAttribute{
-				Description: "The unique identifier of the identity provider issuing the OIDC tokens.",
-				Required:    true,
+				Description:   "The unique identifier of the identity provider issuing the OIDC tokens. Required unless `template_id` is set.",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{useStateForUnknownUnlessTemplateLinked{}},
 			},
 			"bound_audiences": schema.ListAttribute{
 				Description:   "The comma-separated list of intended recipients.",
 				Optional:      true,
 				Computed:      true,
 				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.List{useStateForUnknownUnlessTemplateLinked{}, clearWhenUnlinking{}},
 			},
 			"bound_claims": schema.MapAttribute{
 				Description: "The attributes that should be present in the JWT for it to be valid. The provided values can be a glob pattern.",
@@ -115,11 +130,25 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"oidc_ca_certificate": schema.StringAttribute{
+				CustomType:          customtypes.TrimmedStringType{},
 				Description:         "The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints",
 				MarkdownDescription: "The PEM-encoded CA cert for establishing secure communication with the Identity Provider endpoints",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers:       []planmodifier.String{useStateForUnknownUnlessTemplateLinked{}, clearWhenUnlinking{}},
+			},
+			"template_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "The ID of an `infisical_identity_oidc_auth_template` to take the identity provider settings from. When set, `oidc_discovery_url`, `bound_issuer`, `bound_audiences` and `oidc_ca_certificate` come from the template and must not be set here, later edits to the template propagate to this identity, and `bound_subject` or `bound_claims` must restrict which workloads can authenticate. Removing it unlinks the template and applies the settings in this configuration instead: `bound_audiences` and `oidc_ca_certificate` are cleared when the configuration leaves them out, and the plan shows it. To unlink and keep the template's settings, set them here to the template's values (for example from the `infisical_identity_oidc_auth_template` data source); an unlink that changes nothing else then only needs the `unlink-templates` permission on auth templates, or `edit-auth` on the identity.",
+				Validators: []validator.String{
+					terraform.UuidValidator,
+					stringvalidator.ConflictsWith(
+						path.MatchRoot("oidc_discovery_url"),
+						path.MatchRoot("bound_issuer"),
+						path.MatchRoot("bound_audiences"),
+						path.MatchRoot("oidc_ca_certificate"),
+					),
+				},
 			},
 			"access_token_trusted_ips": schema.ListNestedAttribute{
 				Optional:    true,
@@ -157,6 +186,43 @@ func (r *IdentityOidcAuthResource) Schema(_ context.Context, _ resource.SchemaRe
 	}
 }
 
+// The provider settings are required unless a linked template supplies them, and a linked
+// identity must carry its own principal binding, since the template pins only the issuer.
+func (r *IdentityOidcAuthResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config IdentityOidcAuthResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if config.TemplateID.IsNull() {
+		for attribute, value := range map[string]types.String{
+			"oidc_discovery_url": config.OidcDiscoveryUrl,
+			"bound_issuer":       config.BoundIssuer,
+		} {
+			if value.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root(attribute),
+					"Missing required argument",
+					attribute+" is required unless template_id is set.",
+				)
+			}
+		}
+		return
+	}
+
+	if config.BoundSubject.IsUnknown() || config.BoundClaims.IsUnknown() {
+		return
+	}
+	if config.BoundSubject.ValueString() == "" && len(config.BoundClaims.Elements()) == 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("template_id"),
+			"No principal binding configured",
+			"An identity linked to an auth template must set bound_subject or at least one bound_claims entry. The template pins only the issuer, so without a binding any token that issuer signs could authenticate as this identity.",
+		)
+	}
+}
+
 // Configure adds the provider configured client to the resource.
 func (r *IdentityOidcAuthResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -185,7 +251,13 @@ func updateOidcAuthStateByApi(ctx context.Context, diagnose diag.Diagnostics, pl
 	plan.OidcDiscoveryUrl = types.StringValue(newIdentityOidcAuth.OidcDiscoveryUrl)
 	plan.BoundIssuer = types.StringValue(newIdentityOidcAuth.BoundIssuer)
 	plan.BoundSubject = types.StringValue(newIdentityOidcAuth.BoundSubject)
-	plan.CaCertificate = types.StringValue(newIdentityOidcAuth.CACERT)
+	plan.CaCertificate = customtypes.NewTrimmedStringValue(newIdentityOidcAuth.CACERT)
+
+	if newIdentityOidcAuth.TemplateID != nil && *newIdentityOidcAuth.TemplateID != "" {
+		plan.TemplateID = types.StringValue(*newIdentityOidcAuth.TemplateID)
+	} else {
+		plan.TemplateID = types.StringNull()
+	}
 
 	boundClaimsElements := make(map[string]attr.Value)
 	claimMetadataMappingElements := make(map[string]attr.Value)
@@ -307,20 +379,36 @@ func (r *IdentityOidcAuthResource) Create(ctx context.Context, req resource.Crea
 		}
 	}
 
-	newIdentityOidcAuth, err := r.client.CreateIdentityOidcAuth(infisical.CreateIdentityOidcAuthRequest{
-		IdentityID:              plan.IdentityID.ValueString(),
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
-		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		OidcDiscoveryUrl:        plan.OidcDiscoveryUrl.ValueString(),
-		BoundAudiences:          strings.Join(boundAudiences, ","),
-		BoundIssuer:             plan.BoundIssuer.ValueString(),
-		BoundSubject:            plan.BoundSubject.ValueString(),
-		BoundClaims:             boundClaimsMap,
-		ClaimMetadataMapping:    claimMetadataMappingMap,
-		CACERT:                  plan.CaCertificate.ValueString(),
-	})
+	var newIdentityOidcAuth infisical.IdentityOidcAuth
+	var err error
+	if !plan.TemplateID.IsNull() {
+		newIdentityOidcAuth, err = r.client.CreateIdentityOidcAuthFromTemplate(infisical.CreateIdentityOidcAuthFromTemplateRequest{
+			IdentityID:              plan.IdentityID.ValueString(),
+			TemplateID:              plan.TemplateID.ValueString(),
+			AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+			AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+			AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+			AccessTokenTrustedIPS:   accessTokenTrustedIps,
+			BoundSubject:            plan.BoundSubject.ValueString(),
+			BoundClaims:             boundClaimsMap,
+			ClaimMetadataMapping:    claimMetadataMappingMap,
+		})
+	} else {
+		newIdentityOidcAuth, err = r.client.CreateIdentityOidcAuth(infisical.CreateIdentityOidcAuthRequest{
+			IdentityID:              plan.IdentityID.ValueString(),
+			AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+			AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+			AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+			AccessTokenTrustedIPS:   accessTokenTrustedIps,
+			OidcDiscoveryUrl:        plan.OidcDiscoveryUrl.ValueString(),
+			BoundAudiences:          strings.Join(boundAudiences, ","),
+			BoundIssuer:             plan.BoundIssuer.ValueString(),
+			BoundSubject:            plan.BoundSubject.ValueString(),
+			BoundClaims:             boundClaimsMap,
+			ClaimMetadataMapping:    claimMetadataMappingMap,
+			CACERT:                  plan.CaCertificate.ValueString(),
+		})
+	}
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -432,20 +520,40 @@ func (r *IdentityOidcAuthResource) Update(ctx context.Context, req resource.Upda
 		}
 	}
 
-	updatedIdentityOidcAuth, err := r.client.UpdateIdentityOidcAuth(infisical.UpdateIdentityOidcAuthRequest{
-		IdentityID:              plan.IdentityID.ValueString(),
-		AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
-		AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
-		AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
-		AccessTokenTrustedIPS:   accessTokenTrustedIps,
-		OidcDiscoveryUrl:        plan.OidcDiscoveryUrl.ValueString(),
-		BoundAudiences:          strings.Join(boundAudiences, ","),
-		BoundIssuer:             plan.BoundIssuer.ValueString(),
-		BoundSubject:            plan.BoundSubject.ValueString(),
-		BoundClaims:             boundClaimsMap,
-		ClaimMetadataMapping:    claimMetadataMappingMap,
-		CACERT:                  plan.CaCertificate.ValueString(),
-	})
+	var updatedIdentityOidcAuth infisical.IdentityOidcAuth
+	var err error
+	if oidcAuthUnlinksOnly(plan, state) {
+		updatedIdentityOidcAuth, err = r.unlinkTemplateOnly(state)
+	} else if !plan.TemplateID.IsNull() {
+		updatedIdentityOidcAuth, err = r.client.UpdateIdentityOidcAuthFromTemplate(infisical.UpdateIdentityOidcAuthFromTemplateRequest{
+			IdentityID:              plan.IdentityID.ValueString(),
+			TemplateID:              plan.TemplateID.ValueString(),
+			AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+			AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+			AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+			AccessTokenTrustedIPS:   accessTokenTrustedIps,
+			BoundSubject:            plan.BoundSubject.ValueString(),
+			BoundClaims:             boundClaimsMap,
+			ClaimMetadataMapping:    claimMetadataMappingMap,
+		})
+	} else {
+		updatedIdentityOidcAuth, err = r.client.UpdateIdentityOidcAuth(infisical.UpdateIdentityOidcAuthRequest{
+			IdentityID:              plan.IdentityID.ValueString(),
+			AccessTokenTTL:          plan.AccessTokenTTL.ValueInt64(),
+			AccessTokenMaxTTL:       plan.AccessTokenMaxTTL.ValueInt64(),
+			AccessTokenNumUsesLimit: plan.AccessTokenNumUsesLimit.ValueInt64(),
+			AccessTokenTrustedIPS:   accessTokenTrustedIps,
+			OidcDiscoveryUrl:        plan.OidcDiscoveryUrl.ValueString(),
+			BoundAudiences:          strings.Join(boundAudiences, ","),
+			BoundIssuer:             plan.BoundIssuer.ValueString(),
+			BoundSubject:            plan.BoundSubject.ValueString(),
+			BoundClaims:             boundClaimsMap,
+			ClaimMetadataMapping:    claimMetadataMappingMap,
+			CACERT:                  plan.CaCertificate.ValueString(),
+			// Null unlinks a template this identity was linked to.
+			TemplateID: nil,
+		})
+	}
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -462,6 +570,50 @@ func (r *IdentityOidcAuthResource) Update(ctx context.Context, req resource.Upda
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// oidcAuthUnlinksOnly reports whether the plan removes template_id and changes nothing else, which
+// the configuration expresses by setting the template's values. Such a plan needs only the link
+// removed, not an edit of the auth configuration.
+func oidcAuthUnlinksOnly(plan, state IdentityOidcAuthResourceModel) bool {
+	if state.TemplateID.IsNull() || !plan.TemplateID.IsNull() {
+		return false
+	}
+
+	return plan.OidcDiscoveryUrl.Equal(state.OidcDiscoveryUrl) &&
+		plan.BoundIssuer.Equal(state.BoundIssuer) &&
+		plan.BoundAudiences.Equal(state.BoundAudiences) &&
+		!plan.CaCertificate.IsUnknown() &&
+		strings.TrimSpace(plan.CaCertificate.ValueString()) == strings.TrimSpace(state.CaCertificate.ValueString()) &&
+		plan.BoundSubject.Equal(state.BoundSubject) &&
+		plan.BoundClaims.Equal(state.BoundClaims) &&
+		plan.ClaimMetadataMapping.Equal(state.ClaimMetadataMapping) &&
+		// Unset TTLs and trusted IPs are left out of an update, so the API keeps them.
+		unchangedOrDefaulted(plan.AccessTokenTTL, state.AccessTokenTTL) &&
+		unchangedOrDefaulted(plan.AccessTokenMaxTTL, state.AccessTokenMaxTTL) &&
+		unchangedOrDefaulted(plan.AccessTokenNumUsesLimit, state.AccessTokenNumUsesLimit) &&
+		unchangedOrDefaulted(plan.AccessTokenTrustedIps, state.AccessTokenTrustedIps)
+}
+
+// unlinkTemplateOnly removes the template link and nothing else. It goes through the template's
+// delete-usage endpoint first, which needs only unlink-templates, so a role scoped to unlinking can
+// do it. That endpoint also requires the template to exist and the org's plan to include
+// templates, so on any failure it falls back to the identity's own update endpoint, which needs
+// edit-auth and has neither requirement. Either way the identity keeps the settings copied onto it.
+func (r *IdentityOidcAuthResource) unlinkTemplateOnly(state IdentityOidcAuthResourceModel) (infisical.IdentityOidcAuth, error) {
+	identityID := state.IdentityID.ValueString()
+
+	usageErr := r.client.UnlinkIdentityAuthTemplateUsage(state.TemplateID.ValueString(), []string{identityID})
+	if usageErr != nil {
+		if _, err := r.client.UnlinkIdentityOidcAuthTemplate(identityID); err != nil {
+			return infisical.IdentityOidcAuth{}, fmt.Errorf(
+				"unlinking needs unlink-templates on auth templates or edit-auth on the identity; the template's delete-usage endpoint failed (%w) and so did the identity's update endpoint (%w)",
+				usageErr, err,
+			)
+		}
+	}
+
+	return r.client.GetIdentityOidcAuth(infisical.GetIdentityOidcAuthRequest{IdentityID: identityID})
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

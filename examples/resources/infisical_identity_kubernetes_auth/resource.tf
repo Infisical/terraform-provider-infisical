@@ -59,3 +59,20 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-2" {
   token_reviewer_mode = "gateway"
   gateway_id          = "<your-gateway-id>"
 }
+
+
+# Using an auth template for the connection settings
+resource "infisical_identity" "machine-identity-demo-3" {
+  name   = "machine-identity-demo-3"
+  role   = "admin"
+  org_id = "<your-org-id>"
+}
+
+# kubernetes_host, kubernetes_ca_certificate, token_reviewer_jwt, token_reviewer_mode, gateway_id and allowed_audience come from the template.
+resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-3" {
+  identity_id = infisical_identity.machine-identity-demo-3.id
+  template_id = "<your-kubernetes-auth-template-id>"
+
+  allowed_namespaces            = ["infisical-ns"]
+  allowed_service_account_names = ["infisical-sa"]
+}

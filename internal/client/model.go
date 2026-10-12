@@ -209,6 +209,9 @@ type IdentityKubernetesAuth struct {
 	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
 	TokenReviewerMode          string                  `json:"tokenReviewMode"`
 	GatewayID                  string                  `json:"gatewayId"`
+	TemplateID                 *string                 `json:"templateId"`
+	// A JWT copied from a linked template reads back as "", so this is the only sign one is stored.
+	IsTokenReviewerJwtTemplateSourced bool `json:"isTokenReviewerJwtTemplateSourced"`
 }
 
 type IdentityOidcAuth struct {
@@ -227,6 +230,7 @@ type IdentityOidcAuth struct {
 	ClaimMetadataMapping    map[string]string       `json:"claimMetadataMapping"`
 	BoundSubject            string                  `json:"boundSubject"`
 	CACERT                  string                  `json:"caCert"`
+	TemplateID              *string                 `json:"templateId"`
 }
 
 type IdentityTokenAuth struct {
@@ -1524,6 +1528,49 @@ type SearchIdentitiesResponse struct {
 	TotalCount int           `json:"totalCount"`
 }
 
+const (
+	SearchIdentitiesScopeOrganization = "organization"
+	SearchIdentitiesScopeProject      = "project"
+)
+
+type SearchIdentitiesV2Request struct {
+	Scope  []string `json:"scope"`
+	Limit  int      `json:"limit"`
+	Offset int      `json:"offset"`
+}
+
+type SearchIdentitiesV2Role struct {
+	ID             string  `json:"id"`
+	Role           string  `json:"role"`
+	CustomRoleID   *string `json:"customRoleId"`
+	CustomRoleSlug *string `json:"customRoleSlug"`
+	IsTemporary    bool    `json:"isTemporary"`
+}
+
+// SearchIdentitiesV2Membership is one identity membership returned by the v2 search.
+// Organization identities appear through their organization membership, and
+// project identities through their project membership, so each identity appears once.
+type SearchIdentitiesV2Membership struct {
+	ID         string                   `json:"id"`
+	IdentityID string                   `json:"identityId"`
+	Scope      string                   `json:"scope"`
+	OrgID      string                   `json:"orgId"`
+	ProjectID  *string                  `json:"projectId"`
+	Roles      []SearchIdentitiesV2Role `json:"roles"`
+	Identity   struct {
+		ID                  string   `json:"id"`
+		Name                string   `json:"name"`
+		HasDeleteProtection bool     `json:"hasDeleteProtection"`
+		OrgID               string   `json:"orgId"`
+		AuthMethods         []string `json:"authMethods"`
+	} `json:"identity"`
+}
+
+type SearchIdentitiesV2Response struct {
+	Identities []SearchIdentitiesV2Membership `json:"identities"`
+	TotalCount int                            `json:"totalCount"`
+}
+
 type IdentityAuthTrustedIpRequest struct {
 	IPAddress string `json:"ipAddress"`
 }
@@ -1811,6 +1858,56 @@ type UpdateIdentityKubernetesAuthRequest struct {
 	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
 	TokenReviewerMode       string                         `json:"tokenReviewMode"`
 	GatewayID               *string                        `json:"gatewayId"`
+	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
+	TemplateID *string `json:"templateId"`
+	// Leaves tokenReviewerJwt out of the request, which keeps the stored JWT. A nil TokenReviewerJwt
+	// is sent as null, which clears it.
+	KeepTokenReviewerJwt bool `json:"-"`
+}
+
+func (request UpdateIdentityKubernetesAuthRequest) MarshalJSON() ([]byte, error) {
+	type plain UpdateIdentityKubernetesAuthRequest
+	body, err := json.Marshal(plain(request))
+	if err != nil || !request.KeepTokenReviewerJwt {
+		return body, err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, err
+	}
+	delete(fields, "tokenReviewerJwt")
+	return json.Marshal(fields)
+}
+
+// The API rejects every template-managed connection field on a templated attach, even as null,
+// so a template-linked kubernetes auth is written with its own request types that cannot carry them.
+type CreateIdentityKubernetesAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	AllowedNamespaces       string                         `json:"allowedNamespaces"`
+	AllowedNames            string                         `json:"allowedNames"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+// unlinkIdentityAuthTemplateRequest unlinks a template and changes nothing else: the API leaves
+// every field the request omits as it is, so the identity keeps the settings copied onto it.
+type unlinkIdentityAuthTemplateRequest struct {
+	TemplateID *string `json:"templateId"`
+}
+
+type UpdateIdentityKubernetesAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	AllowedNamespaces       string                         `json:"allowedNamespaces"`
+	AllowedNames            string                         `json:"allowedNames"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
 }
 
 type CreateIdentityOidcAuthResponse struct {
@@ -1858,6 +1955,34 @@ type UpdateIdentityOidcAuthRequest struct {
 	CACERT                  string                         `json:"caCert"`
 	BoundIssuer             string                         `json:"boundIssuer"`
 	BoundAudiences          string                         `json:"boundAudiences"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+	// Always sent, so a custom configuration applied to a template-linked identity unlinks it.
+	TemplateID *string `json:"templateId"`
+}
+
+// The API rejects every template-managed provider field on a templated attach, even as null, so a
+// template-linked OIDC auth is written with its own request types that cannot carry them.
+type CreateIdentityOidcAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
+	BoundClaims             map[string]string              `json:"boundClaims"`
+	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
+	BoundSubject            string                         `json:"boundSubject"`
+	AccessTokenTrustedIPS   []IdentityAuthTrustedIpRequest `json:"accessTokenTrustedIps,omitempty"`
+	AccessTokenTTL          int64                          `json:"accessTokenTTL,omitempty"`
+	AccessTokenMaxTTL       int64                          `json:"accessTokenMaxTTL,omitempty"`
+	AccessTokenNumUsesLimit int64                          `json:"accessTokenNumUsesLimit,omitempty"`
+}
+
+type UpdateIdentityOidcAuthFromTemplateRequest struct {
+	IdentityID              string                         `json:"identityId"`
+	TemplateID              string                         `json:"templateId"`
 	BoundClaims             map[string]string              `json:"boundClaims"`
 	ClaimMetadataMapping    map[string]string              `json:"claimMetadataMapping"`
 	BoundSubject            string                         `json:"boundSubject"`
@@ -4500,6 +4625,72 @@ type DeleteSubOrganizationRequest struct {
 
 type DeleteSubOrganizationResponse struct {
 	Organization SubOrganization `json:"organization"`
+}
+
+// Sub-org group links
+
+type AvailableGroup struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type ListAvailableGroupsResponse struct {
+	Groups []AvailableGroup `json:"groups"`
+}
+
+type OrgGroupMembershipGroup struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Slug  string `json:"slug"`
+	OrgID string `json:"orgId"`
+}
+
+type OrgGroupMembershipRole struct {
+	ID                       string     `json:"id"`
+	Role                     string     `json:"role"`
+	CustomRoleID             *string    `json:"customRoleId"`
+	CustomRoleSlug           *string    `json:"customRoleSlug"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            *string    `json:"temporaryMode"`
+	TemporaryRange           *string    `json:"temporaryRange"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime"`
+	TemporaryAccessEndTime   *time.Time `json:"temporaryAccessEndTime"`
+}
+
+type OrgGroupMembership struct {
+	ID      string                   `json:"id"`
+	GroupID string                   `json:"groupId"`
+	Group   OrgGroupMembershipGroup  `json:"group"`
+	Roles   []OrgGroupMembershipRole `json:"roles"`
+}
+
+// The API rejects temporary fields on a permanent role, even empty ones, so they're omitted.
+type OrgGroupMembershipRoleRequest struct {
+	Role                     string     `json:"role"`
+	IsTemporary              bool       `json:"isTemporary"`
+	TemporaryMode            string     `json:"temporaryMode,omitempty"`
+	TemporaryRange           string     `json:"temporaryRange,omitempty"`
+	TemporaryAccessStartTime *time.Time `json:"temporaryAccessStartTime,omitempty"`
+}
+
+type CreateOrgGroupMembershipRequest struct {
+	GroupID string                          `json:"-"`
+	Roles   []OrgGroupMembershipRoleRequest `json:"roles"`
+}
+
+type UpdateOrgGroupMembershipRequest struct {
+	GroupID string                          `json:"-"`
+	Roles   []OrgGroupMembershipRoleRequest `json:"roles"`
+}
+
+type OrgGroupMembershipResponse struct {
+	GroupMembership OrgGroupMembership `json:"groupMembership"`
+}
+
+type ListOrgGroupMembershipsResponse struct {
+	GroupMemberships []OrgGroupMembership `json:"groupMemberships"`
+	TotalCount       int                  `json:"totalCount"`
 }
 
 type IdentityTlsCertAuth struct {

@@ -53,7 +53,10 @@ func (r *ProjectGroupResource) Metadata(_ context.Context, req resource.Metadata
 // Schema defines the schema for the resource.
 func (r *ProjectGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create project groups & save to Infisical. Only Machine Identity authentication is supported for this data source",
+		Description: "Add an existing group to a project and assign it project roles. Exactly one of `group_id` or `group_name` must be set. " +
+			"This resource does not create groups; to create a group, use the `infisical_group` resource. " +
+			"Destroying this resource removes the group from the project; the group itself is left untouched. " +
+			"Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Description: "The id of the project.",
