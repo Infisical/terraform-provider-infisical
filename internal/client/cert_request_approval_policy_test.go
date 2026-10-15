@@ -98,3 +98,34 @@ func TestCreateCertRequestApprovalPolicy(t *testing.T) {
 		t.Errorf("scopeId = %v, want app-1", created.Policy.ScopeID)
 	}
 }
+
+func TestUpdateCertRequestApprovalPolicyClearsTTL(t *testing.T) {
+	ttl := "7d"
+	for name, c := range map[string]struct {
+		ttl  *string
+		want any
+	}{
+		"cleared": {nil, nil},
+		"set":     {&ttl, "7d"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var gotBody map[string]any
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				if err := json.Unmarshal(raw, &gotBody); err != nil {
+					t.Errorf("request body is not JSON: %v", err)
+				}
+				jsonResponse(http.StatusOK, `{"policy":{"id":"policy-1","conditions":{"conditions":[]},"steps":[]}}`)(w, r)
+			})
+
+			if _, err := client.UpdateCertRequestApprovalPolicy(UpdateCertRequestApprovalPolicyRequest{ID: "policy-1", MaxRequestTTL: c.ttl}); err != nil {
+				t.Fatalf("UpdateCertRequestApprovalPolicy() error = %v", err)
+			}
+
+			got, sent := gotBody["maxRequestTtl"]
+			if !sent || got != c.want {
+				t.Errorf("maxRequestTtl sent = %v (present: %v), want %v", got, sent, c.want)
+			}
+		})
+	}
+}

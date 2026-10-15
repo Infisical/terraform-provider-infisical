@@ -21,11 +21,17 @@ resource "infisical_cert_manager_application" "payments" {
   name = "payments"
 }
 
-# Approvers of an application policy have to be members of the application
+# Approvers of an application policy, users and groups alike, have to be members of the application
 resource "infisical_cert_manager_application_user" "security_lead" {
   application_id = infisical_cert_manager_application.payments.id
   email          = "security-lead@example.com"
   role           = "admin"
+}
+
+resource "infisical_cert_manager_application_group" "platform" {
+  application_id = infisical_cert_manager_application.payments.id
+  group_id       = "<platform-group-id>"
+  role           = "operator"
 }
 
 # Certificates requested through the payments application from the public TLS profile need the
@@ -51,10 +57,13 @@ resource "infisical_cert_manager_certificate_request_approval_policy" "payments_
       required_approvals = 1
       notify_approvers   = false # Approvers see the request in Infisical, but are not emailed
       approvers = [
-        { type = "group", id = "<platform-group-id>" },
+        { type = "group", id = infisical_cert_manager_application_group.platform.group_id },
       ]
     },
   ]
 
-  depends_on = [infisical_cert_manager_application_user.security_lead]
+  depends_on = [
+    infisical_cert_manager_application_user.security_lead,
+    infisical_cert_manager_application_group.platform,
+  ]
 }

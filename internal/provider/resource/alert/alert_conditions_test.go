@@ -491,3 +491,35 @@ func TestDescribeAlertBeforeDaysLimits(t *testing.T) {
 		t.Errorf("describeAlertBeforeDaysLimits() = %q, want %q", got, want)
 	}
 }
+
+func TestValidateConfigWithEventOnlyAlerts(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	for _, resourceType := range []string{alertResourceTypeCertManagerApplication, alertResourceTypeCertManager} {
+		for _, block := range []string{alertBlockIssuance, alertBlockRenewal, alertBlockRevocation} {
+			t.Run(resourceType+"/"+block, func(t *testing.T) {
+				model := alertModel(t, map[string]alertChannelModel{})
+				model.ResourceType = types.StringValue(resourceType)
+				if alertResourceTypes[resourceType].scopeWide {
+					model.ResourceID = types.StringNull()
+				}
+				model.Expiry = nil
+				switch block {
+				case alertBlockIssuance:
+					model.Issuance = &eventConditionModel{}
+				case alertBlockRenewal:
+					model.Renewal = &eventConditionModel{}
+				case alertBlockRevocation:
+					model.Revocation = &eventConditionModel{}
+				}
+
+				resp := &resource.ValidateConfigResponse{}
+				(&alertResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{Config: alertConfig(t, s, model)}, resp)
+				if resp.Diagnostics.HasError() {
+					t.Errorf("ValidateConfig() diagnostics = %v, want none", resp.Diagnostics)
+				}
+			})
+		}
+	}
+}
