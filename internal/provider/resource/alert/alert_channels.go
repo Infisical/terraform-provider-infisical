@@ -44,6 +44,7 @@ var alertChannelTypes = []string{
 const (
 	AlertRecipientTypeUser  = "user"
 	AlertRecipientTypeGroup = "group"
+	AlertRecipientTypeEmail = "email"
 )
 
 const (
@@ -230,14 +231,17 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 								Attributes: map[string]schema.Attribute{
 									"type": schema.StringAttribute{
 										Required:    true,
-										Description: "The type of the recipient. Options: " + AlertRecipientTypeUser + ", " + AlertRecipientTypeGroup + ".",
+										Description: "The type of the recipient. Options: " + AlertRecipientTypeUser + ", " + AlertRecipientTypeGroup + ", " + AlertRecipientTypeEmail + ". The " + AlertRecipientTypeEmail + " type is only for " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsEmailRecipients }), ", ") + " alerts.",
 										Validators: []validator.String{
-											stringvalidator.OneOf(AlertRecipientTypeUser, AlertRecipientTypeGroup),
+											stringvalidator.OneOf(AlertRecipientTypeUser, AlertRecipientTypeGroup, AlertRecipientTypeEmail),
 										},
 									},
 									"id": schema.StringAttribute{
 										Required:    true,
-										Description: "The ID of the recipient user or group. The principal must belong to the scope the alert is created in.",
+										Description: "The ID of the recipient user or group, which must belong to the scope the alert is created in. For an " + AlertRecipientTypeEmail + " recipient this is the email address, which must be on one of your organization's verified email domains.",
+										Validators: []validator.String{
+											stringvalidator.RegexMatches(regexp.MustCompile(`^\S(.*\S)?$`), "must not be empty or start or end with whitespace"),
+										},
 									},
 								},
 							},
@@ -339,6 +343,63 @@ func validateChannelsHaveOneType(ctx context.Context, config tfsdk.Config) diag.
 			"Invalid alert channel",
 			fmt.Sprintf("%s Give it exactly one of: %s.", detail, strings.Join(alertChannelTypes, ", ")),
 		)
+	}
+
+	return diags
+}
+
+func channelHasEmailRecipient(value attr.Value) bool {
+	channel, ok := value.(types.Object)
+	if !ok || channel.IsNull() || channel.IsUnknown() {
+		return false
+	}
+	email, ok := channel.Attributes()[AlertChannelTypeEmail].(types.Object)
+	if !ok || email.IsNull() || email.IsUnknown() {
+		return false
+	}
+	recipients, ok := email.Attributes()["recipients"].(types.Set)
+	if !ok || recipients.IsNull() || recipients.IsUnknown() {
+		return false
+	}
+
+	for _, element := range recipients.Elements() {
+		recipient, ok := element.(types.Object)
+		if !ok || recipient.IsNull() || recipient.IsUnknown() {
+			continue
+		}
+		if recipientType, ok := recipient.Attributes()["type"].(types.String); ok && recipientType.ValueString() == AlertRecipientTypeEmail {
+			return true
+		}
+	}
+	return false
+}
+
+func validateRecipientTypesForResourceType(ctx context.Context, config tfsdk.Config, resourceType string) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if alertResourceTypes[resourceType].allowsEmailRecipients {
+		return diags
+	}
+
+	var channels types.Map
+	diags.Append(config.GetAttribute(ctx, path.Root("channels"), &channels)...)
+	if diags.HasError() || channels.IsNull() || channels.IsUnknown() {
+		return diags
+	}
+
+	elements := channels.Elements()
+	for _, key := range slices.Sorted(maps.Keys(elements)) {
+		if !channelHasEmailRecipient(elements[key]) {
+			continue
+		}
+		diags.AddAttributeError(
+			path.Root("channels").AtMapKey(key).AtName("email").AtName("recipients"),
+			"Unsupported alert recipient",
+			fmt.Sprintf(
+				"%s alerts cannot notify email addresses directly. Use a user or group recipient instead. Email address recipients are only for: %s.",
+				resourceType, strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsEmailRecipients }), ", "),
+			),
+		)
+		return diags
 	}
 
 	return diags

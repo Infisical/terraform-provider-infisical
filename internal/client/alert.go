@@ -28,9 +28,13 @@ func (e *AlertAlreadyExistsError) Unwrap() error {
 }
 
 func (client Client) existingAlertForEvent(request CreateAlertRequest) *Alert {
+	if request.ResourceID == nil || *request.ResourceID == "" {
+		return nil
+	}
+
 	alerts, err := client.ListAlerts(ListAlertsRequest{
 		ResourceType: request.ResourceType,
-		ResourceID:   request.ResourceID,
+		ResourceID:   *request.ResourceID,
 		ProjectID:    request.ProjectID,
 	})
 	if err != nil {

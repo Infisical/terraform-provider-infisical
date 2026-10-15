@@ -510,6 +510,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewCertManagerCACertificateResource,
 		infisicalResource.NewCertManagerApplicationResource,
 		infisicalResource.NewCertManagerApplicationProfileResource,
+		infisicalResource.NewCertManagerCertificateRequestApprovalPolicyResource,
 		infisicalResource.NewCertManagerApplicationUserResource,
 		infisicalResource.NewCertManagerApplicationGroupResource,
 		infisicalResource.NewCertManagerApplicationIdentityResource,

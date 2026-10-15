@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -101,8 +102,9 @@ func TestAlertResourceModelMatchesSchema(t *testing.T) {
 
 func TestSupportedAlertResourceTypes(t *testing.T) {
 	types := supportedAlertResourceTypes()
-	if len(types) != 1 || types[0] != alertResourceTypeIdentityAuthentication {
-		t.Errorf("supportedAlertResourceTypes() = %v, want only %q", types, alertResourceTypeIdentityAuthentication)
+	want := []string{alertResourceTypeCertManager, alertResourceTypeCertManagerApplication, alertResourceTypeCertManagerSigner, alertResourceTypeIdentityAuthentication}
+	if !slices.Equal(types, want) {
+		t.Errorf("supportedAlertResourceTypes() = %v, want %v", types, want)
 	}
 }
 
@@ -160,8 +162,13 @@ func TestAlertBlocksForResourceType(t *testing.T) {
 // the event table rather than being written out by hand.
 func TestAlertResourceTypesForBlock(t *testing.T) {
 	resourceTypes := alertResourceTypesForBlock(alertBlockExpiry)
-	if len(resourceTypes) != 1 || resourceTypes[0] != alertResourceTypeIdentityAuthentication {
-		t.Errorf("alertResourceTypesForBlock(%q) = %v, want only %q", alertBlockExpiry, resourceTypes, alertResourceTypeIdentityAuthentication)
+	want := []string{alertResourceTypeCertManager, alertResourceTypeCertManagerApplication, alertResourceTypeCertManagerSigner, alertResourceTypeIdentityAuthentication}
+	if !slices.Equal(resourceTypes, want) {
+		t.Errorf("alertResourceTypesForBlock(%q) = %v, want %v", alertBlockExpiry, resourceTypes, want)
+	}
+
+	if got := alertResourceTypesForBlock(alertBlockIssuance); !slices.Equal(got, []string{alertResourceTypeCertManager, alertResourceTypeCertManagerApplication}) {
+		t.Errorf("alertResourceTypesForBlock(%q) = %v, want the application and Certificate Manager scopes", alertBlockIssuance, got)
 	}
 
 	if got := alertResourceTypesForBlock("rotation_failed"); len(got) != 0 {
@@ -270,7 +277,7 @@ func TestSetAlertConditionFromAPIRejectsUnreadableConditions(t *testing.T) {
 		"no condition":         ``,
 		"null condition":       `null`,
 		"not a day count":      `{"alertBefore":"3 months"}`,
-		"a unit we cannot map": `{"alertBefore":"2w"}`,
+		"a unit we cannot map": `{"alertBefore":"2h"}`,
 	}
 
 	for name, raw := range cases {
@@ -295,8 +302,12 @@ func TestParseAlertBeforeDays(t *testing.T) {
 		"1d":  {want: 1},
 		"30d": {want: 30},
 		"90d": {want: 90},
+		"2w":  {want: 14},
+		"1m":  {want: 30},
+		"1y":  {want: 365},
 		"30":  {wantError: true},
-		"1m":  {wantError: true},
+		"2h":  {wantError: true},
+		"-1d": {wantError: true},
 		"":    {wantError: true},
 		"d":   {wantError: true},
 	}
@@ -311,5 +322,172 @@ func TestParseAlertBeforeDays(t *testing.T) {
 				t.Errorf("parseAlertBeforeDays(%q) = %d, want %d", alertBefore, got, c.want)
 			}
 		})
+	}
+}
+
+func TestAlertConditionForAPIWithAnEventBlock(t *testing.T) {
+	cases := map[string]struct {
+		plan alertResourceModel
+		want string
+	}{
+		alertBlockIssuance:   {alertResourceModel{Issuance: &eventConditionModel{}}, alertEventTypeCertManagerApplicationCertIssuance},
+		alertBlockRenewal:    {alertResourceModel{Renewal: &eventConditionModel{}}, alertEventTypeCertManagerApplicationCertRenewal},
+		alertBlockRevocation: {alertResourceModel{Revocation: &eventConditionModel{}}, alertEventTypeCertManagerApplicationCertRevocation},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			c.plan.ResourceType = types.StringValue(alertResourceTypeCertManagerApplication)
+
+			event, condition, diags := alertConditionForAPI(c.plan)
+			if diags.HasError() {
+				t.Fatalf("alertConditionForAPI() diagnostics = %v", diags)
+			}
+			if event.eventType != c.want {
+				t.Errorf("event type = %q, want %q", event.eventType, c.want)
+			}
+			if condition != nil {
+				t.Errorf("condition = %#v, want none", condition)
+			}
+		})
+	}
+}
+
+func TestAlertConditionForAPIWithApplicationExpiry(t *testing.T) {
+	event, condition, diags := alertConditionForAPI(alertResourceModel{
+		ResourceType: types.StringValue(alertResourceTypeCertManagerApplication),
+		Expiry:       &expiryConditionModel{AlertBeforeDays: types.Int64Value(200), DailyReminder: types.BoolValue(false)},
+	})
+	if diags.HasError() {
+		t.Fatalf("alertConditionForAPI() diagnostics = %v", diags)
+	}
+	if event.eventType != alertEventTypeCertManagerApplicationCertExpiry {
+		t.Errorf("event type = %q, want %q", event.eventType, alertEventTypeCertManagerApplicationCertExpiry)
+	}
+	got, ok := condition.(expiryCondition)
+	if !ok {
+		t.Fatalf("condition = %T, want an expiryCondition", condition)
+	}
+	if got.AlertBefore != "200d" {
+		t.Errorf("alertBefore = %q, want 200d", got.AlertBefore)
+	}
+}
+
+func TestSetAlertConditionFromAPIWithAnEventBlock(t *testing.T) {
+	event, ok := alertEventForEventType(alertEventTypeCertManagerApplicationCertRevocation)
+	if !ok {
+		t.Fatal("no event registered for the application certificate revocation event type")
+	}
+
+	for _, raw := range []string{`null`, `{}`, ``} {
+		state := alertResourceModel{Expiry: &expiryConditionModel{}}
+		if diags := setAlertConditionFromAPI(&state, event, json.RawMessage(raw)); diags.HasError() {
+			t.Fatalf("setAlertConditionFromAPI(%q) diagnostics = %v", raw, diags)
+		}
+		if state.Revocation == nil {
+			t.Errorf("setAlertConditionFromAPI(%q): revocation block not set", raw)
+		}
+		if state.Expiry != nil || state.Issuance != nil || state.Renewal != nil {
+			t.Errorf("setAlertConditionFromAPI(%q): another condition block is still set", raw)
+		}
+	}
+}
+
+func TestAlertResourceTypeTraits(t *testing.T) {
+	if !alertResourceTypes[alertResourceTypeCertManagerApplication].resolvesProject {
+		t.Error("an application alert's project should be resolved from the application")
+	}
+	if alertResourceTypes[alertResourceTypeIdentityAuthentication].resolvesProject {
+		t.Error("an identity alert's project is whatever the configuration says, so it must not be resolved")
+	}
+	if !alertResourceTypes[alertResourceTypeCertManagerApplication].allowsEmailRecipients {
+		t.Error("application alerts should accept email address recipients")
+	}
+	if alertResourceTypes[alertResourceTypeIdentityAuthentication].allowsEmailRecipients {
+		t.Error("identity alerts should not accept email address recipients")
+	}
+
+	for _, event := range alertEvents {
+		if _, ok := alertResourceTypes[event.resourceType]; !ok {
+			t.Errorf("event %q is on resource type %q, which has no entry in alertResourceTypes", event.eventType, event.resourceType)
+		}
+		if event.block == alertBlockExpiry && event.maxAlertBeforeDays < minAlertBeforeDays {
+			t.Errorf("expiry event %q has no alert_before_days limit", event.eventType)
+		}
+	}
+}
+
+func TestAlertConditionForAPIWithFilters(t *testing.T) {
+	filters := &alertFiltersModel{
+		ApplicationIDs: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("app-2"), types.StringValue("app-1")}),
+		ProfileIDs:     types.SetNull(types.StringType),
+		Sources:        types.SetValueMust(types.StringType, []attr.Value{types.StringValue("issued")}),
+	}
+
+	_, expiry, diags := alertConditionForAPI(alertResourceModel{
+		ResourceType: types.StringValue(alertResourceTypeCertManager),
+		Expiry:       &expiryConditionModel{AlertBeforeDays: types.Int64Value(30), DailyReminder: types.BoolValue(false)},
+		Filters:      filters,
+	})
+	if diags.HasError() {
+		t.Fatalf("alertConditionForAPI() diagnostics = %v", diags)
+	}
+	raw, _ := json.Marshal(expiry)
+	if string(raw) != `{"alertBefore":"30d","dailyReminder":false,"applicationIds":["app-1","app-2"],"sources":["issued"]}` {
+		t.Errorf("expiry condition = %s, want the filters merged into it and no empty profileIds", raw)
+	}
+
+	event, issuance, diags := alertConditionForAPI(alertResourceModel{
+		ResourceType: types.StringValue(alertResourceTypeCertManager),
+		Issuance:     &eventConditionModel{},
+		Filters:      filters,
+	})
+	if diags.HasError() {
+		t.Fatalf("alertConditionForAPI() diagnostics = %v", diags)
+	}
+	if event.eventType != alertEventTypeCertManagerCertIssuance {
+		t.Errorf("event type = %q, want %q", event.eventType, alertEventTypeCertManagerCertIssuance)
+	}
+	raw, _ = json.Marshal(issuance)
+	if string(raw) != `{"applicationIds":["app-1","app-2"],"sources":["issued"]}` {
+		t.Errorf("issuance condition = %s, want only the filters", raw)
+	}
+}
+
+func TestSetAlertConditionFromAPIWithFilters(t *testing.T) {
+	event, _ := alertEventForEventType(alertEventTypeCertManagerCertExpiry)
+
+	var state alertResourceModel
+	diags := setAlertConditionFromAPI(&state, event, json.RawMessage(`{"alertBefore":"2w","dailyReminder":true,"profileIds":["profile-1"]}`))
+	if diags.HasError() {
+		t.Fatalf("setAlertConditionFromAPI() diagnostics = %v", diags)
+	}
+	if state.Expiry == nil || state.Expiry.AlertBeforeDays.ValueInt64() != 14 {
+		t.Errorf("expiry = %+v, want 14 days", state.Expiry)
+	}
+	if state.Filters == nil || len(state.Filters.ProfileIDs.Elements()) != 1 {
+		t.Fatalf("filters = %+v, want the profile filter", state.Filters)
+	}
+	if !state.Filters.ApplicationIDs.IsNull() || !state.Filters.Sources.IsNull() {
+		t.Errorf("filters = %+v, want the lists Infisical left out to stay null", state.Filters)
+	}
+
+	issuance, _ := alertEventForEventType(alertEventTypeCertManagerCertIssuance)
+	for _, raw := range []string{`null`, `{}`} {
+		state := alertResourceModel{Filters: &alertFiltersModel{}}
+		if diags := setAlertConditionFromAPI(&state, issuance, json.RawMessage(raw)); diags.HasError() {
+			t.Fatalf("setAlertConditionFromAPI(%q) diagnostics = %v", raw, diags)
+		}
+		if state.Filters != nil || state.Issuance == nil {
+			t.Errorf("setAlertConditionFromAPI(%q): filters = %+v, issuance = %v, want no filters and the issuance block", raw, state.Filters, state.Issuance)
+		}
+	}
+}
+
+func TestDescribeAlertBeforeDaysLimits(t *testing.T) {
+	got := describeAlertBeforeDaysLimits()
+	want := "90 for identity.authentication; 365 for cert-manager, cert-manager.application, cert-manager.signer"
+	if got != want {
+		t.Errorf("describeAlertBeforeDaysLimits() = %q, want %q", got, want)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,27 +22,120 @@ import (
 const (
 	alertResourceTypeIdentityAuthentication    = "identity.authentication"
 	alertEventTypeIdentityAuthenticationExpiry = "identity.authentication.expiry"
-)
 
-const alertBlockExpiry = "expiry"
+	alertResourceTypeCertManagerApplication            = "cert-manager.application"
+	alertEventTypeCertManagerApplicationCertExpiry     = "cert-manager.application.certificate.expiry"
+	alertEventTypeCertManagerApplicationCertIssuance   = "cert-manager.application.certificate.issuance"
+	alertEventTypeCertManagerApplicationCertRenewal    = "cert-manager.application.certificate.renewal"
+	alertEventTypeCertManagerApplicationCertRevocation = "cert-manager.application.certificate.revocation"
+
+	alertResourceTypeCertManager            = "cert-manager"
+	alertEventTypeCertManagerCertExpiry     = "cert-manager.certificate.expiry"
+	alertEventTypeCertManagerCertIssuance   = "cert-manager.certificate.issuance"
+	alertEventTypeCertManagerCertRenewal    = "cert-manager.certificate.renewal"
+	alertEventTypeCertManagerCertRevocation = "cert-manager.certificate.revocation"
+
+	alertResourceTypeCertManagerSigner        = "cert-manager.signer"
+	alertEventTypeCertManagerSignerCertExpiry = "cert-manager.signer.certificate.expiry"
+)
 
 const (
-	minAlertBeforeDays = 1
-	maxAlertBeforeDays = 90
+	alertBlockExpiry     = "expiry"
+	alertBlockIssuance   = "issuance"
+	alertBlockRenewal    = "renewal"
+	alertBlockRevocation = "revocation"
 )
+
+const minAlertBeforeDays = 1
 
 type alertEvent struct {
 	resourceType string
 	eventType    string
 	block        string
+
+	maxAlertBeforeDays int64
+}
+
+type alertResourceTypeTraits struct {
+	resolvesProject       bool
+	allowsEmailRecipients bool
+	scopeWide             bool
+	supportsFilters       bool
+}
+
+var alertResourceTypes = map[string]alertResourceTypeTraits{
+	alertResourceTypeIdentityAuthentication: {},
+	alertResourceTypeCertManagerApplication: {resolvesProject: true, allowsEmailRecipients: true},
+	alertResourceTypeCertManager:            {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true, supportsFilters: true},
+	alertResourceTypeCertManagerSigner:      {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
 }
 
 var alertEvents = []alertEvent{
 	{
-		resourceType: alertResourceTypeIdentityAuthentication,
-		eventType:    alertEventTypeIdentityAuthenticationExpiry,
-		block:        alertBlockExpiry,
+		resourceType:       alertResourceTypeIdentityAuthentication,
+		eventType:          alertEventTypeIdentityAuthenticationExpiry,
+		block:              alertBlockExpiry,
+		maxAlertBeforeDays: 90,
 	},
+	{
+		resourceType:       alertResourceTypeCertManagerApplication,
+		eventType:          alertEventTypeCertManagerApplicationCertExpiry,
+		block:              alertBlockExpiry,
+		maxAlertBeforeDays: 365,
+	},
+	{
+		resourceType: alertResourceTypeCertManagerApplication,
+		eventType:    alertEventTypeCertManagerApplicationCertIssuance,
+		block:        alertBlockIssuance,
+	},
+	{
+		resourceType: alertResourceTypeCertManagerApplication,
+		eventType:    alertEventTypeCertManagerApplicationCertRenewal,
+		block:        alertBlockRenewal,
+	},
+	{
+		resourceType: alertResourceTypeCertManagerApplication,
+		eventType:    alertEventTypeCertManagerApplicationCertRevocation,
+		block:        alertBlockRevocation,
+	},
+	{
+		resourceType:       alertResourceTypeCertManager,
+		eventType:          alertEventTypeCertManagerCertExpiry,
+		block:              alertBlockExpiry,
+		maxAlertBeforeDays: 365,
+	},
+	{
+		resourceType: alertResourceTypeCertManager,
+		eventType:    alertEventTypeCertManagerCertIssuance,
+		block:        alertBlockIssuance,
+	},
+	{
+		resourceType: alertResourceTypeCertManager,
+		eventType:    alertEventTypeCertManagerCertRenewal,
+		block:        alertBlockRenewal,
+	},
+	{
+		resourceType: alertResourceTypeCertManager,
+		eventType:    alertEventTypeCertManagerCertRevocation,
+		block:        alertBlockRevocation,
+	},
+	{
+		resourceType:       alertResourceTypeCertManagerSigner,
+		eventType:          alertEventTypeCertManagerSignerCertExpiry,
+		block:              alertBlockExpiry,
+		maxAlertBeforeDays: 365,
+	},
+}
+
+func alertResourceTypesWhere(match func(alertResourceTypeTraits) bool) []string {
+	resourceTypes := []string{}
+	for resourceType, traits := range alertResourceTypes {
+		if match(traits) {
+			resourceTypes = append(resourceTypes, resourceType)
+		}
+	}
+	sort.Strings(resourceTypes)
+	return resourceTypes
 }
 
 func alertEventFor(resourceType, block string) (alertEvent, bool) {
@@ -105,17 +200,7 @@ func alertEventFromBlocks(ctx context.Context, source alertConditionSource) (ale
 }
 
 func supportedAlertResourceTypes() []string {
-	seen := make(map[string]bool, len(alertEvents))
-	resourceTypes := make([]string, 0, len(alertEvents))
-	for _, event := range alertEvents {
-		if seen[event.resourceType] {
-			continue
-		}
-		seen[event.resourceType] = true
-		resourceTypes = append(resourceTypes, event.resourceType)
-	}
-	sort.Strings(resourceTypes)
-	return resourceTypes
+	return alertResourceTypesWhere(func(alertResourceTypeTraits) bool { return true })
 }
 
 func alertConditionBlockNames() []string {
@@ -177,54 +262,115 @@ type expiryConditionModel struct {
 type expiryCondition struct {
 	AlertBefore   string `json:"alertBefore"`
 	DailyReminder bool   `json:"dailyReminder"`
+	certificateFilters
 }
+
+type eventConditionModel struct{}
 
 func expiryConditionSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional: true,
 		Description: fmt.Sprintf(
-			"Fires before the watched resource expires. Only for alerts on these resource types: %s.",
+			"Fires before something the alert watches expires. Only for alerts on these resource types: %s.",
 			strings.Join(alertResourceTypesForBlock(alertBlockExpiry), ", "),
 		),
 		Attributes: map[string]schema.Attribute{
 			"alert_before_days": schema.Int64Attribute{
 				Required:    true,
-				Description: fmt.Sprintf("How many days before the watched resource expires the alert fires. Must be between %d and %d.", minAlertBeforeDays, maxAlertBeforeDays),
+				Description: fmt.Sprintf("How many days before expiry the alert fires. Must be at least %d, and at most %s.", minAlertBeforeDays, describeAlertBeforeDaysLimits()),
 				Validators: []validator.Int64{
-					int64validator.Between(minAlertBeforeDays, maxAlertBeforeDays),
+					int64validator.AtLeast(minAlertBeforeDays),
 				},
 			},
 			"daily_reminder": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
-				Description: "Whether to keep notifying once a day until the watched resource expires, instead of notifying once. Defaults to false.",
+				Description: "Whether to keep notifying once a day until expiry, instead of notifying once. Defaults to false.",
 			},
 		},
+	}
+}
+
+func describeAlertBeforeDaysLimits() string {
+	typesByLimit := map[int64][]string{}
+	for _, event := range alertEvents {
+		if event.block == alertBlockExpiry {
+			typesByLimit[event.maxAlertBeforeDays] = append(typesByLimit[event.maxAlertBeforeDays], event.resourceType)
+		}
+	}
+
+	limits := make([]string, 0, len(typesByLimit))
+	for _, limit := range slices.Sorted(maps.Keys(typesByLimit)) {
+		resourceTypes := typesByLimit[limit]
+		sort.Strings(resourceTypes)
+		limits = append(limits, fmt.Sprintf("%d for %s", limit, strings.Join(resourceTypes, ", ")))
+	}
+	return strings.Join(limits, "; ")
+}
+
+var eventConditionVerbs = map[string]string{
+	alertBlockIssuance:   "issued",
+	alertBlockRenewal:    "renewed",
+	alertBlockRevocation: "revoked",
+}
+
+func eventConditionSchema(block string) schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Optional: true,
+		Description: fmt.Sprintf(
+			"Fires each time something the alert watches is %s. It takes no settings, so write it as `%s = {}`. Only for alerts on these resource types: %s.",
+			eventConditionVerbs[block], block, strings.Join(alertResourceTypesForBlock(block), ", "),
+		),
+		Attributes: map[string]schema.Attribute{},
+	}
+}
+
+func alertConditionBlocks(model alertResourceModel) map[string]bool {
+	return map[string]bool{
+		alertBlockExpiry:     model.Expiry != nil,
+		alertBlockIssuance:   model.Issuance != nil,
+		alertBlockRenewal:    model.Renewal != nil,
+		alertBlockRevocation: model.Revocation != nil,
 	}
 }
 
 func alertConditionForAPI(plan alertResourceModel) (alertEvent, any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	if plan.Expiry != nil {
-		resourceType := plan.ResourceType.ValueString()
-		event, ok := alertEventFor(resourceType, alertBlockExpiry)
+	resourceType := plan.ResourceType.ValueString()
+	blocks := alertConditionBlocks(plan)
+	for _, block := range alertConditionBlockNames() {
+		if !blocks[block] {
+			continue
+		}
+
+		event, ok := alertEventFor(resourceType, block)
 		if !ok {
 			diags.AddAttributeError(
-				path.Root(alertBlockExpiry),
+				path.Root(block),
 				"Unexpected alert condition",
 				fmt.Sprintf(
 					"A %s block does not describe an event on the %s resource type, so there is nothing to tell Infisical when the alert should fire.",
-					alertBlockExpiry, resourceType,
+					block, resourceType,
 				),
 			)
 			return alertEvent{}, nil, diags
 		}
 
+		filters := alertFiltersForAPI(plan.Filters)
+
+		if block != alertBlockExpiry {
+			if filters.isEmpty() {
+				return event, nil, diags
+			}
+			return event, filters, diags
+		}
+
 		return event, expiryCondition{
-			AlertBefore:   fmt.Sprintf("%dd", plan.Expiry.AlertBeforeDays.ValueInt64()),
-			DailyReminder: plan.Expiry.DailyReminder.ValueBool(),
+			AlertBefore:        fmt.Sprintf("%dd", plan.Expiry.AlertBeforeDays.ValueInt64()),
+			DailyReminder:      plan.Expiry.DailyReminder.ValueBool(),
+			certificateFilters: filters,
 		}, diags
 	}
 
@@ -239,6 +385,19 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 	var diags diag.Diagnostics
 
 	state.Expiry = nil
+	state.Issuance = nil
+	state.Renewal = nil
+	state.Revocation = nil
+	state.Filters = nil
+
+	if alertResourceTypes[event.resourceType].supportsFilters {
+		filters, filterDiags := alertFiltersFromAPI(raw)
+		diags.Append(filterDiags...)
+		if diags.HasError() {
+			return diags
+		}
+		state.Filters = filters
+	}
 
 	switch event.block {
 	case alertBlockExpiry:
@@ -258,6 +417,12 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 			AlertBeforeDays: types.Int64Value(alertBeforeDays),
 			DailyReminder:   types.BoolValue(condition.DailyReminder),
 		}
+	case alertBlockIssuance:
+		state.Issuance = &eventConditionModel{}
+	case alertBlockRenewal:
+		state.Renewal = &eventConditionModel{}
+	case alertBlockRevocation:
+		state.Revocation = &eventConditionModel{}
 	default:
 		diags.AddError(
 			"Unsupported alert event",
@@ -293,17 +458,22 @@ func parseExpiryCondition(raw json.RawMessage) (expiryCondition, diag.Diagnostic
 	return condition, diags
 }
 
+var daysPerAlertBeforeUnit = map[string]int64{"d": 1, "w": 7, "m": 30, "y": 365}
+
 func parseAlertBeforeDays(alertBefore string) (int64, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	days, err := strconv.ParseInt(strings.TrimSuffix(alertBefore, "d"), 10, 64)
-	if err != nil || !strings.HasSuffix(alertBefore, "d") {
-		diags.AddError(
-			"Error reading alert condition",
-			fmt.Sprintf("Infisical returned an alert that fires %q before expiry, which is not a whole number of days such as \"30d\".", alertBefore),
-		)
-		return 0, diags
+	if len(alertBefore) >= 2 {
+		perUnit, unitOK := daysPerAlertBeforeUnit[alertBefore[len(alertBefore)-1:]]
+		count, err := strconv.ParseInt(alertBefore[:len(alertBefore)-1], 10, 64)
+		if unitOK && err == nil && count >= 0 {
+			return count * perUnit, diags
+		}
 	}
 
-	return days, diags
+	diags.AddError(
+		"Error reading alert condition",
+		fmt.Sprintf("Infisical returned an alert that fires %q before expiry, which is not a duration such as \"30d\", \"2w\", \"1m\" or \"1y\".", alertBefore),
+	)
+	return 0, diags
 }

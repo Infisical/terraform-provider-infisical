@@ -4,13 +4,27 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/go-resty/resty/v2"
 
 	infisicalerrors "terraform-provider-infisical/internal/errors"
 )
 
 // Helpers shared by the client's tests. They live here rather than in whichever test file first
 // needed them, so a second consumer does not have to reach into an unrelated feature's file.
+
+func testClient(t *testing.T, handler http.HandlerFunc) Client {
+	t.Helper()
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	return Client{Config: Config{
+		HostURL:    server.URL,
+		HttpClient: resty.New().SetBaseURL(server.URL),
+	}}
+}
 
 func jsonResponse(status int, body string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {

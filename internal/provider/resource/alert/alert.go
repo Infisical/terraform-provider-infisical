@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-uuid"
+
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
@@ -54,7 +56,11 @@ type alertResourceModel struct {
 	Description  types.String `tfsdk:"description"`
 	Enabled      types.Bool   `tfsdk:"enabled"`
 
-	Expiry *expiryConditionModel `tfsdk:"expiry"`
+	Expiry     *expiryConditionModel `tfsdk:"expiry"`
+	Issuance   *eventConditionModel  `tfsdk:"issuance"`
+	Renewal    *eventConditionModel  `tfsdk:"renewal"`
+	Revocation *eventConditionModel  `tfsdk:"revocation"`
+	Filters    *alertFiltersModel    `tfsdk:"filters"`
 
 	Channels map[string]alertChannelModel `tfsdk:"channels"`
 }
@@ -65,7 +71,7 @@ func (r *alertResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage alerts that notify you about a resource in Infisical. An alert watches one resource for one event, and a resource can only have one alert per event within a scope.",
+		Description: "Create and manage alerts that notify you about a resource in Infisical. An alert watches one event, either on a single resource or across a whole scope, depending on its resource type. A resource can only have one alert per event within a scope.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the alert.",
@@ -85,8 +91,8 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"resource_id": schema.StringAttribute{
-				Description: "The ID of the resource to watch. For the " + alertResourceTypeIdentityAuthentication + " resource type this is a machine identity's ID.",
-				Required:    true,
+				Description: "The ID of the resource to watch, of the kind resource_type names. Required, except for resource types that watch a whole scope, where it must be omitted: " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.scopeWide }), ", ") + ".",
+				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -95,7 +101,7 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones.",
+				Description: "The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones. Not used by these resource types, so leave it out: " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.resolvesProject }), ", ") + ".",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -131,8 +137,12 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
-			alertBlockExpiry: expiryConditionSchema(),
-			"channels":       alertChannelsSchema(),
+			alertBlockExpiry:     expiryConditionSchema(),
+			alertBlockIssuance:   eventConditionSchema(alertBlockIssuance),
+			alertBlockRenewal:    eventConditionSchema(alertBlockRenewal),
+			alertBlockRevocation: eventConditionSchema(alertBlockRevocation),
+			"filters":            alertFiltersSchema(),
+			"channels":           alertChannelsSchema(),
 		},
 	}
 }
@@ -145,22 +155,102 @@ func (r *alertResource) ConfigValidators(_ context.Context) []resource.ConfigVal
 
 func (r *alertResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	resp.Diagnostics.Append(validateChannelsHaveOneType(ctx, req.Config)...)
-	resp.Diagnostics.Append(validateAlertConditionMatchesResourceType(ctx, req.Config)...)
-}
-
-func validateAlertConditionMatchesResourceType(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
-	var diags diag.Diagnostics
 
 	var resourceType types.String
-	diags.Append(config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	if resp.Diagnostics.HasError() || resourceType.IsNull() || resourceType.IsUnknown() {
+		return
+	}
+
+	rt := resourceType.ValueString()
+	resp.Diagnostics.Append(validateAlertConditionMatchesResourceType(ctx, req.Config, rt)...)
+	resp.Diagnostics.Append(validateAttributesForResourceType(ctx, req.Config, rt)...)
+	resp.Diagnostics.Append(validateAlertBeforeDaysForResourceType(ctx, req.Config, rt)...)
+	resp.Diagnostics.Append(validateRecipientTypesForResourceType(ctx, req.Config, rt)...)
+	resp.Diagnostics.Append(validateAlertFilters(ctx, req.Config)...)
+}
+
+type attributePresence int
+
+const (
+	attributeOptional attributePresence = iota
+	attributeRequired
+	attributeForbidden
+)
+
+func validateAttributesForResourceType(ctx context.Context, config tfsdk.Config, resourceType string) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var resourceID, projectID types.String
+	var filters types.Object
+	diags.Append(config.GetAttribute(ctx, path.Root("resource_id"), &resourceID)...)
+	diags.Append(config.GetAttribute(ctx, path.Root("project_id"), &projectID)...)
+	diags.Append(config.GetAttribute(ctx, path.Root("filters"), &filters)...)
 	if diags.HasError() {
 		return diags
 	}
-	if resourceType.IsNull() || resourceType.IsUnknown() {
+
+	traits := alertResourceTypes[resourceType]
+	rules := []struct {
+		attribute string
+		set       bool
+		presence  attributePresence
+		reason    string
+	}{
+		{"resource_id", !resourceID.IsNull(), attributeRequired, "watch one resource"},
+		{"project_id", !projectID.IsNull(), attributeOptional, ""},
+		{"filters", !filters.IsNull(), attributeForbidden, "cannot be filtered"},
+	}
+	if traits.scopeWide {
+		rules[0].presence, rules[0].reason = attributeForbidden, "watch the whole product rather than one resource"
+	}
+	if traits.resolvesProject {
+		rules[1].presence, rules[1].reason = attributeForbidden, "don't use a project_id"
+	}
+	if traits.supportsFilters {
+		rules[2].presence = attributeOptional
+	}
+
+	for _, rule := range rules {
+		switch {
+		case rule.presence == attributeRequired && !rule.set:
+			diags.AddAttributeError(path.Root(rule.attribute), "Missing "+rule.attribute,
+				fmt.Sprintf("%s alerts %s, so %s is required.", resourceType, rule.reason, rule.attribute))
+		case rule.presence == attributeForbidden && rule.set:
+			diags.AddAttributeError(path.Root(rule.attribute), "Unexpected "+rule.attribute,
+				fmt.Sprintf("%s alerts %s, so remove %s.", resourceType, rule.reason, rule.attribute))
+		}
+	}
+
+	return diags
+}
+
+func validateAlertBeforeDaysForResourceType(ctx context.Context, config tfsdk.Config, resourceType string) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var alertBeforeDays types.Int64
+	diags.Append(config.GetAttribute(ctx, path.Root(alertBlockExpiry).AtName("alert_before_days"), &alertBeforeDays)...)
+	if diags.HasError() || alertBeforeDays.IsNull() || alertBeforeDays.IsUnknown() {
 		return diags
 	}
 
-	accepted := alertBlocksForResourceType(resourceType.ValueString())
+	event, ok := alertEventFor(resourceType, alertBlockExpiry)
+	if !ok || alertBeforeDays.ValueInt64() <= event.maxAlertBeforeDays {
+		return diags
+	}
+
+	diags.AddAttributeError(
+		path.Root(alertBlockExpiry).AtName("alert_before_days"),
+		"Invalid alert_before_days",
+		fmt.Sprintf("%s alerts can fire at most %d days before expiry, got %d.", resourceType, event.maxAlertBeforeDays, alertBeforeDays.ValueInt64()),
+	)
+	return diags
+}
+
+func validateAlertConditionMatchesResourceType(ctx context.Context, config tfsdk.Config, resourceType string) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	accepted := alertBlocksForResourceType(resourceType)
 	if len(accepted) == 0 {
 		return diags
 	}
@@ -174,7 +264,7 @@ func validateAlertConditionMatchesResourceType(ctx context.Context, config tfsdk
 		if condition.IsNull() || condition.IsUnknown() {
 			continue
 		}
-		if _, ok := alertEventFor(resourceType.ValueString(), block); ok {
+		if _, ok := alertEventFor(resourceType, block); ok {
 			continue
 		}
 
@@ -183,7 +273,7 @@ func validateAlertConditionMatchesResourceType(ctx context.Context, config tfsdk
 			"Unexpected alert condition",
 			fmt.Sprintf(
 				"A %s block does not describe an event on the %s resource type, which is what this alert watches. Use one of: %s.",
-				block, resourceType.ValueString(), strings.Join(accepted, ", "),
+				block, resourceType, strings.Join(accepted, ", "),
 			),
 		)
 	}
@@ -280,7 +370,7 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 	createRequest := infisical.CreateAlertRequest{
 		Name:         plan.Name.ValueString(),
 		ResourceType: plan.ResourceType.ValueString(),
-		ResourceID:   plan.ResourceID.ValueString(),
+		ResourceID:   plan.ResourceID.ValueStringPointer(),
 		EventType:    event.eventType,
 		Condition:    condition,
 		Enabled:      plan.Enabled.ValueBool(),
@@ -441,6 +531,13 @@ func (r *alertResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 }
 
 func (r *alertResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.ParseUUID(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected the ID of an alert, such as 64c72b54-af83-48bb-9350-a6fa0a612731, got: %q", req.ID),
+		)
+		return
+	}
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
@@ -471,7 +568,7 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 		state.ResourceID = types.StringNull()
 	}
 
-	if alert.ProjectID != nil {
+	if alert.ProjectID != nil && !alertResourceTypes[alert.ResourceType].resolvesProject {
 		state.ProjectID = types.StringValue(*alert.ProjectID)
 	} else {
 		state.ProjectID = types.StringNull()

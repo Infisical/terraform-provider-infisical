@@ -8,6 +8,7 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -440,4 +441,194 @@ func TestChannelTypeFromObjectWithUnknownBlock(t *testing.T) {
 	if _, known := channelTypeFromObject(channel); known {
 		t.Error("channelTypeFromObject() reported a known type for a channel with an unknown block")
 	}
+}
+
+func TestValidateAlertBeforeDaysForResourceType(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	cases := map[string]struct {
+		resourceType string
+		days         int64
+		wantError    bool
+	}{
+		"identity within its limit":     {alertResourceTypeIdentityAuthentication, 90, false},
+		"identity past its limit":       {alertResourceTypeIdentityAuthentication, 91, true},
+		"application within its limit":  {alertResourceTypeCertManagerApplication, 365, false},
+		"application past identity max": {alertResourceTypeCertManagerApplication, 200, false},
+		"application past its limit":    {alertResourceTypeCertManagerApplication, 366, true},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			model := alertModel(t, map[string]alertChannelModel{})
+			model.ResourceType = types.StringValue(c.resourceType)
+			model.Expiry.AlertBeforeDays = types.Int64Value(c.days)
+
+			diags := validateAlertBeforeDaysForResourceType(ctx, alertConfig(t, s, model), c.resourceType)
+			if diags.HasError() != c.wantError {
+				t.Errorf("validateAlertBeforeDaysForResourceType() error = %v, want %v: %v", diags.HasError(), c.wantError, diags)
+			}
+		})
+	}
+}
+
+func TestValidateProjectIDForResourceType(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	cases := map[string]struct {
+		resourceType string
+		projectID    types.String
+		wantError    bool
+	}{
+		"application alert with a project":    {alertResourceTypeCertManagerApplication, types.StringValue("project-1"), true},
+		"application alert without a project": {alertResourceTypeCertManagerApplication, types.StringNull(), false},
+		"project level identity alert":        {alertResourceTypeIdentityAuthentication, types.StringValue("project-1"), false},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			model := alertModel(t, map[string]alertChannelModel{})
+			model.ResourceType = types.StringValue(c.resourceType)
+			model.ProjectID = c.projectID
+
+			diags := validateAttributesForResourceType(ctx, alertConfig(t, s, model), c.resourceType)
+			if diags.HasError() != c.wantError {
+				t.Errorf("validateAttributesForResourceType() error = %v, want %v: %v", diags.HasError(), c.wantError, diags)
+			}
+		})
+	}
+}
+
+func TestSetStateFromAlertProjectID(t *testing.T) {
+	projectID, resourceID := "project-1", "resource-1"
+
+	cases := map[string]struct {
+		alert infisical.Alert
+		want  types.String
+	}{
+		"application alert": {
+			alert: infisical.Alert{ResourceType: alertResourceTypeCertManagerApplication, EventType: alertEventTypeCertManagerApplicationCertIssuance},
+			want:  types.StringNull(),
+		},
+		"project level identity alert": {
+			alert: infisical.Alert{ResourceType: alertResourceTypeIdentityAuthentication, EventType: alertEventTypeIdentityAuthenticationExpiry, Condition: []byte(`{"alertBefore":"30d"}`)},
+			want:  types.StringValue(projectID),
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			c.alert.ID, c.alert.ProjectID, c.alert.ResourceID = "alert-1", &projectID, &resourceID
+
+			var state alertResourceModel
+			if diags := (&alertResource{}).setStateFromAlert(context.Background(), &state, c.alert); diags.HasError() {
+				t.Fatalf("setStateFromAlert() diagnostics = %v", diags)
+			}
+			if !state.ProjectID.Equal(c.want) {
+				t.Errorf("project_id = %v, want %v", state.ProjectID, c.want)
+			}
+		})
+	}
+}
+
+func TestValidateResourceIDAndFiltersForResourceType(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	someFilters := &alertFiltersModel{
+		ApplicationIDs: types.SetNull(types.StringType),
+		ProfileIDs:     types.SetNull(types.StringType),
+		Sources:        types.SetValueMust(types.StringType, []attr.Value{types.StringValue("issued")}),
+	}
+	emptyFilters := &alertFiltersModel{
+		ApplicationIDs: types.SetNull(types.StringType),
+		ProfileIDs:     types.SetNull(types.StringType),
+		Sources:        types.SetNull(types.StringType),
+	}
+
+	cases := map[string]struct {
+		resourceType string
+		resourceID   types.String
+		filters      *alertFiltersModel
+		wantError    bool
+	}{
+		"application alert on an application":      {alertResourceTypeCertManagerApplication, types.StringValue("app-1"), nil, false},
+		"application alert without an application": {alertResourceTypeCertManagerApplication, types.StringNull(), nil, true},
+		"product-wide alert":                       {alertResourceTypeCertManager, types.StringNull(), nil, false},
+		"product-wide alert bound to a resource":   {alertResourceTypeCertManager, types.StringValue("app-1"), nil, true},
+		"filtered product-wide alert":              {alertResourceTypeCertManager, types.StringNull(), someFilters, false},
+		"product-wide alert with an empty filter":  {alertResourceTypeCertManager, types.StringNull(), emptyFilters, true},
+		"signer alert":                             {alertResourceTypeCertManagerSigner, types.StringNull(), nil, false},
+		"signer alert with filters":                {alertResourceTypeCertManagerSigner, types.StringNull(), someFilters, true},
+		"application alert with filters":           {alertResourceTypeCertManagerApplication, types.StringValue("app-1"), someFilters, true},
+		"identity alert without an identity":       {alertResourceTypeIdentityAuthentication, types.StringNull(), nil, true},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			model := alertModel(t, map[string]alertChannelModel{})
+			model.ResourceType = types.StringValue(c.resourceType)
+			model.ResourceID = c.resourceID
+			model.Filters = c.filters
+			config := alertConfig(t, s, model)
+
+			diags := validateAttributesForResourceType(ctx, config, c.resourceType)
+			diags.Append(validateAlertFilters(ctx, config)...)
+			if diags.HasError() != c.wantError {
+				t.Errorf("validation error = %v, want %v: %v", diags.HasError(), c.wantError, diags)
+			}
+		})
+	}
+}
+
+func TestValidateConfigWithUnknownValues(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+	channelType := as[types.ObjectType](t, as[types.MapType](t, s.Attributes["channels"].GetType()).ElemType)
+	filtersType := as[types.ObjectType](t, s.Attributes["filters"].GetType())
+
+	cases := map[string]struct {
+		resourceType string
+		path         path.Path
+		value        attr.Value
+	}{
+		"unknown channels on an identity alert": {alertResourceTypeIdentityAuthentication, path.Root("channels"), types.MapUnknown(channelType)},
+		"unknown channel on an identity alert": {alertResourceTypeIdentityAuthentication, path.Root("channels"),
+			types.MapValueMust(channelType, map[string]attr.Value{"team": types.ObjectUnknown(channelType.AttrTypes)})},
+		"unknown filters": {alertResourceTypeCertManager, path.Root("filters"), types.ObjectUnknown(filtersType.AttrTypes)},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			model := alertModel(t, map[string]alertChannelModel{})
+			model.ResourceType = types.StringValue(c.resourceType)
+			if alertResourceTypes[c.resourceType].scopeWide {
+				model.ResourceID = types.StringNull()
+			}
+			plan := alertPlan(t, s, model)
+			if diags := plan.SetAttribute(ctx, c.path, c.value); diags.HasError() {
+				t.Fatalf("setting %s: %v", c.path, diags)
+			}
+
+			config := tfsdk.Config{Raw: plan.Raw, Schema: s}
+			diags := validateRecipientTypesForResourceType(ctx, config, c.resourceType)
+			diags.Append(validateAlertFilters(ctx, config)...)
+			if diags.HasError() {
+				t.Errorf("validation diagnostics = %v, want none while values are unknown", diags)
+			}
+		})
+	}
+}
+
+func as[T any](t *testing.T, value any) T {
+	t.Helper()
+
+	typed, ok := value.(T)
+	if !ok {
+		var want T
+		t.Fatalf("got %T, want %T", value, want)
+	}
+	return typed
 }

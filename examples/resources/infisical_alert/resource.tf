@@ -93,3 +93,28 @@ resource "infisical_alert" "deploy_identity" {
     }
   }
 }
+
+# Certificate Manager alerts use the same resource. This one emails a team before any certificate in
+# an application expires. See the Certificate alerts guide for alerts across Certificate Manager,
+# filters and code signing signer alerts.
+resource "infisical_alert" "payments_certificates_expiring" {
+  resource_type = "cert-manager.application"
+  resource_id   = "<your-certificate-manager-application-id>"
+  name          = "Payments certificates expiring"
+
+  expiry = {
+    alert_before_days = 60 # Up to 365 for certificate alerts
+  }
+
+  channels = {
+    payments_team = {
+      name = "Payments team"
+      email = {
+        recipients = [
+          { type = "user", id = "<your-user-id>" },
+          { type = "email", id = "payments-oncall@example.com" }, # Must be on a verified domain
+        ]
+      }
+    }
+  }
+}
