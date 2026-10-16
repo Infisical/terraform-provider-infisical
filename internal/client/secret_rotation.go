@@ -17,6 +17,7 @@ const (
 	SecretRotationProviderLdapPassword        SecretRotationProvider = "ldap-password"
 	SecretRotationProviderDatadogApiKey       SecretRotationProvider = "datadog-api-key"
 	SecretRotationProviderAuth0ClientSecret   SecretRotationProvider = "auth0-client-secret"
+	SecretRotationProviderLiteLLMApiKey       SecretRotationProvider = "litellm-api-key"
 )
 
 const (
