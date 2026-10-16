@@ -285,6 +285,7 @@ func (r *IdentityUniversalAuthResource) Read(ctx context.Context, req resource.R
 		}
 	}
 
+	state.ID = types.StringValue(identityUniversalAuth.ID)
 	updateUniversalAuthStateByApi(ctx, resp.Diagnostics, &state, &identityUniversalAuth)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
