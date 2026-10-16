@@ -74,12 +74,16 @@ func alertModel(t *testing.T, channels map[string]alertChannelModel) alertResour
 		Name:         types.StringValue("Credentials expiring"),
 		Description:  types.StringNull(),
 		Enabled:      types.BoolValue(true),
-		Expiry: &expiryConditionModel{
-			AlertBeforeDays: types.Int64Value(30),
-			DailyReminder:   types.BoolValue(false),
-		},
-		Channels: channels,
+		EventType:    newAlertEventTypeValue("expiry"),
+		Condition:    conditionWithDays(30),
+		Channels:     channels,
 	}
+}
+
+func conditionWithDays(days int64) *alertConditionModel {
+	condition := emptyCondition()
+	condition.AlertBeforeDays = types.Int64Value(days)
+	return condition
 }
 
 func modifiedChannels(t *testing.T, plan tfsdk.Plan, state tfsdk.State) map[string]alertChannelModel {
@@ -298,8 +302,6 @@ func TestModifyPlanOnCreate(t *testing.T) {
 	}
 }
 
-// Editing the condition is an update, so nothing about it may ask for a replacement. Swapping the
-// block for another event's would, but there is only one event to swap between so far.
 func TestModifyPlanKeepsAnEditedConditionInPlace(t *testing.T) {
 	s := alertSchema(t)
 
@@ -310,7 +312,7 @@ func TestModifyPlanKeepsAnEditedConditionInPlace(t *testing.T) {
 			Enabled: types.BoolValue(true),
 			Slack:   &alertSlackChannelModel{WebhookURL: types.StringValue("https://hooks.slack.com/services/abc")},
 		}})
-		model.Expiry.AlertBeforeDays = types.Int64Value(alertBeforeDays)
+		model.Condition.AlertBeforeDays = types.Int64Value(alertBeforeDays)
 		return model
 	}
 
@@ -347,32 +349,47 @@ func TestSetStateFromAlertOnAnUnknownEvent(t *testing.T) {
 	}
 }
 
-func TestAlertEventFromBlocks(t *testing.T) {
+// Replacement follows the event, so the deprecated expiry block, the full event type and the short one
+// all have to resolve to the same event, while a different event asks for a new alert.
+func TestModifyPlanReplacesOnlyWhenTheEventChanges(t *testing.T) {
 	ctx := context.Background()
 	s := alertSchema(t)
 
-	model := alertModel(t, map[string]alertChannelModel{"security_team": {
-		ID:      types.StringValue("channel-1"),
-		Name:    types.StringValue("Security team"),
-		Enabled: types.BoolValue(true),
-		Email:   emailChannel(t, alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-1")}),
-	}})
+	newFormat := func(eventType string) alertResourceModel {
+		model := alertModel(t, map[string]alertChannelModel{})
+		model.EventType = newAlertEventTypeValue(eventType)
+		return model
+	}
+	legacy := alertModel(t, map[string]alertChannelModel{})
+	legacy.EventType = newAlertEventTypeValue(alertEventTypeIdentityAuthenticationExpiry)
+	legacy.Condition = nil
+	legacy.Expiry = &expiryConditionModel{AlertBeforeDays: types.Int64Value(30), DailyReminder: types.BoolValue(false)}
 
-	event, known, diags := alertEventFromBlocks(ctx, alertPlan(t, s, model))
-	if diags.HasError() {
-		t.Fatalf("alertEventFromBlocks() diagnostics = %v", diags)
-	}
-	if !known {
-		t.Fatal("alertEventFromBlocks() could not tell the event of an alert with a condition block")
-	}
-	if event.eventType != alertEventTypeIdentityAuthenticationExpiry {
-		t.Errorf("event type = %q, want %q", event.eventType, alertEventTypeIdentityAuthenticationExpiry)
+	authMethodChanged := newFormat("auth-method-changed")
+	authMethodChanged.Condition = nil
+
+	cases := map[string]struct {
+		stored, planned alertResourceModel
+		wantReplace     bool
+	}{
+		"short to full form":          {newFormat("expiry"), newFormat(alertEventTypeIdentityAuthenticationExpiry), false},
+		"deprecated expiry migrated":  {legacy, newFormat("expiry"), false},
+		"back to the deprecated form": {newFormat("expiry"), legacy, false},
+		"another event":               {newFormat("expiry"), authMethodChanged, true},
 	}
 
-	// A destroy plan, or a state the resource does not have yet, carries no condition at all.
-	model.Expiry = nil
-	if _, known, diags := alertEventFromBlocks(ctx, alertPlan(t, s, model)); known || diags.HasError() {
-		t.Errorf("alertEventFromBlocks() without a condition block: known = %v, diagnostics = %v, want false and none", known, diags)
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			plan := alertPlan(t, s, c.planned)
+			resp := &resource.ModifyPlanResponse{Plan: plan}
+			(&alertResource{}).ModifyPlan(ctx, resource.ModifyPlanRequest{Plan: plan, State: alertState(t, s, c.stored)}, resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("ModifyPlan() diagnostics = %v", resp.Diagnostics)
+			}
+			if got := len(resp.RequiresReplace) > 0; got != c.wantReplace {
+				t.Errorf("replace = %v, want %v", got, c.wantReplace)
+			}
+		})
 	}
 }
 
@@ -443,36 +460,6 @@ func TestChannelTypeFromObjectWithUnknownBlock(t *testing.T) {
 	}
 }
 
-func TestValidateAlertBeforeDaysForResourceType(t *testing.T) {
-	ctx := context.Background()
-	s := alertSchema(t)
-
-	cases := map[string]struct {
-		resourceType string
-		days         int64
-		wantError    bool
-	}{
-		"identity within its limit":     {alertResourceTypeIdentityAuthentication, 90, false},
-		"identity past its limit":       {alertResourceTypeIdentityAuthentication, 91, true},
-		"application within its limit":  {alertResourceTypeCertManagerApplication, 365, false},
-		"application past identity max": {alertResourceTypeCertManagerApplication, 200, false},
-		"application past its limit":    {alertResourceTypeCertManagerApplication, 366, true},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			model := alertModel(t, map[string]alertChannelModel{})
-			model.ResourceType = types.StringValue(c.resourceType)
-			model.Expiry.AlertBeforeDays = types.Int64Value(c.days)
-
-			diags := validateAlertBeforeDaysForResourceType(ctx, alertConfig(t, s, model), c.resourceType)
-			if diags.HasError() != c.wantError {
-				t.Errorf("validateAlertBeforeDaysForResourceType() error = %v, want %v: %v", diags.HasError(), c.wantError, diags)
-			}
-		})
-	}
-}
-
 func TestValidateProjectIDForResourceType(t *testing.T) {
 	ctx := context.Background()
 	s := alertSchema(t)
@@ -533,37 +520,21 @@ func TestSetStateFromAlertProjectID(t *testing.T) {
 	}
 }
 
-func TestValidateResourceIDAndFiltersForResourceType(t *testing.T) {
+func TestValidateResourceIDForResourceType(t *testing.T) {
 	ctx := context.Background()
 	s := alertSchema(t)
-
-	someFilters := &alertFiltersModel{
-		ApplicationIDs: types.SetNull(types.StringType),
-		ProfileIDs:     types.SetNull(types.StringType),
-		Sources:        types.SetValueMust(types.StringType, []attr.Value{types.StringValue("issued")}),
-	}
-	emptyFilters := &alertFiltersModel{
-		ApplicationIDs: types.SetNull(types.StringType),
-		ProfileIDs:     types.SetNull(types.StringType),
-		Sources:        types.SetNull(types.StringType),
-	}
 
 	cases := map[string]struct {
 		resourceType string
 		resourceID   types.String
-		filters      *alertFiltersModel
 		wantError    bool
 	}{
-		"application alert on an application":      {alertResourceTypeCertManagerApplication, types.StringValue("app-1"), nil, false},
-		"application alert without an application": {alertResourceTypeCertManagerApplication, types.StringNull(), nil, true},
-		"product-wide alert":                       {alertResourceTypeCertManager, types.StringNull(), nil, false},
-		"product-wide alert bound to a resource":   {alertResourceTypeCertManager, types.StringValue("app-1"), nil, true},
-		"filtered product-wide alert":              {alertResourceTypeCertManager, types.StringNull(), someFilters, false},
-		"product-wide alert with an empty filter":  {alertResourceTypeCertManager, types.StringNull(), emptyFilters, true},
-		"signer alert":                             {alertResourceTypeCertManagerSigner, types.StringNull(), nil, false},
-		"signer alert with filters":                {alertResourceTypeCertManagerSigner, types.StringNull(), someFilters, true},
-		"application alert with filters":           {alertResourceTypeCertManagerApplication, types.StringValue("app-1"), someFilters, true},
-		"identity alert without an identity":       {alertResourceTypeIdentityAuthentication, types.StringNull(), nil, true},
+		"application alert on an application":      {alertResourceTypeCertManagerApplication, types.StringValue("app-1"), false},
+		"application alert without an application": {alertResourceTypeCertManagerApplication, types.StringNull(), true},
+		"product-wide alert":                       {alertResourceTypeCertManager, types.StringNull(), false},
+		"product-wide alert bound to a resource":   {alertResourceTypeCertManager, types.StringValue("app-1"), true},
+		"signer alert":                             {alertResourceTypeCertManagerSigner, types.StringNull(), false},
+		"identity alert without an identity":       {alertResourceTypeIdentityAuthentication, types.StringNull(), true},
 	}
 
 	for name, c := range cases {
@@ -571,11 +542,8 @@ func TestValidateResourceIDAndFiltersForResourceType(t *testing.T) {
 			model := alertModel(t, map[string]alertChannelModel{})
 			model.ResourceType = types.StringValue(c.resourceType)
 			model.ResourceID = c.resourceID
-			model.Filters = c.filters
-			config := alertConfig(t, s, model)
 
-			diags := validateAttributesForResourceType(ctx, config, c.resourceType)
-			diags.Append(validateAlertFilters(ctx, config)...)
+			diags := validateAttributesForResourceType(ctx, alertConfig(t, s, model), c.resourceType)
 			if diags.HasError() != c.wantError {
 				t.Errorf("validation error = %v, want %v: %v", diags.HasError(), c.wantError, diags)
 			}
@@ -587,7 +555,7 @@ func TestValidateConfigWithUnknownValues(t *testing.T) {
 	ctx := context.Background()
 	s := alertSchema(t)
 	channelType := as[types.ObjectType](t, as[types.MapType](t, s.Attributes["channels"].GetType()).ElemType)
-	filtersType := as[types.ObjectType](t, s.Attributes["filters"].GetType())
+	conditionType := as[types.ObjectType](t, s.Attributes["condition"].GetType())
 
 	cases := map[string]struct {
 		resourceType string
@@ -597,7 +565,8 @@ func TestValidateConfigWithUnknownValues(t *testing.T) {
 		"unknown channels on an identity alert": {alertResourceTypeIdentityAuthentication, path.Root("channels"), types.MapUnknown(channelType)},
 		"unknown channel on an identity alert": {alertResourceTypeIdentityAuthentication, path.Root("channels"),
 			types.MapValueMust(channelType, map[string]attr.Value{"team": types.ObjectUnknown(channelType.AttrTypes)})},
-		"unknown filters": {alertResourceTypeCertManager, path.Root("filters"), types.ObjectUnknown(filtersType.AttrTypes)},
+		"unknown condition":  {alertResourceTypeIdentityAuthentication, path.Root("condition"), types.ObjectUnknown(conditionType.AttrTypes)},
+		"unknown event_type": {alertResourceTypeIdentityAuthentication, path.Root("event_type"), alertEventTypeValue{StringValue: types.StringUnknown()}},
 	}
 
 	for name, c := range cases {
@@ -614,7 +583,7 @@ func TestValidateConfigWithUnknownValues(t *testing.T) {
 
 			config := tfsdk.Config{Raw: plan.Raw, Schema: s}
 			diags := validateRecipientTypesForResourceType(ctx, config, c.resourceType)
-			diags.Append(validateAlertFilters(ctx, config)...)
+			diags.Append(validateAlertEvent(ctx, config, c.resourceType)...)
 			if diags.HasError() {
 				t.Errorf("validation diagnostics = %v, want none while values are unknown", diags)
 			}

@@ -3,10 +3,9 @@
 resource "infisical_alert" "public_tls_issued" {
   resource_type = "cert-manager"
   name          = "Public TLS certificate issued"
+  event_type    = "certificate.issuance"
 
-  issuance = {}
-
-  filters = {
+  condition = {
     application_ids = ["<your-application-id>"]
     profile_ids     = ["<your-certificate-profile-id>"]
     sources         = ["issued"] # Options: issued, discovered, imported
@@ -26,8 +25,9 @@ resource "infisical_alert" "public_tls_issued" {
 resource "infisical_alert" "anything_expiring" {
   resource_type = "cert-manager"
   name          = "Any certificate expiring"
+  event_type    = "certificate.expiry"
 
-  expiry = {
+  condition = {
     alert_before_days = 30
   }
 

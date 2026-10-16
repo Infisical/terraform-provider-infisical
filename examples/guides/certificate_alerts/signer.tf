@@ -2,8 +2,9 @@
 resource "infisical_alert" "signers_expiring" {
   resource_type = "cert-manager.signer"
   name          = "Signer certificates expiring"
+  event_type    = "certificate.expiry"
 
-  expiry = {
+  condition = {
     alert_before_days = 90
   }
 

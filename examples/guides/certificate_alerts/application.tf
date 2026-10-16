@@ -7,8 +7,9 @@ resource "infisical_alert" "payments_expiring" {
   resource_type = "cert-manager.application"
   resource_id   = infisical_cert_manager_application.payments.id
   name          = "Payments certificates expiring"
+  event_type    = "certificate.expiry"
 
-  expiry = {
+  condition = {
     alert_before_days = 60
     daily_reminder    = true # Keep reminding every day until the certificate expires
   }
@@ -31,8 +32,7 @@ resource "infisical_alert" "payments_revoked" {
   resource_type = "cert-manager.application"
   resource_id   = infisical_cert_manager_application.payments.id
   name          = "Payments certificate revoked"
-
-  revocation = {}
+  event_type    = "certificate.revocation" # Fires as it happens, so it takes no condition
 
   channels = {
     on_call = {

@@ -40,9 +40,10 @@ resource "infisical_alert" "ci_identity" {
   name          = "CI identity credentials expiring"
   description   = "Rotate the CI machine identity client secret before it expires"
 
-  # The condition block is what the alert fires on, and every alert carries exactly one. It is named
-  # after the shape of the condition, so resource_type is what says what expires.
-  expiry = {
+  # The event the alert fires on, written in full ("identity.authentication.expiry") or without the
+  # resource_type prefix. condition holds the settings that event takes.
+  event_type = "expiry"
+  condition = {
     alert_before_days = 30
   }
 
@@ -77,8 +78,9 @@ resource "infisical_alert" "deploy_identity" {
   resource_id   = "<your-machine-identity-id>"
   project_id    = "<your-project-id>" # Required for resources that belong to a project
   name          = "Deploy identity credentials expiring"
+  event_type    = "expiry"
 
-  expiry = {
+  condition = {
     alert_before_days = 7
     daily_reminder    = true
   }
@@ -109,16 +111,33 @@ resource "infisical_alert" "deploy_identity" {
   }
 }
 
-# Certificate Manager alerts use the same resource. This one emails a team before any certificate in
-# an application expires. See the Certificate alerts guide for alerts across Certificate Manager,
-# filters and code signing signer alerts.
+# Ask the security team whenever any auth method of a machine identity changes. Events without
+# settings take no condition.
+resource "infisical_alert" "ci_identity_auth_changes" {
+  resource_type = "identity.authentication"
+  resource_id   = "<your-machine-identity-id>"
+  name          = "CI identity auth method changed"
+  event_type    = "auth-method-changed"
+
+  channels = {
+    security_team = {
+      name = "Security team"
+      email = {
+        recipients = [{ type = "group", id = "<your-group-id>" }]
+      }
+    }
+  }
+}
+
+# Email a team before any certificate in a Certificate Manager application expires
 resource "infisical_alert" "payments_certificates_expiring" {
   resource_type = "cert-manager.application"
   resource_id   = "<your-certificate-manager-application-id>"
   name          = "Payments certificates expiring"
+  event_type    = "certificate.expiry"
 
-  expiry = {
-    alert_before_days = 60 # Up to 365 for certificate alerts
+  condition = {
+    alert_before_days = 60
   }
 
   channels = {
@@ -146,15 +165,13 @@ resource "infisical_alert" "payments_certificates_expiring" {
 
 ### Optional
 
+- `condition` (Attributes) The settings of the event the alert fires on. Which ones apply depends on event_type, and events without settings take no condition. (see [below for nested schema](#nestedatt--condition))
 - `description` (String) An optional description of the alert.
 - `enabled` (Boolean) Whether the alert is evaluated. Defaults to true.
-- `expiry` (Attributes) Fires before something the alert watches expires. Only for alerts on these resource types: cert-manager, cert-manager.application, cert-manager.signer, identity.authentication. (see [below for nested schema](#nestedatt--expiry))
-- `filters` (Attributes) Narrows the alert to some of what it watches, which has to match every list that is set. Only for alerts on these resource types: cert-manager. (see [below for nested schema](#nestedatt--filters))
-- `issuance` (Attributes) Fires each time something the alert watches is issued. It takes no settings, so write it as `issuance = {}`. Only for alerts on these resource types: cert-manager, cert-manager.application. (see [below for nested schema](#nestedatt--issuance))
+- `event_type` (String) The event the alert fires on, written as the full event type or without the resource_type prefix, such as `cert-manager.application.certificate.expiry` or `certificate.expiry` for a cert-manager.application alert. Changing the event creates a new alert. Options: for cert-manager, certificate.expiry (cert-manager.certificate.expiry), certificate.issuance (cert-manager.certificate.issuance), certificate.renewal (cert-manager.certificate.renewal), certificate.revocation (cert-manager.certificate.revocation); for cert-manager.application, certificate.expiry (cert-manager.application.certificate.expiry), certificate.issuance (cert-manager.application.certificate.issuance), certificate.renewal (cert-manager.application.certificate.renewal), certificate.revocation (cert-manager.application.certificate.revocation); for cert-manager.signer, certificate.expiry (cert-manager.signer.certificate.expiry); for identity.authentication, expiry (identity.authentication.expiry), auth-method-changed (identity.authentication.auth-method-changed).
+- `expiry` (Attributes, Deprecated) Fires before the watched resource expires. Only for identity.authentication alerts. Deprecated: use event_type and condition instead. (see [below for nested schema](#nestedatt--expiry))
 - `project_id` (String) The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones. Not used by these resource types, so leave it out: cert-manager, cert-manager.application, cert-manager.signer.
-- `renewal` (Attributes) Fires each time something the alert watches is renewed. It takes no settings, so write it as `renewal = {}`. Only for alerts on these resource types: cert-manager, cert-manager.application. (see [below for nested schema](#nestedatt--renewal))
 - `resource_id` (String) The ID of the resource to watch, of the kind resource_type names. Required, except for resource types that watch a whole scope, where it must be omitted: cert-manager, cert-manager.signer.
-- `revocation` (Attributes) Fires each time something the alert watches is revoked. It takes no settings, so write it as `revocation = {}`. Only for alerts on these resource types: cert-manager, cert-manager.application. (see [below for nested schema](#nestedatt--revocation))
 
 ### Read-Only
 
@@ -226,38 +243,28 @@ Optional:
 
 
 
+<a id="nestedatt--condition"></a>
+### Nested Schema for `condition`
+
+Optional:
+
+- `alert_before_days` (Number) How many days before expiry the alert fires. Required for these events, and not used by the others: identity.authentication.expiry, cert-manager.application.certificate.expiry, cert-manager.certificate.expiry, cert-manager.signer.certificate.expiry. Must be at least 1, and at most 90 for identity.authentication; 365 for cert-manager, cert-manager.application, cert-manager.signer.
+- `application_ids` (Set of String) Only certificates in these Certificate Manager applications. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation. Leave it out to cover all of them. At most 100.
+- `daily_reminder` (Boolean) Whether to keep notifying once a day until expiry, instead of notifying once. Defaults to false. Only for the events that take alert_before_days.
+- `profile_ids` (Set of String) Only certificates issued from these certificate profiles. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation. Leave it out to cover all of them. At most 100.
+- `sources` (Set of String) Only certificates with these sources. Options: issued, discovered, imported. Leave it out to cover every source. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation.
+
+
 <a id="nestedatt--expiry"></a>
 ### Nested Schema for `expiry`
 
 Required:
 
-- `alert_before_days` (Number) How many days before expiry the alert fires. Must be at least 1, and at most 90 for identity.authentication; 365 for cert-manager, cert-manager.application, cert-manager.signer.
+- `alert_before_days` (Number) How many days before the watched resource expires the alert fires. Must be between 1 and 90.
 
 Optional:
 
-- `daily_reminder` (Boolean) Whether to keep notifying once a day until expiry, instead of notifying once. Defaults to false.
-
-
-<a id="nestedatt--filters"></a>
-### Nested Schema for `filters`
-
-Optional:
-
-- `application_ids` (Set of String) Only certificates in these Certificate Manager applications. Leave it out to cover all of them. At most 100.
-- `profile_ids` (Set of String) Only certificates issued from these certificate profiles. Leave it out to cover all of them. At most 100.
-- `sources` (Set of String) Only certificates with these sources. Options: issued, discovered, imported. Leave it out to cover every source.
-
-
-<a id="nestedatt--issuance"></a>
-### Nested Schema for `issuance`
-
-
-<a id="nestedatt--renewal"></a>
-### Nested Schema for `renewal`
-
-
-<a id="nestedatt--revocation"></a>
-### Nested Schema for `revocation`
+- `daily_reminder` (Boolean) Whether to keep notifying once a day until the watched resource expires, instead of notifying once. Defaults to false.
 
 ## Import
 
