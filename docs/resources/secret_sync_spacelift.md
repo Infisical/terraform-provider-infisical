@@ -50,7 +50,7 @@ resource "infisical_secret_sync_spacelift" "example" {
 
   sync_options = {
     disable_secret_deletion = false
-    key_schema              = "{{secretKey}}-{{environment}}"
+    key_schema              = "{{secretKey}}_{{environment}}"
     write_only              = true
   }
 }

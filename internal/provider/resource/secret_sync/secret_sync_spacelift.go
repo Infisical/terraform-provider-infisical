@@ -2,13 +2,16 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -55,6 +58,14 @@ func readSpaceliftDestinationConfigFromPlan(ctx context.Context, plan SecretSync
 		return nil, diags
 	}
 
+	// skips the duplicate destination check in ModifyPlan until all values are known
+	for field, value := range plan.DestinationConfig.Attributes() {
+		if value.IsUnknown() {
+			diags.AddError("Invalid destination config", fmt.Sprintf("Expected '%s' to be known", field))
+			return nil, diags
+		}
+	}
+
 	destinationConfig := map[string]interface{}{
 		"contextId":   cfg.ContextId.ValueString(),
 		"contextName": cfg.ContextName.ValueString(),
@@ -88,6 +99,7 @@ func NewSecretSyncSpaceliftResource() resource.Resource {
 			"config_type": schema.StringAttribute{
 				Required:    true,
 				Description: "The type of config element to create in Spacelift. Supported options: environment-variable, file-mount",
+				Validators:  []validator.String{stringvalidator.OneOf("environment-variable", "file-mount")},
 			},
 			"mount_path": schema.StringAttribute{
 				Optional:    true,
@@ -96,6 +108,7 @@ func NewSecretSyncSpaceliftResource() resource.Resource {
 			"file_mount_format": schema.StringAttribute{
 				Optional:    true,
 				Description: "The format for file mount config elements. Supported options: dot-env (default), secret-per-file",
+				Validators:  []validator.String{stringvalidator.OneOf("dot-env", "secret-per-file")},
 			},
 		},
 		SyncOptionsAttributes: map[string]schema.Attribute{
