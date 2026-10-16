@@ -42,6 +42,7 @@ const (
 	AppConnectionAppDigiCert              AppConnectionApp = "digicert"
 	AppConnectionAppAuth0                 AppConnectionApp = "auth0"
 	AppConnectionAppSpacelift             AppConnectionApp = "spacelift"
+	AppConnectionAppLiteLLM               AppConnectionApp = "litellm"
 )
 
 const (

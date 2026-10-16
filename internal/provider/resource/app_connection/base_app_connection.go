@@ -185,6 +185,7 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 		"method": schema.StringAttribute{
 			Required:    true,
 			Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
+			Validators:  []validator.String{stringvalidator.OneOf(r.AllowedMethods...)},
 		},
 		"name": schema.StringAttribute{
 			Required:    true,
