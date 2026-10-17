@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-uuid"
+
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
@@ -54,7 +56,9 @@ type alertResourceModel struct {
 	Description  types.String `tfsdk:"description"`
 	Enabled      types.Bool   `tfsdk:"enabled"`
 
-	Expiry *expiryConditionModel `tfsdk:"expiry"`
+	EventType alertEventTypeValue   `tfsdk:"event_type"`
+	Condition *alertConditionModel  `tfsdk:"condition"`
+	Expiry    *expiryConditionModel `tfsdk:"expiry"`
 
 	Channels map[string]alertChannelModel `tfsdk:"channels"`
 }
@@ -65,7 +69,7 @@ func (r *alertResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create and manage alerts that notify you about a resource in Infisical. An alert watches one resource for one event, and a resource can only have one alert per event within a scope.",
+		Description: "Create and manage alerts that notify you about a resource in Infisical. An alert watches one event, either on a single resource or across a whole scope, depending on its resource type. A resource can only have one alert per event within a scope.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the alert.",
@@ -85,8 +89,8 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"resource_id": schema.StringAttribute{
-				Description: "The ID of the resource to watch. For the " + alertResourceTypeIdentityAuthentication + " resource type this is a machine identity's ID.",
-				Required:    true,
+				Description: "The ID of the resource to watch, of the kind resource_type names. Required, except for resource types that watch a whole scope, where it must be omitted: " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.scopeWide }), ", ") + ".",
+				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -95,7 +99,7 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones.",
+				Description: "The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones. Not used by these resource types, so leave it out: " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.resolvesProject }), ", ") + ".",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -131,61 +135,87 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
-			alertBlockExpiry: expiryConditionSchema(),
-			"channels":       alertChannelsSchema(),
+			"event_type": schema.StringAttribute{
+				CustomType:  alertEventTypeType{},
+				Description: "The event the alert fires on, written as the full event type or without the resource_type prefix, such as `" + alertEventTypeCertManagerApplicationCertExpiry + "` or `certificate.expiry` for a " + alertResourceTypeCertManagerApplication + " alert. Changing the event creates a new alert. Options: " + describeAllAlertEvents() + ".",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"condition": alertConditionSchema(),
+			"expiry":    legacyExpirySchema(),
+			"channels":  alertChannelsSchema(),
 		},
 	}
 }
 
 func (r *alertResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
 	return []resource.ConfigValidator{
-		resourcevalidator.ExactlyOneOf(alertConditionBlockPaths()...),
+		resourcevalidator.ExactlyOneOf(path.MatchRoot("event_type"), path.MatchRoot("expiry")),
 	}
 }
 
 func (r *alertResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	resp.Diagnostics.Append(validateChannelsHaveOneType(ctx, req.Config)...)
-	resp.Diagnostics.Append(validateAlertConditionMatchesResourceType(ctx, req.Config)...)
-}
-
-func validateAlertConditionMatchesResourceType(ctx context.Context, config tfsdk.Config) diag.Diagnostics {
-	var diags diag.Diagnostics
 
 	var resourceType types.String
-	diags.Append(config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("resource_type"), &resourceType)...)
+	if resp.Diagnostics.HasError() || resourceType.IsNull() || resourceType.IsUnknown() {
+		return
+	}
+
+	rt := resourceType.ValueString()
+	resp.Diagnostics.Append(validateAlertEvent(ctx, req.Config, rt)...)
+	resp.Diagnostics.Append(validateAttributesForResourceType(ctx, req.Config, rt)...)
+	resp.Diagnostics.Append(validateRecipientTypesForResourceType(ctx, req.Config, rt)...)
+}
+
+type attributePresence int
+
+const (
+	attributeOptional attributePresence = iota
+	attributeRequired
+	attributeForbidden
+)
+
+func validateAttributesForResourceType(ctx context.Context, config tfsdk.Config, resourceType string) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var resourceID, projectID types.String
+	diags.Append(config.GetAttribute(ctx, path.Root("resource_id"), &resourceID)...)
+	diags.Append(config.GetAttribute(ctx, path.Root("project_id"), &projectID)...)
 	if diags.HasError() {
 		return diags
 	}
-	if resourceType.IsNull() || resourceType.IsUnknown() {
-		return diags
+
+	traits := alertResourceTypes[resourceType]
+	rules := []struct {
+		attribute string
+		set       bool
+		presence  attributePresence
+		reason    string
+	}{
+		{"resource_id", !resourceID.IsNull(), attributeRequired, "watch one resource"},
+		{"project_id", !projectID.IsNull(), attributeOptional, ""},
+	}
+	if traits.scopeWide {
+		rules[0].presence, rules[0].reason = attributeForbidden, "watch the whole product rather than one resource"
+	}
+	if traits.resolvesProject {
+		rules[1].presence, rules[1].reason = attributeForbidden, "don't use a project_id"
 	}
 
-	accepted := alertBlocksForResourceType(resourceType.ValueString())
-	if len(accepted) == 0 {
-		return diags
-	}
-
-	for _, block := range alertConditionBlockNames() {
-		var condition types.Object
-		diags.Append(config.GetAttribute(ctx, path.Root(block), &condition)...)
-		if diags.HasError() {
-			return diags
+	for _, rule := range rules {
+		switch {
+		case rule.presence == attributeRequired && !rule.set:
+			diags.AddAttributeError(path.Root(rule.attribute), "Missing "+rule.attribute,
+				fmt.Sprintf("%s alerts %s, so %s is required.", resourceType, rule.reason, rule.attribute))
+		case rule.presence == attributeForbidden && rule.set:
+			diags.AddAttributeError(path.Root(rule.attribute), "Unexpected "+rule.attribute,
+				fmt.Sprintf("%s alerts %s, so remove %s.", resourceType, rule.reason, rule.attribute))
 		}
-		if condition.IsNull() || condition.IsUnknown() {
-			continue
-		}
-		if _, ok := alertEventFor(resourceType.ValueString(), block); ok {
-			continue
-		}
-
-		diags.AddAttributeError(
-			path.Root(block),
-			"Unexpected alert condition",
-			fmt.Sprintf(
-				"A %s block does not describe an event on the %s resource type, which is what this alert watches. Use one of: %s.",
-				block, resourceType.ValueString(), strings.Join(accepted, ", "),
-			),
-		)
 	}
 
 	return diags
@@ -196,15 +226,16 @@ func (r *alertResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 		return
 	}
 
-	plannedEvent, plannedEventKnown, plannedDiags := alertEventFromBlocks(ctx, req.Plan)
-	storedEvent, storedEventKnown, storedDiags := alertEventFromBlocks(ctx, req.State)
+	// The API can't change an alert's event, so only a different event needs a new alert.
+	plannedEvent, plannedEventKnown, plannedDiags := alertEventFromSource(ctx, req.Plan)
+	storedEvent, storedEventKnown, storedDiags := alertEventFromSource(ctx, req.State)
 	resp.Diagnostics.Append(plannedDiags...)
 	resp.Diagnostics.Append(storedDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	if plannedEventKnown && storedEventKnown && plannedEvent.eventType != storedEvent.eventType {
-		resp.RequiresReplace = append(resp.RequiresReplace, path.Root(plannedEvent.block))
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("event_type"))
 	}
 
 	channelsPath := path.Root("channels")
@@ -265,7 +296,7 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	event, condition, diags := alertConditionForAPI(plan)
+	event, diags := plannedAlertEvent(plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -280,9 +311,9 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 	createRequest := infisical.CreateAlertRequest{
 		Name:         plan.Name.ValueString(),
 		ResourceType: plan.ResourceType.ValueString(),
-		ResourceID:   plan.ResourceID.ValueString(),
+		ResourceID:   plan.ResourceID.ValueStringPointer(),
 		EventType:    event.eventType,
-		Condition:    condition,
+		Condition:    alertConditionForAPI(event, plan),
 		Enabled:      plan.Enabled.ValueBool(),
 		Channels:     channels,
 	}
@@ -323,6 +354,9 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	plan.ID = types.StringValue(alert.Alert.ID)
 	plan.OrgID = types.StringValue(alert.Alert.OrgID)
+	if plan.EventType.IsUnknown() {
+		plan.EventType = newAlertEventTypeValue(event.eventType)
+	}
 
 	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, nil, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
@@ -370,7 +404,7 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	_, condition, diags := alertConditionForAPI(plan)
+	event, diags := plannedAlertEvent(plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -385,7 +419,7 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	updateRequest := infisical.UpdateAlertRequest{
 		ID:        state.ID.ValueString(),
 		Name:      plan.Name.ValueString(),
-		Condition: condition,
+		Condition: alertConditionForAPI(event, plan),
 		Enabled:   plan.Enabled.ValueBool(),
 		Channels:  channels,
 	}
@@ -414,6 +448,9 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	plan.OrgID = types.StringValue(alert.Alert.OrgID)
+	if plan.EventType.IsUnknown() {
+		plan.EventType = newAlertEventTypeValue(event.eventType)
+	}
 
 	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, state.Channels, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
@@ -441,6 +478,13 @@ func (r *alertResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 }
 
 func (r *alertResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.ParseUUID(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected the ID of an alert, such as 64c72b54-af83-48bb-9350-a6fa0a612731, got: %q", req.ID),
+		)
+		return
+	}
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
@@ -464,6 +508,7 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 	state.Enabled = types.BoolValue(alert.Enabled)
 	state.ResourceType = types.StringValue(alert.ResourceType)
 	state.OrgID = types.StringValue(alert.OrgID)
+	state.EventType = newAlertEventTypeValue(alert.EventType)
 
 	if alert.ResourceID != nil {
 		state.ResourceID = types.StringValue(*alert.ResourceID)
@@ -471,7 +516,7 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 		state.ResourceID = types.StringNull()
 	}
 
-	if alert.ProjectID != nil {
+	if alert.ProjectID != nil && !alertResourceTypes[alert.ResourceType].resolvesProject {
 		state.ProjectID = types.StringValue(*alert.ProjectID)
 	} else {
 		state.ProjectID = types.StringNull()
@@ -496,4 +541,45 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 	state.Channels = channels
 
 	return diags
+}
+
+func describeAllAlertEvents() string {
+	names := []string{}
+	for _, resourceType := range supportedAlertResourceTypes() {
+		names = append(names, fmt.Sprintf("for %s, %s", resourceType, describeAlertEvents(resourceType)))
+	}
+	return strings.Join(names, "; ")
+}
+
+type alertAttributeSource interface {
+	GetAttribute(ctx context.Context, p path.Path, target any) diag.Diagnostics
+}
+
+func plannedAlertEvent(plan alertResourceModel) (alertEvent, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	event, ok := alertEventFromModel(plan)
+	if !ok {
+		diags.AddAttributeError(path.Root("event_type"), "Unsupported event_type",
+			fmt.Sprintf("%s alerts don't have a %q event.", plan.ResourceType.ValueString(), plan.EventType.ValueString()))
+	}
+	return event, diags
+}
+
+func alertEventFromSource(ctx context.Context, source alertAttributeSource) (alertEvent, bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var model alertResourceModel
+	var expiry types.Object
+	diags.Append(source.GetAttribute(ctx, path.Root("resource_type"), &model.ResourceType)...)
+	diags.Append(source.GetAttribute(ctx, path.Root("event_type"), &model.EventType)...)
+	diags.Append(source.GetAttribute(ctx, path.Root("expiry"), &expiry)...)
+	if diags.HasError() || expiry.IsUnknown() || model.ResourceType.IsUnknown() {
+		return alertEvent{}, false, diags
+	}
+	if !expiry.IsNull() {
+		model.Expiry = &expiryConditionModel{}
+	}
+
+	event, ok := alertEventFromModel(model)
+	return event, ok, diags
 }

@@ -25,9 +25,10 @@ resource "infisical_alert" "ci_identity" {
   name          = "CI identity credentials expiring"
   description   = "Rotate the CI machine identity client secret before it expires"
 
-  # The condition block is what the alert fires on, and every alert carries exactly one. It is named
-  # after the shape of the condition, so resource_type is what says what expires.
-  expiry = {
+  # The event the alert fires on, written in full ("identity.authentication.expiry") or without the
+  # resource_type prefix. condition holds the settings that event takes.
+  event_type = "expiry"
+  condition = {
     alert_before_days = 30
   }
 
@@ -62,8 +63,9 @@ resource "infisical_alert" "deploy_identity" {
   resource_id   = "<your-machine-identity-id>"
   project_id    = "<your-project-id>" # Required for resources that belong to a project
   name          = "Deploy identity credentials expiring"
+  event_type    = "expiry"
 
-  expiry = {
+  condition = {
     alert_before_days = 7
     daily_reminder    = true
   }
@@ -89,6 +91,48 @@ resource "infisical_alert" "deploy_identity" {
       enabled = false # Configured up front, but not paging anyone yet
       pagerduty = {
         integration_key = "<your-pagerduty-events-api-v2-integration-key>"
+      }
+    }
+  }
+}
+
+# Ask the security team whenever any auth method of a machine identity changes. Events without
+# settings take no condition.
+resource "infisical_alert" "ci_identity_auth_changes" {
+  resource_type = "identity.authentication"
+  resource_id   = "<your-machine-identity-id>"
+  name          = "CI identity auth method changed"
+  event_type    = "auth-method-changed"
+
+  channels = {
+    security_team = {
+      name = "Security team"
+      email = {
+        recipients = [{ type = "group", id = "<your-group-id>" }]
+      }
+    }
+  }
+}
+
+# Email a team before any certificate in a Certificate Manager application expires
+resource "infisical_alert" "payments_certificates_expiring" {
+  resource_type = "cert-manager.application"
+  resource_id   = "<your-certificate-manager-application-id>"
+  name          = "Payments certificates expiring"
+  event_type    = "certificate.expiry"
+
+  condition = {
+    alert_before_days = 60
+  }
+
+  channels = {
+    payments_team = {
+      name = "Payments team"
+      email = {
+        recipients = [
+          { type = "user", id = "<your-user-id>" },
+          { type = "email", id = "payments-oncall@example.com" }, # Must be on a verified domain
+        ]
       }
     }
   }

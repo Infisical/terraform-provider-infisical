@@ -4792,7 +4792,7 @@ type CreateAlertRequest struct {
 	Name         string              `json:"name"`
 	Description  *string             `json:"description,omitempty"`
 	ResourceType string              `json:"resourceType"`
-	ResourceID   string              `json:"resourceId"`
+	ResourceID   *string             `json:"resourceId,omitempty"`
 	EventType    string              `json:"eventType"`
 	Condition    any                 `json:"condition"`
 	Enabled      bool                `json:"enabled"`
@@ -4946,4 +4946,65 @@ type ListAllSecretValidationRulesRequest struct {
 
 type ListSecretValidationRulesResponse struct {
 	SecretValidationRules []SecretValidationRule `json:"secretValidationRules"`
+}
+
+type ApprovalPolicyApprover struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+type ApprovalPolicyStep struct {
+	Name              *string                  `json:"name,omitempty"`
+	RequiredApprovals int64                    `json:"requiredApprovals"`
+	NotifyApprovers   *bool                    `json:"notifyApprovers,omitempty"`
+	Approvers         []ApprovalPolicyApprover `json:"approvers"`
+}
+
+type CertRequestApprovalPolicyCondition struct {
+	ProfileNames []string `json:"profileNames"`
+}
+
+type CertRequestApprovalPolicy struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Conditions struct {
+		Conditions []CertRequestApprovalPolicyCondition `json:"conditions"`
+	} `json:"conditions"`
+	BypassForMachineIdentities *bool                `json:"bypassForMachineIdentities"`
+	MaxRequestTTL              *string              `json:"maxRequestTtl"`
+	ScopeType                  *string              `json:"scopeType"`
+	ScopeID                    *string              `json:"scopeId"`
+	Steps                      []ApprovalPolicyStep `json:"steps"`
+}
+
+type CreateCertRequestApprovalPolicyRequest struct {
+	Scope                      string                               `json:"scope"`
+	ScopeID                    string                               `json:"scopeId"`
+	Name                       string                               `json:"name"`
+	Conditions                 []CertRequestApprovalPolicyCondition `json:"conditions"`
+	Steps                      []ApprovalPolicyStep                 `json:"steps"`
+	BypassForMachineIdentities bool                                 `json:"bypassForMachineIdentities"`
+	MaxRequestTTL              *string                              `json:"maxRequestTtl,omitempty"`
+}
+
+type GetCertRequestApprovalPolicyRequest struct {
+	ID string
+}
+
+type UpdateCertRequestApprovalPolicyRequest struct {
+	ID                         string                               `json:"-"`
+	Name                       string                               `json:"name"`
+	Conditions                 []CertRequestApprovalPolicyCondition `json:"conditions"`
+	Steps                      []ApprovalPolicyStep                 `json:"steps"`
+	BypassForMachineIdentities bool                                 `json:"bypassForMachineIdentities"`
+	// Sent as null to clear a stored TTL.
+	MaxRequestTTL *string `json:"maxRequestTtl"`
+}
+
+type DeleteCertRequestApprovalPolicyRequest struct {
+	ID string
+}
+
+type CertRequestApprovalPolicyResponse struct {
+	Policy CertRequestApprovalPolicy `json:"policy"`
 }
