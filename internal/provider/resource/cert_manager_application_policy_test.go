@@ -21,7 +21,7 @@ func certRequestApprovalPolicySchema(t *testing.T) schema.Schema {
 	t.Helper()
 
 	resp := &resource.SchemaResponse{}
-	(&certManagerCertificateRequestApprovalPolicyResource{}).Schema(context.Background(), resource.SchemaRequest{}, resp)
+	(&certManagerApplicationPolicyResource{}).Schema(context.Background(), resource.SchemaRequest{}, resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("Schema() diagnostics = %v", resp.Diagnostics)
 	}
@@ -248,7 +248,7 @@ func TestCertRequestApprovalPolicyValidateConfig(t *testing.T) {
 			plan := certRequestApprovalPolicyRaw(t, s, certRequestApprovalPolicyModelFor(t, types.StringValue("app-1"), c.step))
 
 			resp := &resource.ValidateConfigResponse{}
-			(&certManagerCertificateRequestApprovalPolicyResource{}).ValidateConfig(context.Background(), resource.ValidateConfigRequest{
+			(&certManagerApplicationPolicyResource{}).ValidateConfig(context.Background(), resource.ValidateConfigRequest{
 				Config: tfsdk.Config{Raw: plan.Raw, Schema: s},
 			}, resp)
 
@@ -307,7 +307,7 @@ func TestCertRequestApprovalPolicyValidateConfigWithUnknownValues(t *testing.T) 
 			}
 
 			resp := &resource.ValidateConfigResponse{}
-			(&certManagerCertificateRequestApprovalPolicyResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{
+			(&certManagerApplicationPolicyResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{
 				Config: tfsdk.Config{Raw: plan.Raw, Schema: s},
 			}, resp)
 			if resp.Diagnostics.HasError() {
@@ -328,7 +328,7 @@ func TestCertRequestApprovalPolicyImportStateRejectsNonIDs(t *testing.T) {
 		"":                                     true,
 	} {
 		resp := &resource.ImportStateResponse{State: tfsdk.State{Raw: tftypes.NewValue(s.Type().TerraformType(ctx), nil), Schema: s}}
-		(&certManagerCertificateRequestApprovalPolicyResource{}).ImportState(ctx, resource.ImportStateRequest{ID: id}, resp)
+		(&certManagerApplicationPolicyResource{}).ImportState(ctx, resource.ImportStateRequest{ID: id}, resp)
 		if resp.Diagnostics.HasError() != wantError {
 			t.Errorf("ImportState(%q) error = %v, want %v: %v", id, resp.Diagnostics.HasError(), wantError, resp.Diagnostics)
 		}

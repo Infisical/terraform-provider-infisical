@@ -36,7 +36,7 @@ resource "infisical_cert_manager_application_group" "platform" {
 
 # Certificates requested through the payments application from the public TLS profile need the
 # security lead's approval, then one approval from the platform group
-resource "infisical_cert_manager_certificate_request_approval_policy" "payments_public_tls" {
+resource "infisical_cert_manager_application_policy" "payments_public_tls" {
   name           = "Payments public TLS"
   application_id = infisical_cert_manager_application.payments.id
   profile_names  = ["public-tls"] # The name of an infisical_cert_manager_certificate_profile

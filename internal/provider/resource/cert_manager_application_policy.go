@@ -43,10 +43,10 @@ const (
 )
 
 var (
-	_ resource.Resource                   = &certManagerCertificateRequestApprovalPolicyResource{}
-	_ resource.ResourceWithConfigure      = &certManagerCertificateRequestApprovalPolicyResource{}
-	_ resource.ResourceWithImportState    = &certManagerCertificateRequestApprovalPolicyResource{}
-	_ resource.ResourceWithValidateConfig = &certManagerCertificateRequestApprovalPolicyResource{}
+	_ resource.Resource                   = &certManagerApplicationPolicyResource{}
+	_ resource.ResourceWithConfigure      = &certManagerApplicationPolicyResource{}
+	_ resource.ResourceWithImportState    = &certManagerApplicationPolicyResource{}
+	_ resource.ResourceWithValidateConfig = &certManagerApplicationPolicyResource{}
 )
 
 var approvalPolicyApproverObjectType = types.ObjectType{AttrTypes: map[string]attr.Type{
@@ -54,11 +54,11 @@ var approvalPolicyApproverObjectType = types.ObjectType{AttrTypes: map[string]at
 	"id":   types.StringType,
 }}
 
-func NewCertManagerCertificateRequestApprovalPolicyResource() resource.Resource {
-	return &certManagerCertificateRequestApprovalPolicyResource{}
+func NewCertManagerApplicationPolicyResource() resource.Resource {
+	return &certManagerApplicationPolicyResource{}
 }
 
-type certManagerCertificateRequestApprovalPolicyResource struct {
+type certManagerApplicationPolicyResource struct {
 	client *infisical.Client
 }
 
@@ -84,11 +84,11 @@ type approvalPolicyApproverModel struct {
 	ID   types.String `tfsdk:"id"`
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_cert_manager_certificate_request_approval_policy"
+func (r *certManagerApplicationPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cert_manager_application_policy"
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *certManagerApplicationPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Create and manage a Certificate Manager application's approval policy for certificate requests. A certificate requested through the application from one of the policy's certificate profiles waits for the approvals the policy asks for before it is issued.",
 		Attributes: map[string]schema.Attribute{
@@ -198,7 +198,7 @@ func (r *certManagerCertificateRequestApprovalPolicyResource) Schema(_ context.C
 	}
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+func (r *certManagerApplicationPolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var steps types.List
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("steps"), &steps)...)
 	if resp.Diagnostics.HasError() || steps.IsNull() || steps.IsUnknown() {
@@ -248,7 +248,7 @@ func countUserApprovers(value attr.Value) (int, bool) {
 	return users, true
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *certManagerApplicationPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -265,7 +265,7 @@ func (r *certManagerCertificateRequestApprovalPolicyResource) Configure(_ contex
 	r.client = client
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *certManagerApplicationPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -302,7 +302,7 @@ func (r *certManagerCertificateRequestApprovalPolicyResource) Create(ctx context
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *certManagerApplicationPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -343,7 +343,7 @@ func (r *certManagerCertificateRequestApprovalPolicyResource) Read(ctx context.C
 	resp.Diagnostics.Append(resp.State.Set(ctx, &refreshed)...)
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *certManagerApplicationPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -386,7 +386,7 @@ func (r *certManagerCertificateRequestApprovalPolicyResource) Update(ctx context
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *certManagerApplicationPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -404,7 +404,7 @@ func (r *certManagerCertificateRequestApprovalPolicyResource) Delete(ctx context
 	}
 }
 
-func (r *certManagerCertificateRequestApprovalPolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *certManagerApplicationPolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if _, err := uuid.ParseUUID(req.ID); err != nil {
 		resp.Diagnostics.AddError(
 			"Unexpected Import Identifier",
