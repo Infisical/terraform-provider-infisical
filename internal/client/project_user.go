@@ -1,6 +1,7 @@
 package infisicalclient
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"terraform-provider-infisical/internal/errors"
@@ -135,10 +136,54 @@ func (client Client) GetProjectMembershipByUserID(request GetProjectMembershipBy
 
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
+			// Older self-hosted versions do not expose the lookup-by-user-ID route.
+			// A membership-level 404 must retain its existing not-found semantics.
+			var body struct {
+				Message string `json:"message"`
+			}
+			missingRoute := fmt.Sprintf("Route GET:/api/v1/projects/%s/user/%s/membership not found", request.ProjectID, request.UserID)
+			if json.Unmarshal(response.Body(), &body) == nil && body.Message == missingRoute {
+				return client.getProjectMembershipByUserIDLegacy(request)
+			}
 			return GetProjectUserByUserNameResponse{}, ErrNotFound
 		}
 		return GetProjectUserByUserNameResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectMembershipByUserID, response, nil)
 	}
 
 	return projectMembershipResponse, nil
+}
+
+// getProjectMembershipByUserIDLegacy resolves the immutable user ID before using
+// the existing username-based read endpoint. Neither request changes membership.
+func (client Client) getProjectMembershipByUserIDLegacy(request GetProjectMembershipByUserIDRequest) (GetProjectUserByUserNameResponse, error) {
+	memberships, err := client.GetProjectMemberships(GetProjectMembershipsRequest{ProjectID: request.ProjectID})
+	if err != nil {
+		return GetProjectUserByUserNameResponse{}, fmt.Errorf("listing project memberships for legacy user lookup: %w", err)
+	}
+	if memberships.Memberships == nil {
+		return GetProjectUserByUserNameResponse{}, fmt.Errorf("legacy user lookup returned no membership list")
+	}
+
+	for _, membership := range memberships.Memberships {
+		if membership.UserID != request.UserID && membership.User.ID != request.UserID {
+			continue
+		}
+		if membership.ID == "" || membership.User.Username == "" {
+			return GetProjectUserByUserNameResponse{}, fmt.Errorf("legacy user lookup returned a membership without an ID or username")
+		}
+
+		details, err := client.GetProjectUserByUsername(GetProjectUserByUserNameRequest{
+			ProjectID: request.ProjectID,
+			Username:  membership.User.Username,
+		})
+		if err != nil {
+			return GetProjectUserByUserNameResponse{}, err
+		}
+		if details.Membership.ID != membership.ID || details.Membership.User.ID != request.UserID {
+			return GetProjectUserByUserNameResponse{}, fmt.Errorf("legacy user lookup returned a different membership or user ID")
+		}
+		return details, nil
+	}
+
+	return GetProjectUserByUserNameResponse{}, ErrNotFound
 }
