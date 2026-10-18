@@ -40,3 +40,12 @@ Create and manage identity gcp auth in Infisical.
 Optional:
 
 - `ip_address` (String)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import the existing auth configuration using its identity ID (not the auth config ID).
+terraform import infisical_identity_gcp_auth.example <identity_id>
+```
