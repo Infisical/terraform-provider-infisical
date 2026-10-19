@@ -109,6 +109,12 @@ func (r *CertificateSyncCertificateResource) ModifyPlan(ctx context.Context, req
 	orders := newCertificateOrderResolver(r.client, nil)
 	planOrder, planErr := orders.orderOf(plan.CertificateID.ValueString())
 	stateOrder, stateErr := orders.orderOf(state.CertificateID.ValueString())
+	for _, err := range []error{planErr, stateErr} {
+		if err != nil && err != infisical.ErrNotFound {
+			resp.Diagnostics.AddError("Error looking up certificate", "Couldn't compare the certificate orders, unexpected error: "+err.Error())
+			return
+		}
+	}
 	if planErr != nil || stateErr != nil || planOrder != stateOrder {
 		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("certificate_id"))
 	}
@@ -172,7 +178,7 @@ func (r *CertificateSyncCertificateResource) Create(ctx context.Context, req res
 		resp.Diagnostics.AddError(
 			"Error adding certificate to certificate sync",
 			fmt.Sprintf(
-				"Couldn't add certificate %q to certificate sync %q. Revoked or expired certificates cannot be synced.\n\nOriginal error: %s",
+				"Couldn't add certificate %q to certificate sync %q: %s",
 				plan.CertificateID.ValueString(), plan.CertificateSyncID.ValueString(), err.Error(),
 			),
 		)

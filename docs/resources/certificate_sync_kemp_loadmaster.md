@@ -95,7 +95,7 @@ Required:
 Optional:
 
 - `ca_certificate_name_schema` (String) The naming scheme for synced CA certificates, which must compile to 1-251 alphanumeric characters, hyphens, underscores, or periods. Available placeholders: {{fingerprint}} (recommended so each CA gets a unique name) and {{commonName}}. Defaults to `Infisical-ca-{{fingerprint}}`.
-- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from Kemp LoadMaster when they are no longer managed in Infisical. Defaults to `true`.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from Kemp LoadMaster when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `true`.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to `false`.
 - `preserve_item_on_renewal` (Boolean) Whether a renewed certificate replaces its existing Kemp LoadMaster certificate instead of creating a new one. Defaults to `true`.
 

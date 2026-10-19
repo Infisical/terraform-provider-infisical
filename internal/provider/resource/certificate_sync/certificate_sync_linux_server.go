@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"regexp"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -18,6 +20,12 @@ import (
 )
 
 const linuxServerDefaultExportFormat = hostExportFormatPem
+
+var (
+	linuxFileModePattern      = regexp.MustCompile(`^0?[0-7]{3}$`)
+	linuxPosixNamePattern     = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_-]*\$?$`)
+	linuxPathTraversalPattern = regexp.MustCompile(`(^|/)\.\.(/|$)`)
+)
 
 type CertificateSyncLinuxServerDestinationConfigModel struct {
 	DestinationPath customtypes.TrimmedStringValue `tfsdk:"destination_path"`
@@ -91,13 +99,13 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 		},
 		SyncOptionsAttributes: mergeHostAttributes(certificateSyncHostExportOptionsAttributes(linuxServerDefaultExportFormat), map[string]schema.Attribute{
 			"file_mode": schema.StringAttribute{
-				Validators:  []validator.String{notBlank()},
+				Validators:  []validator.String{stringvalidator.RegexMatches(linuxFileModePattern, "must be a 3-digit octal mode, optionally with a leading 0, for example 0644"), notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The octal file mode applied to delivered certificate files (e.g. 0644).",
 			},
 			"private_key_file_mode": schema.StringAttribute{
-				Validators:  []validator.String{notBlank()},
+				Validators:  []validator.String{stringvalidator.RegexMatches(linuxFileModePattern, "must be a 3-digit octal mode, optionally with a leading 0, for example 0644"), notBlank()},
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The octal file mode applied to delivered private key files (e.g. 0600).",
@@ -106,7 +114,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The Linux user that should own the delivered files.",
-				Validators: []validator.String{
+				Validators: []validator.String{stringvalidator.RegexMatches(linuxPosixNamePattern, "must be a valid POSIX user or group name"),
 					notBlank(),
 					stringvalidator.LengthAtMost(32),
 				},
@@ -115,7 +123,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				Optional:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The Linux group that should own the delivered files.",
-				Validators: []validator.String{
+				Validators: []validator.String{stringvalidator.RegexMatches(linuxPosixNamePattern, "must be a valid POSIX user or group name"),
 					notBlank(),
 					stringvalidator.LengthAtMost(32),
 				},
@@ -130,6 +138,7 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				return
 			}
 			validateCertificateSyncHostExportOptions(config, syncOptions.CertificateSyncHostExportOptionsModel, linuxServerDefaultExportFormat, diags)
+			validateLinuxDestinationPath(ctx, config.DestinationConfig, diags)
 		},
 
 		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -193,5 +202,17 @@ func NewCertificateSyncLinuxServerResource() resource.Resource {
 				"ssh_host_keys":    optionalTrimmedStringFromMap(certificateSync.DestinationConfig, "sshHostKeys"),
 			})
 		},
+	}
+}
+
+func validateLinuxDestinationPath(ctx context.Context, destinationConfig types.Object, diags *diag.Diagnostics) {
+	value, known, set := stringAttribute(ctx, destinationConfig, "destination_path")
+	if !known || !set {
+		return
+	}
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "/") || linuxPathTraversalPattern.MatchString(value) {
+		diags.AddAttributeError(path.Root(attrDestinationConfig).AtName("destination_path"), "Invalid destination path",
+			"destination_path must be an absolute path, starting with /, with no .. segments.")
 	}
 }

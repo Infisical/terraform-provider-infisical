@@ -59,7 +59,7 @@ func NewCertificateSyncAwsCertificateManagerResource() resource.Resource {
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove certificates from AWS Certificate Manager when they are no longer managed in Infisical.",
+				Description: "Whether Infisical should remove certificates from AWS Certificate Manager when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"include_root_ca": schema.BoolAttribute{

@@ -28,11 +28,10 @@ resource "infisical_certificate_sync_chef" "example" {
   }
 
   sync_options = {
-    certificate_name_schema      = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
-    can_remove_certificates      = true
-    include_root_ca              = false
-    preserve_item_on_renewal     = true
-    update_existing_certificates = true
+    certificate_name_schema  = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    can_remove_certificates  = true
+    include_root_ca          = false
+    preserve_item_on_renewal = true
 
     field_mappings = {
       certificate       = "certificate"

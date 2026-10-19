@@ -28,11 +28,10 @@ resource "infisical_certificate_sync_aws_secrets_manager" "example" {
   }
 
   sync_options = {
-    certificate_name_schema      = "infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
-    can_remove_certificates      = true
-    include_root_ca              = false
-    preserve_secret_on_renewal   = true
-    update_existing_certificates = true
+    certificate_name_schema    = "infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    can_remove_certificates    = true
+    include_root_ca            = false
+    preserve_secret_on_renewal = true
     field_mappings = {
       certificate       = "certificate"
       private_key       = "private_key"

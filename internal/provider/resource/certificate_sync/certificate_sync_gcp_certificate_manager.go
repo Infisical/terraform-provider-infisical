@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -43,15 +44,15 @@ var (
 )
 
 type CertificateSyncGcpCertificateManagerCertificateMapBindingModel struct {
-	CertificateMap types.String `tfsdk:"certificate_map"`
-	Hostname       types.String `tfsdk:"hostname"`
+	CertificateMap customtypes.TrimmedStringValue `tfsdk:"certificate_map"`
+	Hostname       customtypes.TrimmedStringValue `tfsdk:"hostname"`
 }
 
 type CertificateSyncGcpCertificateManagerDestinationConfigModel struct {
-	GcpProjectID          types.String `tfsdk:"gcp_project_id"`
-	Location              types.String `tfsdk:"location"`
-	Scope                 types.String `tfsdk:"scope"`
-	CertificateMapBinding types.Object `tfsdk:"certificate_map_binding"`
+	GcpProjectID          customtypes.TrimmedStringValue `tfsdk:"gcp_project_id"`
+	Location              customtypes.TrimmedStringValue `tfsdk:"location"`
+	Scope                 types.String                   `tfsdk:"scope"`
+	CertificateMapBinding types.Object                   `tfsdk:"certificate_map_binding"`
 }
 
 type CertificateSyncGcpCertificateManagerSyncOptionsModel struct {
@@ -63,13 +64,13 @@ type CertificateSyncGcpCertificateManagerSyncOptionsModel struct {
 }
 
 var certificateSyncGcpCertificateManagerCertificateMapBindingAttrTypes = map[string]attr.Type{
-	"certificate_map": types.StringType,
-	"hostname":        types.StringType,
+	"certificate_map": customtypes.TrimmedStringType{},
+	"hostname":        customtypes.TrimmedStringType{},
 }
 
 var certificateSyncGcpCertificateManagerDestinationConfigAttrTypes = map[string]attr.Type{
-	"gcp_project_id":          types.StringType,
-	"location":                types.StringType,
+	"gcp_project_id":          customtypes.TrimmedStringType{},
+	"location":                customtypes.TrimmedStringType{},
 	"scope":                   types.StringType,
 	"certificate_map_binding": types.ObjectType{AttrTypes: certificateSyncGcpCertificateManagerCertificateMapBindingAttrTypes},
 }
@@ -87,15 +88,17 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 		App:                 infisical.CertificateSyncAppGCPCertificateManager,
 		SyncName:            "GCP Certificate Manager",
 		ResourceTypeName:    "_certificate_sync_gcp_certificate_manager",
-		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`), requireIdentifier: true, requirement: "1-63 lowercase letters, digits or hyphens, starting with a letter (prefix the schema, for example \"infisical-{{certificateId}}\")"},
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`), requireIdentifier: true, requireLeadingLowercase: true, requirement: "1-63 lowercase letters, digits or hyphens, starting with a letter (prefix the schema, for example \"infisical-{{certificateId}}\")"},
 		AppConnection:       infisical.AppConnectionAppGCP,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"gcp_project_id": schema.StringAttribute{
+				CustomType:    customtypes.TrimmedStringType{},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Required:      true,
 				Description:   "The ID of the GCP project to sync certificates to.",
 			},
 			"location": schema.StringAttribute{
+				CustomType:    customtypes.TrimmedStringType{},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Required:      true,
 				Description:   "The Certificate Manager location to create certificates in, either global or a region ID such as us-central1.",
@@ -120,10 +123,12 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 				Description: "Adds the synced certificates to an entry in an existing certificate map. Requires the global location and the default scope.",
 				Attributes: map[string]schema.Attribute{
 					"certificate_map": schema.StringAttribute{
+						CustomType:  customtypes.TrimmedStringType{},
 						Required:    true,
 						Description: "The name of the certificate map to add the certificates to.",
 					},
 					"hostname": schema.StringAttribute{
+						CustomType:  customtypes.TrimmedStringType{},
 						Validators:  []validator.String{notBlank()},
 						Optional:    true,
 						Description: "The hostname of the certificate map entry, such as www.example.com or *.example.com. Leave unset to use the primary entry.",
@@ -140,7 +145,7 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove certificates from GCP Certificate Manager when they are no longer managed in Infisical. Defaults to true.",
+				Description: "Whether Infisical should remove certificates from GCP Certificate Manager when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to true.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"include_root_ca": schema.BoolAttribute{
@@ -178,13 +183,14 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 			}
 
 			var destinationConfig CertificateSyncGcpCertificateManagerDestinationConfigModel
-			diags.Append(config.DestinationConfig.As(ctx, &destinationConfig, basetypes.ObjectAsOptions{})...)
-			if diags.HasError() {
+			decodeDiags := config.DestinationConfig.As(ctx, &destinationConfig, basetypes.ObjectAsOptions{})
+			diags.Append(decodeDiags...)
+			if decodeDiags.HasError() {
 				return
 			}
 
 			locationKnown := !destinationConfig.Location.IsUnknown()
-			isGlobal := destinationConfig.Location.ValueString() == gcpCertificateManagerGlobalLocation
+			isGlobal := strings.TrimSpace(destinationConfig.Location.ValueString()) == gcpCertificateManagerGlobalLocation
 			scopeKnown := !destinationConfig.Scope.IsUnknown()
 			scope := destinationConfig.Scope.ValueString()
 			hasBinding := !destinationConfig.CertificateMapBinding.IsNull() && !destinationConfig.CertificateMapBinding.IsUnknown()
@@ -325,8 +331,8 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 		ReadDestinationConfigFromApi: func(_ context.Context, certificateSync infisical.CertificateSync) (types.Object, diag.Diagnostics) {
 			var diags diag.Diagnostics
 
-			gcpProjectID := stringFromMap(certificateSync.DestinationConfig, "gcpProjectId", &diags)
-			location := stringFromMap(certificateSync.DestinationConfig, "location", &diags)
+			gcpProjectID := trimmedStringFromMap(certificateSync.DestinationConfig, "gcpProjectId", &diags)
+			location := trimmedStringFromMap(certificateSync.DestinationConfig, "location", &diags)
 			if diags.HasError() {
 				return types.ObjectNull(certificateSyncGcpCertificateManagerDestinationConfigAttrTypes), diags
 			}
@@ -338,14 +344,14 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 
 			binding := types.ObjectNull(certificateSyncGcpCertificateManagerCertificateMapBindingAttrTypes)
 			if rawBinding, ok := certificateSync.DestinationConfig["certificateMapBinding"].(map[string]interface{}); ok {
-				certificateMap := stringFromMap(rawBinding, "certificateMap", &diags)
+				certificateMap := trimmedStringFromMap(rawBinding, "certificateMap", &diags)
 				if diags.HasError() {
 					return types.ObjectNull(certificateSyncGcpCertificateManagerDestinationConfigAttrTypes), diags
 				}
 				var bindingDiags diag.Diagnostics
 				binding, bindingDiags = types.ObjectValue(certificateSyncGcpCertificateManagerCertificateMapBindingAttrTypes, map[string]attr.Value{
 					"certificate_map": certificateMap,
-					"hostname":        optionalStringFromMap(rawBinding, "hostname"),
+					"hostname":        optionalTrimmedStringFromMap(rawBinding, "hostname"),
 				})
 				diags.Append(bindingDiags...)
 				if diags.HasError() {

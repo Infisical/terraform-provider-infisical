@@ -43,11 +43,10 @@ resource "infisical_certificate_sync_aws_secrets_manager" "example" {
   }
 
   sync_options = {
-    certificate_name_schema      = "infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
-    can_remove_certificates      = true
-    include_root_ca              = false
-    preserve_secret_on_renewal   = true
-    update_existing_certificates = true
+    certificate_name_schema    = "infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    can_remove_certificates    = true
+    include_root_ca            = false
+    preserve_secret_on_renewal = true
     field_mappings = {
       certificate       = "certificate"
       private_key       = "private_key"
@@ -105,11 +104,10 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove secrets from AWS Secrets Manager when their certificates are no longer managed in Infisical. Defaults to true.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove secrets from AWS Secrets Manager when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to true.
 - `field_mappings` (Attributes) The JSON field names used for each part of the certificate inside the secret. (see [below for nested schema](#nestedatt--sync_options--field_mappings))
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to false.
 - `preserve_secret_on_renewal` (Boolean) Whether to update the existing secret when a certificate is renewed instead of creating a new one. Defaults to true.
-- `update_existing_certificates` (Boolean) Whether to overwrite existing secrets in AWS Secrets Manager that match a synced certificate's name. Defaults to true.
 
 <a id="nestedatt--sync_options--field_mappings"></a>
 ### Nested Schema for `sync_options.field_mappings`

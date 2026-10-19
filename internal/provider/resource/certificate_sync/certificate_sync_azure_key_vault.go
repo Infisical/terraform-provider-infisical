@@ -59,7 +59,7 @@ func NewCertificateSyncAzureKeyVaultResource() resource.Resource {
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove certificates from Azure Key Vault when they are no longer managed in Infisical. Defaults to true.",
+				Description: "Whether Infisical should remove certificates from Azure Key Vault when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to true.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"include_root_ca": schema.BoolAttribute{

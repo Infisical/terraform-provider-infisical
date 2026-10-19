@@ -147,7 +147,7 @@ func NewCertificateSyncF5BigIpResource() resource.Resource {
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove certificates from F5 BIG-IP when they are no longer managed in Infisical. Defaults to `true`.",
+				Description: "Whether Infisical should remove certificates from F5 BIG-IP when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `true`.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"include_root_ca": schema.BoolAttribute{

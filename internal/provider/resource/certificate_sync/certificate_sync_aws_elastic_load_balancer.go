@@ -107,7 +107,7 @@ func NewCertificateSyncAwsElasticLoadBalancerResource() resource.Resource {
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove certificates from the load balancer when they are no longer managed in Infisical. Defaults to false.",
+				Description: "Whether Infisical should remove certificates from the load balancer when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to false.",
 				Default:     booldefault.StaticBool(false),
 			},
 			"include_root_ca": schema.BoolAttribute{
@@ -251,8 +251,9 @@ func validateAwsElasticLoadBalancerListeners(ctx context.Context, config Certifi
 		return
 	}
 	var destinationConfig CertificateSyncAwsElasticLoadBalancerDestinationConfigModel
-	diags.Append(config.DestinationConfig.As(ctx, &destinationConfig, objectAsOptions)...)
-	if diags.HasError() || destinationConfig.LoadBalancerArn.IsUnknown() || destinationConfig.LoadBalancerArn.IsNull() || destinationConfig.Listeners.IsUnknown() {
+	decodeDiags := config.DestinationConfig.As(ctx, &destinationConfig, objectAsOptions)
+	diags.Append(decodeDiags...)
+	if decodeDiags.HasError() || destinationConfig.LoadBalancerArn.IsUnknown() || destinationConfig.LoadBalancerArn.IsNull() || destinationConfig.Listeners.IsUnknown() {
 		return
 	}
 
@@ -270,8 +271,9 @@ func validateAwsElasticLoadBalancerListeners(ctx context.Context, config Certifi
 	}
 
 	var listeners []CertificateSyncAwsElasticLoadBalancerListenerModel
-	diags.Append(destinationConfig.Listeners.ElementsAs(ctx, &listeners, false)...)
-	if diags.HasError() {
+	listenersDiags := destinationConfig.Listeners.ElementsAs(ctx, &listeners, false)
+	diags.Append(listenersDiags...)
+	if listenersDiags.HasError() {
 		return
 	}
 	listenerPrefix := strings.Replace(loadBalancerArn, ":loadbalancer/", ":listener/", 1) + "/"

@@ -43,11 +43,10 @@ resource "infisical_certificate_sync_chef" "example" {
   }
 
   sync_options = {
-    certificate_name_schema      = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
-    can_remove_certificates      = true
-    include_root_ca              = false
-    preserve_item_on_renewal     = true
-    update_existing_certificates = true
+    certificate_name_schema  = "Infisical-{{certificateId}}" # Must include {{certificateId}} or {{shortCertificateId}}
+    can_remove_certificates  = true
+    include_root_ca          = false
+    preserve_item_on_renewal = true
 
     field_mappings = {
       certificate       = "certificate"
@@ -101,11 +100,10 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove data bag items from Chef when their certificates are no longer managed in Infisical. Defaults to `true`.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove data bag items from Chef when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `true`.
 - `field_mappings` (Attributes) The data bag item field names that hold each part of the certificate. Defaults to `certificate`, `private_key`, `certificate_chain`, and `ca_certificate`. (see [below for nested schema](#nestedatt--sync_options--field_mappings))
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to `false`.
 - `preserve_item_on_renewal` (Boolean) Whether a renewed certificate overwrites its existing data bag item instead of creating a new one. Defaults to `true`.
-- `update_existing_certificates` (Boolean) Whether Infisical should update data bag items that already exist in Chef. Defaults to `true`.
 
 <a id="nestedatt--sync_options--field_mappings"></a>
 ### Nested Schema for `sync_options.field_mappings`

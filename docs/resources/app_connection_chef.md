@@ -78,4 +78,5 @@ Required:
 
 Optional:
 
+- `data_bag_secret` (String, Sensitive) The secret used to encrypt data bag items. Set it when certificate syncs should write encrypted data bag items.
 - `server_url` (String) The URL of the Chef Server to connect to, e.g. `https://chef.example.com`, defaulting to the hosted Chef API when omitted.

@@ -120,7 +120,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from GCP Certificate Manager when they are no longer managed in Infisical. Defaults to true.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from GCP Certificate Manager when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to true.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to false.
 - `labels` (Map of String) Labels to set on the synced GCP certificates, up to 62. The keys managed-by and infisical-certificate-id are reserved.
 - `preserve_item_on_renewal` (Boolean) Whether to update the existing GCP certificate when a certificate is renewed instead of creating a new one. Defaults to true.

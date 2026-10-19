@@ -93,7 +93,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from NetScaler when they are no longer managed in Infisical. Defaults to `true`.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from NetScaler when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `true`.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to `false`.
 - `preserve_item_on_renewal` (Boolean) Whether a renewed certificate replaces its existing NetScaler certkey instead of creating a new one. Defaults to `true`.
 

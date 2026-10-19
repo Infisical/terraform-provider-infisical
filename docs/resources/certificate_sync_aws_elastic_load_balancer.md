@@ -112,7 +112,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from the load balancer when they are no longer managed in Infisical. Defaults to false.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from the load balancer when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to false.
 - `certificate_name_schema` (String) The naming scheme for certificates imported into ACM for the listeners. When set, it must include the {{certificateId}} placeholder; {{shortCertificateId}} is not supported for this destination. Names may contain letters, digits, spaces, hyphens and underscores (1-256 characters). When unset, the sync holds only one certificate.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to false.
 - `preserve_arn` (Boolean) Whether to preserve the certificate ARN when a certificate is renewed, reimporting into the existing certificate instead of creating a new one. Defaults to true.

@@ -117,7 +117,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should delete certificate files from the server when the certificates are no longer managed in Infisical. Defaults to `false`.
+- `can_remove_certificates` (Boolean) Whether Infisical should delete certificate files from the server when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `false`.
 - `combine_certificate_chain` (Boolean) Whether to write the leaf certificate followed by the chain into a single PEM file instead of a separate chain file. Defaults to `false`.
 - `export_format` (String) The file format to deliver certificates in. Supported values: `pem`, `pkcs12`, `jks`. Defaults to `pem`.
 - `file_mode` (String) The octal file mode applied to delivered certificate files (e.g. 0644).

@@ -100,7 +100,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from AWS Certificate Manager when they are no longer managed in Infisical.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from AWS Certificate Manager when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain.
 - `preserve_arn` (Boolean) Whether to preserve the AWS Certificate Manager ARN when a certificate is renewed, reimporting into the existing certificate instead of creating a new one.
 

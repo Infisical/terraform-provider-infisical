@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -66,7 +67,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 		"can_remove_certificates": schema.BoolAttribute{
 			Optional:    true,
 			Computed:    true,
-			Description: "Whether Infisical should delete certificate files from the server when the certificates are no longer managed in Infisical. Defaults to `false`.",
+			Description: "Whether Infisical should delete certificate files from the server when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `false`.",
 			Default:     booldefault.StaticBool(false),
 		},
 		"include_root_ca": schema.BoolAttribute{
@@ -112,6 +113,7 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 			Validators: []validator.String{
 				notBlank(),
 				stringvalidator.LengthBetween(1, 128),
+				stringvalidator.RegexMatches(keystoreAliasPattern, "must contain only letters, digits, periods, hyphens and underscores"),
 			},
 		},
 		"include_truststore": schema.BoolAttribute{
@@ -138,6 +140,8 @@ func certificateSyncHostExportOptionsAttributes(defaultExportFormat string) map[
 		},
 	}
 }
+
+var keystoreAliasPattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 func mergeHostAttributes[T any](maps ...map[string]T) map[string]T {
 	merged := map[string]T{}

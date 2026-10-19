@@ -37,12 +37,11 @@ type CertificateSyncChefFieldMappingsModel struct {
 }
 
 type CertificateSyncChefSyncOptionsModel struct {
-	CertificateNameSchema      customtypes.TrimmedStringValue `tfsdk:"certificate_name_schema"`
-	CanRemoveCertificates      types.Bool                     `tfsdk:"can_remove_certificates"`
-	IncludeRootCa              types.Bool                     `tfsdk:"include_root_ca"`
-	PreserveItemOnRenewal      types.Bool                     `tfsdk:"preserve_item_on_renewal"`
-	UpdateExistingCertificates types.Bool                     `tfsdk:"update_existing_certificates"`
-	FieldMappings              types.Object                   `tfsdk:"field_mappings"`
+	CertificateNameSchema customtypes.TrimmedStringValue `tfsdk:"certificate_name_schema"`
+	CanRemoveCertificates types.Bool                     `tfsdk:"can_remove_certificates"`
+	IncludeRootCa         types.Bool                     `tfsdk:"include_root_ca"`
+	PreserveItemOnRenewal types.Bool                     `tfsdk:"preserve_item_on_renewal"`
+	FieldMappings         types.Object                   `tfsdk:"field_mappings"`
 }
 
 var certificateSyncChefDestinationConfigAttrTypes = map[string]attr.Type{
@@ -57,13 +56,14 @@ var certificateSyncChefFieldMappingsAttrTypes = map[string]attr.Type{
 }
 
 var certificateSyncChefSyncOptionsAttrTypes = map[string]attr.Type{
-	"certificate_name_schema":      customtypes.TrimmedStringType{},
-	"can_remove_certificates":      types.BoolType,
-	"include_root_ca":              types.BoolType,
-	"preserve_item_on_renewal":     types.BoolType,
-	"update_existing_certificates": types.BoolType,
-	"field_mappings":               types.ObjectType{AttrTypes: certificateSyncChefFieldMappingsAttrTypes},
+	"certificate_name_schema":  customtypes.TrimmedStringType{},
+	"can_remove_certificates":  types.BoolType,
+	"include_root_ca":          types.BoolType,
+	"preserve_item_on_renewal": types.BoolType,
+	"field_mappings":           types.ObjectType{AttrTypes: certificateSyncChefFieldMappingsAttrTypes},
 }
+
+var chefDataBagNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 func chefFieldMappingAttribute(description, def string) schema.StringAttribute {
 	return schema.StringAttribute{
@@ -94,7 +94,7 @@ func NewCertificateSyncChefResource() resource.Resource {
 				Required:    true,
 				CustomType:  customtypes.TrimmedStringType{},
 				Description: "The name of the Chef data bag to sync certificates to. May only contain alphanumeric characters, underscores, and hyphens.",
-				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
+				Validators:  []validator.String{stringvalidator.RegexMatches(chefDataBagNamePattern, "must contain only letters, digits, hyphens and underscores"), stringvalidator.LengthBetween(1, 255)},
 			},
 		},
 		SyncOptionsAttributes: map[string]schema.Attribute{
@@ -106,7 +106,7 @@ func NewCertificateSyncChefResource() resource.Resource {
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove data bag items from Chef when their certificates are no longer managed in Infisical. Defaults to `true`.",
+				Description: "Whether Infisical should remove data bag items from Chef when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `true`.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"include_root_ca": schema.BoolAttribute{
@@ -119,12 +119,6 @@ func NewCertificateSyncChefResource() resource.Resource {
 				Optional:    true,
 				Computed:    true,
 				Description: "Whether a renewed certificate overwrites its existing data bag item instead of creating a new one. Defaults to `true`.",
-				Default:     booldefault.StaticBool(true),
-			},
-			"update_existing_certificates": schema.BoolAttribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "Whether Infisical should update data bag items that already exist in Chef. Defaults to `true`.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"field_mappings": schema.SingleNestedAttribute{
@@ -169,12 +163,11 @@ func NewCertificateSyncChefResource() resource.Resource {
 			}
 
 			return map[string]interface{}{
-				"certificateNameSchema":      syncOptions.CertificateNameSchema.ValueString(),
-				"canRemoveCertificates":      syncOptions.CanRemoveCertificates.ValueBool(),
-				"includeRootCa":              syncOptions.IncludeRootCa.ValueBool(),
-				"preserveItemOnRenewal":      syncOptions.PreserveItemOnRenewal.ValueBool(),
-				"updateExistingCertificates": syncOptions.UpdateExistingCertificates.ValueBool(),
-				"canImportCertificates":      false,
+				"certificateNameSchema": syncOptions.CertificateNameSchema.ValueString(),
+				"canRemoveCertificates": syncOptions.CanRemoveCertificates.ValueBool(),
+				"includeRootCa":         syncOptions.IncludeRootCa.ValueBool(),
+				"preserveItemOnRenewal": syncOptions.PreserveItemOnRenewal.ValueBool(),
+				"canImportCertificates": false,
 				"fieldMappings": map[string]interface{}{
 					"certificate":      fieldMappings.Certificate.ValueString(),
 					"privateKey":       fieldMappings.PrivateKey.ValueString(),
@@ -205,12 +198,11 @@ func NewCertificateSyncChefResource() resource.Resource {
 			}
 
 			return types.ObjectValue(certificateSyncChefSyncOptionsAttrTypes, map[string]attr.Value{
-				"certificate_name_schema":      certificateNameSchema,
-				"can_remove_certificates":      boolFromMap(certificateSync.SyncOptions, "canRemoveCertificates", true),
-				"include_root_ca":              boolFromMap(certificateSync.SyncOptions, "includeRootCa", false),
-				"preserve_item_on_renewal":     boolFromMap(certificateSync.SyncOptions, "preserveItemOnRenewal", true),
-				"update_existing_certificates": boolFromMap(certificateSync.SyncOptions, "updateExistingCertificates", true),
-				"field_mappings":               fieldMappings,
+				"certificate_name_schema":  certificateNameSchema,
+				"can_remove_certificates":  boolFromMap(certificateSync.SyncOptions, "canRemoveCertificates", true),
+				"include_root_ca":          boolFromMap(certificateSync.SyncOptions, "includeRootCa", false),
+				"preserve_item_on_renewal": boolFromMap(certificateSync.SyncOptions, "preserveItemOnRenewal", true),
+				"field_mappings":           fieldMappings,
 			})
 		},
 

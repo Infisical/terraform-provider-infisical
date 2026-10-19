@@ -93,7 +93,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from Azure Key Vault when they are no longer managed in Infisical. Defaults to true.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from Azure Key Vault when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to true.
 - `enable_versioning` (Boolean) Whether a renewed certificate is added as a new version of the existing Azure Key Vault certificate instead of a new certificate. Defaults to true.
 - `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to false.
 

@@ -13,10 +13,11 @@ import (
 )
 
 type AppConnectionChefCredentialsModel struct {
-	ServerUrl  types.String `tfsdk:"server_url"`
-	OrgName    types.String `tfsdk:"org_name"`
-	UserName   types.String `tfsdk:"user_name"`
-	PrivateKey types.String `tfsdk:"private_key"`
+	ServerUrl     types.String `tfsdk:"server_url"`
+	OrgName       types.String `tfsdk:"org_name"`
+	UserName      types.String `tfsdk:"user_name"`
+	PrivateKey    types.String `tfsdk:"private_key"`
+	DataBagSecret types.String `tfsdk:"data_bag_secret"`
 }
 
 const ChefAppConnectionUserKeyMethod = "user-key"
@@ -45,6 +46,11 @@ func NewAppConnectionChefResource() resource.Resource {
 				Required:    true,
 				Sensitive:   true,
 				Description: "The PEM-encoded private key of the Chef user.",
+			},
+			"data_bag_secret": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "The secret used to encrypt data bag items. Set it when certificate syncs should write encrypted data bag items.",
 			},
 		},
 		ReadCredentialsForCreateFromPlan: func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics) {
@@ -94,6 +100,9 @@ func NewAppConnectionChefResource() resource.Resource {
 			credentialsConfig["orgName"] = credentials.OrgName.ValueString()
 			credentialsConfig["userName"] = credentials.UserName.ValueString()
 			credentialsConfig["privateKey"] = credentials.PrivateKey.ValueString()
+			if !credentials.DataBagSecret.IsNull() && credentials.DataBagSecret.ValueString() != "" {
+				credentialsConfig["dataBagSecret"] = credentials.DataBagSecret.ValueString()
+			}
 
 			return credentialsConfig, diags
 		},
@@ -135,6 +144,11 @@ func NewAppConnectionChefResource() resource.Resource {
 				userName = credentialsFromState.UserName
 			}
 
+			dataBagSecret := credentialsFromPlan.DataBagSecret
+			if credentialsFromPlan.DataBagSecret.IsUnknown() {
+				dataBagSecret = credentialsFromState.DataBagSecret
+			}
+
 			privateKey := credentialsFromPlan.PrivateKey
 			if credentialsFromPlan.PrivateKey.IsUnknown() {
 				privateKey = credentialsFromState.PrivateKey
@@ -170,23 +184,28 @@ func NewAppConnectionChefResource() resource.Resource {
 			credentialsConfig["orgName"] = orgName.ValueString()
 			credentialsConfig["userName"] = userName.ValueString()
 			credentialsConfig["privateKey"] = privateKey.ValueString()
+			if !dataBagSecret.IsNull() && dataBagSecret.ValueString() != "" {
+				credentialsConfig["dataBagSecret"] = dataBagSecret.ValueString()
+			}
 
 			return credentialsConfig, diags
 		},
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
 			credentialsConfig := map[string]attr.Value{
-				"server_url":  types.StringNull(),
-				"org_name":    types.StringNull(),
-				"user_name":   types.StringNull(),
-				"private_key": types.StringNull(),
+				"server_url":      types.StringNull(),
+				"data_bag_secret": types.StringNull(),
+				"org_name":        types.StringNull(),
+				"user_name":       types.StringNull(),
+				"private_key":     types.StringNull(),
 			}
 
 			var diags diag.Diagnostics
 			state.Credentials, diags = types.ObjectValue(map[string]attr.Type{
-				"server_url":  types.StringType,
-				"org_name":    types.StringType,
-				"user_name":   types.StringType,
-				"private_key": types.StringType,
+				"server_url":      types.StringType,
+				"data_bag_secret": types.StringType,
+				"org_name":        types.StringType,
+				"user_name":       types.StringType,
+				"private_key":     types.StringType,
 			}, credentialsConfig)
 
 			return diags

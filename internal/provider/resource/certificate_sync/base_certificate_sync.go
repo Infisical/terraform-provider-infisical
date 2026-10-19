@@ -182,7 +182,7 @@ type CertificateSyncBaseResourceModel struct {
 	ConnectionID            types.String
 	Name                    customtypes.TrimmedStringValue
 	ApplicationID           types.String
-	Description             types.String
+	Description             customtypes.TrimmedStringValue
 	AutoSyncEnabled         types.Bool
 	SyncOptions             types.Object
 	DestinationConfig       types.Object
@@ -228,6 +228,7 @@ func (r *CertificateSyncBaseResource) modelFields(m *CertificateSyncBaseResource
 func (r *CertificateSyncBaseResource) newModel() CertificateSyncBaseResourceModel {
 	return CertificateSyncBaseResourceModel{
 		Name:                    customtypes.NewTrimmedStringNull(),
+		Description:             customtypes.NewTrimmedStringNull(),
 		SyncOptions:             types.ObjectNull(map[string]attr.Type{}),
 		CertificateFilters:      types.ObjectNull(certificateFiltersAttrTypes),
 		DefaultCertificateID:    types.StringNull(),
@@ -314,6 +315,7 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 		},
 		attrDescription: schema.StringAttribute{
 			Optional:    true,
+			CustomType:  customtypes.TrimmedStringType{},
 			Description: fmt.Sprintf("An optional description for the %s sync.", r.SyncName),
 		},
 		attrAutoSyncEnabled: schema.BoolAttribute{
@@ -543,6 +545,14 @@ func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
+	if certificateSync.Destination != string(r.App) {
+		resp.Diagnostics.AddError(
+			"Wrong certificate sync type",
+			fmt.Sprintf("Certificate sync %q is a %s sync, so it can't be managed as infisical%s. Use the resource for its destination instead.", state.ID.ValueString(), certificateSync.Destination, r.ResourceTypeName),
+		)
+		return
+	}
+
 	state.ConnectionID = types.StringValue(certificateSync.ConnectionID)
 	state.Name = customtypes.NewTrimmedStringValue(certificateSync.Name)
 	state.ApplicationID = types.StringValue(certificateSync.ApplicationID)
@@ -550,7 +560,7 @@ func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.Rea
 
 	// Keep an unset optional description null instead of flipping it to "" on every read.
 	if !(state.Description.IsNull() && certificateSync.Description == "") {
-		state.Description = types.StringValue(certificateSync.Description)
+		state.Description = customtypes.NewTrimmedStringValue(certificateSync.Description)
 	}
 
 	if r.hasSyncOptions() {

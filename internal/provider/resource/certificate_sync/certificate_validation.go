@@ -21,6 +21,7 @@ const (
 
 var (
 	anyNamePlaceholderPattern = regexp.MustCompile(`\{\{(certificateId|shortCertificateId|profileId|applicationId|applicationName|commonName)\}\}`)
+	leadingLowercasePattern   = regexp.MustCompile(`^[a-z]`)
 	commandVariablePattern    = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_]+)\s*\}\}`)
 )
 
@@ -33,6 +34,7 @@ type certificateNameRule struct {
 	minLength, maxLength        int
 	requireIdentifier           bool
 	requireLiteralCertificateID bool
+	requireLeadingLowercase     bool
 	requirement                 string
 }
 
@@ -65,6 +67,10 @@ func (rule certificateNameRule) validate(schema string) []string {
 		problems = append(problems, "It must include the {{certificateId}} placeholder. {{shortCertificateId}} is accepted when the sync is created but fails every sync run for this destination.")
 	} else if rule.requireIdentifier && !hasCertificateIdentifier(schema) {
 		problems = append(problems, "It must include the {{certificateId}} or {{shortCertificateId}} placeholder.")
+	}
+
+	if rule.requireLeadingLowercase && !leadingLowercasePattern.MatchString(schema) {
+		problems = append(problems, `It must start with a lowercase letter, not a placeholder, for example "infisical-{{certificateId}}".`)
 	}
 
 	compiled := compileCertificateNameSchemaTest(schema)
@@ -149,8 +155,9 @@ func enforceCertificateCap(ctx context.Context, limit certificateCap, filters ty
 		return
 	}
 	var model certificateFiltersModel
-	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
-	if diags.HasError() {
+	decodeDiags := filters.As(ctx, &model, objectAsOptions)
+	diags.Append(decodeDiags...)
+	if decodeDiags.HasError() {
 		return
 	}
 
@@ -178,8 +185,9 @@ func warnOnNameCollisions(ctx context.Context, schema string, filters types.Obje
 		return
 	}
 	var model certificateFiltersModel
-	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
-	if diags.HasError() {
+	decodeDiags := filters.As(ctx, &model, objectAsOptions)
+	diags.Append(decodeDiags...)
+	if decodeDiags.HasError() {
 		return
 	}
 	multiple := !model.ProfileIDs.IsNull() || !model.Metadata.IsNull() ||
@@ -208,7 +216,8 @@ func (r *CertificateSyncBaseResource) validateCertificateNamesAndCap(ctx context
 		return
 	}
 
-	if schemaKnown && schemaSet {
+	rule := r.CertificateNameRule
+	if schemaKnown && schemaSet && (rule == nil || !(rule.requireIdentifier || rule.requireLiteralCertificateID)) {
 		warnOnNameCollisions(ctx, schema, config.CertificateFilters, diags)
 	}
 }

@@ -94,7 +94,10 @@ func emptyCertificateFilters() types.Object {
 }
 
 func hasAnyCertificateFilter(filters *infisical.CertificateSyncFilters) bool {
-	return filters != nil && (filters.CertificateOrderIDs != nil || filters.ProfileIDs != nil || filters.Metadata != nil)
+	if filters == nil {
+		return false
+	}
+	return len(derefStrings(filters.CertificateOrderIDs)) > 0 || len(derefStrings(filters.ProfileIDs)) > 0 || (filters.Metadata != nil && len(*filters.Metadata) > 0)
 }
 
 func derefStrings(values *[]string) []string {

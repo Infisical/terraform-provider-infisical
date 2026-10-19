@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -189,6 +191,7 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 				return
 			}
 			validateCertificateSyncHostExportOptions(config, syncOptions.CertificateSyncHostExportOptionsModel, windowsServerDefaultExportFormat, diags)
+			validateWindowsDestinationPath(ctx, config.DestinationConfig, diags)
 		},
 
 		ReadSyncOptionsFromPlan: func(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -274,5 +277,25 @@ func NewCertificateSyncWindowsServerResource() resource.Resource {
 				"ssl_certificate":         optionalTrimmedStringFromMap(certificateSync.DestinationConfig, "sslCertificate"),
 			})
 		},
+	}
+}
+
+var (
+	windowsAbsolutePathPattern  = regexp.MustCompile(`^[a-zA-Z]:\\`)
+	windowsPathCharsPattern     = regexp.MustCompile(`^[A-Za-z0-9 ._\-\\/:]+$`)
+	windowsPathTraversalPattern = regexp.MustCompile(`(^|[\\/])\.\.([\\/]|$)`)
+	windowsDoubleSeparator      = regexp.MustCompile(`[\\/]{2,}`)
+)
+
+func validateWindowsDestinationPath(ctx context.Context, destinationConfig types.Object, diags *diag.Diagnostics) {
+	value, known, set := stringAttribute(ctx, destinationConfig, "destination_path")
+	if !known || !set {
+		return
+	}
+	value = strings.TrimSpace(value)
+	if !windowsAbsolutePathPattern.MatchString(value) || !windowsPathCharsPattern.MatchString(value) ||
+		windowsPathTraversalPattern.MatchString(value) || windowsDoubleSeparator.MatchString(value) {
+		diags.AddAttributeError(path.Root(attrDestinationConfig).AtName("destination_path"), "Invalid destination path",
+			`destination_path must be an absolute drive path such as C:\certs, using letters, digits, spaces, periods, hyphens, underscores and separators, with no .. segments or doubled separators.`)
 	}
 }
