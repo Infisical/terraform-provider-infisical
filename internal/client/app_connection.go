@@ -48,6 +48,8 @@ const (
 	AppConnectionAppNutanixPrismCentral   AppConnectionApp = "nutanix-prism-central"
 	AppConnectionAppSSH                   AppConnectionApp = "ssh"
 	AppConnectionAppWinRM                 AppConnectionApp = "winrm"
+	AppConnectionAppSpacelift             AppConnectionApp = "spacelift"
+	AppConnectionAppLiteLLM               AppConnectionApp = "litellm"
 )
 
 const (

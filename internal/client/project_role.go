@@ -151,6 +151,9 @@ func (client Client) GetProjectRoleBySlug(request GetProjectRoleBySlugRequest) (
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectRoleBySlugResponse{}, ErrNotFound
+		}
 		return GetProjectRoleBySlugResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectRoleBySlug, response, nil)
 	}
 

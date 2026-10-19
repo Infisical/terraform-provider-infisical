@@ -425,6 +425,10 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		})
 
 		if err != nil {
+			if err == infisical.ErrNotFound {
+				resp.State.RemoveResource(ctx)
+				return
+			}
 			resp.Diagnostics.AddError(
 				"Error reading project role",
 				"Couldn't read project role from Infisical, unexpected error: "+err.Error(),
@@ -564,6 +568,10 @@ func (r *projectRoleResource) Read(ctx context.Context, req resource.ReadRequest
 		})
 
 		if err != nil {
+			if err == infisical.ErrNotFound {
+				resp.State.RemoveResource(ctx)
+				return
+			}
 			resp.Diagnostics.AddError(
 				"Error reading project role",
 				"Couldn't read project role from Infisical, unexpected error: "+err.Error(),

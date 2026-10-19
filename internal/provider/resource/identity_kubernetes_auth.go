@@ -477,6 +477,7 @@ func (r *IdentityKubernetesAuthResource) Read(ctx context.Context, req resource.
 		}
 	}
 
+	state.ID = types.StringValue(identityKubernetesAuth.ID)
 	updateKubernetesAuthStateByApi(ctx, resp.Diagnostics, &state, &identityKubernetesAuth)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
