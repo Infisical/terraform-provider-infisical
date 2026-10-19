@@ -26,9 +26,9 @@ resource "infisical_certificate_sync_aws_certificate_manager" "example" {
   # Omit certificate_filters to choose the synced certificates outside Terraform.
   # Fields are combined: a certificate must match every field that is set.
   certificate_filters = {
-    certificate_ids = [
-      infisical_cert_manager_certificate.api.id,
-      infisical_cert_manager_certificate.www.id,
+    certificate_order_ids = [
+      infisical_cert_manager_certificate.api.order_id,
+      infisical_cert_manager_certificate.www.order_id,
     ]
     # profile_ids = ["<certificate-profile-id>"]
     # metadata    = [{ key = "env", value = "prod" }]

@@ -24,7 +24,7 @@ resource "infisical_certificate_sync_gcp_certificate_manager" "example" {
   connection_id  = "<app-connection-id>"
 
   certificate_filters = {
-    certificate_ids = [infisical_cert_manager_certificate.example.id]
+    certificate_order_ids = [infisical_cert_manager_certificate.example.order_id]
   }
 
   sync_options = {

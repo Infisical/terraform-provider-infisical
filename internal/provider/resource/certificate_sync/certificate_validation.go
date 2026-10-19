@@ -165,15 +165,14 @@ func enforceCertificateCap(ctx context.Context, limit certificateCap, filters ty
 		diags.AddAttributeError(
 			path.Root(attrCertificateFilters),
 			"Certificate filter not allowed",
-			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s, so certificate_filters can only use certificate_ids. Remove profile_ids and metadata.", limit.max, limit.reason),
+			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s, so certificate_filters can only use certificate_order_ids. Remove profile_ids and metadata.", limit.max, limit.reason),
 		)
 	}
-	// A warning, since IDs of a certificate and its renewal share one order and count once in the backend.
-	if !model.CertificateIDs.IsNull() && !model.CertificateIDs.IsUnknown() && len(model.CertificateIDs.Elements()) > limit.max {
-		diags.AddAttributeWarning(
-			path.Root(attrCertificateFilters).AtName("certificate_ids"),
+	if !model.CertificateOrderIDs.IsNull() && !model.CertificateOrderIDs.IsUnknown() && len(model.CertificateOrderIDs.Elements()) > limit.max {
+		diags.AddAttributeError(
+			path.Root(attrCertificateFilters).AtName("certificate_order_ids"),
 			"Too many certificates",
-			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s. Apply fails unless the extra IDs are renewals of the same certificate.", limit.max, limit.reason),
+			fmt.Sprintf("This sync can hold at most %d certificate(s) because %s. Remove the extra certificate orders.", limit.max, limit.reason),
 		)
 	}
 }
@@ -191,7 +190,7 @@ func warnOnNameCollisions(ctx context.Context, schema string, filters types.Obje
 		return
 	}
 	multiple := !model.ProfileIDs.IsNull() || !model.Metadata.IsNull() ||
-		(!model.CertificateIDs.IsNull() && !model.CertificateIDs.IsUnknown() && len(model.CertificateIDs.Elements()) > 1)
+		(!model.CertificateOrderIDs.IsNull() && !model.CertificateOrderIDs.IsUnknown() && len(model.CertificateOrderIDs.Elements()) > 1)
 	if !multiple {
 		return
 	}

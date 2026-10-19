@@ -127,19 +127,19 @@ func setOptionalInt64(m map[string]interface{}, key string, value types.Int64) {
 const exportPasswordMaxLength = 1024
 
 const (
-	attrID                      = "id"
-	attrConnectionID            = "connection_id"
-	attrName                    = "name"
-	attrApplicationID           = "application_id"
-	attrDescription             = "description"
-	attrAutoSyncEnabled         = "auto_sync_enabled"
-	attrSyncOptions             = "sync_options"
-	attrDestinationConfig       = "destination_config"
-	attrCertificateFilters      = "certificate_filters"
-	attrDefaultCertificateID    = "default_certificate_id"
-	attrExportPassword          = "export_password"
-	attrExportPasswordWO        = "export_password_wo"
-	attrExportPasswordWOVersion = "export_password_wo_version"
+	attrID                        = "id"
+	attrConnectionID              = "connection_id"
+	attrName                      = "name"
+	attrApplicationID             = "application_id"
+	attrDescription               = "description"
+	attrAutoSyncEnabled           = "auto_sync_enabled"
+	attrSyncOptions               = "sync_options"
+	attrDestinationConfig         = "destination_config"
+	attrCertificateFilters        = "certificate_filters"
+	attrDefaultCertificateOrderID = "default_certificate_order_id"
+	attrExportPassword            = "export_password"
+	attrExportPasswordWO          = "export_password_wo"
+	attrExportPasswordWOVersion   = "export_password_wo_version"
 )
 
 // CertificateSyncBaseResource is the shared implementation behind every certificate sync destination.
@@ -178,19 +178,19 @@ type CertificateSyncBaseResource struct {
 // CertificateSyncBaseResourceModel holds every attribute any destination can declare. Attributes a
 // destination does not declare stay null and are never read from or written to plan and state.
 type CertificateSyncBaseResourceModel struct {
-	ID                      types.String
-	ConnectionID            types.String
-	Name                    customtypes.TrimmedStringValue
-	ApplicationID           types.String
-	Description             customtypes.TrimmedStringValue
-	AutoSyncEnabled         types.Bool
-	SyncOptions             types.Object
-	DestinationConfig       types.Object
-	CertificateFilters      types.Object
-	DefaultCertificateID    types.String
-	ExportPassword          types.String
-	ExportPasswordWO        types.String
-	ExportPasswordWOVersion types.Int64
+	ID                        types.String
+	ConnectionID              types.String
+	Name                      customtypes.TrimmedStringValue
+	ApplicationID             types.String
+	Description               customtypes.TrimmedStringValue
+	AutoSyncEnabled           types.Bool
+	SyncOptions               types.Object
+	DestinationConfig         types.Object
+	CertificateFilters        types.Object
+	DefaultCertificateOrderID types.String
+	ExportPassword            types.String
+	ExportPasswordWO          types.String
+	ExportPasswordWOVersion   types.Int64
 }
 
 type attributeGetter interface {
@@ -216,7 +216,7 @@ func (r *CertificateSyncBaseResource) modelFields(m *CertificateSyncBaseResource
 		fields[attrSyncOptions] = &m.SyncOptions
 	}
 	if r.SupportsDefaultCertificate {
-		fields[attrDefaultCertificateID] = &m.DefaultCertificateID
+		fields[attrDefaultCertificateOrderID] = &m.DefaultCertificateOrderID
 	}
 	if r.SupportsExportPassword {
 		fields[attrExportPassword] = &m.ExportPassword
@@ -227,14 +227,14 @@ func (r *CertificateSyncBaseResource) modelFields(m *CertificateSyncBaseResource
 
 func (r *CertificateSyncBaseResource) newModel() CertificateSyncBaseResourceModel {
 	return CertificateSyncBaseResourceModel{
-		Name:                    customtypes.NewTrimmedStringNull(),
-		Description:             customtypes.NewTrimmedStringNull(),
-		SyncOptions:             types.ObjectNull(map[string]attr.Type{}),
-		CertificateFilters:      types.ObjectNull(certificateFiltersAttrTypes),
-		DefaultCertificateID:    types.StringNull(),
-		ExportPassword:          types.StringNull(),
-		ExportPasswordWO:        types.StringNull(),
-		ExportPasswordWOVersion: types.Int64Null(),
+		Name:                      customtypes.NewTrimmedStringNull(),
+		Description:               customtypes.NewTrimmedStringNull(),
+		SyncOptions:               types.ObjectNull(map[string]attr.Type{}),
+		CertificateFilters:        types.ObjectNull(certificateFiltersAttrTypes),
+		DefaultCertificateOrderID: types.StringNull(),
+		ExportPassword:            types.StringNull(),
+		ExportPasswordWO:          types.StringNull(),
+		ExportPasswordWOVersion:   types.Int64Null(),
 	}
 }
 
@@ -341,10 +341,10 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 	}
 
 	if r.SupportsDefaultCertificate {
-		attributes[attrDefaultCertificateID] = schema.StringAttribute{
+		attributes[attrDefaultCertificateOrderID] = schema.StringAttribute{
 			Optional: true,
-			Description: "The ID of the certificate to set as the default certificate on every listener. The load balancer serves it when a client's SNI matches no other certificate. " +
-				"It must be one of the certificates the sync holds. Leave unset to leave the listeners' default unmanaged; removing it later stops managing the default without changing it.",
+			Description: "The certificate order whose newest certificate is the default certificate on every listener, from the `order_id` attribute of `infisical_cert_manager_certificate`. The load balancer serves it when a client's SNI matches no other certificate. " +
+				"It must be one of the orders the sync holds. Leave unset to leave the listeners' default unmanaged; removing it later stops managing the default without changing it.",
 		}
 	}
 
@@ -414,7 +414,7 @@ func (r *CertificateSyncBaseResource) ValidateConfig(ctx context.Context, req re
 	resp.Diagnostics.Append(validateCertificateFilters(ctx, config.CertificateFilters)...)
 
 	if r.SupportsDefaultCertificate {
-		resp.Diagnostics.Append(validateDefaultCertificateInFilters(ctx, config.DefaultCertificateID, config.CertificateFilters)...)
+		resp.Diagnostics.Append(validateDefaultCertificateInFilters(ctx, config.DefaultCertificateOrderID, config.CertificateFilters)...)
 	}
 
 	r.validateCertificateNamesAndCap(ctx, config, &resp.Diagnostics)
@@ -458,9 +458,7 @@ func (r *CertificateSyncBaseResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	orders := newCertificateOrderResolver(r.client, nil)
-
-	filters, diags := certificateFiltersForRequest(ctx, plan.CertificateFilters, orders, plan.ApplicationID.ValueString())
+	filters, diags := certificateFiltersForRequest(ctx, plan.CertificateFilters)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -505,14 +503,12 @@ func (r *CertificateSyncBaseResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	if r.SupportsDefaultCertificate && !plan.DefaultCertificateID.IsNull() {
+	if r.SupportsDefaultCertificate && !plan.DefaultCertificateOrderID.IsNull() {
 		// An error would taint the new sync and force a recreate; the next refresh sees the unset default and retries it.
-		for _, d := range r.setDefaultCertificate(certificateSync.ID, plan.DefaultCertificateID.ValueString(), orders).Errors() {
+		for _, d := range r.setDefaultCertificate(certificateSync.ID, plan.DefaultCertificateOrderID.ValueString()).Errors() {
 			resp.Diagnostics.AddWarning("Default certificate not set: "+d.Summary(), d.Detail())
 		}
 	}
-
-	resp.Diagnostics.Append(orders.save(ctx, resp.Private)...)
 }
 
 func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -581,26 +577,18 @@ func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.Rea
 	resp.Diagnostics.Append(diags...)
 	isImport := string(imported) == "true"
 
-	orders, diags := loadCertificateOrderResolver(ctx, r.client, req.Private)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	linked := newLinkedCertificates(r.client, certificateSync.ID)
-
 	priorFilters := state.CertificateFilters
 	if isImport && priorFilters.IsNull() && hasAnyCertificateFilter(certificateSync.Filters) {
 		priorFilters = emptyCertificateFilters()
 	}
-	state.CertificateFilters, diags = certificateFiltersFromApi(ctx, priorFilters, certificateSync.Filters, orders, linked)
+	state.CertificateFilters, diags = certificateFiltersFromApi(priorFilters, certificateSync.Filters)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if r.SupportsDefaultCertificate && (!state.DefaultCertificateID.IsNull() || isImport) {
-		state.DefaultCertificateID, diags = defaultCertificateFromApi(state.DefaultCertificateID, orders, linked)
+	if r.SupportsDefaultCertificate && (!state.DefaultCertificateOrderID.IsNull() || isImport) {
+		state.DefaultCertificateOrderID, diags = defaultCertificateFromApi(newLinkedCertificates(r.client, certificateSync.ID))
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -608,7 +596,6 @@ func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.Rea
 	}
 
 	resp.Diagnostics.Append(r.setModel(ctx, &resp.State, state)...)
-	resp.Diagnostics.Append(orders.save(ctx, resp.Private)...)
 	if isImport {
 		resp.Diagnostics.Append(resp.Private.SetKey(ctx, privateKeyImported, nil)...)
 	}
@@ -647,12 +634,6 @@ func (r *CertificateSyncBaseResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	orders, diags := loadCertificateOrderResolver(ctx, r.client, req.Private)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	request := infisical.UpdateCertificateSyncRequest{
 		App:               r.App,
 		ID:                state.ID.ValueString(),
@@ -666,7 +647,7 @@ func (r *CertificateSyncBaseResource) Update(ctx context.Context, req resource.U
 
 	// An omitted block leaves the list unmanaged, so the API's filters are only replaced when the configured block changed.
 	if !plan.CertificateFilters.IsNull() && !plan.CertificateFilters.Equal(state.CertificateFilters) {
-		request.Filters, diags = certificateFiltersForRequest(ctx, plan.CertificateFilters, orders, plan.ApplicationID.ValueString())
+		request.Filters, diags = certificateFiltersForRequest(ctx, plan.CertificateFilters)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -701,11 +682,9 @@ func (r *CertificateSyncBaseResource) Update(ctx context.Context, req resource.U
 	}
 
 	// An unset default stops managing it rather than clearing the listeners' current default.
-	if r.SupportsDefaultCertificate && !plan.DefaultCertificateID.IsNull() && !plan.DefaultCertificateID.Equal(state.DefaultCertificateID) {
-		resp.Diagnostics.Append(r.setDefaultCertificate(state.ID.ValueString(), plan.DefaultCertificateID.ValueString(), orders)...)
+	if r.SupportsDefaultCertificate && !plan.DefaultCertificateOrderID.IsNull() && !plan.DefaultCertificateOrderID.Equal(state.DefaultCertificateOrderID) {
+		resp.Diagnostics.Append(r.setDefaultCertificate(state.ID.ValueString(), plan.DefaultCertificateOrderID.ValueString())...)
 	}
-
-	resp.Diagnostics.Append(orders.save(ctx, resp.Private)...)
 }
 
 func (r *CertificateSyncBaseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -735,19 +714,11 @@ func (r *CertificateSyncBaseResource) Delete(ctx context.Context, req resource.D
 	}
 }
 
-// setDefaultCertificate marks the synced certificate in the same order as certificateID as the default.
-// The order is matched rather than the ID because the configured ID may predate a renewal.
-func (r *CertificateSyncBaseResource) setDefaultCertificate(certificateSyncID, certificateID string, orders *certificateOrderResolver) diag.Diagnostics {
+// setDefaultCertificate marks the newest synced certificate of the order as the default.
+func (r *CertificateSyncBaseResource) setDefaultCertificate(certificateSyncID, orderID string) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	orderID, err := orders.orderOf(certificateID)
-	if err != nil {
-		diags.AddError("Error resolving default certificate", fmt.Sprintf("Couldn't look up certificate %q: %s", certificateID, err.Error()))
-		return diags
-	}
-
-	linked := newLinkedCertificates(r.client, certificateSyncID)
-	current, err := linked.byOrder(orderID)
+	current, err := newLinkedCertificates(r.client, certificateSyncID).byOrder(orderID)
 	if err != nil {
 		diags.AddError("Error resolving default certificate", "Couldn't list the certificate sync's certificates: "+err.Error())
 		return diags
@@ -755,7 +726,7 @@ func (r *CertificateSyncBaseResource) setDefaultCertificate(certificateSyncID, c
 	if current == nil {
 		diags.AddError(
 			"Invalid default certificate",
-			fmt.Sprintf("Certificate %q is not one of the certificates this sync holds. Add it to certificate_filters first.", certificateID),
+			fmt.Sprintf("Certificate order %q has no certificate in this sync. Add it to certificate_filters first.", orderID),
 		)
 		return diags
 	}
@@ -771,55 +742,46 @@ func (r *CertificateSyncBaseResource) setDefaultCertificate(certificateSyncID, c
 	return diags
 }
 
-func defaultCertificateFromApi(prior types.String, orders *certificateOrderResolver, linked *linkedCertificates) (types.String, diag.Diagnostics) {
+func defaultCertificateFromApi(linked *linkedCertificates) (types.String, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	current, err := linked.defaultCertificate()
 	if err != nil {
 		diags.AddError("Error reading default certificate", "Couldn't list the certificate sync's certificates: "+err.Error())
-		return prior, diags
+		return types.StringNull(), diags
 	}
 	if current == nil {
 		return types.StringNull(), diags
 	}
-
-	if !prior.IsNull() {
-		priorOrder, err := orders.orderOf(prior.ValueString())
-		if err == nil && priorOrder == current.CertificateOrderID {
-			return prior, diags
-		}
-	}
-
-	orders.remember(current.CertificateID, current.CertificateOrderID)
-	return types.StringValue(current.CertificateID), diags
+	return types.StringValue(current.CertificateOrderID), diags
 }
 
-func validateDefaultCertificateInFilters(ctx context.Context, defaultCertificateID types.String, filters types.Object) diag.Diagnostics {
+func validateDefaultCertificateInFilters(ctx context.Context, defaultOrderID types.String, filters types.Object) diag.Diagnostics {
 	var diags diag.Diagnostics
-	if defaultCertificateID.IsNull() || defaultCertificateID.IsUnknown() || filters.IsNull() || filters.IsUnknown() {
+	if defaultOrderID.IsNull() || defaultOrderID.IsUnknown() || filters.IsNull() || filters.IsUnknown() {
 		return diags
 	}
 
 	var model certificateFiltersModel
 	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
-	if diags.HasError() || model.CertificateIDs.IsNull() || model.CertificateIDs.IsUnknown() {
+	if diags.HasError() || model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
 		return diags
 	}
 
-	for _, element := range model.CertificateIDs.Elements() {
+	for _, element := range model.CertificateOrderIDs.Elements() {
 		value, ok := element.(types.String)
 		if !ok || value.IsUnknown() {
 			return diags
 		}
-		if value.ValueString() == defaultCertificateID.ValueString() {
+		if value.ValueString() == defaultOrderID.ValueString() {
 			return diags
 		}
 	}
 
-	diags.AddAttributeWarning(
-		path.Root(attrDefaultCertificateID),
-		"Default certificate not in certificate_ids",
-		"default_certificate_id is not one of the IDs in certificate_filters.certificate_ids. This is fine when it is a renewal of one of them; otherwise setting the default fails at apply.",
+	diags.AddAttributeError(
+		path.Root(attrDefaultCertificateOrderID),
+		"Default certificate not in the sync",
+		"default_certificate_order_id must be one of the orders in certificate_filters.certificate_order_ids.",
 	)
 	return diags
 }

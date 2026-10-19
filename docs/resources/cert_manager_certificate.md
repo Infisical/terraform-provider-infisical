@@ -141,6 +141,7 @@ output "cert_private_key" {
 - `id` (String) The ID of the certificate
 - `not_after` (String) The not-after (expiration) date of the certificate (RFC3339 format)
 - `not_before` (String) The not-before date of the certificate (RFC3339 format)
+- `order_id` (String) The ID of the certificate order. A certificate and all of its renewals share one order, so use it to select this certificate in a certificate sync's `certificate_filters`.
 - `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based).
 - `serial_number` (String) The serial number of the issued certificate
 - `status` (String) The status of the certificate (pending, issued, failed)

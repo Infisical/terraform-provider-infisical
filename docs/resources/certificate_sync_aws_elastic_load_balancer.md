@@ -39,10 +39,10 @@ resource "infisical_certificate_sync_aws_elastic_load_balancer" "example" {
   connection_id  = "<app-connection-id>"
 
   certificate_filters = {
-    certificate_ids = [infisical_cert_manager_certificate.example.id]
+    certificate_order_ids = [infisical_cert_manager_certificate.example.order_id]
   }
 
-  default_certificate_id = infisical_cert_manager_certificate.example.id
+  default_certificate_order_id = infisical_cert_manager_certificate.example.order_id
 
   sync_options = {
     certificate_name_schema = "Infisical-{{certificateId}}"
@@ -79,8 +79,8 @@ resource "infisical_certificate_sync_aws_elastic_load_balancer" "example" {
 ### Optional
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
-- `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
-- `default_certificate_id` (String) The ID of the certificate to set as the default certificate on every listener. The load balancer serves it when a client's SNI matches no other certificate. It must be one of the certificates the sync holds. Leave unset to leave the listeners' default unmanaged; removing it later stops managing the default without changing it.
+- `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
+- `default_certificate_order_id` (String) The certificate order whose newest certificate is the default certificate on every listener, from the `order_id` attribute of `infisical_cert_manager_certificate`. The load balancer serves it when a client's SNI matches no other certificate. It must be one of the orders the sync holds. Leave unset to leave the listeners' default unmanaged; removing it later stops managing the default without changing it.
 - `description` (String) An optional description for the AWS Elastic Load Balancer sync.
 
 ### Read-Only
@@ -123,7 +123,7 @@ Optional:
 
 Optional:
 
-- `certificate_ids` (Set of String) The IDs of the certificates to sync. A certificate keeps syncing across renewals, so an ID that has since been renewed still selects the renewed certificate and does not show as drift.
+- `certificate_order_ids` (Set of String) The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order.
 - `metadata` (Attributes Set) Sync certificates carrying every one of these metadata pairs. (see [below for nested schema](#nestedatt--certificate_filters--metadata))
 - `profile_ids` (Set of String) Sync certificates issued from any one of these certificate profiles.
 

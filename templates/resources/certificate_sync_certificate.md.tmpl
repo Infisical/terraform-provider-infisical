@@ -12,7 +12,7 @@ description: |-
 
 ## Migrating to certificate_filters
 
-1. Add the certificate IDs to `certificate_filters.certificate_ids` on the certificate sync resource.
+1. Add each certificate's `order_id` to `certificate_filters.certificate_order_ids` on the certificate sync resource.
 2. Replace each `infisical_certificate_sync_certificate` block with a `removed` block that keeps the attachment in Infisical (Terraform 1.7 or higher):
 
 ```terraform

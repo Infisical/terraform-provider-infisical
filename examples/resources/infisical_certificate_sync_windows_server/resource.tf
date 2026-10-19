@@ -51,6 +51,6 @@ resource "infisical_certificate_sync_windows_server" "example" {
   export_password = var.keystore_password # Stored in state, use export_password_wo to avoid that
 
   certificate_filters = {
-    certificate_ids = [infisical_cert_manager_certificate.example.id]
+    certificate_order_ids = [infisical_cert_manager_certificate.example.order_id]
   }
 }

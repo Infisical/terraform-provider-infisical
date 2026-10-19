@@ -15,8 +15,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-const deprecationMessage = "Use the certificate_filters.certificate_ids attribute on the certificate sync resource instead. " +
-	"To migrate without detaching certificates, add the IDs to certificate_filters and drop this resource from state with a removed block that sets destroy = false."
+const deprecationMessage = "Use the certificate_filters.certificate_order_ids attribute on the certificate sync resource instead. " +
+	"To migrate without detaching certificates, add the certificates' order_id values to certificate_filters and drop this resource from state with a removed block that sets destroy = false."
 
 // CertificateSyncCertificateResource is deprecated; it matches by certificate order to survive renewals.
 type CertificateSyncCertificateResource struct {
@@ -65,7 +65,7 @@ func (r *CertificateSyncCertificateResource) ImportState(ctx context.Context, re
 func (r *CertificateSyncCertificateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Attach a certificate to a certificate sync so it is synced to the destination. The certificate must belong to the same application as the certificate sync. " +
-			"The attachment follows the certificate across renewals. Deprecated: use `certificate_filters.certificate_ids` on the certificate sync resource instead.",
+			"The attachment follows the certificate across renewals. Deprecated: use `certificate_filters.certificate_order_ids` on the certificate sync resource instead.",
 		DeprecationMessage: deprecationMessage,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -106,9 +106,8 @@ func (r *CertificateSyncCertificateResource) ModifyPlan(ctx context.Context, req
 		return
 	}
 
-	orders := newCertificateOrderResolver(r.client, nil)
-	planOrder, planErr := orders.orderOf(plan.CertificateID.ValueString())
-	stateOrder, stateErr := orders.orderOf(state.CertificateID.ValueString())
+	planOrder, planErr := r.certificateOrderID(plan.CertificateID.ValueString())
+	stateOrder, stateErr := r.certificateOrderID(state.CertificateID.ValueString())
 	for _, err := range []error{planErr, stateErr} {
 		if err != nil && err != infisical.ErrNotFound {
 			resp.Diagnostics.AddError("Error looking up certificate", "Couldn't compare the certificate orders, unexpected error: "+err.Error())
@@ -137,10 +136,18 @@ func (r *CertificateSyncCertificateResource) Configure(_ context.Context, req re
 	r.client = client
 }
 
+func (r *CertificateSyncCertificateResource) certificateOrderID(certificateID string) (string, error) {
+	response, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateID})
+	if err != nil {
+		return "", err
+	}
+	return response.Certificate.OrderId, nil
+}
+
 // findAssociation returns the association holding the current certificate in the same certificate
 // order as certificateID, or an empty string when the order is not attached.
 func (r *CertificateSyncCertificateResource) findAssociation(certificateSyncID, certificateID string) (string, error) {
-	orderID, err := newCertificateOrderResolver(r.client, nil).orderOf(certificateID)
+	orderID, err := r.certificateOrderID(certificateID)
 	if err != nil {
 		if err == infisical.ErrNotFound {
 			return "", nil

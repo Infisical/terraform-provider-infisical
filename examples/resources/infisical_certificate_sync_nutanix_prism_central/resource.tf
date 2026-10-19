@@ -25,7 +25,7 @@ resource "infisical_certificate_sync_nutanix_prism_central" "example" {
 
   # A Nutanix Prism Central cluster holds a single certificate.
   certificate_filters = {
-    certificate_ids = [infisical_cert_manager_certificate.example.id]
+    certificate_order_ids = [infisical_cert_manager_certificate.example.order_id]
   }
 
   destination_config = {

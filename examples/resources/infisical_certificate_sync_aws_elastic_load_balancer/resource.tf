@@ -24,10 +24,10 @@ resource "infisical_certificate_sync_aws_elastic_load_balancer" "example" {
   connection_id  = "<app-connection-id>"
 
   certificate_filters = {
-    certificate_ids = [infisical_cert_manager_certificate.example.id]
+    certificate_order_ids = [infisical_cert_manager_certificate.example.order_id]
   }
 
-  default_certificate_id = infisical_cert_manager_certificate.example.id
+  default_certificate_order_id = infisical_cert_manager_certificate.example.order_id
 
   sync_options = {
     certificate_name_schema = "Infisical-{{certificateId}}"

@@ -65,7 +65,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
   export_password_wo_version = 1 # Increment to send a new export_password_wo
 
   certificate_filters = {
-    certificate_ids = [infisical_cert_manager_certificate.example.id]
+    certificate_order_ids = [infisical_cert_manager_certificate.example.order_id]
   }
 }
 ```
@@ -84,7 +84,7 @@ resource "infisical_certificate_sync_linux_server" "example" {
 ### Optional
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
-- `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
+- `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
 - `description` (String) An optional description for the Linux Server sync.
 - `export_password` (String, Sensitive) The password protecting the exported PKCS#12 or Java KeyStore file. Required when `export_format` is `pkcs12` or `jks`, unless `export_password_wo` is set. Stored in state.
 - `export_password_wo` (String, Sensitive) The keystore export password as a write-only value that is never stored in state. Requires Terraform 1.11 or higher.
@@ -138,7 +138,7 @@ Optional:
 
 Optional:
 
-- `certificate_ids` (Set of String) The IDs of the certificates to sync. A certificate keeps syncing across renewals, so an ID that has since been renewed still selects the renewed certificate and does not show as drift.
+- `certificate_order_ids` (Set of String) The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order.
 - `metadata` (Attributes Set) Sync certificates carrying every one of these metadata pairs. (see [below for nested schema](#nestedatt--certificate_filters--metadata))
 - `profile_ids` (Set of String) Sync certificates issued from any one of these certificate profiles.
 
