@@ -88,7 +88,7 @@ func alertConditionSchema() schema.SingleNestedAttribute {
 			},
 			"daily_reminder": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Whether to keep notifying once a day until expiry, instead of notifying once. Defaults to false. Only for the events that take alert_before_days.",
+				Description: "When true, sends a reminder every day until expiry. Defaults to false. Only for the events that take alert_before_days.",
 			},
 			"application_ids": idsAttribute("Only certificates in these Certificate Manager applications. Only for these events: " + filterEvents + "."),
 			"profile_ids":     idsAttribute("Only certificates issued from these certificate profiles. Only for these events: " + filterEvents + "."),

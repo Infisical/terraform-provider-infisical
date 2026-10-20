@@ -270,7 +270,7 @@ Optional:
 
 - `alert_before_days` (Number) How many days before expiry the alert fires. Required for these events, and not used by the others: identity.authentication.expiry, cert-manager.application.certificate.expiry, cert-manager.certificate.expiry, cert-manager.signer.certificate.expiry. Must be at least 1, and at most 90 for identity.authentication; 365 for cert-manager, cert-manager.application, cert-manager.signer.
 - `application_ids` (Set of String) Only certificates in these Certificate Manager applications. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation. Leave it out to cover all of them. At most 100.
-- `daily_reminder` (Boolean) Whether to keep notifying once a day until expiry, instead of notifying once. Defaults to false. Only for the events that take alert_before_days.
+- `daily_reminder` (Boolean) When true, sends a reminder every day until expiry. Defaults to false. Only for the events that take alert_before_days.
 - `profile_ids` (Set of String) Only certificates issued from these certificate profiles. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation. Leave it out to cover all of them. At most 100.
 - `sources` (Set of String) Only certificates with these sources. Options: issued, discovered, imported. Leave it out to cover every source. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation.
 
