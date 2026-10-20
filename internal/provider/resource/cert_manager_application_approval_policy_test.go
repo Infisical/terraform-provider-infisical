@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -21,7 +20,7 @@ func certRequestApprovalPolicySchema(t *testing.T) schema.Schema {
 	t.Helper()
 
 	resp := &resource.SchemaResponse{}
-	(&certManagerApplicationPolicyResource{}).Schema(context.Background(), resource.SchemaRequest{}, resp)
+	(&certManagerApplicationApprovalPolicyResource{}).Schema(context.Background(), resource.SchemaRequest{}, resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("Schema() diagnostics = %v", resp.Diagnostics)
 	}
@@ -248,7 +247,7 @@ func TestCertRequestApprovalPolicyValidateConfig(t *testing.T) {
 			plan := certRequestApprovalPolicyRaw(t, s, certRequestApprovalPolicyModelFor(t, types.StringValue("app-1"), c.step))
 
 			resp := &resource.ValidateConfigResponse{}
-			(&certManagerApplicationPolicyResource{}).ValidateConfig(context.Background(), resource.ValidateConfigRequest{
+			(&certManagerApplicationApprovalPolicyResource{}).ValidateConfig(context.Background(), resource.ValidateConfigRequest{
 				Config: tfsdk.Config{Raw: plan.Raw, Schema: s},
 			}, resp)
 
@@ -307,7 +306,7 @@ func TestCertRequestApprovalPolicyValidateConfigWithUnknownValues(t *testing.T) 
 			}
 
 			resp := &resource.ValidateConfigResponse{}
-			(&certManagerApplicationPolicyResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{
+			(&certManagerApplicationApprovalPolicyResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{
 				Config: tfsdk.Config{Raw: plan.Raw, Schema: s},
 			}, resp)
 			if resp.Diagnostics.HasError() {
@@ -328,40 +327,9 @@ func TestCertRequestApprovalPolicyImportStateRejectsNonIDs(t *testing.T) {
 		"":                                     true,
 	} {
 		resp := &resource.ImportStateResponse{State: tfsdk.State{Raw: tftypes.NewValue(s.Type().TerraformType(ctx), nil), Schema: s}}
-		(&certManagerApplicationPolicyResource{}).ImportState(ctx, resource.ImportStateRequest{ID: id}, resp)
+		(&certManagerApplicationApprovalPolicyResource{}).ImportState(ctx, resource.ImportStateRequest{ID: id}, resp)
 		if resp.Diagnostics.HasError() != wantError {
 			t.Errorf("ImportState(%q) error = %v, want %v: %v", id, resp.Diagnostics.HasError(), wantError, resp.Diagnostics)
-		}
-	}
-}
-
-func TestMaxRequestTTLValidator(t *testing.T) {
-	cases := map[string]bool{
-		"1h":       true,
-		"7d":       true,
-		"48h":      true,
-		"30d":      true,
-		"2 days":   true,
-		"1.5 Days": true,
-		"4w":       true,
-		"3600000":  true,
-		"59m":      false,
-		"31d":      false,
-		"5w":       false,
-		"1y":       false,
-		"abc":      false,
-		"7 dayz":   false,
-		"":         false,
-	}
-
-	for value, wantValid := range cases {
-		resp := &validator.StringResponse{}
-		maxRequestTTLValidator{}.ValidateString(context.Background(), validator.StringRequest{
-			Path:        path.Root("max_request_ttl"),
-			ConfigValue: types.StringValue(value),
-		}, resp)
-		if resp.Diagnostics.HasError() == wantValid {
-			t.Errorf("max_request_ttl %q: valid = %v, want %v", value, !resp.Diagnostics.HasError(), wantValid)
 		}
 	}
 }

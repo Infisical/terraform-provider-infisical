@@ -137,12 +137,8 @@ func (r *alertResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"event_type": schema.StringAttribute{
 				CustomType:  alertEventTypeType{},
-				Description: "The event the alert fires on, written as the full event type or without the resource_type prefix, such as `" + alertEventTypeCertManagerApplicationCertExpiry + "` or `certificate.expiry` for a " + alertResourceTypeCertManagerApplication + " alert. Changing the event creates a new alert. Options: " + describeAllAlertEvents() + ".",
+				Description: "The event the alert fires on, written in full, such as `" + alertEventTypeCertManagerApplicationCertExpiry + "`, or without the resource_type prefix, such as `certificate.expiry`. See [Event types](#event-types) for every event and the condition it takes. Changing the event creates a new alert.",
 				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"condition": alertConditionSchema(),
 			"expiry":    legacyExpirySchema(),
@@ -354,9 +350,6 @@ func (r *alertResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	plan.ID = types.StringValue(alert.Alert.ID)
 	plan.OrgID = types.StringValue(alert.Alert.OrgID)
-	if plan.EventType.IsUnknown() {
-		plan.EventType = newAlertEventTypeValue(event.eventType)
-	}
 
 	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, nil, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
@@ -448,9 +441,6 @@ func (r *alertResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	plan.OrgID = types.StringValue(alert.Alert.OrgID)
-	if plan.EventType.IsUnknown() {
-		plan.EventType = newAlertEventTypeValue(event.eventType)
-	}
 
 	channelsWithIDs, channelDiags := alertChannelIDsFromAPI(plan.Channels, state.Channels, alert.Alert.Channels)
 	plan.Channels = channelsWithIDs
@@ -508,7 +498,6 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 	state.Enabled = types.BoolValue(alert.Enabled)
 	state.ResourceType = types.StringValue(alert.ResourceType)
 	state.OrgID = types.StringValue(alert.OrgID)
-	state.EventType = newAlertEventTypeValue(alert.EventType)
 
 	if alert.ResourceID != nil {
 		state.ResourceID = types.StringValue(*alert.ResourceID)
@@ -533,6 +522,12 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 		return diags
 	}
 
+	// An alert still configured through the deprecated expiry block leaves event_type unset.
+	state.EventType = newAlertEventTypeValue(alert.EventType)
+	if state.Expiry != nil {
+		state.EventType = alertEventTypeValue{StringValue: types.StringNull()}
+	}
+
 	channels, channelDiags := alertChannelsFromAPI(ctx, alert.Channels, state.Channels)
 	diags.Append(channelDiags...)
 	if diags.HasError() {
@@ -541,14 +536,6 @@ func (r *alertResource) setStateFromAlert(ctx context.Context, state *alertResou
 	state.Channels = channels
 
 	return diags
-}
-
-func describeAllAlertEvents() string {
-	names := []string{}
-	for _, resourceType := range supportedAlertResourceTypes() {
-		names = append(names, fmt.Sprintf("for %s, %s", resourceType, describeAlertEvents(resourceType)))
-	}
-	return strings.Join(names, "; ")
 }
 
 type alertAttributeSource interface {

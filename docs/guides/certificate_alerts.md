@@ -85,11 +85,11 @@ These alerts watch every certificate in Certificate Manager, and you can create 
 
 ### Certificate events
 
-The filters narrow a `cert-manager` alert. A certificate has to match every list that is set, and each list left out covers everything:
+All three filters are optional. Set any of them inside `condition` to narrow a `cert-manager` alert: a certificate has to match every list you set, and a list you leave out covers everything. Without any filter, leave `condition` out of issuance, renewal and revocation alerts.
 
-- `application_ids`: only certificates in these applications.
-- `profile_ids`: only certificates issued from these certificate profiles.
-- `sources`: only certificates with these sources (`issued`, `discovered` or `imported`).
+- `application_ids` (optional): only certificates in these applications.
+- `profile_ids` (optional): only certificates issued from these certificate profiles.
+- `sources` (optional): only certificates with these sources (`issued`, `discovered` or `imported`).
 
 ```terraform
 # Alert on certificates issued anywhere in Certificate Manager, narrowed with filters.

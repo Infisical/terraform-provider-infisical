@@ -3,6 +3,10 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	infisical "terraform-provider-infisical/internal/client"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -197,7 +201,7 @@ func TestSetAlertConditionFromAPI(t *testing.T) {
 	}
 
 	t.Run("deprecated expiry block stays in use", func(t *testing.T) {
-		state := alertResourceModel{Expiry: &expiryConditionModel{}}
+		state := alertResourceModel{Expiry: &expiryConditionModel{}, EventType: newAlertEventTypeValue(alertEventTypeIdentityAuthenticationExpiry)}
 		setAlertConditionFromAPI(&state, event(alertEventTypeIdentityAuthenticationExpiry), json.RawMessage(`{"alertBefore":"1m"}`))
 		if state.Expiry == nil || state.Expiry.AlertBeforeDays.ValueInt64() != 30 || state.Expiry.DailyReminder.ValueBool() || state.Condition != nil {
 			t.Errorf("expiry = %+v, condition = %+v, want the expiry block with 30 days and no condition", state.Expiry, state.Condition)
@@ -336,5 +340,65 @@ func TestAlertResourceModelMatchesSchema(t *testing.T) {
 	}
 	if roundTripped.EventType.ValueString() != "expiry" || roundTripped.Condition.AlertBeforeDays.ValueInt64() != 30 {
 		t.Errorf("model did not survive the round trip: %+v", roundTripped)
+	}
+}
+
+// The Event types table in the docs template is written by hand, so it has to list every event.
+func TestAlertDocsTemplateListsEveryEvent(t *testing.T) {
+	template, err := os.ReadFile("../../../../templates/resources/alert.md.tmpl")
+	if err != nil {
+		t.Fatalf("reading the docs template: %v", err)
+	}
+	for _, event := range alertEvents {
+		condition := "None"
+		switch {
+		case event.firesBeforeExpiry() && event.filters:
+			condition = fmt.Sprintf("`alert_before_days` (1 to %d), optional `daily_reminder`, optional filters", event.maxAlertBeforeDays)
+		case event.firesBeforeExpiry():
+			condition = fmt.Sprintf("`alert_before_days` (1 to %d), optional `daily_reminder`", event.maxAlertBeforeDays)
+		case event.filters:
+			condition = "Optional filters"
+		}
+		row := fmt.Sprintf("| `%s` | `%s` | `%s` | %s |", event.resourceType, event.shortEventType(), event.eventType, condition)
+		if !strings.Contains(string(template), row) {
+			t.Errorf("templates/resources/alert.md.tmpl has no Event types row matching %q", row)
+		}
+	}
+
+	rows := 0
+	for _, line := range strings.Split(string(template), "\n") {
+		if strings.HasPrefix(line, "| `") && !strings.Contains(line, "Full event type") {
+			rows++
+		}
+	}
+	if rows != len(alertEvents) {
+		t.Errorf("the Event types table has %d rows, want one per event (%d)", rows, len(alertEvents))
+	}
+}
+
+func TestSetStateFromAlertEventType(t *testing.T) {
+	resourceID := "identity-1"
+	alert := infisical.Alert{
+		ID:           "alert-1",
+		ResourceType: alertResourceTypeIdentityAuthentication,
+		ResourceID:   &resourceID,
+		EventType:    alertEventTypeIdentityAuthenticationExpiry,
+		Condition:    json.RawMessage(`{"alertBefore":"30d"}`),
+	}
+
+	legacy := alertResourceModel{Expiry: &expiryConditionModel{}}
+	if diags := (&alertResource{}).setStateFromAlert(context.Background(), &legacy, alert); diags.HasError() {
+		t.Fatalf("setStateFromAlert() diagnostics = %v", diags)
+	}
+	if !legacy.EventType.IsNull() || legacy.Expiry == nil {
+		t.Errorf("legacy alert: event_type = %v, expiry = %v, want no event_type and the expiry block", legacy.EventType, legacy.Expiry)
+	}
+
+	var imported alertResourceModel
+	if diags := (&alertResource{}).setStateFromAlert(context.Background(), &imported, alert); diags.HasError() {
+		t.Fatalf("setStateFromAlert() diagnostics = %v", diags)
+	}
+	if imported.EventType.ValueString() != alertEventTypeIdentityAuthenticationExpiry || imported.Expiry != nil {
+		t.Errorf("imported alert: event_type = %v, expiry = %v, want the full event type and no expiry block", imported.EventType, imported.Expiry)
 	}
 }

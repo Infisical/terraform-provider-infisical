@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
-	"strconv"
-	"strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
+	"terraform-provider-infisical/internal/pkg/validators"
 	"time"
 
 	"github.com/hashicorp/go-uuid"
@@ -43,10 +41,10 @@ const (
 )
 
 var (
-	_ resource.Resource                   = &certManagerApplicationPolicyResource{}
-	_ resource.ResourceWithConfigure      = &certManagerApplicationPolicyResource{}
-	_ resource.ResourceWithImportState    = &certManagerApplicationPolicyResource{}
-	_ resource.ResourceWithValidateConfig = &certManagerApplicationPolicyResource{}
+	_ resource.Resource                   = &certManagerApplicationApprovalPolicyResource{}
+	_ resource.ResourceWithConfigure      = &certManagerApplicationApprovalPolicyResource{}
+	_ resource.ResourceWithImportState    = &certManagerApplicationApprovalPolicyResource{}
+	_ resource.ResourceWithValidateConfig = &certManagerApplicationApprovalPolicyResource{}
 )
 
 var approvalPolicyApproverObjectType = types.ObjectType{AttrTypes: map[string]attr.Type{
@@ -54,11 +52,11 @@ var approvalPolicyApproverObjectType = types.ObjectType{AttrTypes: map[string]at
 	"id":   types.StringType,
 }}
 
-func NewCertManagerApplicationPolicyResource() resource.Resource {
-	return &certManagerApplicationPolicyResource{}
+func NewCertManagerApplicationApprovalPolicyResource() resource.Resource {
+	return &certManagerApplicationApprovalPolicyResource{}
 }
 
-type certManagerApplicationPolicyResource struct {
+type certManagerApplicationApprovalPolicyResource struct {
 	client *infisical.Client
 }
 
@@ -84,11 +82,11 @@ type approvalPolicyApproverModel struct {
 	ID   types.String `tfsdk:"id"`
 }
 
-func (r *certManagerApplicationPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_cert_manager_application_policy"
+func (r *certManagerApplicationApprovalPolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cert_manager_application_approval_policy"
 }
 
-func (r *certManagerApplicationPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Create and manage a Certificate Manager application's approval policy for certificate requests. A certificate requested through the application from one of the policy's certificate profiles waits for the approvals the policy asks for before it is issued.",
 		Attributes: map[string]schema.Attribute{
@@ -135,7 +133,7 @@ func (r *certManagerApplicationPolicyResource) Schema(_ context.Context, _ resou
 				Description: "How long a certificate request can wait for approval before it expires, such as `7d` or `12h`. Must be between 1 hour and 30 days. Leave it out for requests that never expire.",
 				Optional:    true,
 				Validators: []validator.String{
-					maxRequestTTLValidator{},
+					validators.MsDurationBetween(time.Hour, 30*24*time.Hour),
 				},
 			},
 			"steps": schema.ListNestedAttribute{
@@ -198,7 +196,7 @@ func (r *certManagerApplicationPolicyResource) Schema(_ context.Context, _ resou
 	}
 }
 
-func (r *certManagerApplicationPolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var steps types.List
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("steps"), &steps)...)
 	if resp.Diagnostics.HasError() || steps.IsNull() || steps.IsUnknown() {
@@ -248,7 +246,7 @@ func countUserApprovers(value attr.Value) (int, bool) {
 	return users, true
 }
 
-func (r *certManagerApplicationPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -265,7 +263,7 @@ func (r *certManagerApplicationPolicyResource) Configure(_ context.Context, req 
 	r.client = client
 }
 
-func (r *certManagerApplicationPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -302,7 +300,7 @@ func (r *certManagerApplicationPolicyResource) Create(ctx context.Context, req r
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *certManagerApplicationPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -343,7 +341,7 @@ func (r *certManagerApplicationPolicyResource) Read(ctx context.Context, req res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &refreshed)...)
 }
 
-func (r *certManagerApplicationPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -386,7 +384,7 @@ func (r *certManagerApplicationPolicyResource) Update(ctx context.Context, req r
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *certManagerApplicationPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state certRequestApprovalPolicyModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -404,7 +402,7 @@ func (r *certManagerApplicationPolicyResource) Delete(ctx context.Context, req r
 	}
 }
 
-func (r *certManagerApplicationPolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *certManagerApplicationApprovalPolicyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if _, err := uuid.ParseUUID(req.ID); err != nil {
 		resp.Diagnostics.AddError(
 			"Unexpected Import Identifier",
@@ -513,67 +511,4 @@ func certRequestApprovalPolicyFromAPI(ctx context.Context, policy infisical.Cert
 	}
 
 	return model, diags
-}
-
-const (
-	minMaxRequestTTL = time.Hour
-	maxMaxRequestTTL = 30 * 24 * time.Hour
-)
-
-// The npm ms format Infisical reads max_request_ttl with. No unit means milliseconds.
-var msDurationPattern = regexp.MustCompile(`(?i)^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$`)
-
-func parseMsDuration(value string) (time.Duration, bool) {
-	match := msDurationPattern.FindStringSubmatch(value)
-	if len(value) > 100 || match == nil {
-		return 0, false
-	}
-
-	amount, err := strconv.ParseFloat(match[1], 64)
-	if err != nil {
-		return 0, false
-	}
-
-	unit := time.Millisecond
-	switch strings.ToLower(match[2]) {
-	case "seconds", "second", "secs", "sec", "s":
-		unit = time.Second
-	case "minutes", "minute", "mins", "min", "m":
-		unit = time.Minute
-	case "hours", "hour", "hrs", "hr", "h":
-		unit = time.Hour
-	case "days", "day", "d":
-		unit = 24 * time.Hour
-	case "weeks", "week", "w":
-		unit = 7 * 24 * time.Hour
-	case "years", "year", "yrs", "yr", "y":
-		unit = time.Duration(365.25 * float64(24*time.Hour))
-	}
-
-	return time.Duration(amount * float64(unit)), true
-}
-
-type maxRequestTTLValidator struct{}
-
-func (v maxRequestTTLValidator) Description(_ context.Context) string {
-	return "must be a duration such as 7d or 12h, between 1 hour and 30 days"
-}
-
-func (v maxRequestTTLValidator) MarkdownDescription(ctx context.Context) string {
-	return v.Description(ctx)
-}
-
-func (v maxRequestTTLValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	ttl, ok := parseMsDuration(req.ConfigValue.ValueString())
-	if !ok || ttl < minMaxRequestTTL || ttl > maxMaxRequestTTL {
-		resp.Diagnostics.AddAttributeError(
-			req.Path,
-			"Invalid max_request_ttl",
-			fmt.Sprintf("max_request_ttl %s, got %q.", v.Description(ctx), req.ConfigValue.ValueString()),
-		)
-	}
 }

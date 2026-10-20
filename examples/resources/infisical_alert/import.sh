@@ -9,3 +9,6 @@ terraform import infisical_alert.example <alert_id>
 # Write-only channel secrets (a Slack webhook URL, a PagerDuty integration key, a webhook
 # signing secret) are never returned by the API, so the first plan after an import shows them
 # being set. A signing secret left out of the configuration keeps whatever is stored.
+#
+# An imported alert uses event_type and condition. Importing it into a configuration that still uses
+# the deprecated expiry block shows one in-place update that changes nothing in Infisical.
