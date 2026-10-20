@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
 
@@ -38,10 +39,11 @@ var certificateSyncAwsCertificateManagerSyncOptionsAttrTypes = map[string]attr.T
 
 func NewCertificateSyncAwsCertificateManagerResource() resource.Resource {
 	return &CertificateSyncBaseResource{
-		App:              infisical.CertificateSyncAppAWSCertificateManager,
-		SyncName:         "AWS Certificate Manager",
-		ResourceTypeName: "_certificate_sync_aws_certificate_manager",
-		AppConnection:    infisical.AppConnectionAppAWS,
+		App:                 infisical.CertificateSyncAppAWSCertificateManager,
+		SyncName:            "AWS Certificate Manager",
+		ResourceTypeName:    "_certificate_sync_aws_certificate_manager",
+		CertificateNameRule: &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9\s_-]{1,256}$`), requireLiteralCertificateID: true, requirement: "1-256 letters, digits, spaces, hyphens or underscores"},
+		AppConnection:       infisical.AppConnectionAppAWS,
 		DestinationConfigAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,
@@ -52,12 +54,12 @@ func NewCertificateSyncAwsCertificateManagerResource() resource.Resource {
 			"certificate_name_schema": schema.StringAttribute{
 				Required:    true,
 				CustomType:  customtypes.TrimmedStringType{},
-				Description: "The naming scheme for synced certificates. Must include the {{certificateId}} or {{shortCertificateId}} placeholder. Available placeholders: {{certificateId}}, {{shortCertificateId}}, {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.",
+				Description: "The naming scheme for synced certificates. Must include the {{certificateId}} placeholder; {{shortCertificateId}} is not supported for this destination. Names may contain letters, digits, spaces, hyphens and underscores (1-256 characters). Other placeholders: {{profileId}}, {{applicationId}}, {{applicationName}}, {{commonName}}.",
 			},
 			"can_remove_certificates": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether Infisical should remove certificates from AWS Certificate Manager when they are no longer managed in Infisical.",
+				Description: "Whether Infisical should remove certificates from AWS Certificate Manager when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place.",
 				Default:     booldefault.StaticBool(true),
 			},
 			"include_root_ca": schema.BoolAttribute{

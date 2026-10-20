@@ -25,6 +25,7 @@ type AppConnectionBaseResource struct {
 	ResourceTypeName                 string                     // terraform resource name suffix
 	AppConnectionName                string                     // complete descriptive name of the app connection
 	SupportsGateway                  bool                       // when true, exposes gateway_id and sends it to the API
+	RequiresGateway                  bool                       // when true, gateway_id is required
 	client                           *infisical.Client
 	AllowedMethods                   []string
 	CredentialsAttributes            map[string]schema.Attribute
@@ -183,9 +184,10 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 		},
 		"method": schema.StringAttribute{
-			Required:    true,
-			Description: fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
-			Validators:  []validator.String{stringvalidator.OneOf(r.AllowedMethods...)},
+			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			Validators:    []validator.String{stringvalidator.OneOf(r.AllowedMethods...)},
+			Required:      true,
+			Description:   fmt.Sprintf("The method used to authenticate with %s. Possible values are: %s", r.AppConnectionName, strings.Join(r.AllowedMethods, ", ")),
 		},
 		"name": schema.StringAttribute{
 			Required:    true,
@@ -212,9 +214,14 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 	}
 
 	if r.SupportsGateway {
+		description := "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used."
+		if r.RequiresGateway {
+			description = fmt.Sprintf("The Gateway ID to use for the app connection. %s connections can only reach the host through a gateway.", r.AppConnectionName)
+		}
 		attributes["gateway_id"] = schema.StringAttribute{
-			Optional:    true,
-			Description: "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.",
+			Optional:    !r.RequiresGateway,
+			Required:    r.RequiresGateway,
+			Description: description,
 			Validators: []validator.String{
 				stringvalidator.LengthAtLeast(1),
 			},

@@ -107,6 +107,7 @@ type certManagerCertificateResourceModel struct {
 	TTL                  types.String `tfsdk:"ttl"`
 	TimeoutSeconds       types.Int64  `tfsdk:"timeout_seconds"`
 	Id                   types.String `tfsdk:"id"`
+	OrderId              types.String `tfsdk:"order_id"`
 	CertificateRequestId types.String `tfsdk:"certificate_request_id"`
 	Status               types.String `tfsdk:"status"`
 	SerialNumber         types.String `tfsdk:"serial_number"`
@@ -293,6 +294,13 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"id": schema.StringAttribute{
 				Description: "The ID of the certificate",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"order_id": schema.StringAttribute{
+				Description: "The ID of the certificate order. A certificate and all of its renewals share one order, so use it to select this certificate in a certificate sync's `certificate_filters`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -575,10 +583,12 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 		})
 		plan.NotBefore = types.StringValue("")
 		plan.NotAfter = types.StringValue("")
+		plan.OrderId = types.StringNull()
 		return
 	}
 
 	cert := certDetails.Certificate
+	plan.OrderId = types.StringValue(cert.OrderId)
 	plan.CommonName = types.StringValue(cert.CommonName)
 	plan.KeyAlgorithm = types.StringValue(cert.KeyAlgorithm)
 	plan.SignatureAlgorithm = types.StringValue(cert.SignatureAlgorithm)
@@ -904,6 +914,7 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 	state.AltNames = r.parseAltNames(ctx, cert.AltNames)
 
 	state.SerialNumber = types.StringValue(cert.SerialNumber)
+	state.OrderId = types.StringValue(cert.OrderId)
 	state.NotBefore = types.StringValue(cert.NotBefore)
 	state.NotAfter = types.StringValue(cert.NotAfter)
 	state.KeyAlgorithm = types.StringValue(cert.KeyAlgorithm)
