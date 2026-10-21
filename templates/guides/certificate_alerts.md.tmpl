@@ -1,0 +1,70 @@
+---
+page_title: "Certificate alerts"
+subcategory: "Certificate Management"
+description: |-
+  Use infisical_alert to get notified about certificates in Certificate Manager, either in one application or across Certificate Manager.
+---
+
+# Certificate alerts
+
+Certificate Manager alerts are managed with the [`infisical_alert`](../resources/alert) resource. Like in Infisical, an alert either watches one application or all of Certificate Manager, and fires on one event:
+
+- `resource_type` says what the alert watches, and `event_type` which event it fires on. Write `event_type` in full, such as `cert-manager.application.certificate.expiry`, or without the `resource_type` prefix, such as `certificate.expiry`.
+- `condition` holds the settings of the event. Expiry events take `alert_before_days` (1 to 365) and an optional `daily_reminder`. Issuance, renewal and revocation fire as they happen, so they take no condition, except for the optional filters of alerts across Certificate Manager.
+
+## Alerts on an application
+
+Set `resource_type = "cert-manager.application"` and `resource_id` to the application's ID. The alert covers every certificate in the application, and an application can have one alert per event.
+
+| Event | `event_type` | `condition` |
+|---|---|---|
+| Certificate Expiration | `certificate.expiry` | `alert_before_days`, optional `daily_reminder` |
+| Certificate Issuance | `certificate.issuance` | None |
+| Certificate Renewal | `certificate.renewal` | None |
+| Certificate Revocation | `certificate.revocation` | None |
+
+{{ tffile "examples/guides/certificate_alerts/application.tf" }}
+
+## Alerts across Certificate Manager
+
+These alerts watch every certificate in Certificate Manager, and you can create as many as you need for the same event, for example to send expiring certificates from different profiles to different teams. Only Certificate Manager admins can create them.
+
+| Event | `resource_type` | `event_type` | `condition` |
+|---|---|---|---|
+| Certificate Expiration | `cert-manager` | `certificate.expiry` | `alert_before_days`, optional `daily_reminder` and filters |
+| Certificate Issuance | `cert-manager` | `certificate.issuance` | Optional filters |
+| Certificate Renewal | `cert-manager` | `certificate.renewal` | Optional filters |
+| Certificate Revocation | `cert-manager` | `certificate.revocation` | Optional filters |
+| Signer Certificate Expiration (Code Signing) | `cert-manager.signer` | `certificate.expiry` | `alert_before_days`, optional `daily_reminder` |
+
+### Certificate events
+
+All three filters are optional. Set any of them inside `condition` to narrow a `cert-manager` alert: a certificate has to match every list you set, and a list you leave out covers everything. Without any filter, leave `condition` out of issuance, renewal and revocation alerts.
+
+- `application_ids` (optional): only certificates in these applications.
+- `profile_ids` (optional): only certificates issued from these certificate profiles.
+- `sources` (optional): only certificates with these sources (`issued`, `discovered` or `imported`).
+
+{{ tffile "examples/guides/certificate_alerts/certificate_manager.tf" }}
+
+### Signer certificate expiration
+
+Fires before the certificate any code signing signer signs with expires.
+
+{{ tffile "examples/guides/certificate_alerts/signer.tf" }}
+
+## Channels and recipients
+
+Each alert has up to 10 channels, keyed by a name of your choosing: `email`, `slack`, `webhook` or `pagerduty`. Email channels notify `user` and `group` recipients, or an email address directly with `type = "email"`, as long as it is on one of your organization's verified email domains. Slack, webhook and PagerDuty channels need a plan that includes them.
+
+## Changes made in Infisical
+
+Terraform picks up changes made to these alerts in Infisical on the next plan and puts the configuration back on apply. A duration saved in Infisical as weeks, months or years, such as `2w` or `1m`, reads back as the same number of days (`14`, `30`), so it shows no change. An alert deleted in Infisical, or removed along with its application, is created again on the next apply. Changing `event_type` to another event creates a new alert, while switching between its full and short form does not.
+
+## Import
+
+```shell
+terraform import infisical_alert.example <alert_id>
+```
+
+An imported alert has `event_type` in its full form. Writing the short form in your configuration afterwards shows one in-place update that changes nothing in Infisical. An imported alert also keys its channels by their names in Infisical, so use those names as the channel keys in your configuration.

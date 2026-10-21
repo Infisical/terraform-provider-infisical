@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -40,7 +41,7 @@ func writeAlertError(t *testing.T, w http.ResponseWriter, status int, message st
 var duplicateAlertRequest = CreateAlertRequest{
 	Name:         "Credentials expiring",
 	ResourceType: "identity.authentication",
-	ResourceID:   "identity-1",
+	ResourceID:   infisicalstrings.StringToPtr("identity-1"),
 	EventType:    "identity.authentication.credential.expiring",
 }
 
@@ -276,5 +277,24 @@ func TestUpdateAlertReportsOtherFailures(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "does not belong to this alert") {
 		t.Errorf("UpdateAlert() error = %q, want it to carry the API's message", got)
+	}
+}
+
+func TestCreateAlertNeverReportsAScopeWideDuplicate(t *testing.T) {
+	client, done := alertTestClient(t, alertRejectingCreates(t,
+		"Invalid alert condition: sources lists the same source more than once",
+		Alert{ID: "alert-1", EventType: "cert-manager.certificate.expiry"},
+	))
+	defer done()
+
+	_, err := client.CreateAlert(CreateAlertRequest{
+		Name:         "Expiring anywhere",
+		ResourceType: "cert-manager",
+		EventType:    "cert-manager.certificate.expiry",
+	})
+
+	var alreadyExists *AlertAlreadyExistsError
+	if err == nil || errors.As(err, &alreadyExists) {
+		t.Errorf("CreateAlert() error = %v, want the API error and not an AlertAlreadyExistsError", err)
 	}
 }

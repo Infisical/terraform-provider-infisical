@@ -3,12 +3,12 @@
 page_title: "infisical_alert Resource - terraform-provider-infisical"
 subcategory: "Alerts"
 description: |-
-  Create and manage alerts that notify you about a resource in Infisical. An alert watches one resource for one event, and a resource can only have one alert per event within a scope.
+  Create and manage alerts that notify you about a resource in Infisical. An alert watches one event, either on a single resource or across a whole scope, depending on its resource type. A resource can only have one alert per event within a scope.
 ---
 
 # infisical_alert (Resource)
 
-Create and manage alerts that notify you about a resource in Infisical. An alert watches one resource for one event, and a resource can only have one alert per event within a scope.
+Create and manage alerts that notify you about a resource in Infisical. An alert watches one event, either on a single resource or across a whole scope, depending on its resource type. A resource can only have one alert per event within a scope.
 
 ## Example Usage
 
@@ -40,9 +40,10 @@ resource "infisical_alert" "ci_identity" {
   name          = "CI identity credentials expiring"
   description   = "Rotate the CI machine identity client secret before it expires"
 
-  # The condition block is what the alert fires on, and every alert carries exactly one. It is named
-  # after the shape of the condition, so resource_type is what says what expires.
-  expiry = {
+  # The event the alert fires on, written in full ("identity.authentication.expiry") or without the
+  # resource_type prefix. condition holds the settings that event takes.
+  event_type = "expiry"
+  condition = {
     alert_before_days = 30
   }
 
@@ -77,8 +78,9 @@ resource "infisical_alert" "deploy_identity" {
   resource_id   = "<your-machine-identity-id>"
   project_id    = "<your-project-id>" # Required for resources that belong to a project
   name          = "Deploy identity credentials expiring"
+  event_type    = "expiry"
 
-  expiry = {
+  condition = {
     alert_before_days = 7
     daily_reminder    = true
   }
@@ -108,7 +110,69 @@ resource "infisical_alert" "deploy_identity" {
     }
   }
 }
+
+# Ask the security team whenever any auth method of a machine identity changes. Events without
+# settings take no condition.
+resource "infisical_alert" "ci_identity_auth_changes" {
+  resource_type = "identity.authentication"
+  resource_id   = "<your-machine-identity-id>"
+  name          = "CI identity auth method changed"
+  event_type    = "auth-method-changed"
+
+  channels = {
+    security_team = {
+      name = "Security team"
+      email = {
+        recipients = [{ type = "group", id = "<your-group-id>" }]
+      }
+    }
+  }
+}
+
+# Email a team before any certificate in a Certificate Manager application expires
+resource "infisical_alert" "payments_certificates_expiring" {
+  resource_type = "cert-manager.application"
+  resource_id   = "<your-certificate-manager-application-id>"
+  name          = "Payments certificates expiring"
+  event_type    = "certificate.expiry"
+
+  condition = {
+    alert_before_days = 60
+  }
+
+  channels = {
+    payments_team = {
+      name = "Payments team"
+      email = {
+        recipients = [
+          { type = "user", id = "<your-user-id>" },
+          { type = "email", id = "payments-oncall@example.com" }, # Must be on a verified domain
+        ]
+      }
+    }
+  }
+}
 ```
+
+## Event types
+
+Set `event_type` in full or without the `resource_type` prefix: both name the same event. Events that take no settings take no `condition`.
+
+| `resource_type` | `event_type` | Full event type | `condition` |
+|---|---|---|---|
+| `identity.authentication` | `expiry` | `identity.authentication.expiry` | `alert_before_days` (1 to 90), optional `daily_reminder` |
+| `identity.authentication` | `auth-method-changed` | `identity.authentication.auth-method-changed` | None |
+| `cert-manager.application` | `certificate.expiry` | `cert-manager.application.certificate.expiry` | `alert_before_days` (1 to 365), optional `daily_reminder` |
+| `cert-manager.application` | `certificate.issuance` | `cert-manager.application.certificate.issuance` | None |
+| `cert-manager.application` | `certificate.renewal` | `cert-manager.application.certificate.renewal` | None |
+| `cert-manager.application` | `certificate.revocation` | `cert-manager.application.certificate.revocation` | None |
+| `cert-manager` | `certificate.expiry` | `cert-manager.certificate.expiry` | `alert_before_days` (1 to 365), optional `daily_reminder`, optional filters |
+| `cert-manager` | `certificate.issuance` | `cert-manager.certificate.issuance` | Optional filters |
+| `cert-manager` | `certificate.renewal` | `cert-manager.certificate.renewal` | Optional filters |
+| `cert-manager` | `certificate.revocation` | `cert-manager.certificate.revocation` | Optional filters |
+| `cert-manager.signer` | `certificate.expiry` | `cert-manager.signer.certificate.expiry` | `alert_before_days` (1 to 365), optional `daily_reminder` |
+
+The optional filters are `application_ids`, `profile_ids` and `sources`. See the [Certificate alerts guide](../guides/certificate_alerts) for the certificate alerts in detail.
 
 <!-- schema generated by tfplugindocs -->
 ## Schema
@@ -117,15 +181,17 @@ resource "infisical_alert" "deploy_identity" {
 
 - `channels` (Attributes Map) The channels the alert is delivered to, keyed by a name of your choosing. The key is what identifies a channel to Terraform and is never sent to Infisical, so renaming a channel updates it in place and it keeps the deliveries it has already made. Changing a key, on the other hand, deletes the channel and creates a new one, so the new channel notifies about everything that is still expiring, even if the old one already did. Each channel carries exactly one configuration block, and that block is what gives the channel its type. At least one and at most 10 channels are allowed. (see [below for nested schema](#nestedatt--channels))
 - `name` (String) The name of the alert.
-- `resource_id` (String) The ID of the resource to watch. For the identity.authentication resource type this is a machine identity's ID.
-- `resource_type` (String) The type of the resource to watch. Options: identity.authentication.
+- `resource_type` (String) The type of the resource to watch. Options: cert-manager, cert-manager.application, cert-manager.signer, identity.authentication.
 
 ### Optional
 
+- `condition` (Attributes) The settings of the event the alert fires on. Which ones apply depends on event_type, and events without settings take no condition. (see [below for nested schema](#nestedatt--condition))
 - `description` (String) An optional description of the alert.
 - `enabled` (Boolean) Whether the alert is evaluated. Defaults to true.
-- `expiry` (Attributes) Fires before the watched resource expires. Only for alerts on these resource types: identity.authentication. (see [below for nested schema](#nestedatt--expiry))
-- `project_id` (String) The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones.
+- `event_type` (String) The event the alert fires on, written in full, such as `cert-manager.application.certificate.expiry`, or without the resource_type prefix, such as `certificate.expiry`. See [Event types](#event-types) for every event and the condition it takes. Changing the event creates a new alert.
+- `expiry` (Attributes, Deprecated) Fires before the watched resource expires. Only for identity.authentication alerts. Deprecated: use event_type and condition instead. (see [below for nested schema](#nestedatt--expiry))
+- `project_id` (String) The ID of the project the resource belongs to. Required for project level resources, and must be omitted for organization level ones. Not used by these resource types, so leave it out: cert-manager, cert-manager.application, cert-manager.signer.
+- `resource_id` (String) The ID of the resource to watch, of the kind resource_type names. Required, except for resource types that watch a whole scope, where it must be omitted: cert-manager, cert-manager.signer.
 
 ### Read-Only
 
@@ -163,8 +229,8 @@ Required:
 
 Required:
 
-- `id` (String) The ID of the recipient user or group. The principal must belong to the scope the alert is created in.
-- `type` (String) The type of the recipient. Options: user, group.
+- `id` (String) The ID of the recipient user or group, which must belong to the scope the alert is created in. For an email recipient this is the email address, which must be on one of your organization's verified email domains.
+- `type` (String) The type of the recipient. Options: user, group, email. The email type is only for cert-manager, cert-manager.application, cert-manager.signer alerts.
 
 
 
@@ -197,6 +263,18 @@ Optional:
 
 
 
+<a id="nestedatt--condition"></a>
+### Nested Schema for `condition`
+
+Optional:
+
+- `alert_before_days` (Number) How many days before expiry the alert fires. Required for these events, and not used by the others: identity.authentication.expiry, cert-manager.application.certificate.expiry, cert-manager.certificate.expiry, cert-manager.signer.certificate.expiry. Must be at least 1, and at most 90 for identity.authentication; 365 for cert-manager, cert-manager.application, cert-manager.signer.
+- `application_ids` (Set of String) Only certificates in these Certificate Manager applications. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation. Leave it out to cover all of them. At most 100.
+- `daily_reminder` (Boolean) When true, sends a reminder every day until expiry. Defaults to false. Only for the events that take alert_before_days.
+- `profile_ids` (Set of String) Only certificates issued from these certificate profiles. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation. Leave it out to cover all of them. At most 100.
+- `sources` (Set of String) Only certificates with these sources. Options: issued, discovered, imported. Leave it out to cover every source. Only for these events: cert-manager.certificate.expiry, cert-manager.certificate.issuance, cert-manager.certificate.renewal, cert-manager.certificate.revocation.
+
+
 <a id="nestedatt--expiry"></a>
 ### Nested Schema for `expiry`
 
@@ -224,4 +302,7 @@ terraform import infisical_alert.example <alert_id>
 # Write-only channel secrets (a Slack webhook URL, a PagerDuty integration key, a webhook
 # signing secret) are never returned by the API, so the first plan after an import shows them
 # being set. A signing secret left out of the configuration keeps whatever is stored.
+#
+# An imported alert uses event_type and condition. Importing it into a configuration that still uses
+# the deprecated expiry block shows one in-place update that changes nothing in Infisical.
 ```

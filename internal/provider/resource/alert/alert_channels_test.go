@@ -853,3 +853,61 @@ func TestValidateConfigAllowsDuplicateChannelNames(t *testing.T) {
 		t.Errorf("ValidateConfig() with two channels sharing a name: diagnostics = %v, want none", resp.Diagnostics)
 	}
 }
+
+func TestValidateRecipientTypesForResourceType(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	model := func(resourceType string) alertResourceModel {
+		m := alertModel(t, map[string]alertChannelModel{"on_call": {
+			ID:      types.StringValue("channel-1"),
+			Name:    types.StringValue("On-call"),
+			Enabled: types.BoolValue(true),
+			Email: emailChannel(t,
+				alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeUser), ID: types.StringValue("user-1")},
+				alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeEmail), ID: types.StringValue("oncall@example.com")},
+			),
+		}})
+		m.ResourceType = types.StringValue(resourceType)
+		return m
+	}
+
+	if diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(alertResourceTypeCertManagerApplication)), alertResourceTypeCertManagerApplication); diags.HasError() {
+		t.Errorf("email recipient on an application alert: diagnostics = %v, want none", diags)
+	}
+
+	diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(alertResourceTypeIdentityAuthentication)), alertResourceTypeIdentityAuthentication)
+	if !diags.HasError() {
+		t.Fatal("email recipient on an identity alert: no error, want one")
+	}
+	want := path.Root("channels").AtMapKey("on_call").AtName("email").AtName("recipients")
+	if got := errorPath(t, diags); !got.Equal(want) {
+		t.Errorf("error path = %v, want %v", got, want)
+	}
+}
+
+func TestRecipientIDRejectsSurroundingWhitespace(t *testing.T) {
+	s := alertSchema(t)
+	channels := as[schema.MapNestedAttribute](t, s.Attributes["channels"])
+	email := as[schema.SingleNestedAttribute](t, channels.NestedObject.Attributes[AlertChannelTypeEmail])
+	recipients := as[schema.SetNestedAttribute](t, email.Attributes["recipients"])
+	id := as[schema.StringAttribute](t, recipients.NestedObject.Attributes["id"])
+
+	for value, wantError := range map[string]bool{
+		"oncall@example.com":   false,
+		"a":                    false,
+		" oncall@example.com":  true,
+		"oncall@example.com\n": true,
+		"":                     true,
+	} {
+		var diags diag.Diagnostics
+		for _, v := range id.Validators {
+			resp := &validator.StringResponse{}
+			v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: types.StringValue(value)}, resp)
+			diags.Append(resp.Diagnostics...)
+		}
+		if diags.HasError() != wantError {
+			t.Errorf("recipient id %q: error = %v, want %v", value, diags.HasError(), wantError)
+		}
+	}
+}
