@@ -3665,33 +3665,39 @@ type CertificateBasicConstraints struct {
 }
 
 type Certificate struct {
-	Id                        string                       `json:"id"`
-	ProjectId                 string                       `json:"projectId"`
-	ProfileId                 string                       `json:"profileId"`
-	OrderId                   string                       `json:"orderId,omitempty"`
-	ApplicationId             string                       `json:"applicationId,omitempty"`
-	Status                    string                       `json:"status"` // pending, issued, failed
-	CommonName                string                       `json:"commonName"`
-	AltNames                  interface{}                  `json:"altNames,omitempty"`
-	SerialNumber              string                       `json:"serialNumber,omitempty"`
-	NotBefore                 string                       `json:"notBefore,omitempty"`
-	NotAfter                  string                       `json:"notAfter,omitempty"`
-	Certificate               string                       `json:"certificate,omitempty"`
-	PrivateKey                string                       `json:"privateKey,omitempty"`
-	CertificateChain          string                       `json:"certificateChain,omitempty"`
-	KeyAlgorithm              string                       `json:"keyAlgorithm,omitempty"`
-	SignatureAlgorithm        string                       `json:"signatureAlgorithm,omitempty"`
-	KeyUsages                 []string                     `json:"keyUsages,omitempty"`
-	ExtendedKeyUsages         []string                     `json:"extendedKeyUsages,omitempty"`
-	SubjectOrganization       string                       `json:"subjectOrganization,omitempty"`
-	SubjectOrganizationalUnit string                       `json:"subjectOrganizationalUnit,omitempty"`
-	SubjectCountry            string                       `json:"subjectCountry,omitempty"`
-	SubjectState              string                       `json:"subjectState,omitempty"`
-	SubjectLocality           string                       `json:"subjectLocality,omitempty"`
-	SubjectDomainComponents   string                       `json:"subjectDomainComponents,omitempty"`
-	BasicConstraints          *CertificateBasicConstraints `json:"basicConstraints,omitempty"`
-	CreatedAt                 string                       `json:"createdAt"`
-	UpdatedAt                 string                       `json:"updatedAt"`
+	Id                         string                       `json:"id"`
+	ProjectId                  string                       `json:"projectId"`
+	ProfileId                  string                       `json:"profileId"`
+	OrderId                    string                       `json:"orderId,omitempty"`
+	ApplicationId              string                       `json:"applicationId,omitempty"`
+	Status                     string                       `json:"status"` // pending, issued, failed
+	CommonName                 string                       `json:"commonName"`
+	AltNames                   interface{}                  `json:"altNames,omitempty"`
+	SerialNumber               string                       `json:"serialNumber,omitempty"`
+	NotBefore                  string                       `json:"notBefore,omitempty"`
+	NotAfter                   string                       `json:"notAfter,omitempty"`
+	Certificate                string                       `json:"certificate,omitempty"`
+	PrivateKey                 string                       `json:"privateKey,omitempty"`
+	CertificateChain           string                       `json:"certificateChain,omitempty"`
+	KeyAlgorithm               string                       `json:"keyAlgorithm,omitempty"`
+	SignatureAlgorithm         string                       `json:"signatureAlgorithm,omitempty"`
+	KeyUsages                  []string                     `json:"keyUsages,omitempty"`
+	ExtendedKeyUsages          []string                     `json:"extendedKeyUsages,omitempty"`
+	SubjectOrganization        string                       `json:"subjectOrganization,omitempty"`
+	SubjectOrganizationalUnit  string                       `json:"subjectOrganizationalUnit,omitempty"`
+	SubjectCountry             string                       `json:"subjectCountry,omitempty"`
+	SubjectState               string                       `json:"subjectState,omitempty"`
+	SubjectLocality            string                       `json:"subjectLocality,omitempty"`
+	SubjectDomainComponents    string                       `json:"subjectDomainComponents,omitempty"`
+	BasicConstraints           *CertificateBasicConstraints `json:"basicConstraints,omitempty"`
+	CaId                       string                       `json:"caId,omitempty"`
+	CaType                     *string                      `json:"caType,omitempty"`
+	DeletedAt                  string                       `json:"deletedAt,omitempty"`
+	HasPrivateKey              *bool                        `json:"hasPrivateKey,omitempty"`
+	RenewedByCertificateId     string                       `json:"renewedByCertificateId,omitempty"`
+	LatestRenewalCertificateId *string                      `json:"latestRenewalCertificateId,omitempty"`
+	CreatedAt                  string                       `json:"createdAt"`
+	UpdatedAt                  string                       `json:"updatedAt"`
 }
 
 type CertificateAltName struct {
@@ -3740,11 +3746,51 @@ type RequestCertificateResponse struct {
 }
 
 type GetCertificateRequest struct {
-	CertificateId string
+	CertificateId  string
+	IncludeDeleted bool
 }
 
 type GetCertificateResponse struct {
 	Certificate Certificate `json:"certificate"`
+}
+
+type RenewCertificateRequest struct {
+	CertificateId    string                 `json:"-"`
+	RenewalKeySource string                 `json:"renewalKeySource,omitempty"`
+	CSR              string                 `json:"csr,omitempty"`
+	Attributes       *CertificateAttributes `json:"attributes,omitempty"`
+}
+
+type RenewCertificateResponse struct {
+	CertificateId        string `json:"certificateId"`
+	CertificateRequestId string `json:"certificateRequestId"`
+	Certificate          string `json:"certificate"`
+	CertificateChain     string `json:"certificateChain"`
+	IssuingCaCertificate string `json:"issuingCaCertificate"`
+	SerialNumber         string `json:"serialNumber"`
+	PrivateKey           string `json:"privateKey"`
+}
+
+type RevokeCertificateRequest struct {
+	CertificateId    string `json:"-"`
+	RevocationReason string `json:"revocationReason"`
+}
+
+type DeleteCertificateRequest struct {
+	CertificateId string
+}
+
+type GetCertificateBundleResponse struct {
+	Certificate      string `json:"certificate"`
+	CertificateChain string `json:"certificateChain"`
+	PrivateKey       string `json:"privateKey"`
+	SerialNumber     string `json:"serialNumber"`
+}
+
+type GetCertificateBodyResponse struct {
+	Certificate      string `json:"certificate"`
+	CertificateChain string `json:"certificateChain"`
+	SerialNumber     string `json:"serialNumber"`
 }
 
 type GetCertificateRequestStatusRequest struct {

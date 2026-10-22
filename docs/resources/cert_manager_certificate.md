@@ -3,12 +3,18 @@
 page_title: "infisical_cert_manager_certificate Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Request and manage certificates from Infisical certificate profiles. Supports both CSR-based and direct field requests. The resource will poll until the certificate is issued or a timeout is reached. Only Machine Identity authentication is supported for this resource.
+  Request and manage certificates from Infisical certificate profiles, either from a CSR or from subject fields. The resource polls until the certificate is issued or timeout_seconds is reached. Only Machine Identity authentication is supported.
+  manual_renew_days_before_expiry renews the certificate in place on terraform apply once it is close to expiry, and changing csr renews it in place with the new CSR. Renewal only runs when you apply, so apply regularly or use the profile's auto-renewal instead. The previous certificate stays valid until it expires.
+  revoke_on_destroy and delete_on_destroy act when the resource is destroyed or replaced, using the values from the last apply. With revoke_on_destroy, add lifecycle { create_before_destroy = true } so the replacement exists before the old certificate is revoked.
 ---
 
 # infisical_cert_manager_certificate (Resource)
 
-Request and manage certificates from Infisical certificate profiles. Supports both CSR-based and direct field requests. The resource will poll until the certificate is issued or a timeout is reached. Only Machine Identity authentication is supported for this resource.
+Request and manage certificates from Infisical certificate profiles, either from a CSR or from subject fields. The resource polls until the certificate is issued or `timeout_seconds` is reached. Only Machine Identity authentication is supported.
+
+`manual_renew_days_before_expiry` renews the certificate in place on `terraform apply` once it is close to expiry, and changing `csr` renews it in place with the new CSR. Renewal only runs when you apply, so apply regularly or use the profile's auto-renewal instead. The previous certificate stays valid until it expires.
+
+`revoke_on_destroy` and `delete_on_destroy` act when the resource is destroyed or replaced, using the values from the last apply. With `revoke_on_destroy`, add `lifecycle { create_before_destroy = true }` so the replacement exists before the old certificate is revoked.
 
 ## Example Usage
 
@@ -83,6 +89,31 @@ CSR
   timeout_seconds = 300
 }
 
+resource "infisical_cert_manager_certificate" "api_csr_renewed" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
+
+  csr = file("./my-certificate.csr")
+  ttl = "90d"
+
+  manual_renew_days_before_expiry = 30
+}
+
+resource "infisical_cert_manager_certificate" "api_revoked_on_destroy" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
+
+  common_name = "web.example.com"
+  ttl         = "90d"
+
+  revoke_on_destroy            = true
+  revocation_reason_on_destroy = "superseded"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 output "cert_details" {
   value = {
     id            = infisical_cert_manager_certificate.api_direct.id
@@ -113,22 +144,26 @@ output "cert_private_key" {
 ### Required
 
 - `application_id` (String) The ID of the Certificate Manager application to issue this certificate from
-- `profile_id` (String) The ID of the certificate profile to use for issuance
+- `profile_id` (String) The ID of the certificate profile to use for issuance. Find it on the profile's page in Certificate Manager, or reference an `infisical_cert_manager_certificate_profile` resource.
 
 ### Optional
 
 - `alt_names` (List of String) Subject alternative names (SANs) for the certificate
 - `common_name` (String) The common name (CN) for the certificate. Required when not using CSR
 - `country` (String) The country (C) for the certificate (2-letter code)
-- `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")).
+- `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")). Changing the CSR renews the certificate in place with the new CSR. Adding or removing the CSR replaces the certificate.
+- `delete_on_destroy` (Boolean) Delete the certificate when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.
 - `domain_components` (List of String) Domain components (DC) for the certificate. Multi-valued; each entry becomes a DC attribute in the subject.
 - `extended_key_usages` (List of String) Extended key usages for the certificate. Supported: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 - `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `key_usages` (List of String) Key usages for the certificate. Supported: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
 - `locality` (String) The locality (L) for the certificate
+- `manual_renew_days_before_expiry` (Number) Renew the certificate in place on `terraform apply` once it has fewer than this many days left before expiry. Must be at least 1 and smaller than the certificate lifetime. Renewal only happens when an apply runs. Not set by default.
 - `organization` (String) The organization (O) for the certificate
 - `ou` (String) The organizational unit (OU) for the certificate
 - `province` (String) The state/province (ST) for the certificate
+- `revocation_reason_on_destroy` (String) The reason sent when the certificate is revoked on destroy, used with `revoke_on_destroy`. Supported: unspecified, key_compromise, ca_compromise, affiliation_changed, superseded, cessation_of_operation, certificate_hold, privilege_withdrawn, aa_compromise. Defaults to unspecified.
+- `revoke_on_destroy` (Boolean) Revoke the certificate when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.
 - `signature_algorithm` (String) The signature algorithm for the certificate. Supported: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
 - `timeout_seconds` (Number) Maximum time to wait for certificate issuance in seconds. Defaults to 3600 (1 hour)
 - `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y').
@@ -138,13 +173,13 @@ output "cert_private_key" {
 - `certificate` (String) The issued certificate in PEM format.
 - `certificate_chain` (String) The certificate chain in PEM format.
 - `certificate_request_id` (String) The ID of the certificate request
-- `id` (String) The ID of the certificate
+- `id` (String) The ID of the certificate. Changes when the certificate is renewed.
 - `not_after` (String) The not-after (expiration) date of the certificate (RFC3339 format)
 - `not_before` (String) The not-before date of the certificate (RFC3339 format)
 - `order_id` (String) The ID of the certificate order. A certificate and all of its renewals share one order, so use it to select this certificate in a certificate sync's `certificate_filters`.
 - `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based).
 - `serial_number` (String) The serial number of the issued certificate
-- `status` (String) The status of the certificate (pending, issued, failed)
+- `status` (String) The status of the certificate: active or revoked, or renewed when it was renewed outside Terraform and that renewal is no longer available. Use not_after to tell whether it has expired.
 
 ## Import
 

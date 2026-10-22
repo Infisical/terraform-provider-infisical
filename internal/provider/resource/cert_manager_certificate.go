@@ -8,15 +8,19 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -77,7 +81,9 @@ func normalizeExtendedKeyUsage(usage string) string {
 }
 
 var (
-	_ resource.Resource = &certManagerCertificateResource{}
+	_ resource.Resource                   = &certManagerCertificateResource{}
+	_ resource.ResourceWithModifyPlan     = &certManagerCertificateResource{}
+	_ resource.ResourceWithValidateConfig = &certManagerCertificateResource{}
 )
 
 func NewCertManagerCertificateResource() resource.Resource {
@@ -89,33 +95,37 @@ type certManagerCertificateResource struct {
 }
 
 type certManagerCertificateResourceModel struct {
-	ProfileId            types.String `tfsdk:"profile_id"`
-	ApplicationId        types.String `tfsdk:"application_id"`
-	CSR                  types.String `tfsdk:"csr"`
-	CommonName           types.String `tfsdk:"common_name"`
-	AltNames             types.List   `tfsdk:"alt_names"`
-	Organization         types.String `tfsdk:"organization"`
-	OU                   types.String `tfsdk:"ou"`
-	Country              types.String `tfsdk:"country"`
-	Province             types.String `tfsdk:"province"`
-	Locality             types.String `tfsdk:"locality"`
-	DomainComponents     types.List   `tfsdk:"domain_components"`
-	KeyAlgorithm         types.String `tfsdk:"key_algorithm"`
-	SignatureAlgorithm   types.String `tfsdk:"signature_algorithm"`
-	KeyUsages            types.List   `tfsdk:"key_usages"`
-	ExtendedKeyUsages    types.List   `tfsdk:"extended_key_usages"`
-	TTL                  types.String `tfsdk:"ttl"`
-	TimeoutSeconds       types.Int64  `tfsdk:"timeout_seconds"`
-	Id                   types.String `tfsdk:"id"`
-	OrderId              types.String `tfsdk:"order_id"`
-	CertificateRequestId types.String `tfsdk:"certificate_request_id"`
-	Status               types.String `tfsdk:"status"`
-	SerialNumber         types.String `tfsdk:"serial_number"`
-	NotBefore            types.String `tfsdk:"not_before"`
-	NotAfter             types.String `tfsdk:"not_after"`
-	Certificate          types.String `tfsdk:"certificate"`
-	PrivateKey           types.String `tfsdk:"private_key"`
-	CertificateChain     types.String `tfsdk:"certificate_chain"`
+	ProfileId                   types.String `tfsdk:"profile_id"`
+	ApplicationId               types.String `tfsdk:"application_id"`
+	CSR                         types.String `tfsdk:"csr"`
+	CommonName                  types.String `tfsdk:"common_name"`
+	AltNames                    types.List   `tfsdk:"alt_names"`
+	Organization                types.String `tfsdk:"organization"`
+	OU                          types.String `tfsdk:"ou"`
+	Country                     types.String `tfsdk:"country"`
+	Province                    types.String `tfsdk:"province"`
+	Locality                    types.String `tfsdk:"locality"`
+	DomainComponents            types.List   `tfsdk:"domain_components"`
+	KeyAlgorithm                types.String `tfsdk:"key_algorithm"`
+	SignatureAlgorithm          types.String `tfsdk:"signature_algorithm"`
+	KeyUsages                   types.List   `tfsdk:"key_usages"`
+	ExtendedKeyUsages           types.List   `tfsdk:"extended_key_usages"`
+	TTL                         types.String `tfsdk:"ttl"`
+	TimeoutSeconds              types.Int64  `tfsdk:"timeout_seconds"`
+	ManualRenewDaysBeforeExpiry types.Int64  `tfsdk:"manual_renew_days_before_expiry"`
+	RevokeOnDestroy             types.Bool   `tfsdk:"revoke_on_destroy"`
+	RevocationReason            types.String `tfsdk:"revocation_reason_on_destroy"`
+	DeleteOnDestroy             types.Bool   `tfsdk:"delete_on_destroy"`
+	Id                          types.String `tfsdk:"id"`
+	OrderId                     types.String `tfsdk:"order_id"`
+	CertificateRequestId        types.String `tfsdk:"certificate_request_id"`
+	Status                      types.String `tfsdk:"status"`
+	SerialNumber                types.String `tfsdk:"serial_number"`
+	NotBefore                   types.String `tfsdk:"not_before"`
+	NotAfter                    types.String `tfsdk:"not_after"`
+	Certificate                 types.String `tfsdk:"certificate"`
+	PrivateKey                  types.String `tfsdk:"private_key"`
+	CertificateChain            types.String `tfsdk:"certificate_chain"`
 }
 
 func (r *certManagerCertificateResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -124,10 +134,12 @@ func (r *certManagerCertificateResource) Metadata(_ context.Context, req resourc
 
 func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Request and manage certificates from Infisical certificate profiles. Supports both CSR-based and direct field requests. The resource will poll until the certificate is issued or a timeout is reached. Only Machine Identity authentication is supported for this resource.",
+		Description: "Request and manage certificates from Infisical certificate profiles, either from a CSR or from subject fields. The resource polls until the certificate is issued or `timeout_seconds` is reached. Only Machine Identity authentication is supported.\n\n" +
+			"`manual_renew_days_before_expiry` renews the certificate in place on `terraform apply` once it is close to expiry, and changing `csr` renews it in place with the new CSR. Renewal only runs when you apply, so apply regularly or use the profile's auto-renewal instead. The previous certificate stays valid until it expires.\n\n" +
+			"`revoke_on_destroy` and `delete_on_destroy` act when the resource is destroyed or replaced, using the values from the last apply. With `revoke_on_destroy`, add `lifecycle { create_before_destroy = true }` so the replacement exists before the old certificate is revoked.",
 		Attributes: map[string]schema.Attribute{
 			"profile_id": schema.StringAttribute{
-				Description: "The ID of the certificate profile to use for issuance",
+				Description: "The ID of the certificate profile to use for issuance. Find it on the profile's page in Certificate Manager, or reference an `infisical_cert_manager_certificate_profile` resource.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -141,12 +153,16 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"csr": schema.StringAttribute{
-				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")).",
+				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")). Changing the CSR renews the certificate in place with the new CSR. Adding or removing the CSR replaces the certificate.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIf(
+						certificateIssuanceModeChanged,
+						"Switching between CSR and field-based issuance replaces the certificate.",
+						"Switching between CSR and field-based issuance replaces the certificate.",
+					),
 				},
 			},
 			"common_name": schema.StringAttribute{
@@ -154,8 +170,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"alt_names": schema.ListAttribute{
@@ -164,8 +180,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
 					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 			"organization": schema.StringAttribute{
@@ -173,8 +189,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"ou": schema.StringAttribute{
@@ -182,8 +198,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"country": schema.StringAttribute{
@@ -194,8 +210,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					stringvalidator.LengthBetween(2, 2),
 				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"province": schema.StringAttribute{
@@ -203,8 +219,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"locality": schema.StringAttribute{
@@ -212,8 +228,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"domain_components": schema.ListAttribute{
@@ -222,8 +238,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
 					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
@@ -234,6 +250,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS...),
 				},
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
@@ -245,6 +262,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS...),
 				},
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
@@ -257,8 +275,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_USAGES...)),
 				},
 				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
 					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 			"extended_key_usages": schema.ListAttribute{
@@ -270,8 +288,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					listvalidator.ValueStringsAre(stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_EXTENDED_KEY_USAGES...)),
 				},
 				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
 					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 			"ttl": schema.StringAttribute{
@@ -279,8 +297,8 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"timeout_seconds": schema.Int64Attribute{
@@ -292,8 +310,36 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
+			"manual_renew_days_before_expiry": schema.Int64Attribute{
+				Description: "Renew the certificate in place on `terraform apply` once it has fewer than this many days left before expiry. Must be at least 1 and smaller than the certificate lifetime. Renewal only happens when an apply runs. Not set by default.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"revoke_on_destroy": schema.BoolAttribute{
+				Description: "Revoke the certificate when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"revocation_reason_on_destroy": schema.StringAttribute{
+				Description: "The reason sent when the certificate is revoked on destroy, used with `revoke_on_destroy`. Supported: " + strings.Join(SUPPORTED_CERT_REVOCATION_REASONS, ", ") + ". Defaults to unspecified.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("unspecified"),
+				Validators: []validator.String{
+					stringvalidator.OneOf(SUPPORTED_CERT_REVOCATION_REASONS...),
+				},
+			},
+			"delete_on_destroy": schema.BoolAttribute{
+				Description: "Delete the certificate when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 			"id": schema.StringAttribute{
-				Description: "The ID of the certificate",
+				Description: "The ID of the certificate. Changes when the certificate is renewed.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -314,20 +360,32 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"status": schema.StringAttribute{
-				Description: "The status of the certificate (pending, issued, failed)",
+				Description: "The status of the certificate: active or revoked, or renewed when it was renewed outside Terraform and that renewal is no longer available. Use not_after to tell whether it has expired.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"serial_number": schema.StringAttribute{
 				Description: "The serial number of the issued certificate",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"not_before": schema.StringAttribute{
 				Description: "The not-before date of the certificate (RFC3339 format)",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"not_after": schema.StringAttribute{
 				Description: "The not-after (expiration) date of the certificate (RFC3339 format)",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"certificate": schema.StringAttribute{
 				Description: "The issued certificate in PEM format.",
@@ -353,6 +411,22 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 			},
 		},
 	}
+}
+
+func (r *certManagerCertificateResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config certManagerCertificateResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() || config.RevocationReason.IsNull() || config.RevocationReason.IsUnknown() {
+		return
+	}
+	if config.RevokeOnDestroy.ValueBool() || config.RevokeOnDestroy.IsUnknown() {
+		return
+	}
+	resp.Diagnostics.AddAttributeWarning(
+		path.Root("revocation_reason_on_destroy"),
+		"Revocation reason has no effect",
+		"revocation_reason_on_destroy is only used when revoke_on_destroy is true.",
+	)
 }
 
 func (r *certManagerCertificateResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -534,7 +608,7 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 		return
 	}
 
-	r.pollCertificateRequest(ctx, &plan, certificateRequestId, timeoutSeconds, resp)
+	r.pollCertificateRequest(ctx, &plan, certificateRequestId, timeoutSeconds, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -543,7 +617,7 @@ func (r *certManagerCertificateResource) Create(ctx context.Context, req resourc
 
 func (r *certManagerCertificateResource) populatePlanFromImmediateResponse(ctx context.Context, plan *certManagerCertificateResourceModel, certResponse infisical.CertificateResponse) {
 	plan.Id = types.StringValue(certResponse.CertificateId)
-	plan.Status = types.StringValue("issued")
+	plan.Status = types.StringValue(certificateStatusActive)
 
 	if certResponse.Certificate != "" {
 		plan.Certificate = types.StringValue(certResponse.Certificate)
@@ -583,11 +657,24 @@ func (r *certManagerCertificateResource) populateCertificateDetails(ctx context.
 		})
 		plan.NotBefore = types.StringValue("")
 		plan.NotAfter = types.StringValue("")
-		plan.OrderId = types.StringNull()
+		if plan.OrderId.IsUnknown() {
+			plan.OrderId = types.StringNull()
+		}
+		for _, value := range []*types.String{&plan.CommonName, &plan.Organization, &plan.OU, &plan.Country, &plan.Province, &plan.Locality, &plan.KeyAlgorithm, &plan.SignatureAlgorithm, &plan.CSR, &plan.TTL} {
+			if value.IsUnknown() {
+				*value = types.StringNull()
+			}
+		}
+		for _, value := range []*types.List{&plan.AltNames, &plan.DomainComponents, &plan.KeyUsages, &plan.ExtendedKeyUsages} {
+			if value.IsUnknown() {
+				*value = types.ListNull(types.StringType)
+			}
+		}
 		return
 	}
 
 	cert := certDetails.Certificate
+	plan.Status = types.StringValue(cert.Status)
 	plan.OrderId = types.StringValue(cert.OrderId)
 	plan.CommonName = types.StringValue(cert.CommonName)
 	plan.KeyAlgorithm = types.StringValue(cert.KeyAlgorithm)
@@ -742,7 +829,7 @@ func (r *certManagerCertificateResource) parseAltNames(ctx context.Context, altN
 	return altNamesList
 }
 
-func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Context, plan *certManagerCertificateResourceModel, certificateRequestId string, timeoutSeconds int64, resp *resource.CreateResponse) {
+func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Context, plan *certManagerCertificateResourceModel, certificateRequestId string, timeoutSeconds int64, diagnostics *diag.Diagnostics) {
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	startTime := time.Now()
 
@@ -752,12 +839,12 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 
 	for {
 		if ctx.Err() != nil {
-			resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+			diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 			return
 		}
 
 		if time.Since(startTime) > timeout {
-			resp.Diagnostics.AddError(
+			diagnostics.AddError(
 				"Certificate issuance timeout",
 				fmt.Sprintf("Certificate issuance did not complete within %d seconds. Request ID: %s", timeoutSeconds, certificateRequestId),
 			)
@@ -771,14 +858,14 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 			if err == infisical.ErrNotFound {
 				select {
 				case <-ctx.Done():
-					resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+					diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 					return
 				case <-time.After(currentInterval):
 					currentInterval = r.nextBackoffInterval(currentInterval, maxInterval)
 					continue
 				}
 			}
-			resp.Diagnostics.AddError(
+			diagnostics.AddError(
 				"Error checking certificate request status",
 				fmt.Sprintf("Failed to check certificate request status: %v. Request ID: %s", err, certificateRequestId),
 			)
@@ -797,7 +884,7 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 			if statusResponse.ErrorMessage != nil && *statusResponse.ErrorMessage != "" {
 				errorMsg = fmt.Sprintf("Certificate issuance failed: %s", *statusResponse.ErrorMessage)
 			}
-			resp.Diagnostics.AddError(
+			diagnostics.AddError(
 				"Certificate issuance failed",
 				fmt.Sprintf("%s. Request ID: %s", errorMsg, certificateRequestId),
 			)
@@ -806,7 +893,7 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 		case "pending":
 			select {
 			case <-ctx.Done():
-				resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+				diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 				return
 			case <-time.After(currentInterval):
 				currentInterval = r.nextBackoffInterval(currentInterval, maxInterval)
@@ -821,7 +908,7 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 			}
 			select {
 			case <-ctx.Done():
-				resp.Diagnostics.AddError("Operation cancelled", ctx.Err().Error())
+				diagnostics.AddError("Operation cancelled", ctx.Err().Error())
 				return
 			case <-time.After(currentInterval):
 				currentInterval = r.nextBackoffInterval(currentInterval, maxInterval)
@@ -840,7 +927,7 @@ func (r *certManagerCertificateResource) nextBackoffInterval(current, maxInterva
 }
 
 func (r *certManagerCertificateResource) handleIssuedCertificate(ctx context.Context, plan *certManagerCertificateResourceModel, statusResponse *infisical.GetCertificateRequestStatusResponse) {
-	plan.Status = types.StringValue("issued")
+	plan.Status = types.StringValue(certificateStatusActive)
 
 	certificateId := ""
 	if statusResponse.CertificateId != nil && *statusResponse.CertificateId != "" {
@@ -894,7 +981,8 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 	}
 
 	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{
-		CertificateId: state.Id.ValueString(),
+		CertificateId:  state.Id.ValueString(),
+		IncludeDeleted: true,
 	})
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -908,7 +996,44 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 
 	cert := certResponse.Certificate
 
+	if pendingRequestId := pendingRenewalRequestId(ctx, req.Private); pendingRequestId != "" {
+		r.resolvePendingRenewal(ctx, cert, pendingRequestId, resp)
+	}
+
+	latestRenewalId := ""
+	if cert.LatestRenewalCertificateId != nil && *cert.LatestRenewalCertificateId != cert.Id {
+		latestRenewalId = *cert.LatestRenewalCertificateId
+	}
+
+	if latestRenewalId != "" && (cert.RenewedByCertificateId != "" || cert.DeletedAt != "") {
+		latestCert, followed := r.followLatestRenewal(ctx, &state, latestRenewalId, &resp.Diagnostics)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if followed {
+			cert = latestCert
+		}
+	}
+
+	if cert.DeletedAt != "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if state.Certificate.IsNull() || state.Certificate.IsUnknown() || state.Certificate.ValueString() == "" {
+		if !r.populateCertificateMaterial(&state, cert.Id, &resp.Diagnostics) {
+			return
+		}
+	}
+
+	if !hasCSRValue(state.CSR) && cert.HasPrivateKey != nil && !*cert.HasPrivateKey {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateIssuedFromCSRKey, []byte("true"))...)
+	}
+
 	state.Status = types.StringValue(cert.Status)
+	if cert.RenewedByCertificateId != "" {
+		state.Status = types.StringValue(certificateStatusRenewed)
+	}
 	state.CommonName = types.StringValue(cert.CommonName)
 
 	state.AltNames = r.parseAltNames(ctx, cert.AltNames)
@@ -938,6 +1063,18 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 
 	if state.TimeoutSeconds.IsNull() || state.TimeoutSeconds.IsUnknown() {
 		state.TimeoutSeconds = types.Int64Value(3600)
+	}
+
+	if state.RevokeOnDestroy.IsNull() || state.RevokeOnDestroy.IsUnknown() {
+		state.RevokeOnDestroy = types.BoolValue(false)
+	}
+
+	if state.RevocationReason.IsNull() || state.RevocationReason.IsUnknown() {
+		state.RevocationReason = types.StringValue("unspecified")
+	}
+
+	if state.DeleteOnDestroy.IsNull() || state.DeleteOnDestroy.IsUnknown() {
+		state.DeleteOnDestroy = types.BoolValue(false)
 	}
 
 	if cert.ApplicationId != "" {
@@ -1014,13 +1151,84 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 }
 
 func (r *certManagerCertificateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Certificate updates not supported",
-		"Certificates cannot be updated. To change certificate attributes, destroy and recreate the resource.",
-	)
+	var plan, state certManagerCertificateResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.Certificate.IsUnknown() || (!certificateCSRChanged(plan, state) && !certificateRenewalDue(plan, state)) {
+		applyInPlaceChanges(&state, plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+		return
+	}
+
+	issuedFromCSR, diags := req.Private.GetKey(ctx, certificateIssuedFromCSRKey)
+	resp.Diagnostics.Append(diags...)
+	r.renewCertificate(ctx, plan, state, string(issuedFromCSR) == "true", resp)
 }
 
 func (r *certManagerCertificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state certManagerCertificateResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !state.RevokeOnDestroy.ValueBool() && !state.DeleteOnDestroy.ValueBool() {
+		return
+	}
+
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to destroy certificate",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	certificateId := state.Id.ValueString()
+
+	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateId, IncludeDeleted: true})
+	if err == infisical.ErrNotFound {
+		return
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading certificate before destroying it", err.Error())
+		return
+	}
+	cert := certResponse.Certificate
+
+	if state.RevokeOnDestroy.ValueBool() && !certificateExpired(state) && cert.Status != certificateStatusRevoked {
+		if cert.CaId == "" {
+			resp.Diagnostics.AddWarning(
+				"Certificate not revoked",
+				fmt.Sprintf("Certificate %s has no issuing certificate authority, for example because it is self-signed, so it cannot be revoked.", certificateId),
+			)
+		} else {
+			err = r.client.RevokeCertificate(infisical.RevokeCertificateRequest{
+				CertificateId:    certificateId,
+				RevocationReason: certificateRevocationReasons[state.RevocationReason.ValueString()],
+			})
+			if err == infisical.ErrNotFound {
+				return
+			}
+			if err != nil {
+				resp.Diagnostics.AddError("Error revoking certificate", err.Error())
+				return
+			}
+		}
+	}
+
+	if !state.DeleteOnDestroy.ValueBool() || cert.DeletedAt != "" {
+		return
+	}
+
+	err = r.client.DeleteCertificate(infisical.DeleteCertificateRequest{CertificateId: certificateId})
+	if err != nil && err != infisical.ErrNotFound {
+		resp.Diagnostics.AddError("Error deleting certificate", err.Error())
+	}
 }
 
 func (r *certManagerCertificateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
