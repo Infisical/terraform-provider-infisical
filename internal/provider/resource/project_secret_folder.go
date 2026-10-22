@@ -345,4 +345,7 @@ func (r *projectSecretFolderResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), folder.Folder.ProjectID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("path"), folder.Folder.Path)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), folder.Folder.Description)...)
+	// This local-only deletion policy is not returned by the API. Seed its safe
+	// default so importing does not schedule an otherwise unnecessary API update.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("force_delete"), false)...)
 }
