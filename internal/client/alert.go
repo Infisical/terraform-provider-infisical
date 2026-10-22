@@ -1,9 +1,13 @@
 package infisicalclient
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"terraform-provider-infisical/internal/errors"
+
+	"github.com/go-resty/resty/v2"
 )
 
 const (
@@ -25,6 +29,25 @@ func (e *AlertAlreadyExistsError) Error() string {
 
 func (e *AlertAlreadyExistsError) Unwrap() error {
 	return e.apiError
+}
+
+// An update also answers 404 when the condition names a signer, application or profile that is missing,
+// so only the alert's own "Alert with ID ... not found" means the alert is gone.
+func isAlertNotFound(response *resty.Response) bool {
+	switch response.StatusCode() {
+	case http.StatusUnprocessableEntity:
+		return true
+	case http.StatusNotFound:
+		var body struct {
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(response.Body(), &body); err != nil {
+			return false
+		}
+		return strings.HasPrefix(body.Message, "Alert with ID ")
+	default:
+		return false
+	}
 }
 
 func (client Client) existingAlertForEvent(request CreateAlertRequest) *Alert {
@@ -140,7 +163,7 @@ func (client Client) UpdateAlert(request UpdateAlertRequest) (UpdateAlertRespons
 	}
 
 	if response.IsError() {
-		if response.StatusCode() == http.StatusNotFound || response.StatusCode() == http.StatusUnprocessableEntity {
+		if isAlertNotFound(response) {
 			return UpdateAlertResponse{}, ErrNotFound
 		}
 		return UpdateAlertResponse{}, errors.NewAPIErrorWithResponse(operationUpdateAlert, response, nil)

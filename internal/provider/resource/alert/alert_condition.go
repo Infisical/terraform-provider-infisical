@@ -36,6 +36,7 @@ type alertConditionModel struct {
 	ApplicationIDs  types.Set   `tfsdk:"application_ids"`
 	ProfileIDs      types.Set   `tfsdk:"profile_ids"`
 	Sources         types.Set   `tfsdk:"sources"`
+	SignerIDs       types.Set   `tfsdk:"signer_ids"`
 }
 
 type expiryConditionModel struct {
@@ -49,6 +50,7 @@ type alertConditionPayload struct {
 	ApplicationIDs []string `json:"applicationIds,omitempty"`
 	ProfileIDs     []string `json:"profileIds,omitempty"`
 	Sources        []string `json:"sources,omitempty"`
+	SignerIDs      []string `json:"signerIds,omitempty"`
 }
 
 func eventsWhere(match func(alertEvent) bool) string {
@@ -73,7 +75,9 @@ func alertConditionSchema() schema.SingleNestedAttribute {
 			},
 		}
 	}
-	filterEvents := eventsWhere(func(event alertEvent) bool { return event.filters })
+	filterEvents := func(name string) string {
+		return eventsWhere(func(event alertEvent) bool { return event.takesFilter(name) })
+	}
 
 	return schema.SingleNestedAttribute{
 		Optional:    true,
@@ -90,17 +94,18 @@ func alertConditionSchema() schema.SingleNestedAttribute {
 				Optional:    true,
 				Description: "When true, sends a reminder every day until expiry. Defaults to false. Only for the events that take alert_before_days.",
 			},
-			"application_ids": idsAttribute("Only certificates in these Certificate Manager applications. Only for these events: " + filterEvents + "."),
-			"profile_ids":     idsAttribute("Only certificates issued from these certificate profiles. Only for these events: " + filterEvents + "."),
+			"application_ids": idsAttribute("Only certificates in these Certificate Manager applications. Only for these events: " + filterEvents("application_ids") + "."),
+			"profile_ids":     idsAttribute("Only certificates issued from these certificate profiles. Only for these events: " + filterEvents("profile_ids") + "."),
 			"sources": schema.SetAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Only certificates with these sources. Options: " + strings.Join(certificateSources, ", ") + ". Leave it out to cover every source. Only for these events: " + filterEvents + ".",
+				Description: "Only certificates with these sources. Options: " + strings.Join(certificateSources, ", ") + ". Leave it out to cover every source. Only for these events: " + filterEvents("sources") + ".",
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(stringvalidator.OneOf(certificateSources...)),
 				},
 			},
+			"signer_ids": idsAttribute("Only certificates of these code signing signers, by ID. To get a signer's ID, open it under Code Signing > Signers in Certificate Manager and select Options > Copy Signer ID. Only for these events: " + filterEvents("signer_ids") + "."),
 		},
 	}
 }
@@ -155,12 +160,13 @@ func alertConditionForAPI(event alertEvent, model alertResourceModel) any {
 		payload.ApplicationIDs = setStrings(model.Condition.ApplicationIDs)
 		payload.ProfileIDs = setStrings(model.Condition.ProfileIDs)
 		payload.Sources = setStrings(model.Condition.Sources)
+		payload.SignerIDs = setStrings(model.Condition.SignerIDs)
 		if event.firesBeforeExpiry() {
 			payload = withExpiry(payload, model.Condition.AlertBeforeDays, model.Condition.DailyReminder)
 		}
 	}
 
-	if payload.AlertBefore == nil && len(payload.ApplicationIDs) == 0 && len(payload.ProfileIDs) == 0 && len(payload.Sources) == 0 {
+	if payload.AlertBefore == nil && len(payload.ApplicationIDs) == 0 && len(payload.ProfileIDs) == 0 && len(payload.Sources) == 0 && len(payload.SignerIDs) == 0 {
 		return nil
 	}
 	return payload
@@ -230,6 +236,7 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 		ApplicationIDs:  stringSet(payload.ApplicationIDs),
 		ProfileIDs:      stringSet(payload.ProfileIDs),
 		Sources:         stringSet(payload.Sources),
+		SignerIDs:       stringSet(payload.SignerIDs),
 	}
 	if event.firesBeforeExpiry() {
 		condition.AlertBeforeDays = alertBeforeDays
@@ -239,7 +246,7 @@ func setAlertConditionFromAPI(state *alertResourceModel, event alertEvent, raw j
 		}
 	}
 
-	if condition.AlertBeforeDays.IsNull() && condition.ApplicationIDs.IsNull() && condition.ProfileIDs.IsNull() && condition.Sources.IsNull() {
+	if condition.AlertBeforeDays.IsNull() && condition.ApplicationIDs.IsNull() && condition.ProfileIDs.IsNull() && condition.Sources.IsNull() && condition.SignerIDs.IsNull() {
 		condition = nil
 	}
 	state.Condition = condition
@@ -324,9 +331,10 @@ func validateAlertEvent(ctx context.Context, config tfsdk.Config, resourceType s
 	allowed := map[string]bool{
 		"alert_before_days": event.firesBeforeExpiry(),
 		"daily_reminder":    event.firesBeforeExpiry(),
-		"application_ids":   event.filters,
-		"profile_ids":       event.filters,
-		"sources":           event.filters,
+		"application_ids":   event.takesFilter("application_ids"),
+		"profile_ids":       event.takesFilter("profile_ids"),
+		"sources":           event.takesFilter("sources"),
+		"signer_ids":        event.takesFilter("signer_ids"),
 	}
 	set := 0
 	for _, name := range slices.Sorted(maps.Keys(allowed)) {
@@ -337,6 +345,10 @@ func validateAlertEvent(ctx context.Context, config tfsdk.Config, resourceType s
 		if !allowed[name] {
 			diags.AddAttributeError(path.Root("condition").AtName(name), "Unexpected "+name,
 				fmt.Sprintf("The %s event doesn't use %s, so remove it.", event.eventType, name))
+		}
+		if values, ok := attributes[name].(types.Set); ok && slices.ContainsFunc(values.Elements(), attr.Value.IsNull) {
+			diags.AddAttributeError(path.Root("condition").AtName(name), "Invalid "+name,
+				fmt.Sprintf("%s can't contain null.", name))
 		}
 	}
 

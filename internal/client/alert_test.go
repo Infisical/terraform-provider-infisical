@@ -280,6 +280,21 @@ func TestUpdateAlertReportsOtherFailures(t *testing.T) {
 	}
 }
 
+func TestUpdateAlertReportsAMissingSigner(t *testing.T) {
+	client, done := alertTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeAlertError(t, w, http.StatusNotFound, "Signer not found in Certificate Manager: signer-1")
+	})
+	defer done()
+
+	_, err := client.UpdateAlert(UpdateAlertRequest{ID: "alert-1"})
+	if errors.Is(err, ErrNotFound) {
+		t.Errorf("UpdateAlert() error = %v, want it not to be ErrNotFound", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "Signer not found in Certificate Manager") {
+		t.Errorf("UpdateAlert() error = %v, want it to carry the API's message", err)
+	}
+}
+
 func TestCreateAlertNeverReportsAScopeWideDuplicate(t *testing.T) {
 	client, done := alertTestClient(t, alertRejectingCreates(t,
 		"Invalid alert condition: sources lists the same source more than once",
