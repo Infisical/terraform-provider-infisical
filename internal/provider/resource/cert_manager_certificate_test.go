@@ -704,7 +704,7 @@ func TestCertDelete(t *testing.T) {
 		{name: "self_signed_skips_revoke_and_deletes", now: "2026-10-05T00:00:00Z", revoke: true, delete: true, reason: "unspecified", serverStatus: "self_signed", wantRequests: []string{get, del}},
 		{name: "deleted_outside_terraform_is_still_revoked", now: "2026-10-05T00:00:00Z", revoke: true, delete: true, reason: "key_compromise", serverStatus: "deleted", wantReason: "KEY_COMPROMISE", wantRequests: []string{get, revoke}},
 		{name: "certificate_gone", now: "2026-10-05T00:00:00Z", revoke: true, delete: true, reason: "unspecified", wantRequests: []string{get}},
-		{name: "revoke_404", now: "2026-10-05T00:00:00Z", revoke: true, reason: "unspecified", serverStatus: "active", revokeStatus: http.StatusNotFound, wantReason: "UNSPECIFIED", wantRequests: []string{get, revoke}},
+		{name: "revoke_404_but_certificate_exists_fails", now: "2026-10-05T00:00:00Z", revoke: true, reason: "unspecified", serverStatus: "active", revokeStatus: http.StatusNotFound, wantReason: "UNSPECIFIED", wantRequests: []string{get, revoke, get}, wantError: true},
 		{name: "delete_404", now: "2026-11-05T00:00:00Z", delete: true, reason: "unspecified", serverStatus: "expired", deleteStatus: http.StatusNotFound, wantRequests: []string{get, del}},
 		{name: "revoke_error_fails", now: "2026-10-05T00:00:00Z", revoke: true, delete: true, reason: "unspecified", serverStatus: "active", revokeStatus: http.StatusBadRequest, wantReason: "UNSPECIFIED", wantRequests: []string{get, revoke}, wantError: true},
 		{name: "delete_error_fails", now: "2026-10-05T00:00:00Z", revoke: true, delete: true, reason: "unspecified", serverStatus: "active", deleteStatus: http.StatusBadRequest, wantReason: "UNSPECIFIED", wantRequests: []string{get, revoke, del}, wantError: true},
@@ -1528,7 +1528,7 @@ func TestCertDeleteCancelsPendingRenewalAndRevokesLaterRenewals(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatal(resp.Diagnostics)
 	}
-	want := "GET /api/v1/cert-manager/certificates/cert-old,POST /api/v1/cert-manager/certificates/certificate-requests/req-slow/cancel,GET /api/v1/cert-manager/certificates/cert-next," +
+	want := "POST /api/v1/cert-manager/certificates/certificate-requests/req-slow/cancel,GET /api/v1/cert-manager/certificates/cert-old,GET /api/v1/cert-manager/certificates/cert-next," +
 		"POST /api/v1/cert-manager/certificates/cert-old/revoke,POST /api/v1/cert-manager/certificates/cert-next/revoke"
 	if strings.Join(log.all(), ",") != want {
 		t.Errorf("requests = %v", log.all())
@@ -1577,5 +1577,200 @@ func TestCertRejectedRequestCountsAsFailedIssuance(t *testing.T) {
 	r.pollCertificateRequest(context.Background(), &model, "req-1", 60, &diagnostics)
 	if !certificateIssuanceFailed(diagnostics) {
 		t.Errorf("a rejected request must stop polling as a failure, got %v", diagnostics)
+	}
+}
+
+func TestCertDeleteKeepsTransientRevokeFailuresOnDeletedCertificatesFatal(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	for _, tc := range []struct {
+		status    int
+		wantError bool
+		message   string
+	}{
+		{http.StatusInternalServerError, true, "Something went wrong"},
+		{http.StatusBadRequest, true, "ADCS gateway operation failed: host unreachable"},
+		{http.StatusBadRequest, false, "Certificate revocation is not supported by this certificate authority type"},
+	} {
+		r := newCertTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch req.Method + " " + req.URL.Path {
+			case "GET /api/v1/cert-manager/certificates/cert-old":
+				_, _ = fmt.Fprint(w, `{"certificate":{"id":"cert-old","status":"active","caId":"ca-1","notAfter":"2026-10-31T00:00:00Z","deletedAt":"2026-10-04T00:00:00Z"}}`)
+			case "POST /api/v1/cert-manager/certificates/cert-old/revoke":
+				w.WriteHeader(tc.status)
+				_, _ = fmt.Fprintf(w, `{"message":%q}`, tc.message)
+			default:
+				t.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+				http.NotFound(w, req)
+			}
+		})
+		state := fieldCertModel()
+		state.Status = types.StringValue(certificateStatusDeleted)
+		state.RevokeOnDestroy = types.BoolValue(true)
+		resp := runDelete(t, r, state)
+		if resp.Diagnostics.HasError() != tc.wantError {
+			t.Errorf("revoke HTTP %d %q on a deleted certificate: error = %v, want error %t", tc.status, tc.message, resp.Diagnostics, tc.wantError)
+		}
+	}
+}
+
+func TestCertDeleteSeesARenewalThatFinishesWhileCancelling(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	cancelled := false
+	log := &certRequestLog{}
+	r := newCertTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+		log.add(req.Method + " " + req.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Method + " " + req.URL.Path {
+		case "POST /api/v1/cert-manager/certificates/certificate-requests/req-slow/cancel":
+			cancelled = true
+			_, _ = fmt.Fprint(w, `{"status":"issued","cancelled":false,"errorMessage":null}`)
+		case "GET /api/v1/cert-manager/certificates/cert-old":
+			renewedBy := ""
+			if cancelled {
+				renewedBy = "cert-next"
+			}
+			_, _ = fmt.Fprintf(w, `{"certificate":{"id":"cert-old","status":"active","caId":"ca-1","notAfter":"2026-10-31T00:00:00Z","renewedByCertificateId":%q}}`, renewedBy)
+		case "GET /api/v1/cert-manager/certificates/cert-next":
+			_, _ = fmt.Fprint(w, `{"certificate":{"id":"cert-next","status":"active","caId":"ca-1","notAfter":"2026-11-30T00:00:00Z","renewedFromCertificateId":"cert-old"}}`)
+		case "POST /api/v1/cert-manager/certificates/cert-old/revoke", "POST /api/v1/cert-manager/certificates/cert-next/revoke":
+			_, _ = fmt.Fprint(w, `{"message":"ok"}`)
+		default:
+			t.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+			http.NotFound(w, req)
+		}
+	})
+	state := fieldCertModel()
+	state.RevokeOnDestroy = types.BoolValue(true)
+	s := certTestSchema(t)
+	priorState := certState(t, s, &state)
+	resp := resource.DeleteResponse{State: priorState}
+	value, _ := json.Marshal(pendingRenewal{RequestId: "req-slow"})
+	r.delete(context.Background(), resource.DeleteRequest{State: priorState}, fakePrivateState{certificatePendingRenewalKey: value}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	if !strings.Contains(strings.Join(log.all(), ","), "POST /api/v1/cert-manager/certificates/cert-next/revoke") {
+		t.Errorf("a renewal issued while cancelling must be revoked too, requests = %v", log.all())
+	}
+}
+
+func renewalChainServer(t *testing.T, length int, loop bool, log *certRequestLog) *certManagerCertificateResource {
+	return newCertTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		id := strings.TrimPrefix(req.URL.Path, "/api/v1/cert-manager/certificates/")
+		switch {
+		case req.Method == "GET":
+			index := 0
+			if id != "cert-old" {
+				_, _ = fmt.Sscanf(id, "cert-%d", &index)
+			}
+			previous := ""
+			if index < length {
+				previous = fmt.Sprintf("cert-%d", index+1)
+			}
+			if loop && index == length {
+				previous = "cert-old"
+			}
+			_, _ = fmt.Fprintf(w, `{"certificate":{"id":%q,"status":"active","caId":"ca-1","notAfter":"2026-10-31T00:00:00Z","renewedFromCertificateId":%q}}`, id, previous)
+		case req.Method == "POST" && strings.HasSuffix(id, "/revoke"):
+			log.add(id)
+			_, _ = fmt.Fprint(w, `{"message":"ok"}`)
+		default:
+			t.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+			http.NotFound(w, req)
+		}
+	})
+}
+
+func TestCertDeleteWalksTheWholeRenewalHistory(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	log := &certRequestLog{}
+	state := fieldCertModel()
+	state.RevokeOnDestroy = types.BoolValue(true)
+	resp := runDelete(t, renewalChainServer(t, 150, false, log), state)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	if got := len(log.all()); got != 151 {
+		t.Errorf("revoked %d certificates, want all 151 generations", got)
+	}
+}
+
+func TestCertDeleteFailsOnALoopingRenewalHistory(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	log := &certRequestLog{}
+	state := fieldCertModel()
+	state.RevokeOnDestroy = types.BoolValue(true)
+	resp := runDelete(t, renewalChainServer(t, 3, true, log), state)
+	if !resp.Diagnostics.HasError() || len(log.all()) != 0 {
+		t.Errorf("a looping history must fail before revoking anything, got %v and revokes %v", resp.Diagnostics, log.all())
+	}
+}
+
+func TestCertDeleteRevokeAndDeleteRaces(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	gone := false
+	r := newCertTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Method + " " + req.URL.Path {
+		case "GET /api/v1/cert-manager/certificates/cert-old":
+			if gone {
+				http.Error(w, `{"message":"Certificate not found"}`, http.StatusNotFound)
+				return
+			}
+			_, _ = fmt.Fprint(w, `{"certificate":{"id":"cert-old","status":"active","caId":"ca-1","notAfter":"2026-10-31T00:00:00Z","renewedFromCertificateId":"cert-prev"}}`)
+		case "GET /api/v1/cert-manager/certificates/cert-prev":
+			_, _ = fmt.Fprint(w, `{"certificate":{"id":"cert-prev","status":"active","caId":"ca-1","notAfter":"2026-10-20T00:00:00Z","renewedByCertificateId":"cert-old"}}`)
+		case "POST /api/v1/cert-manager/certificates/cert-prev/revoke":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprint(w, `{"message":"Certificate 'cert-prev' is already revoked."}`)
+		case "POST /api/v1/cert-manager/certificates/cert-old/revoke":
+			gone = true
+			http.Error(w, `{"message":"Certificate not found"}`, http.StatusNotFound)
+		case "DELETE /api/v1/cert-manager/certificates/cert-prev":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprint(w, `{"message":"Certificate 'cert-prev' was already deleted on 2026-10-05T00:00:00.000Z."}`)
+		case "DELETE /api/v1/cert-manager/certificates/cert-old":
+			http.Error(w, `{"message":"Certificate not found"}`, http.StatusNotFound)
+		default:
+			t.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+			http.NotFound(w, req)
+		}
+	})
+	state := fieldCertModel()
+	state.RevokeOnDestroy = types.BoolValue(true)
+	state.DeleteOnDestroy = types.BoolValue(true)
+	resp := runDelete(t, r, state)
+	if resp.Diagnostics.HasError() {
+		t.Errorf("already revoked, already deleted and really gone must all count as done, got %v", resp.Diagnostics)
+	}
+}
+
+func TestCertDeleteReportsTheReadErrorAfterARevoke404(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	reads := 0
+	r := newCertTestResource(t, func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Method + " " + req.URL.Path {
+		case "GET /api/v1/cert-manager/certificates/cert-old":
+			reads++
+			if reads > 1 {
+				http.Error(w, `{"message":"Something went wrong"}`, http.StatusInternalServerError)
+				return
+			}
+			_, _ = fmt.Fprint(w, `{"certificate":{"id":"cert-old","status":"active","caId":"ca-1","notAfter":"2026-10-31T00:00:00Z"}}`)
+		case "POST /api/v1/cert-manager/certificates/cert-old/revoke":
+			http.Error(w, `{"message":"App connection not found"}`, http.StatusNotFound)
+		default:
+			t.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+			http.NotFound(w, req)
+		}
+	})
+	state := fieldCertModel()
+	state.RevokeOnDestroy = types.BoolValue(true)
+	resp := runDelete(t, r, state)
+	if !resp.Diagnostics.HasError() || !strings.Contains(resp.Diagnostics.Errors()[0].Detail(), "reading it again failed") {
+		t.Errorf("the read error must be reported, got %v", resp.Diagnostics)
 	}
 }

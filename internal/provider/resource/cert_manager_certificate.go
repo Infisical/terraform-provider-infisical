@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -25,6 +26,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	infisicalerrors "terraform-provider-infisical/internal/errors"
 )
 
 var (
@@ -1219,14 +1222,6 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 
 	certificateId := state.Id.ValueString()
 
-	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateId, IncludeDeleted: true})
-	if err == infisical.ErrNotFound {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading certificate before destroying it", err.Error())
-		return
-	}
 	if pending, ok := readPendingRenewal(ctx, private); ok {
 		if err := r.client.CancelCertificateRequest(infisical.GetCertificateRequestStatusRequest{RequestId: pending.RequestId}); err != nil && err != infisical.ErrNotFound {
 			resp.Diagnostics.AddWarning(
@@ -1236,31 +1231,26 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 		}
 	}
 
-	older := []infisical.Certificate{}
-	for previousId := certResponse.Certificate.RenewedFromCertificateId; previousId != "" && len(older) < 100; {
-		previous, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: previousId, IncludeDeleted: true})
-		if err == infisical.ErrNotFound {
-			break
-		}
-		if err != nil {
-			resp.Diagnostics.AddError("Error reading earlier renewal before destroying it", fmt.Sprintf("Failed to read certificate %s, an earlier renewal of %s: %v", previousId, certificateId, err))
-			return
-		}
-		older = append([]infisical.Certificate{previous.Certificate}, older...)
-		previousId = previous.Certificate.RenewedFromCertificateId
+	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateId, IncludeDeleted: true})
+	if err == infisical.ErrNotFound {
+		return
 	}
-	newer := []infisical.Certificate{}
-	for nextId := certResponse.Certificate.RenewedByCertificateId; nextId != "" && len(newer) < 100; {
-		next, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: nextId, IncludeDeleted: true})
-		if err == infisical.ErrNotFound {
-			break
-		}
-		if err != nil {
-			resp.Diagnostics.AddError("Error reading later renewal before destroying it", fmt.Sprintf("Failed to read certificate %s, a later renewal of %s: %v", nextId, certificateId, err))
-			return
-		}
-		newer = append(newer, next.Certificate)
-		nextId = next.Certificate.RenewedByCertificateId
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading certificate before destroying it", err.Error())
+		return
+	}
+
+	visited := map[string]bool{certificateId: true}
+	older, ok := r.collectRenewalChain(certResponse.Certificate.RenewedFromCertificateId, func(c infisical.Certificate) string { return c.RenewedFromCertificateId }, visited, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+	for left, right := 0, len(older)-1; left < right; left, right = left+1, right-1 {
+		older[left], older[right] = older[right], older[left]
+	}
+	newer, ok := r.collectRenewalChain(certResponse.Certificate.RenewedByCertificateId, func(c infisical.Certificate) string { return c.RenewedByCertificateId }, visited, &resp.Diagnostics)
+	if !ok {
+		return
 	}
 	generations := append(append(older, certResponse.Certificate), newer...)
 
@@ -1284,13 +1274,26 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 				CertificateId:    generation.Id,
 				RevocationReason: certificateRevocationReasons[state.RevocationReason.ValueString()],
 			})
-			if err == nil || err == infisical.ErrNotFound {
+			if err == nil || badRequestSays(err, "is already revoked") {
 				continue
 			}
-			if generation.DeletedAt != "" {
+			if err == infisical.ErrNotFound {
+				_, readErr := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: generation.Id, IncludeDeleted: true})
+				if readErr == infisical.ErrNotFound {
+					continue
+				}
+				if readErr != nil {
+					resp.Diagnostics.AddError("Error revoking certificate", fmt.Sprintf("Revoking certificate %s returned not found, and reading it again failed: %v", generation.Id, readErr))
+					return
+				}
+				resp.Diagnostics.AddError("Error revoking certificate", fmt.Sprintf("Revoking certificate %s returned not found, but the certificate still exists. Check that its certificate authority and app connection still exist.", generation.Id))
+				return
+			}
+			permanent := badRequestSays(err, "not supported by this certificate authority type") || badRequestSays(err, "because it was imported and then deleted")
+			if permanent && generation.DeletedAt != "" {
 				resp.Diagnostics.AddWarning(
 					"Deleted certificate not revoked",
-					fmt.Sprintf("Certificate %s was already deleted and could not be revoked: %v", generation.Id, err),
+					fmt.Sprintf("Certificate %s was already deleted and cannot be revoked: %v", generation.Id, err),
 				)
 				continue
 			}
@@ -1307,11 +1310,38 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 			continue
 		}
 		err = r.client.DeleteCertificate(infisical.DeleteCertificateRequest{CertificateId: generation.Id})
-		if err != nil && err != infisical.ErrNotFound {
+		if err != nil && err != infisical.ErrNotFound && !badRequestSays(err, "was already deleted") {
 			resp.Diagnostics.AddError("Error deleting certificate", fmt.Sprintf("Failed to delete certificate %s: %v", generation.Id, err))
 			return
 		}
 	}
+}
+
+func badRequestSays(err error, text string) bool {
+	var apiErr *infisicalerrors.APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == 400 && strings.Contains(apiErr.ErrorMessage, text)
+}
+
+func (r *certManagerCertificateResource) collectRenewalChain(startId string, next func(infisical.Certificate) string, visited map[string]bool, diagnostics *diag.Diagnostics) ([]infisical.Certificate, bool) {
+	chain := []infisical.Certificate{}
+	for id := startId; id != ""; {
+		if visited[id] {
+			diagnostics.AddError("Renewal history loops", fmt.Sprintf("The renewal history of this certificate refers back to certificate %s, so Terraform cannot tell which certificates to clean up.", id))
+			return nil, false
+		}
+		visited[id] = true
+		certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: id, IncludeDeleted: true})
+		if err == infisical.ErrNotFound {
+			break
+		}
+		if err != nil {
+			diagnostics.AddError("Error reading renewal history before destroying it", fmt.Sprintf("Failed to read certificate %s: %v", id, err))
+			return nil, false
+		}
+		chain = append(chain, certResponse.Certificate)
+		id = next(certResponse.Certificate)
+	}
+	return chain, true
 }
 
 func (r *certManagerCertificateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
