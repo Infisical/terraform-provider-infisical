@@ -2,13 +2,16 @@ package resource
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -51,8 +54,10 @@ const (
 	certificateStatusActive      = "active"
 	certificateStatusRevoked     = "revoked"
 	certificateStatusRenewed     = "renewed"
+	certificateStatusDeleted     = "deleted"
 	certificateIssuedFromCSRKey  = "issued_from_csr"
-	certificatePendingRenewalKey = "pending_renewal_request_id"
+	certificatePendingRenewalKey = "pending_renewal"
+	certificateMissingKeyKey     = "private_key_missing"
 	certificateCaTypeInternal    = "internal"
 
 	certificateRenewalKeySourceCSR   = "csr"
@@ -78,7 +83,7 @@ func (r *certManagerCertificateResource) followLatestRenewal(ctx context.Context
 		"certificate_id":          latestId,
 	})
 
-	if !r.populateCertificateMaterial(state, latestId, diagnostics) {
+	if !r.populateCertificateMaterial(state, latestId, latestResponse.Certificate.HasPrivateKey, diagnostics) {
 		return infisical.Certificate{}, false
 	}
 	state.Id = types.StringValue(latestId)
@@ -86,31 +91,37 @@ func (r *certManagerCertificateResource) followLatestRenewal(ctx context.Context
 	return latestResponse.Certificate, true
 }
 
-func (r *certManagerCertificateResource) populateCertificateMaterial(state *certManagerCertificateResourceModel, certificateId string, diagnostics *diag.Diagnostics) bool {
-	privateKey := ""
-	bundle, err := r.client.GetCertificateBundle(infisical.GetCertificateRequest{CertificateId: certificateId})
-	var apiErr *infisicalerrors.APIError
-	if err != nil && errors.As(err, &apiErr) && apiErr.StatusCode == 403 {
-		var body infisical.GetCertificateBodyResponse
-		body, err = r.client.GetCertificateBody(infisical.GetCertificateRequest{CertificateId: certificateId})
-		bundle = infisical.GetCertificateBundleResponse{Certificate: body.Certificate, CertificateChain: body.CertificateChain, SerialNumber: body.SerialNumber}
+func (r *certManagerCertificateResource) populateCertificateMaterial(state *certManagerCertificateResourceModel, certificateId string, hasPrivateKey *bool, diagnostics *diag.Diagnostics) bool {
+	if hasPrivateKey == nil || *hasPrivateKey {
+		bundle, err := r.client.GetCertificateBundle(infisical.GetCertificateRequest{CertificateId: certificateId})
 		if err == nil {
+			state.Certificate = types.StringValue(bundle.Certificate)
+			state.CertificateChain = types.StringValue(bundle.CertificateChain)
+			state.PrivateKey = types.StringValue(bundle.PrivateKey)
+			return true
+		}
+		var apiErr *infisicalerrors.APIError
+		forbidden := errors.As(err, &apiErr) && apiErr.StatusCode == 403
+		if !forbidden && err != infisical.ErrNotFound {
+			diagnostics.AddError("Error reading certificate", fmt.Sprintf("Failed to read the certificate bundle of %s: %v", certificateId, err))
+			return false
+		}
+		if forbidden {
 			diagnostics.AddWarning(
 				"Private key of certificate not available",
 				fmt.Sprintf("This identity is not allowed to read the private key of certificate %s, so private_key is empty.", certificateId),
 			)
 		}
-	} else if err == nil {
-		privateKey = bundle.PrivateKey
 	}
+
+	body, err := r.client.GetCertificateBody(infisical.GetCertificateRequest{CertificateId: certificateId})
 	if err != nil {
 		diagnostics.AddError("Error reading certificate", fmt.Sprintf("Failed to read the certificate body of %s: %v", certificateId, err))
 		return false
 	}
-
-	state.Certificate = types.StringValue(bundle.Certificate)
-	state.CertificateChain = types.StringValue(bundle.CertificateChain)
-	state.PrivateKey = types.StringValue(privateKey)
+	state.Certificate = types.StringValue(body.Certificate)
+	state.CertificateChain = types.StringValue(body.CertificateChain)
+	state.PrivateKey = types.StringValue("")
 	return true
 }
 
@@ -118,20 +129,30 @@ type privateStateReader interface {
 	GetKey(ctx context.Context, key string) ([]byte, diag.Diagnostics)
 }
 
-func pendingRenewalRequestId(ctx context.Context, private privateStateReader) string {
-	value, _ := private.GetKey(ctx, certificatePendingRenewalKey)
-	var requestId string
-	if len(value) == 0 || json.Unmarshal(value, &requestId) != nil {
-		return ""
-	}
-	return requestId
+type pendingRenewal struct {
+	RequestId string `json:"requestId"`
+	CSR       string `json:"csr,omitempty"`
 }
 
-func (r *certManagerCertificateResource) resolvePendingRenewal(ctx context.Context, cert infisical.Certificate, requestId string, resp *resource.ReadResponse) {
+func readPendingRenewal(ctx context.Context, private privateStateReader) (pendingRenewal, bool) {
+	value, _ := private.GetKey(ctx, certificatePendingRenewalKey)
+	var pending pendingRenewal
+	if len(value) == 0 || json.Unmarshal(value, &pending) != nil || pending.RequestId == "" {
+		return pendingRenewal{}, false
+	}
+	return pending, true
+}
+
+func privateFlagSet(ctx context.Context, private privateStateReader, key string) bool {
+	value, _ := private.GetKey(ctx, key)
+	return string(value) == "true"
+}
+
+func (r *certManagerCertificateResource) resolvePendingRenewal(ctx context.Context, cert infisical.Certificate, pending pendingRenewal, resp *resource.ReadResponse) bool {
 	if cert.RenewedByCertificateId == "" {
-		status, err := r.client.GetCertificateRequestStatus(infisical.GetCertificateRequestStatusRequest{RequestId: requestId})
+		status, err := r.client.GetCertificateRequestStatus(infisical.GetCertificateRequestStatusRequest{RequestId: pending.RequestId})
 		if err != nil || !strings.EqualFold(status.Status, "failed") {
-			return
+			return false
 		}
 		message := "no reason given"
 		if status.ErrorMessage != nil && *status.ErrorMessage != "" {
@@ -139,10 +160,83 @@ func (r *certManagerCertificateResource) resolvePendingRenewal(ctx context.Conte
 		}
 		resp.Diagnostics.AddWarning(
 			"Certificate renewal failed",
-			fmt.Sprintf("The renewal of certificate %s requested on a previous apply failed: %s. The next plan requests a new renewal if the certificate is still due.", cert.Id, message),
+			fmt.Sprintf("The renewal of certificate %s requested on a previous apply failed: %s. The next plan requests a new renewal if one is still needed.", cert.Id, message),
 		)
+		if resp.Private != nil {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, nil)...)
+		}
+		return false
 	}
-	resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, nil)...)
+	if resp.Private != nil {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, nil)...)
+	}
+	return true
+}
+
+func certificateDeletedButRevocable(state certManagerCertificateResourceModel, cert infisical.Certificate) bool {
+	return state.RevokeOnDestroy.ValueBool() && cert.Status != certificateStatusRevoked && cert.CaId != "" && !notAfterPassed(cert.NotAfter)
+}
+
+func notAfterPassed(notAfter string) bool {
+	parsed, err := time.Parse(time.RFC3339, notAfter)
+	return err == nil && !nowFunc().Before(parsed)
+}
+
+func csrMatchesCertificateKey(csrPEM, certificatePEM string) bool {
+	csrBlock, _ := pem.Decode([]byte(normalizeCSR(csrPEM)))
+	certBlock, _ := pem.Decode([]byte(strings.TrimSpace(certificatePEM)))
+	if csrBlock == nil || certBlock == nil {
+		return true
+	}
+	csr, err := x509.ParseCertificateRequest(csrBlock.Bytes)
+	if err != nil {
+		return true
+	}
+	certificate, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return true
+	}
+	csrKey, err := x509.MarshalPKIXPublicKey(csr.PublicKey)
+	if err != nil {
+		return true
+	}
+	certificateKey, err := x509.MarshalPKIXPublicKey(certificate.PublicKey)
+	if err != nil {
+		return true
+	}
+	return string(csrKey) == string(certificateKey)
+}
+
+func certificateReplacementPlanned(plan, state certManagerCertificateResourceModel, issuedFromCSR bool) bool {
+	for _, pair := range [][2]attr.Value{
+		{plan.ProfileId, state.ProfileId},
+		{plan.ApplicationId, state.ApplicationId},
+		{plan.CommonName, state.CommonName},
+		{plan.Organization, state.Organization},
+		{plan.OU, state.OU},
+		{plan.Country, state.Country},
+		{plan.Province, state.Province},
+		{plan.Locality, state.Locality},
+		{plan.KeyAlgorithm, state.KeyAlgorithm},
+		{plan.SignatureAlgorithm, state.SignatureAlgorithm},
+		{plan.TTL, state.TTL},
+		{plan.AltNames, state.AltNames},
+		{plan.DomainComponents, state.DomainComponents},
+		{plan.KeyUsages, state.KeyUsages},
+		{plan.ExtendedKeyUsages, state.ExtendedKeyUsages},
+	} {
+		if !pair[0].Equal(pair[1]) {
+			return true
+		}
+	}
+	if plan.CSR.Equal(state.CSR) {
+		return false
+	}
+	stateHasCSR := hasCSRValue(state.CSR) || issuedFromCSR
+	if plan.CSR.IsUnknown() {
+		return !stateHasCSR
+	}
+	return stateHasCSR != hasCSRValue(plan.CSR)
 }
 
 func applyInPlaceChanges(state *certManagerCertificateResourceModel, plan certManagerCertificateResourceModel) {
@@ -187,7 +281,7 @@ func certificateIssuanceModeChanged(ctx context.Context, req planmodifier.String
 
 func certificateCSRChanged(plan, state certManagerCertificateResourceModel) bool {
 	if !hasCSRValue(state.CSR) {
-		return false
+		return hasCSRValue(plan.CSR) && !csrMatchesCertificateKey(plan.CSR.ValueString(), state.Certificate.ValueString())
 	}
 	if plan.CSR.IsUnknown() {
 		return true
@@ -273,6 +367,10 @@ func validateRenewalWindowOnCreate(ctx context.Context, req resource.ModifyPlanR
 }
 
 func (r *certManagerCertificateResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.modifyPlan(ctx, req, req.Private, resp)
+}
+
+func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req resource.ModifyPlanRequest, private privateStateReader, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
 	}
@@ -289,10 +387,22 @@ func (r *certManagerCertificateResource) ModifyPlan(ctx context.Context, req res
 		return
 	}
 
+	if state.Status.ValueString() == certificateStatusDeleted {
+		plan.Status = types.StringUnknown()
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("status"))
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, plan)...)
+		return
+	}
+
 	if config.CSR.IsNull() && hasCSRValue(state.CSR) {
 		plan.CSR = types.StringNull()
 		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("csr"))
 		resp.Diagnostics.Append(resp.Plan.Set(ctx, plan)...)
+		return
+	}
+
+	if certificateReplacementPlanned(plan, state, privateFlagSet(ctx, private, certificateIssuedFromCSRKey)) {
+		validateRenewalWindowOnCreate(ctx, req, resp)
 		return
 	}
 
@@ -314,23 +424,34 @@ func (r *certManagerCertificateResource) ModifyPlan(ctx context.Context, req res
 		}
 	}
 
-	if pendingRequestId := pendingRenewalRequestId(ctx, req.Private); pendingRequestId != "" {
-		if csrChanged {
+	resumePending := false
+	if pending, ok := readPendingRenewal(ctx, private); ok {
+		switch {
+		case csrChanged && pending.CSR != "" && !plan.CSR.IsUnknown() && normalizeCSR(pending.CSR) == normalizeCSR(plan.CSR.ValueString()):
+			resumePending = true
+			resp.Diagnostics.AddWarning(
+				"Certificate renewal still pending",
+				fmt.Sprintf("Certificate %s has a renewal with this CSR from a previous apply that is still pending (request %s). Applying resumes it instead of requesting a second one.", state.Id.ValueString(), pending.RequestId),
+			)
+		case csrChanged:
 			resp.Diagnostics.AddAttributeError(
 				path.Root("csr"),
 				"Certificate renewal still pending",
-				fmt.Sprintf("Certificate %s has a renewal from a previous apply that is still pending (request %s). Wait for it to finish before changing the CSR.", state.Id.ValueString(), pendingRequestId),
+				fmt.Sprintf("Certificate %s has a renewal from a previous apply that is still pending (request %s) with a different CSR. Wait for it to finish before changing the CSR again.", state.Id.ValueString(), pending.RequestId),
 			)
-		} else if certificateRenewalDue(plan, state) {
-			resp.Diagnostics.AddWarning(
-				"Certificate renewal still pending",
-				fmt.Sprintf("Certificate %s has a renewal from a previous apply that is still pending (request %s), so no new renewal is planned. Terraform picks up the renewed certificate on a later refresh.", state.Id.ValueString(), pendingRequestId),
-			)
+			return
+		default:
+			if certificateRenewalDue(plan, state) {
+				resp.Diagnostics.AddWarning(
+					"Certificate renewal still pending",
+					fmt.Sprintf("Certificate %s has a renewal from a previous apply that is still pending (request %s), so no new renewal is planned. Terraform picks up the renewed certificate on a later refresh.", state.Id.ValueString(), pending.RequestId),
+				)
+			}
+			return
 		}
-		return
 	}
 
-	if state.Status.ValueString() == certificateStatusRevoked || state.Status.ValueString() == certificateStatusRenewed || certificateExpired(state) {
+	if !resumePending && (state.Status.ValueString() == certificateStatusRevoked || state.Status.ValueString() == certificateStatusRenewed || certificateExpired(state)) {
 		if csrChanged {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("csr"),
@@ -397,21 +518,26 @@ func (r *certManagerCertificateResource) ModifyPlan(ctx context.Context, req res
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, plan)...)
 }
-func (r *certManagerCertificateResource) keepCertificateWhileRenewalPending(ctx context.Context, plan, state certManagerCertificateResourceModel, requestId string, pollDiagnostics diag.Diagnostics, resp *resource.UpdateResponse) {
+func (r *certManagerCertificateResource) keepCertificateWhileRenewalPending(ctx context.Context, plan, state certManagerCertificateResourceModel, pending pendingRenewal, pollDiagnostics diag.Diagnostics, resp *resource.UpdateResponse) {
+	priorCSR := state.CSR
 	applyInPlaceChanges(&state, plan)
+	state.CSR = priorCSR
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 	if resp.Private != nil {
-		value, _ := json.Marshal(requestId)
+		value, _ := json.Marshal(pending)
 		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, value)...)
 	}
+	requestId := pending.RequestId
 	reason := "it did not finish in time"
 	if errs := pollDiagnostics.Errors(); len(errs) > 0 {
 		reason = errs[0].Detail()
 	}
-	resp.Diagnostics.AddWarning(
-		"Certificate renewal still pending",
-		fmt.Sprintf("The renewal of certificate %s was requested (request %s), but %s. The current certificate stays in state, no second renewal is requested, and Terraform picks up the renewed certificate on a later refresh.", state.Id.ValueString(), requestId, reason),
-	)
+	detail := fmt.Sprintf("The renewal of certificate %s was requested (request %s), but %s. The current certificate stays in state, no second renewal is requested, and Terraform picks up the renewed certificate on a later refresh.", state.Id.ValueString(), requestId, reason)
+	if pending.CSR != "" {
+		resp.Diagnostics.AddError("Certificate renewal still pending", detail+" The new CSR is applied once the renewal is issued; run apply again to resume it.")
+		return
+	}
+	resp.Diagnostics.AddWarning("Certificate renewal still pending", detail)
 }
 
 func (r *certManagerCertificateResource) certificateHasInternalCa(certificateId string) bool {
@@ -419,7 +545,7 @@ func (r *certManagerCertificateResource) certificateHasInternalCa(certificateId 
 	return err == nil && certResponse.Certificate.CaType != nil && *certResponse.Certificate.CaType == certificateCaTypeInternal
 }
 
-func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, plan, state certManagerCertificateResourceModel, issuedFromCSR bool, resp *resource.UpdateResponse) {
+func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, plan, state certManagerCertificateResourceModel, issuedFromCSR bool, pending pendingRenewal, resuming bool, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to renew certificate",
@@ -438,15 +564,25 @@ func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, p
 		renewRequest.CSR = normalizeCSR(plan.CSR.ValueString())
 	}
 
-	renewResponse, err := r.client.RenewCertificate(renewRequest)
-	if err != nil {
-		resp.Diagnostics.AddError("Error renewing certificate", err.Error())
-		return
+	var renewResponse infisical.RenewCertificateResponse
+	if resuming {
+		renewResponse.CertificateRequestId = pending.RequestId
+	} else {
+		var err error
+		renewResponse, err = r.client.RenewCertificate(renewRequest)
+		if err != nil {
+			resp.Diagnostics.AddError("Error renewing certificate", err.Error())
+			return
+		}
+		pending = pendingRenewal{RequestId: renewResponse.CertificateRequestId}
+		if csrChanged {
+			pending.CSR = plan.CSR.ValueString()
+		}
 	}
 
 	plan.CertificateRequestId = types.StringValue(renewResponse.CertificateRequestId)
 
-	if renewResponse.CertificateId != "" && renewResponse.Certificate != "" {
+	if !resuming && renewResponse.CertificateId != "" && renewResponse.Certificate != "" {
 		r.populatePlanFromImmediateResponse(ctx, &plan, infisical.CertificateResponse{
 			CertificateId:    renewResponse.CertificateId,
 			Certificate:      renewResponse.Certificate,
@@ -462,13 +598,20 @@ func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, p
 		var pollDiagnostics diag.Diagnostics
 		r.pollCertificateRequest(ctx, &plan, renewResponse.CertificateRequestId, timeoutSeconds, &pollDiagnostics)
 		if certificateIssuanceFailed(pollDiagnostics) {
+			if resuming && resp.Private != nil {
+				resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, nil)...)
+			}
 			resp.Diagnostics.Append(pollDiagnostics...)
 			return
 		}
 		if pollDiagnostics.HasError() {
-			r.keepCertificateWhileRenewalPending(ctx, plan, state, renewResponse.CertificateRequestId, pollDiagnostics, resp)
+			r.keepCertificateWhileRenewalPending(ctx, plan, state, pending, pollDiagnostics, resp)
 			return
 		}
+	}
+
+	if resuming && resp.Private != nil {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, nil)...)
 	}
 
 	var bundleErr error
@@ -489,9 +632,12 @@ func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, p
 			fmt.Sprintf("Certificate %s was renewed as %s, but this identity is not allowed to read its private key, so private_key is empty.", state.Id.ValueString(), plan.Id.ValueString()),
 		)
 	} else if bundleErr != nil {
+		if resp.Private != nil {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateMissingKeyKey, []byte("true"))...)
+		}
 		resp.Diagnostics.AddError(
 			"Error reading private key of renewed certificate",
-			fmt.Sprintf("Certificate %s was renewed as %s, but its private key could not be read: %v", state.Id.ValueString(), plan.Id.ValueString(), bundleErr),
+			fmt.Sprintf("Certificate %s was renewed as %s, but its private key could not be read: %v. The next refresh tries again.", state.Id.ValueString(), plan.Id.ValueString(), bundleErr),
 		)
 	}
 }

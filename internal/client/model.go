@@ -3695,6 +3695,7 @@ type Certificate struct {
 	DeletedAt                  string                       `json:"deletedAt,omitempty"`
 	HasPrivateKey              *bool                        `json:"hasPrivateKey,omitempty"`
 	RenewedByCertificateId     string                       `json:"renewedByCertificateId,omitempty"`
+	RenewedFromCertificateId   string                       `json:"renewedFromCertificateId,omitempty"`
 	LatestRenewalCertificateId *string                      `json:"latestRenewalCertificateId,omitempty"`
 	CreatedAt                  string                       `json:"createdAt"`
 	UpdatedAt                  string                       `json:"updatedAt"`

@@ -14,6 +14,7 @@ const (
 	operationDeleteCertificate           = "CallDeleteCertificate"
 	operationGetCertificateBundle        = "CallGetCertificateBundle"
 	operationGetCertificateBody          = "CallGetCertificateBody"
+	operationCancelCertificateRequest    = "CallCancelCertificateRequest"
 )
 
 func (client Client) RequestCertificate(request RequestCertificateRequest) (RequestCertificateResponse, error) {
@@ -186,4 +187,24 @@ func (client Client) GetCertificateBody(request GetCertificateRequest) (GetCerti
 	}
 
 	return bodyResponse, nil
+}
+
+func (client Client) CancelCertificateRequest(request GetCertificateRequestStatusRequest) error {
+	response, err := client.Config.HttpClient.
+		R().
+		SetHeader("User-Agent", USER_AGENT).
+		Post(fmt.Sprintf("api/v1/cert-manager/certificates/certificate-requests/%s/cancel", request.RequestId))
+
+	if err != nil {
+		return errors.NewGenericRequestError(operationCancelCertificateRequest, err)
+	}
+
+	if response.IsError() {
+		if response.StatusCode() == 404 {
+			return ErrNotFound
+		}
+		return errors.NewAPIErrorWithResponse(operationCancelCertificateRequest, response, nil)
+	}
+
+	return nil
 }

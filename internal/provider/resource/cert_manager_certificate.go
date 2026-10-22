@@ -318,7 +318,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"revoke_on_destroy": schema.BoolAttribute{
-				Description: "Revoke the certificate when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.",
+				Description: "Revoke the certificate, and every other renewal of it that is still valid, when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -333,7 +333,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"delete_on_destroy": schema.BoolAttribute{
-				Description: "Delete the certificate when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.",
+				Description: "Delete the certificate, and every other renewal of it, when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -360,7 +360,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"status": schema.StringAttribute{
-				Description: "The status of the certificate: active or revoked, or renewed when it was renewed outside Terraform and that renewal is no longer available. Use not_after to tell whether it has expired.",
+				Description: "The status of the certificate: active or revoked. It is renewed when the certificate was renewed outside Terraform and that renewal is no longer available, and deleted when it was deleted outside Terraform but still has to be revoked because revoke_on_destroy is set. Use not_after to tell whether it has expired.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -879,7 +879,7 @@ func (r *certManagerCertificateResource) pollCertificateRequest(ctx context.Cont
 			r.handleIssuedCertificate(ctx, plan, &statusResponse)
 			return
 
-		case "failed":
+		case "failed", "rejected":
 			errorMsg := "Certificate issuance failed"
 			if statusResponse.ErrorMessage != nil && *statusResponse.ErrorMessage != "" {
 				errorMsg = fmt.Sprintf("Certificate issuance failed: %s", *statusResponse.ErrorMessage)
@@ -965,6 +965,10 @@ func (r *certManagerCertificateResource) handleIssuedCertificate(ctx context.Con
 }
 
 func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	r.read(ctx, req, req.Private, resp)
+}
+
+func (r *certManagerCertificateResource) read(ctx context.Context, req resource.ReadRequest, private privateStateReader, resp *resource.ReadResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to read certificate",
@@ -996,37 +1000,55 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 
 	cert := certResponse.Certificate
 
-	if pendingRequestId := pendingRenewalRequestId(ctx, req.Private); pendingRequestId != "" {
-		r.resolvePendingRenewal(ctx, cert, pendingRequestId, resp)
-	}
+	pending, hasPending := readPendingRenewal(ctx, private)
+	pendingResolved := hasPending && r.resolvePendingRenewal(ctx, cert, pending, resp)
 
+	followed := false
 	latestRenewalId := ""
 	if cert.LatestRenewalCertificateId != nil && *cert.LatestRenewalCertificateId != cert.Id {
 		latestRenewalId = *cert.LatestRenewalCertificateId
 	}
 
 	if latestRenewalId != "" && (cert.RenewedByCertificateId != "" || cert.DeletedAt != "") {
-		latestCert, followed := r.followLatestRenewal(ctx, &state, latestRenewalId, &resp.Diagnostics)
+		latestCert, ok := r.followLatestRenewal(ctx, &state, latestRenewalId, &resp.Diagnostics)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		if followed {
+		if ok {
 			cert = latestCert
+			followed = true
 		}
+	}
+
+	if followed && pendingResolved && pending.CSR != "" && csrMatchesCertificateKey(pending.CSR, state.Certificate.ValueString()) {
+		state.CSR = types.StringValue(pending.CSR)
 	}
 
 	if cert.DeletedAt != "" {
-		resp.State.RemoveResource(ctx)
+		if !certificateDeletedButRevocable(state, cert) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddWarning(
+			"Certificate deleted outside Terraform",
+			fmt.Sprintf("Certificate %s was deleted outside Terraform but is not revoked. Because revoke_on_destroy is set, Terraform replaces it and revokes the deleted certificate.", cert.Id),
+		)
+		state.Status = types.StringValue(certificateStatusDeleted)
+		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 		return
 	}
 
-	if state.Certificate.IsNull() || state.Certificate.IsUnknown() || state.Certificate.ValueString() == "" {
-		if !r.populateCertificateMaterial(&state, cert.Id, &resp.Diagnostics) {
+	missingKey := privateFlagSet(ctx, private, certificateMissingKeyKey)
+	if missingKey || state.Certificate.IsNull() || state.Certificate.IsUnknown() || state.Certificate.ValueString() == "" {
+		if !r.populateCertificateMaterial(&state, cert.Id, cert.HasPrivateKey, &resp.Diagnostics) {
 			return
+		}
+		if missingKey && resp.Private != nil {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateMissingKeyKey, nil)...)
 		}
 	}
 
-	if !hasCSRValue(state.CSR) && cert.HasPrivateKey != nil && !*cert.HasPrivateKey {
+	if !hasCSRValue(state.CSR) && cert.HasPrivateKey != nil && !*cert.HasPrivateKey && resp.Private != nil {
 		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateIssuedFromCSRKey, []byte("true"))...)
 	}
 
@@ -1089,7 +1111,7 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 		keyUsagesList, diags := types.ListValueFrom(ctx, types.StringType, normalized)
 		resp.Diagnostics.Append(diags...)
 		state.KeyUsages = keyUsagesList
-	} else if state.KeyUsages.IsNull() || state.KeyUsages.IsUnknown() {
+	} else if state.KeyUsages.IsNull() || state.KeyUsages.IsUnknown() || followed {
 		state.KeyUsages = types.ListNull(types.StringType)
 	}
 
@@ -1101,37 +1123,37 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 		extKeyUsagesList, diags := types.ListValueFrom(ctx, types.StringType, normalized)
 		resp.Diagnostics.Append(diags...)
 		state.ExtendedKeyUsages = extKeyUsagesList
-	} else if state.ExtendedKeyUsages.IsNull() || state.ExtendedKeyUsages.IsUnknown() {
+	} else if state.ExtendedKeyUsages.IsNull() || state.ExtendedKeyUsages.IsUnknown() || followed {
 		state.ExtendedKeyUsages = types.ListNull(types.StringType)
 	}
 
 	if cert.SubjectOrganization != "" {
 		state.Organization = types.StringValue(cert.SubjectOrganization)
-	} else if state.Organization.IsUnknown() {
+	} else if state.Organization.IsUnknown() || followed {
 		state.Organization = types.StringNull()
 	}
 
 	if cert.SubjectOrganizationalUnit != "" {
 		state.OU = types.StringValue(cert.SubjectOrganizationalUnit)
-	} else if state.OU.IsUnknown() {
+	} else if state.OU.IsUnknown() || followed {
 		state.OU = types.StringNull()
 	}
 
 	if cert.SubjectCountry != "" {
 		state.Country = types.StringValue(cert.SubjectCountry)
-	} else if state.Country.IsUnknown() {
+	} else if state.Country.IsUnknown() || followed {
 		state.Country = types.StringNull()
 	}
 
 	if cert.SubjectState != "" {
 		state.Province = types.StringValue(cert.SubjectState)
-	} else if state.Province.IsUnknown() {
+	} else if state.Province.IsUnknown() || followed {
 		state.Province = types.StringNull()
 	}
 
 	if cert.SubjectLocality != "" {
 		state.Locality = types.StringValue(cert.SubjectLocality)
-	} else if state.Locality.IsUnknown() {
+	} else if state.Locality.IsUnknown() || followed {
 		state.Locality = types.StringNull()
 	}
 
@@ -1151,6 +1173,10 @@ func (r *certManagerCertificateResource) Read(ctx context.Context, req resource.
 }
 
 func (r *certManagerCertificateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	r.update(ctx, req, req.Private, resp)
+}
+
+func (r *certManagerCertificateResource) update(ctx context.Context, req resource.UpdateRequest, private privateStateReader, resp *resource.UpdateResponse) {
 	var plan, state certManagerCertificateResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -1164,12 +1190,15 @@ func (r *certManagerCertificateResource) Update(ctx context.Context, req resourc
 		return
 	}
 
-	issuedFromCSR, diags := req.Private.GetKey(ctx, certificateIssuedFromCSRKey)
-	resp.Diagnostics.Append(diags...)
-	r.renewCertificate(ctx, plan, state, string(issuedFromCSR) == "true", resp)
+	pending, resuming := readPendingRenewal(ctx, private)
+	r.renewCertificate(ctx, plan, state, privateFlagSet(ctx, private, certificateIssuedFromCSRKey), pending, resuming, resp)
 }
 
 func (r *certManagerCertificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	r.delete(ctx, req, req.Private, resp)
+}
+
+func (r *certManagerCertificateResource) delete(ctx context.Context, req resource.DeleteRequest, private privateStateReader, resp *resource.DeleteResponse) {
 	var state certManagerCertificateResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -1198,36 +1227,90 @@ func (r *certManagerCertificateResource) Delete(ctx context.Context, req resourc
 		resp.Diagnostics.AddError("Error reading certificate before destroying it", err.Error())
 		return
 	}
-	cert := certResponse.Certificate
-
-	if state.RevokeOnDestroy.ValueBool() && !certificateExpired(state) && cert.Status != certificateStatusRevoked {
-		if cert.CaId == "" {
+	if pending, ok := readPendingRenewal(ctx, private); ok {
+		if err := r.client.CancelCertificateRequest(infisical.GetCertificateRequestStatusRequest{RequestId: pending.RequestId}); err != nil && err != infisical.ErrNotFound {
 			resp.Diagnostics.AddWarning(
-				"Certificate not revoked",
-				fmt.Sprintf("Certificate %s has no issuing certificate authority, for example because it is self-signed, so it cannot be revoked.", certificateId),
+				"Pending renewal not cancelled",
+				fmt.Sprintf("The pending renewal request %s of certificate %s could not be cancelled: %v. If it is still issued, revoke that certificate in Infisical.", pending.RequestId, certificateId, err),
 			)
-		} else {
-			err = r.client.RevokeCertificate(infisical.RevokeCertificateRequest{
-				CertificateId:    certificateId,
-				RevocationReason: certificateRevocationReasons[state.RevocationReason.ValueString()],
-			})
-			if err == infisical.ErrNotFound {
-				return
-			}
-			if err != nil {
-				resp.Diagnostics.AddError("Error revoking certificate", err.Error())
-				return
-			}
 		}
 	}
 
-	if !state.DeleteOnDestroy.ValueBool() || cert.DeletedAt != "" {
-		return
+	older := []infisical.Certificate{}
+	for previousId := certResponse.Certificate.RenewedFromCertificateId; previousId != "" && len(older) < 100; {
+		previous, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: previousId, IncludeDeleted: true})
+		if err == infisical.ErrNotFound {
+			break
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading earlier renewal before destroying it", fmt.Sprintf("Failed to read certificate %s, an earlier renewal of %s: %v", previousId, certificateId, err))
+			return
+		}
+		older = append([]infisical.Certificate{previous.Certificate}, older...)
+		previousId = previous.Certificate.RenewedFromCertificateId
+	}
+	newer := []infisical.Certificate{}
+	for nextId := certResponse.Certificate.RenewedByCertificateId; nextId != "" && len(newer) < 100; {
+		next, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: nextId, IncludeDeleted: true})
+		if err == infisical.ErrNotFound {
+			break
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading later renewal before destroying it", fmt.Sprintf("Failed to read certificate %s, a later renewal of %s: %v", nextId, certificateId, err))
+			return
+		}
+		newer = append(newer, next.Certificate)
+		nextId = next.Certificate.RenewedByCertificateId
+	}
+	generations := append(append(older, certResponse.Certificate), newer...)
+
+	if state.RevokeOnDestroy.ValueBool() {
+		for _, generation := range generations {
+			expired := notAfterPassed(generation.NotAfter)
+			if generation.Id == certificateId {
+				expired = certificateExpired(state)
+			}
+			if expired || generation.Status == certificateStatusRevoked {
+				continue
+			}
+			if generation.CaId == "" {
+				resp.Diagnostics.AddWarning(
+					"Certificate not revoked",
+					fmt.Sprintf("Certificate %s has no issuing certificate authority, for example because it is self-signed, so it cannot be revoked.", generation.Id),
+				)
+				continue
+			}
+			err = r.client.RevokeCertificate(infisical.RevokeCertificateRequest{
+				CertificateId:    generation.Id,
+				RevocationReason: certificateRevocationReasons[state.RevocationReason.ValueString()],
+			})
+			if err == nil || err == infisical.ErrNotFound {
+				continue
+			}
+			if generation.DeletedAt != "" {
+				resp.Diagnostics.AddWarning(
+					"Deleted certificate not revoked",
+					fmt.Sprintf("Certificate %s was already deleted and could not be revoked: %v", generation.Id, err),
+				)
+				continue
+			}
+			resp.Diagnostics.AddError("Error revoking certificate", fmt.Sprintf("Failed to revoke certificate %s: %v", generation.Id, err))
+			return
+		}
 	}
 
-	err = r.client.DeleteCertificate(infisical.DeleteCertificateRequest{CertificateId: certificateId})
-	if err != nil && err != infisical.ErrNotFound {
-		resp.Diagnostics.AddError("Error deleting certificate", err.Error())
+	if !state.DeleteOnDestroy.ValueBool() {
+		return
+	}
+	for _, generation := range generations {
+		if generation.DeletedAt != "" {
+			continue
+		}
+		err = r.client.DeleteCertificate(infisical.DeleteCertificateRequest{CertificateId: generation.Id})
+		if err != nil && err != infisical.ErrNotFound {
+			resp.Diagnostics.AddError("Error deleting certificate", fmt.Sprintf("Failed to delete certificate %s: %v", generation.Id, err))
+			return
+		}
 	}
 }
 

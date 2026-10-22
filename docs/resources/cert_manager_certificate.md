@@ -152,7 +152,7 @@ output "cert_private_key" {
 - `common_name` (String) The common name (CN) for the certificate. Required when not using CSR
 - `country` (String) The country (C) for the certificate (2-letter code)
 - `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")). Changing the CSR renews the certificate in place with the new CSR. Adding or removing the CSR replaces the certificate.
-- `delete_on_destroy` (Boolean) Delete the certificate when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.
+- `delete_on_destroy` (Boolean) Delete the certificate, and every other renewal of it, when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.
 - `domain_components` (List of String) Domain components (DC) for the certificate. Multi-valued; each entry becomes a DC attribute in the subject.
 - `extended_key_usages` (List of String) Extended key usages for the certificate. Supported: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 - `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
@@ -163,7 +163,7 @@ output "cert_private_key" {
 - `ou` (String) The organizational unit (OU) for the certificate
 - `province` (String) The state/province (ST) for the certificate
 - `revocation_reason_on_destroy` (String) The reason sent when the certificate is revoked on destroy, used with `revoke_on_destroy`. Supported: unspecified, key_compromise, ca_compromise, affiliation_changed, superseded, cessation_of_operation, certificate_hold, privilege_withdrawn, aa_compromise. Defaults to unspecified.
-- `revoke_on_destroy` (Boolean) Revoke the certificate when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.
+- `revoke_on_destroy` (Boolean) Revoke the certificate, and every other renewal of it that is still valid, when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.
 - `signature_algorithm` (String) The signature algorithm for the certificate. Supported: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
 - `timeout_seconds` (Number) Maximum time to wait for certificate issuance in seconds. Defaults to 3600 (1 hour)
 - `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y').
@@ -179,7 +179,7 @@ output "cert_private_key" {
 - `order_id` (String) The ID of the certificate order. A certificate and all of its renewals share one order, so use it to select this certificate in a certificate sync's `certificate_filters`.
 - `private_key` (String, Sensitive) The private key in PEM format (only available for direct field requests, not CSR-based).
 - `serial_number` (String) The serial number of the issued certificate
-- `status` (String) The status of the certificate: active or revoked, or renewed when it was renewed outside Terraform and that renewal is no longer available. Use not_after to tell whether it has expired.
+- `status` (String) The status of the certificate: active or revoked. It is renewed when the certificate was renewed outside Terraform and that renewal is no longer available, and deleted when it was deleted outside Terraform but still has to be revoked because revoke_on_destroy is set. Use not_after to tell whether it has expired.
 
 ## Import
 
