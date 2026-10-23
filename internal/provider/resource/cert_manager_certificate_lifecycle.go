@@ -615,7 +615,7 @@ func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, p
 	}
 
 	var bundleErr error
-	if !isCSRCertificate && plan.PrivateKey.ValueString() == "" {
+	if !isCSRCertificate && !issuedFromCSR && plan.PrivateKey.ValueString() == "" {
 		var bundle infisical.GetCertificateBundleResponse
 		bundle, bundleErr = r.client.GetCertificateBundle(infisical.GetCertificateRequest{CertificateId: plan.Id.ValueString()})
 		if bundleErr == nil {
