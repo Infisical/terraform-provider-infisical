@@ -32,22 +32,19 @@ func (e *AlertAlreadyExistsError) Unwrap() error {
 }
 
 // An update also answers 404 when the condition names a signer, application or profile that is missing,
-// so only the alert's own "Alert with ID ... not found" means the alert is gone.
+// so only the alert's own "Alert with ID ... not found" means the alert is gone. A 422 on an update is
+// the request body failing validation, never a missing alert.
 func isAlertNotFound(response *resty.Response) bool {
-	switch response.StatusCode() {
-	case http.StatusUnprocessableEntity:
-		return true
-	case http.StatusNotFound:
-		var body struct {
-			Message string `json:"message"`
-		}
-		if err := json.Unmarshal(response.Body(), &body); err != nil {
-			return false
-		}
-		return strings.HasPrefix(body.Message, "Alert with ID ")
-	default:
+	if response.StatusCode() != http.StatusNotFound {
 		return false
 	}
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(response.Body(), &body); err != nil {
+		return false
+	}
+	return strings.HasPrefix(body.Message, "Alert with ID ")
 }
 
 func (client Client) existingAlertForEvent(request CreateAlertRequest) *Alert {

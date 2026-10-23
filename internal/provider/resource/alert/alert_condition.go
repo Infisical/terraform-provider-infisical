@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -71,7 +73,7 @@ func alertConditionSchema() schema.SingleNestedAttribute {
 			Description: fmt.Sprintf("%s Leave it out to cover all of them. At most %d.", description, maxAlertFilterIDs),
 			Validators: []validator.Set{
 				setvalidator.SizeBetween(1, maxAlertFilterIDs),
-				setvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
+				setvalidator.ValueStringsAre(infisicaltf.UuidValidator),
 			},
 		}
 	}

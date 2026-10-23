@@ -10,7 +10,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -425,5 +429,31 @@ func TestSetStateFromAlertEventType(t *testing.T) {
 	}
 	if imported.EventType.ValueString() != alertEventTypeIdentityAuthenticationExpiry || imported.Expiry != nil {
 		t.Errorf("imported alert: event_type = %v, expiry = %v, want the full event type and no expiry block", imported.EventType, imported.Expiry)
+	}
+}
+
+// The API rejects a non-UUID filter ID with a message that leaves out the field, so the plan catches it.
+func TestConditionFilterIDsMustBeUUIDs(t *testing.T) {
+	condition := as[schema.SingleNestedAttribute](t, alertSchema(t).Attributes["condition"])
+
+	for _, name := range []string{"application_ids", "profile_ids", "signer_ids"} {
+		ids := as[schema.SetAttribute](t, condition.Attributes[name])
+		for value, wantError := range map[string]bool{
+			"3f1c9a8e-2b4d-4c6e-9f10-1a2b3c4d5e6f": false,
+			"my-signer":                            true,
+			"3F1C9A8E-2B4D-4C6E-9F10-1A2B3C4D5E6F": true,
+			"":                                     true,
+		} {
+			set := types.SetValueMust(types.StringType, []attr.Value{types.StringValue(value)})
+			var diags diag.Diagnostics
+			for _, v := range ids.Validators {
+				resp := &validator.SetResponse{}
+				v.ValidateSet(context.Background(), validator.SetRequest{Path: path.Root(name), ConfigValue: set}, resp)
+				diags.Append(resp.Diagnostics...)
+			}
+			if diags.HasError() != wantError {
+				t.Errorf("%s %q: error = %v, want %v", name, value, diags.HasError(), wantError)
+			}
+		}
 	}
 }
