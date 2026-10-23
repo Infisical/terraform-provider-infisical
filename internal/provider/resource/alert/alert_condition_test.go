@@ -10,7 +10,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -98,6 +102,7 @@ func emptyCondition() *alertConditionModel {
 		ApplicationIDs:  types.SetNull(types.StringType),
 		ProfileIDs:      types.SetNull(types.StringType),
 		Sources:         types.SetNull(types.StringType),
+		SignerIDs:       types.SetNull(types.StringType),
 	}
 }
 
@@ -114,6 +119,10 @@ func TestAlertConditionForAPI(t *testing.T) {
 	identityExpiry.AlertBeforeDays = types.Int64Value(30)
 	identityExpiry.DailyReminder = types.BoolValue(true)
 
+	signerExpiry := emptyCondition()
+	signerExpiry.AlertBeforeDays = types.Int64Value(30)
+	signerExpiry.SignerIDs = stringSetOf("signer-2", "signer-1")
+
 	cases := map[string]struct {
 		resourceType, eventType string
 		condition               *alertConditionModel
@@ -125,6 +134,8 @@ func TestAlertConditionForAPI(t *testing.T) {
 		"event with filters":    {alertResourceTypeCertManager, "certificate.issuance", issuanceFiltered, nil, `{"profileIds":["profile-1"]}`},
 		"event without filters": {alertResourceTypeCertManagerApplication, "certificate.revocation", nil, nil, `null`},
 		"identity expiry":       {alertResourceTypeIdentityAuthentication, "expiry", identityExpiry, nil, `{"alertBefore":"30d","dailyReminder":true}`},
+		"signer expiry with signer_ids": {alertResourceTypeCertManagerSigner, "certificate.expiry", signerExpiry, nil,
+			`{"alertBefore":"30d","dailyReminder":false,"signerIds":["signer-1","signer-2"]}`},
 		"deprecated expiry block": {alertResourceTypeIdentityAuthentication, "", nil,
 			&expiryConditionModel{AlertBeforeDays: types.Int64Value(7), DailyReminder: types.BoolValue(false)}, `{"alertBefore":"7d","dailyReminder":false}`},
 	}
@@ -190,6 +201,14 @@ func TestSetAlertConditionFromAPI(t *testing.T) {
 		}
 	})
 
+	t.Run("signer_ids", func(t *testing.T) {
+		var state alertResourceModel
+		setAlertConditionFromAPI(&state, event(alertEventTypeCertManagerSignerCertExpiry), json.RawMessage(`{"alertBefore":"30d","signerIds":["signer-1","signer-2"]}`))
+		if state.Condition == nil || !state.Condition.SignerIDs.Equal(stringSetOf("signer-2", "signer-1")) || !state.Condition.ApplicationIDs.IsNull() {
+			t.Errorf("condition = %+v, want the signer_ids filter", state.Condition)
+		}
+	})
+
 	for _, raw := range []string{`null`, `{}`, ``} {
 		t.Run("event without settings "+raw, func(t *testing.T) {
 			state := alertResourceModel{Condition: emptyCondition()}
@@ -252,8 +271,14 @@ func TestValidateAlertEvent(t *testing.T) {
 		c.Sources = stringSetOf("issued")
 		return c
 	}
+	withSigners := func(c *alertConditionModel) *alertConditionModel {
+		c.SignerIDs = stringSetOf("signer-1")
+		return c
+	}
 	reminderOnly := emptyCondition()
 	reminderOnly.DailyReminder = types.BoolValue(true)
+	nullSigner := withDays(30)
+	nullSigner.SignerIDs = types.SetValueMust(types.StringType, []attr.Value{types.StringNull()})
 
 	cases := map[string]struct {
 		resourceType, eventType string
@@ -273,6 +298,10 @@ func TestValidateAlertEvent(t *testing.T) {
 		"application event without condition":   {alertResourceTypeCertManagerApplication, "certificate.issuance", nil, nil, false},
 		"application event with filters":        {alertResourceTypeCertManagerApplication, "certificate.issuance", withSources(emptyCondition()), nil, true},
 		"signer expiry with filters":            {alertResourceTypeCertManagerSigner, "certificate.expiry", withSources(withDays(30)), nil, true},
+		"signer expiry with signer_ids":         {alertResourceTypeCertManagerSigner, "certificate.expiry", withSigners(withDays(30)), nil, false},
+		"product-wide expiry with signer_ids":   {alertResourceTypeCertManager, "certificate.expiry", withSigners(withDays(30)), nil, true},
+		"application expiry with signer_ids":    {alertResourceTypeCertManagerApplication, "certificate.expiry", withSigners(withDays(30)), nil, true},
+		"signer expiry with a null signer_ids":  {alertResourceTypeCertManagerSigner, "certificate.expiry", nullSigner, nil, true},
 		"event with alert_before_days":          {alertResourceTypeCertManager, "certificate.issuance", withDays(30), nil, true},
 		"empty condition":                       {alertResourceTypeCertManager, "certificate.issuance", emptyCondition(), nil, true},
 		"auth method changed":                   {alertResourceTypeIdentityAuthentication, "auth-method-changed", nil, nil, false},
@@ -352,11 +381,11 @@ func TestAlertDocsTemplateListsEveryEvent(t *testing.T) {
 	for _, event := range alertEvents {
 		condition := "None"
 		switch {
-		case event.firesBeforeExpiry() && event.filters:
+		case event.firesBeforeExpiry() && len(event.filters) > 0:
 			condition = fmt.Sprintf("`alert_before_days` (1 to %d), optional `daily_reminder`, optional filters", event.maxAlertBeforeDays)
 		case event.firesBeforeExpiry():
 			condition = fmt.Sprintf("`alert_before_days` (1 to %d), optional `daily_reminder`", event.maxAlertBeforeDays)
-		case event.filters:
+		case len(event.filters) > 0:
 			condition = "Optional filters"
 		}
 		row := fmt.Sprintf("| `%s` | `%s` | `%s` | %s |", event.resourceType, event.shortEventType(), event.eventType, condition)
@@ -400,5 +429,31 @@ func TestSetStateFromAlertEventType(t *testing.T) {
 	}
 	if imported.EventType.ValueString() != alertEventTypeIdentityAuthenticationExpiry || imported.Expiry != nil {
 		t.Errorf("imported alert: event_type = %v, expiry = %v, want the full event type and no expiry block", imported.EventType, imported.Expiry)
+	}
+}
+
+// The API rejects a non-UUID filter ID with a message that leaves out the field, so the plan catches it.
+func TestConditionFilterIDsMustBeUUIDs(t *testing.T) {
+	condition := as[schema.SingleNestedAttribute](t, alertSchema(t).Attributes["condition"])
+
+	for _, name := range []string{"application_ids", "profile_ids", "signer_ids"} {
+		ids := as[schema.SetAttribute](t, condition.Attributes[name])
+		for value, wantError := range map[string]bool{
+			"3f1c9a8e-2b4d-4c6e-9f10-1a2b3c4d5e6f": false,
+			"my-signer":                            true,
+			"3F1C9A8E-2B4D-4C6E-9F10-1A2B3C4D5E6F": true,
+			"":                                     true,
+		} {
+			set := types.SetValueMust(types.StringType, []attr.Value{types.StringValue(value)})
+			var diags diag.Diagnostics
+			for _, v := range ids.Validators {
+				resp := &validator.SetResponse{}
+				v.ValidateSet(context.Background(), validator.SetRequest{Path: path.Root(name), ConfigValue: set}, resp)
+				diags.Append(resp.Diagnostics...)
+			}
+			if diags.HasError() != wantError {
+				t.Errorf("%s %q: error = %v, want %v", name, value, diags.HasError(), wantError)
+			}
+		}
 	}
 }

@@ -1,4 +1,5 @@
-# Warn before the certificate any code signing signer signs with expires
+# Warn before the certificate of a chosen code signing signer expires.
+# Leave signer_ids out to cover every signer.
 resource "infisical_alert" "signers_expiring" {
   resource_type = "cert-manager.signer"
   name          = "Signer certificates expiring"
@@ -6,6 +7,7 @@ resource "infisical_alert" "signers_expiring" {
 
   condition = {
     alert_before_days = 90
+    signer_ids        = ["<your-signer-id>"]
   }
 
   channels = {

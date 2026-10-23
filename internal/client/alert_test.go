@@ -244,21 +244,30 @@ func TestListAlertsWithoutAProject(t *testing.T) {
 // An alert deleted outside Terraform has to surface as ErrNotFound the way a read does, so the update
 // can explain itself instead of relaying a bare 404.
 func TestUpdateAlertOnADeletedAlert(t *testing.T) {
-	for name, status := range map[string]int{
-		"not found":            http.StatusNotFound,
-		"unprocessable entity": http.StatusUnprocessableEntity,
-	} {
-		t.Run(name, func(t *testing.T) {
-			client, done := alertTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-				writeAlertError(t, w, status, "Alert with ID 'alert-1' not found")
-			})
-			defer done()
+	client, done := alertTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeAlertError(t, w, http.StatusNotFound, "Alert with ID 'alert-1' not found")
+	})
+	defer done()
 
-			_, err := client.UpdateAlert(UpdateAlertRequest{ID: "alert-1"})
-			if !errors.Is(err, ErrNotFound) {
-				t.Errorf("UpdateAlert() error = %v, want ErrNotFound", err)
-			}
-		})
+	_, err := client.UpdateAlert(UpdateAlertRequest{ID: "alert-1"})
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("UpdateAlert() error = %v, want ErrNotFound", err)
+	}
+}
+
+// A 422 on an update is the body failing validation, such as a recipient over 255 characters.
+func TestUpdateAlertReportsAValidationFailure(t *testing.T) {
+	client, done := alertTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeAlertError(t, w, http.StatusUnprocessableEntity, "One or more field values exceed the maximum length allowed for this resource")
+	})
+	defer done()
+
+	_, err := client.UpdateAlert(UpdateAlertRequest{ID: "alert-1"})
+	if errors.Is(err, ErrNotFound) {
+		t.Errorf("UpdateAlert() error = %v, want it not to be ErrNotFound", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "exceed the maximum length") {
+		t.Errorf("UpdateAlert() error = %v, want it to carry the API's message", err)
 	}
 }
 
@@ -277,6 +286,21 @@ func TestUpdateAlertReportsOtherFailures(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "does not belong to this alert") {
 		t.Errorf("UpdateAlert() error = %q, want it to carry the API's message", got)
+	}
+}
+
+func TestUpdateAlertReportsAMissingSigner(t *testing.T) {
+	client, done := alertTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeAlertError(t, w, http.StatusNotFound, "Signer not found in Certificate Manager: signer-1")
+	})
+	defer done()
+
+	_, err := client.UpdateAlert(UpdateAlertRequest{ID: "alert-1"})
+	if errors.Is(err, ErrNotFound) {
+		t.Errorf("UpdateAlert() error = %v, want it not to be ErrNotFound", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "Signer not found in Certificate Manager") {
+		t.Errorf("UpdateAlert() error = %v, want it to carry the API's message", err)
 	}
 }
 

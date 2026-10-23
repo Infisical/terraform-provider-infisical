@@ -81,7 +81,7 @@ These alerts watch every certificate in Certificate Manager, and you can create 
 | Certificate Issuance | `cert-manager` | `certificate.issuance` | Optional filters |
 | Certificate Renewal | `cert-manager` | `certificate.renewal` | Optional filters |
 | Certificate Revocation | `cert-manager` | `certificate.revocation` | Optional filters |
-| Signer Certificate Expiration (Code Signing) | `cert-manager.signer` | `certificate.expiry` | `alert_before_days`, optional `daily_reminder` |
+| Signer Certificate Expiration (Code Signing) | `cert-manager.signer` | `certificate.expiry` | `alert_before_days`, optional `daily_reminder` and `signer_ids` |
 
 ### Certificate events
 
@@ -139,10 +139,13 @@ resource "infisical_alert" "anything_expiring" {
 
 ### Signer certificate expiration
 
-Fires before the certificate any code signing signer signs with expires.
+Fires before the certificate a code signing signer signs with expires. Set `signer_ids` inside `condition` to narrow the alert to those signers; leave it out to cover every signer.
+
+- `signer_ids` (optional): UUIDs of the code signing signers to watch. In Certificate Manager, select **Code Signing > Signers**, open a signer, then select **Options > Copy Signer ID**.
 
 ```terraform
-# Warn before the certificate any code signing signer signs with expires
+# Warn before the certificate of a chosen code signing signer expires.
+# Leave signer_ids out to cover every signer.
 resource "infisical_alert" "signers_expiring" {
   resource_type = "cert-manager.signer"
   name          = "Signer certificates expiring"
@@ -150,6 +153,7 @@ resource "infisical_alert" "signers_expiring" {
 
   condition = {
     alert_before_days = 90
+    signer_ids        = ["<your-signer-id>"]
   }
 
   channels = {

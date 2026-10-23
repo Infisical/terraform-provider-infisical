@@ -54,16 +54,22 @@ type alertEvent struct {
 	eventType    string
 
 	maxAlertBeforeDays int64
-	filters            bool
+	filters            []string
 }
 
 func (e alertEvent) firesBeforeExpiry() bool {
 	return e.maxAlertBeforeDays > 0
 }
 
+func (e alertEvent) takesFilter(name string) bool {
+	return slices.Contains(e.filters, name)
+}
+
 func (e alertEvent) shortEventType() string {
 	return strings.TrimPrefix(e.eventType, e.resourceType+".")
 }
+
+var certificateFilters = []string{"application_ids", "profile_ids", "sources"}
 
 var alertEvents = []alertEvent{
 	{resourceType: alertResourceTypeIdentityAuthentication, eventType: alertEventTypeIdentityAuthenticationExpiry, maxAlertBeforeDays: 90},
@@ -74,12 +80,12 @@ var alertEvents = []alertEvent{
 	{resourceType: alertResourceTypeCertManagerApplication, eventType: alertEventTypeCertManagerApplicationCertRenewal},
 	{resourceType: alertResourceTypeCertManagerApplication, eventType: alertEventTypeCertManagerApplicationCertRevocation},
 
-	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertExpiry, maxAlertBeforeDays: 365, filters: true},
-	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertIssuance, filters: true},
-	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertRenewal, filters: true},
-	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertRevocation, filters: true},
+	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertExpiry, maxAlertBeforeDays: 365, filters: certificateFilters},
+	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertIssuance, filters: certificateFilters},
+	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertRenewal, filters: certificateFilters},
+	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertRevocation, filters: certificateFilters},
 
-	{resourceType: alertResourceTypeCertManagerSigner, eventType: alertEventTypeCertManagerSignerCertExpiry, maxAlertBeforeDays: 365},
+	{resourceType: alertResourceTypeCertManagerSigner, eventType: alertEventTypeCertManagerSignerCertExpiry, maxAlertBeforeDays: 365, filters: []string{"signer_ids"}},
 }
 
 func alertResourceTypesWhere(match func(alertResourceTypeTraits) bool) []string {
