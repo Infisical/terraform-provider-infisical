@@ -8,16 +8,17 @@ import (
 type SecretRotationProvider string
 
 const (
-	SecretRotationProviderMySqlCredentials    SecretRotationProvider = "mysql-credentials"
-	SecretRotationProviderMsSqlCredentials    SecretRotationProvider = "mssql-credentials"
-	SecretRotationProviderPostgresCredentials SecretRotationProvider = "postgres-credentials"
-	SecretRotationProviderOracleCredentials   SecretRotationProvider = "oracledb-credentials"
-	SecretRotationProviderAzureClientSecret   SecretRotationProvider = "azure-client-secret"
-	SecretRotationProviderAwsIamUserSecret    SecretRotationProvider = "aws-iam-user-secret"
-	SecretRotationProviderLdapPassword        SecretRotationProvider = "ldap-password"
-	SecretRotationProviderDatadogApiKey       SecretRotationProvider = "datadog-api-key"
-	SecretRotationProviderAuth0ClientSecret   SecretRotationProvider = "auth0-client-secret"
-	SecretRotationProviderLiteLLMApiKey       SecretRotationProvider = "litellm-api-key"
+	SecretRotationProviderMySqlCredentials     SecretRotationProvider = "mysql-credentials"
+	SecretRotationProviderMsSqlCredentials     SecretRotationProvider = "mssql-credentials"
+	SecretRotationProviderPostgresCredentials  SecretRotationProvider = "postgres-credentials"
+	SecretRotationProviderOracleCredentials    SecretRotationProvider = "oracledb-credentials"
+	SecretRotationProviderAzureClientSecret    SecretRotationProvider = "azure-client-secret"
+	SecretRotationProviderAwsIamUserSecret     SecretRotationProvider = "aws-iam-user-secret"
+	SecretRotationProviderLdapPassword         SecretRotationProvider = "ldap-password"
+	SecretRotationProviderDatadogApiKey        SecretRotationProvider = "datadog-api-key"
+	SecretRotationProviderAuth0ClientSecret    SecretRotationProvider = "auth0-client-secret"
+	SecretRotationProviderLiteLLMApiKey        SecretRotationProvider = "litellm-api-key"
+	SecretRotationProviderGcpServiceAccountKey SecretRotationProvider = "gcp-service-account-key"
 )
 
 const (

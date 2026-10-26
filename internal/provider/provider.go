@@ -518,6 +518,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		secretRotationResource.NewSecretRotationDatadogApiKeyResource,
 		secretRotationResource.NewSecretRotationAuth0ClientSecretResource,
 		secretRotationResource.NewSecretRotationLiteLLMApiKeyResource,
+		secretRotationResource.NewSecretRotationGcpServiceAccountKeyResource,
 		secretValidationRuleResource.NewSecretValidationRuleStaticSecretsResource,
 		secretValidationRuleResource.NewSecretValidationRuleDynamicSecretsResource,
 		secretValidationRuleResource.NewSecretValidationRuleSecretRotationsResource,
