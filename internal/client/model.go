@@ -5042,3 +5042,215 @@ type DeleteCertRequestApprovalPolicyRequest struct {
 type CertRequestApprovalPolicyResponse struct {
 	Policy CertRequestApprovalPolicy `json:"policy"`
 }
+
+type GetPamProjectResponse struct {
+	ProjectID string `json:"projectId"`
+}
+
+type PamFolder struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+}
+
+type CreatePamFolderRequest struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+}
+
+type GetPamFolderRequest struct {
+	ID string
+}
+
+type UpdatePamFolderRequest struct {
+	ID   string `json:"-"`
+	Name string `json:"name"`
+	// Sent as null to clear a stored description.
+	Description *string `json:"description"`
+}
+
+type DeletePamFolderRequest struct {
+	ID string
+}
+
+type PamFolderResponse struct {
+	Folder PamFolder `json:"folder"`
+}
+
+type PamAccountTemplate struct {
+	ID                    string         `json:"id"`
+	Name                  string         `json:"name"`
+	Description           *string        `json:"description"`
+	Type                  string         `json:"type"`
+	Policies              map[string]any `json:"policies"`
+	Settings              map[string]any `json:"settings"`
+	GatewayID             *string        `json:"gatewayId"`
+	GatewayPoolID         *string        `json:"gatewayPoolId"`
+	RecordingConnectionID *string        `json:"recordingConnectionId"`
+}
+
+type CreatePamAccountTemplateRequest struct {
+	Name                  string         `json:"name"`
+	Description           *string        `json:"description,omitempty"`
+	Type                  string         `json:"type"`
+	Policies              map[string]any `json:"policies"`
+	Settings              map[string]any `json:"settings"`
+	GatewayID             *string        `json:"gatewayId,omitempty"`
+	GatewayPoolID         *string        `json:"gatewayPoolId,omitempty"`
+	RecordingConnectionID *string        `json:"recordingConnectionId,omitempty"`
+}
+
+type GetPamAccountTemplateRequest struct {
+	ID string
+}
+
+type UpdatePamAccountTemplateRequest struct {
+	ID       string         `json:"-"`
+	Name     string         `json:"name"`
+	Policies map[string]any `json:"policies"`
+	Settings map[string]any `json:"settings"`
+	// Sent as null to clear a stored value.
+	Description           *string `json:"description"`
+	GatewayID             *string `json:"gatewayId"`
+	GatewayPoolID         *string `json:"gatewayPoolId"`
+	RecordingConnectionID *string `json:"recordingConnectionId"`
+}
+
+type DeletePamAccountTemplateRequest struct {
+	ID string
+}
+
+type PamAccountTemplateResponse struct {
+	Template PamAccountTemplate `json:"template"`
+}
+
+type PamAccount struct {
+	ID                string         `json:"id"`
+	Name              string         `json:"name"`
+	Description       *string        `json:"description"`
+	FolderID          *string        `json:"folderId"`
+	TemplateID        string         `json:"templateId"`
+	GatewayID         *string        `json:"gatewayId"`
+	GatewayPoolID     *string        `json:"gatewayPoolId"`
+	AccountType       string         `json:"accountType"`
+	ConnectionDetails map[string]any `json:"connectionDetails"`
+	// Secrets are never returned.
+	Credentials map[string]any `json:"credentials"`
+}
+
+type CreatePamAccountRequest struct {
+	AccountType       string         `json:"-"`
+	Name              string         `json:"name"`
+	Description       *string        `json:"description,omitempty"`
+	FolderID          string         `json:"folderId"`
+	TemplateID        string         `json:"templateId"`
+	ConnectionDetails map[string]any `json:"connectionDetails"`
+	Credentials       map[string]any `json:"credentials"`
+	GatewayID         *string        `json:"gatewayId,omitempty"`
+	GatewayPoolID     *string        `json:"gatewayPoolId,omitempty"`
+}
+
+type GetPamAccountRequest struct {
+	ID string
+}
+
+type UpdatePamAccountRequest struct {
+	AccountType string
+	ID          string
+	// Changed fields only. A nil value clears the field.
+	Body map[string]any
+}
+
+type DeletePamAccountRequest struct {
+	AccountType string
+	ID          string
+}
+
+type PamAccountResponse struct {
+	Account PamAccount `json:"account"`
+}
+
+type PamAccountRotation struct {
+	RotationAccountID *string `json:"rotationAccountId"`
+}
+
+type GetPamAccountRotationRequest struct {
+	AccountID string
+}
+
+type GetPamAccountRotationResponse struct {
+	Rotation PamAccountRotation `json:"rotation"`
+}
+
+type SetPamAccountRotationAccountRequest struct {
+	AccountID string `json:"-"`
+	// Sent as null to clear the rotation account.
+	RotationAccountID *string `json:"rotationAccountId"`
+}
+
+type PamMemberKind string
+
+const (
+	PamMemberKindUser     PamMemberKind = "users"
+	PamMemberKindGroup    PamMemberKind = "groups"
+	PamMemberKindIdentity PamMemberKind = "identities"
+)
+
+// An empty Resource means the PAM product itself.
+type PamMembershipScope struct {
+	Resource   string
+	ResourceID string
+}
+
+const (
+	PamMembershipResourceFolder  = "folders"
+	PamMembershipResourceAccount = "accounts"
+)
+
+type PamMember struct {
+	MembershipID string  `json:"membershipId"`
+	UserID       *string `json:"userId"`
+	GroupID      *string `json:"groupId"`
+	IdentityID   *string `json:"identityId"`
+	Role         string  `json:"role"`
+}
+
+type ListPamMembersRequest struct {
+	Scope PamMembershipScope
+	Kind  PamMemberKind
+}
+
+type ListPamMembersResponse struct {
+	Members []PamMember `json:"members"`
+}
+
+type AddPamMemberRequest struct {
+	Scope    PamMembershipScope `json:"-"`
+	Kind     PamMemberKind      `json:"-"`
+	MemberID string             `json:"-"`
+	Role     string             `json:"role"`
+}
+
+type AddPamProductUsersRequest struct {
+	Emails []string `json:"emails"`
+	Role   string   `json:"role"`
+}
+
+type AddPamProductUsersResponse struct {
+	Memberships []PamMember `json:"memberships"`
+	// Users that were already members of the product.
+	Skipped []string `json:"skipped"`
+}
+
+type UpdatePamMemberRoleRequest struct {
+	Scope    PamMembershipScope `json:"-"`
+	Kind     PamMemberKind      `json:"-"`
+	MemberID string             `json:"-"`
+	Role     string             `json:"role"`
+}
+
+type RemovePamMemberRequest struct {
+	Scope    PamMembershipScope
+	Kind     PamMemberKind
+	MemberID string
+}
