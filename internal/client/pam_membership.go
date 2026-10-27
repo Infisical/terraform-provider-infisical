@@ -137,9 +137,22 @@ func (client Client) FindPamProductUserByEmail(email string) (string, error) {
 		return "", err
 	}
 
+	// Email matches win over username matches, and more than one match is an error rather than a guess.
+	var byEmail, byUsername []string
 	for _, membership := range memberships.Memberships {
-		if strings.EqualFold(membership.User.Email, email) || strings.EqualFold(membership.User.Username, email) {
-			return membership.UserID, nil
+		if strings.EqualFold(membership.User.Email, email) {
+			byEmail = append(byEmail, membership.UserID)
+		} else if strings.EqualFold(membership.User.Username, email) {
+			byUsername = append(byUsername, membership.UserID)
+		}
+	}
+
+	for _, matches := range [][]string{byEmail, byUsername} {
+		if len(matches) == 1 {
+			return matches[0], nil
+		}
+		if len(matches) > 1 {
+			return "", fmt.Errorf("more than one PAM member matches %q", email)
 		}
 	}
 

@@ -98,7 +98,7 @@ func NewPamAccountPostgresResource() resource.Resource {
 				Description: "The password, for the `password` auth method.",
 				Optional:    true,
 				Sensitive:   true,
-				Validators:  []validator.String{stringvalidator.LengthAtMost(256)},
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 256)},
 			},
 			"aws_region": schema.StringAttribute{
 				Description: "The AWS region of the RDS or Aurora instance, for the `aws-iam` auth method.",

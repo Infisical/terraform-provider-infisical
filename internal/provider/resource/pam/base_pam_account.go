@@ -353,7 +353,7 @@ func (r *PamAccountBaseResource) Update(ctx context.Context, req resource.Update
 
 	plan, rotation, diags := r.getModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
-	state, _, diags := r.getModel(ctx, req.State)
+	state, priorRotation, diags := r.getModel(ctx, req.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -409,6 +409,8 @@ func (r *PamAccountBaseResource) Update(ctx context.Context, req resource.Update
 
 	if r.SupportsRotation {
 		if err := r.syncRotationAccount(state.ID.ValueString(), rotation); err != nil {
+			// The account itself was updated, so its new values are saved.
+			resp.Diagnostics.Append(r.setModel(ctx, &resp.State, plan, priorRotation)...)
 			resp.Diagnostics.AddError("Error setting PAM account rotation account", "Couldn't set the account's rotation account, unexpected error: "+err.Error())
 			return
 		}

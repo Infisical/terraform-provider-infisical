@@ -67,12 +67,13 @@ func NewPamAccountSshResource() resource.Resource {
 				Description: "The password, for the `password` auth method.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"private_key": schema.StringAttribute{
 				Description: "The PEM-encoded private key, for the `public-key` auth method.",
 				Optional:    true,
 				Sensitive:   true,
-				Validators:  []validator.String{stringvalidator.LengthAtMost(5000)},
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 5000)},
 			},
 		},
 

@@ -130,6 +130,7 @@ func NewPamAccountWindowsAdResource() resource.Resource {
 				Description: "The password of the domain user.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 		},
 

@@ -63,6 +63,8 @@ type fakePamBackend struct {
 	members map[string]map[string]map[string]*fakePamMembership
 	// the organization's users, by email
 	orgUsers map[string]string
+
+	failRotationUpdates bool
 }
 
 func newFakePamBackend(t *testing.T) *fakePamBackend {
@@ -370,7 +372,12 @@ func (b *fakePamBackend) handler() http.Handler {
 			b.apiError(w, http.StatusNotFound, "Account not found")
 			return
 		}
-		account.RotationAccountID = optionalBodyString(b.body(r), "rotationAccountId")
+		body := b.body(r)
+		if b.failRotationUpdates {
+			b.apiError(w, http.StatusBadRequest, "Rotation account not found in this project")
+			return
+		}
+		account.RotationAccountID = optionalBodyString(body, "rotationAccountId")
 		b.writeJSON(w, http.StatusOK, map[string]any{"rotationAccountId": account.RotationAccountID})
 	})
 

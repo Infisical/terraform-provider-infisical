@@ -272,6 +272,44 @@ func TestPamAccountRotationAccount(t *testing.T) {
 	}
 }
 
+// A failed rotation update must not lose the password the account update already changed.
+func TestPamAccountKeepsUpdateWhenRotationFails(t *testing.T) {
+	ctx := context.Background()
+	backend := newFakePamBackend(t)
+	r := asPamAccountResource(t, NewPamAccountPostgresResource())
+	configurePamResource(t, r, newPamTestClient(t, backend))
+
+	noRotation := pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolValue(false)}
+	state := createPamResource(t, r, newPamPostgresPlan(t, r, "db.internal", noRotation))
+	accountID := pamAccountID(t, r, state)
+
+	plan := newPamPostgresPlan(t, r, "db.internal", pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolValue(true)})
+	if diags := plan.SetAttribute(ctx, path.Root("id"), accountID); diags.HasError() {
+		t.Fatal(diags)
+	}
+	if diags := plan.SetAttribute(ctx, path.Root("credentials").AtName("password"), "new-password"); diags.HasError() {
+		t.Fatal(diags)
+	}
+
+	backend.failRotationUpdates = true
+	resp := resource.UpdateResponse{State: state}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: state}, &resp)
+	if !resp.Diagnostics.HasError() {
+		t.Fatal("expected the rotation update to fail")
+	}
+	if got := backend.accounts[accountID].Credentials["password"]; got != "new-password" {
+		t.Fatalf("expected the backend to hold the new password, got %v", got)
+	}
+
+	saved, rotation := pamAccountModel(t, r, resp.State)
+	if got := stringAttribute(t, saved.Credentials.Attributes(), "password"); got != "new-password" {
+		t.Errorf("expected the new password to be saved in state, got %q", got)
+	}
+	if rotation.SelfRotation.ValueBool() {
+		t.Error("expected the rotation that failed to stay unsaved")
+	}
+}
+
 func TestPamAccountWindowsAdRoundTrip(t *testing.T) {
 	backend := newFakePamBackend(t)
 	r := asPamAccountResource(t, NewPamAccountWindowsAdResource())
