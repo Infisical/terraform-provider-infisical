@@ -1,6 +1,5 @@
 ---
 page_title: "Certificate alerts"
-subcategory: "Certificate Management"
 description: |-
   Use infisical_alert to get notified about certificates in Certificate Manager, either in one application or across Certificate Manager.
 ---
