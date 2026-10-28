@@ -68,6 +68,31 @@ CSR
   timeout_seconds = 300
 }
 
+resource "infisical_cert_manager_certificate" "api_csr_renewed" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
+
+  csr = file("./my-certificate.csr")
+  ttl = "90d"
+
+  manual_renew_days_before_expiry = 30
+}
+
+resource "infisical_cert_manager_certificate" "api_revoked_on_destroy" {
+  profile_id     = "<profile-id>"
+  application_id = infisical_cert_manager_application.platform.id
+
+  common_name = "web.example.com"
+  ttl         = "90d"
+
+  revoke_on_destroy            = true
+  revocation_reason_on_destroy = "superseded"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 output "cert_details" {
   value = {
     id            = infisical_cert_manager_certificate.api_direct.id
