@@ -17,11 +17,15 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
 resource "infisical_pam_account_template" "ssh" {
   name         = "ssh-default"
   description  = "Standard SSH access"
   account_type = "ssh"
-  gateway_id   = "<gateway-id>"
+  gateway_id   = data.infisical_gateway.main.id
 
   policies = {
     requires_approval    = true
@@ -52,7 +56,7 @@ resource "infisical_pam_account_template" "ssh" {
 resource "infisical_pam_account_template" "postgres" {
   name         = "postgres-rotated"
   account_type = "postgres"
-  gateway_id   = "<gateway-id>"
+  gateway_id   = data.infisical_gateway.main.id
 
   settings = {
     rotation = {

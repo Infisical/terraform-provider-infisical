@@ -53,7 +53,7 @@ resource "infisical_pam_folder_user" "alice_linux" {
 
 ### Required
 
-- `email` (String) The email of the user. Changing it creates a new membership.
+- `email` (String) The email of the user, in lowercase. Changing it creates a new membership.
 - `folder_id` (String) The ID of the PAM folder. Changing it creates a new membership.
 - `role` (String) The role on every account in the folder: `admin`, `operator` (sessions and credentials), `connector` (sessions only) or `auditor` (audit logs and recordings).
 

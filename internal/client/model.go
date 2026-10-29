@@ -5208,11 +5208,12 @@ const (
 )
 
 type PamMember struct {
-	MembershipID string  `json:"membershipId"`
-	UserID       *string `json:"userId"`
-	GroupID      *string `json:"groupId"`
-	IdentityID   *string `json:"identityId"`
-	Role         string  `json:"role"`
+	MembershipID string     `json:"membershipId"`
+	UserID       *string    `json:"userId"`
+	GroupID      *string    `json:"groupId"`
+	IdentityID   *string    `json:"identityId"`
+	Role         string     `json:"role"`
+	ExpiresAt    *time.Time `json:"expiresAt"`
 }
 
 type ListPamMembersRequest struct {

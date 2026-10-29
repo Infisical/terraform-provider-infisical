@@ -43,7 +43,7 @@ resource "infisical_pam_user" "alice" {
 
 ### Required
 
-- `email` (String) The email of the user. Changing it creates a new membership.
+- `email` (String) The email of the user, in lowercase. Changing it creates a new membership.
 - `role` (String) The role in PAM: `admin` or `member`. Members only get the access their folder and account memberships grant.
 
 ### Read-Only

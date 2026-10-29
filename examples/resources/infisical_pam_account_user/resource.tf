@@ -17,13 +17,49 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
+resource "infisical_pam_folder" "linux_team" {
+  name = "linux-team"
+}
+
+resource "infisical_pam_account_template" "ssh" {
+  name         = "ssh-default"
+  account_type = "ssh"
+  gateway_id   = data.infisical_gateway.main.id
+}
+
+resource "infisical_pam_account_ssh" "web01" {
+  name        = "web01-root"
+  folder_id   = infisical_pam_folder.linux_team.id
+  template_id = infisical_pam_account_template.ssh.id
+
+  connection_details = {
+    host = "10.0.1.10"
+    port = 22
+  }
+
+  credentials = {
+    auth_method = "public-key"
+    username    = "root"
+    private_key = var.web01_private_key
+  }
+}
+
+variable "web01_private_key" {
+  type      = string
+  sensitive = true
+}
+
 resource "infisical_pam_user" "alice" {
   email = "alice@example.com"
   role  = "member"
 }
 
-resource "infisical_pam_account_user" "alice_pamadmin" {
-  account_id = "<account-id>"
+resource "infisical_pam_account_user" "alice_web01" {
+  account_id = infisical_pam_account_ssh.web01.id
   email      = infisical_pam_user.alice.email # also makes Terraform add the user to PAM first
   role       = "connector"
 }

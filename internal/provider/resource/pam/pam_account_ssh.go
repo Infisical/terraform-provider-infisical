@@ -54,7 +54,7 @@ func NewPamAccountSshResource() resource.Resource {
 		},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"auth_method": schema.StringAttribute{
-				Description: "How the account authenticates: `password`, `public-key`, or `certificate` (signed by the account's Infisical SSH CA, which the server must trust).",
+				Description: "How the account authenticates: `password`, `public-key`, or `certificate`. With `certificate`, the server must trust the account's Infisical SSH CA: once the account exists, get its public key from `GET /api/v1/pam/accounts/{id}/ssh-ca-public-key` and add it to the server's `TrustedUserCAKeys`. Creation doesn't check this trust, so sessions fail until it is set up.",
 				Required:    true,
 				Validators:  []validator.String{stringvalidator.OneOf(pamSshAuthMethodPassword, pamSshAuthMethodPublicKey, pamSshAuthMethodCertificate)},
 			},

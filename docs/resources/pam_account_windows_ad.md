@@ -3,12 +3,12 @@
 page_title: "infisical_pam_account_windows_ad Resource - terraform-provider-infisical"
 subcategory: "PAM"
 description: |-
-  Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Only Machine Identity authentication is supported for this resource.
+  Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Sessions only launch if the template records to S3: settings.recording needs storage_backend = "aws-s3", connection_id and s3. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_pam_account_windows_ad (Resource)
 
-Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Only Machine Identity authentication is supported for this resource.
+Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Sessions only launch if the template records to S3: `settings.recording` needs `storage_backend = "aws-s3"`, `connection_id` and `s3`. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -32,10 +32,37 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
+resource "infisical_pam_folder" "windows_team" {
+  name = "windows-team"
+}
+
+# Windows AD sessions only launch when the template records to S3.
+resource "infisical_pam_account_template" "windows_ad" {
+  name         = "windows-ad-default"
+  account_type = "windows-ad"
+  gateway_id   = data.infisical_gateway.main.id
+
+  settings = {
+    recording = {
+      storage_backend = "aws-s3"
+      connection_id   = "<aws-app-connection-id>"
+      s3 = {
+        bucket     = "acme-pam-recordings"
+        region     = "us-east-1"
+        key_prefix = "windows/"
+      }
+    }
+  }
+}
+
 resource "infisical_pam_account_windows_ad" "pamadmin" {
   name        = "corp-pamadmin"
-  folder_id   = "<folder-id>"
-  template_id = "<windows-ad-template-id>"
+  folder_id   = infisical_pam_folder.windows_team.id
+  template_id = infisical_pam_account_template.windows_ad.id
 
   connection_details = {
     domain     = "corp.example.com"

@@ -17,10 +17,31 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
+resource "infisical_pam_folder" "dbas" {
+  name = "dbas"
+}
+
+resource "infisical_pam_account_template" "postgres" {
+  name         = "postgres-rotated"
+  account_type = "postgres"
+  gateway_id   = data.infisical_gateway.main.id
+
+  settings = {
+    rotation = {
+      enabled          = true
+      interval_seconds = 604800
+    }
+  }
+}
+
 resource "infisical_pam_account_postgres" "admin" {
   name        = "orders-admin"
-  folder_id   = "<folder-id>"
-  template_id = "<postgres-template-id>"
+  folder_id   = infisical_pam_folder.dbas.id
+  template_id = infisical_pam_account_template.postgres.id
 
   connection_details = {
     host     = "orders.db.internal"
@@ -37,8 +58,8 @@ resource "infisical_pam_account_postgres" "admin" {
 
 resource "infisical_pam_account_postgres" "app" {
   name        = "orders-app"
-  folder_id   = "<folder-id>"
-  template_id = "<postgres-template-id>"
+  folder_id   = infisical_pam_folder.dbas.id
+  template_id = infisical_pam_account_template.postgres.id
 
   connection_details = {
     host     = "orders.db.internal"
@@ -56,8 +77,8 @@ resource "infisical_pam_account_postgres" "app" {
 
 resource "infisical_pam_account_postgres" "rds" {
   name        = "reporting-iam"
-  folder_id   = "<folder-id>"
-  template_id = "<postgres-template-id>"
+  folder_id   = infisical_pam_folder.dbas.id
+  template_id = infisical_pam_account_template.postgres.id
 
   connection_details = {
     host     = "reporting.abc123.us-east-1.rds.amazonaws.com"

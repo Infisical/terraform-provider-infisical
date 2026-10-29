@@ -54,6 +54,7 @@ func NewPamAccountWindowsAdResource() resource.Resource {
 		AccountTypeName:  "Windows Active Directory",
 		ResourceTypeName: "_pam_account_windows_ad",
 		SupportsRotation: true,
+		Prerequisite:     "Sessions only launch if the template records to S3: `settings.recording` needs `storage_backend = \"aws-s3\"`, `connection_id` and `s3`.",
 		ConnectionDetailsAttributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
 				Description: "The fully qualified domain name of the Active Directory domain, e.g. corp.example.com.",

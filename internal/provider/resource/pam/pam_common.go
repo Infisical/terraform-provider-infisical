@@ -1,8 +1,10 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -100,6 +102,23 @@ func priorString(prior types.Object, name string) types.String {
 		return value
 	}
 	return types.StringNull()
+}
+
+// keepTrimmedStrings keeps prior string attributes the API stored trimmed, such as a PEM read with file().
+func keepTrimmedStrings(ctx context.Context, prior, current types.Object) (types.Object, diag.Diagnostics) {
+	if prior.IsNull() || prior.IsUnknown() || current.IsNull() {
+		return current, nil
+	}
+	priorValues := prior.Attributes()
+	values := current.Attributes()
+	for name, value := range values {
+		apiValue, ok := value.(types.String)
+		priorValue, priorOK := priorValues[name].(types.String)
+		if ok && priorOK && !apiValue.IsNull() {
+			values[name] = types.StringValue(infisicaltf.PreserveStringIfTrimmedEqual(apiValue.ValueString(), priorValue))
+		}
+	}
+	return types.ObjectValue(current.AttributeTypes(ctx), values)
 }
 
 // setString adds a configured string to an API payload.

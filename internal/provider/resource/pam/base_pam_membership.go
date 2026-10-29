@@ -3,9 +3,11 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -181,9 +183,12 @@ func (r *PamMembershipBaseResource) Schema(_ context.Context, _ resource.SchemaR
 
 	if r.Kind == infisical.PamMemberKindUser {
 		attributes["email"] = schema.StringAttribute{
-			Description:   "The email of the user. Changing it creates a new membership.",
-			Required:      true,
-			Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
+			Description: "The email of the user, in lowercase. Changing it creates a new membership.",
+			Required:    true,
+			Validators: []validator.String{
+				stringvalidator.LengthAtLeast(1),
+				stringvalidator.RegexMatches(regexp.MustCompile(`^[^A-Z]+$`), "must be lowercase"),
+			},
 			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 		}
 		attributes["user_id"] = schema.StringAttribute{
@@ -234,28 +239,22 @@ func (r *PamMembershipBaseResource) Create(ctx context.Context, req resource.Cre
 
 	var member infisical.PamMember
 	var err error
-	switch {
-	case r.Kind == infisical.PamMemberKindUser && r.Scope == pamMembershipScopeProduct:
+	if r.Kind == infisical.PamMemberKindUser && r.Scope == pamMembershipScopeProduct {
 		member, err = r.addProductUser(plan.Email.ValueString(), plan.Role.ValueString())
-	case r.Kind == infisical.PamMemberKindUser:
-		var userID string
-		userID, err = r.resolveUserID(plan.Email.ValueString())
-		if err == nil {
+	} else {
+		if r.Kind == infisical.PamMemberKindUser {
+			var userID string
+			userID, err = r.resolveUserID(plan.Email.ValueString())
 			plan.MemberID = types.StringValue(userID)
+		}
+		if err == nil {
 			member, err = r.client.AddPamMember(infisical.AddPamMemberRequest{
 				Scope:    r.apiScope(plan.ParentID.ValueString()),
 				Kind:     r.Kind,
-				MemberID: userID,
+				MemberID: plan.MemberID.ValueString(),
 				Role:     plan.Role.ValueString(),
 			})
 		}
-	default:
-		member, err = r.client.AddPamMember(infisical.AddPamMemberRequest{
-			Scope:    r.apiScope(plan.ParentID.ValueString()),
-			Kind:     r.Kind,
-			MemberID: plan.MemberID.ValueString(),
-			Role:     plan.Role.ValueString(),
-		})
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(summary, fmt.Sprintf("Couldn't add the %s, unexpected error: %s", r.kindName(), err.Error()))
@@ -309,7 +308,8 @@ func (r *PamMembershipBaseResource) findMember(values pamMembershipValues) (*inf
 		default:
 			id = member.IdentityID
 		}
-		if id != nil && *id == memberID {
+		// An expired temporary membership grants nothing, so it reads as gone and the next apply adds it again.
+		if id != nil && *id == memberID && (member.ExpiresAt == nil || member.ExpiresAt.After(time.Now())) {
 			return member, nil
 		}
 	}
@@ -436,7 +436,7 @@ func (r *PamMembershipBaseResource) ImportState(ctx context.Context, req resourc
 			return
 		}
 		memberID = userID
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), memberKey)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), strings.ToLower(memberKey))...)
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(r.memberAttribute()), memberID)...)
 }

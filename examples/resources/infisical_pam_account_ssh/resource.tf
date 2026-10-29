@@ -17,10 +17,24 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
+resource "infisical_pam_folder" "linux_team" {
+  name = "linux-team"
+}
+
+resource "infisical_pam_account_template" "ssh" {
+  name         = "ssh-default"
+  account_type = "ssh"
+  gateway_id   = data.infisical_gateway.main.id
+}
+
 resource "infisical_pam_account_ssh" "web01" {
   name        = "web01-root"
-  folder_id   = "<folder-id>"
-  template_id = "<ssh-template-id>"
+  folder_id   = infisical_pam_folder.linux_team.id
+  template_id = infisical_pam_account_template.ssh.id
 
   connection_details = {
     host = "10.0.1.10"

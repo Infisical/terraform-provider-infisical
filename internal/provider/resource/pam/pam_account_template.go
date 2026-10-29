@@ -65,6 +65,8 @@ const pamDefaultHeartbeatIntervalSeconds = 86400
 
 const pamSafePasswordSymbols = "!@#$%^&*()-_=+[]{}|:,.<>/~"
 
+const pamOracleMaxPasswordLength = 30
+
 var pamPatternValidators = []validator.List{
 	listvalidator.SizeBetween(1, 20),
 	listvalidator.ValueStringsAre(
@@ -208,7 +210,7 @@ func (r *pamAccountTemplateResource) Metadata(_ context.Context, req resource.Me
 func pamScheduleAttributes(subject string) map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"enabled": schema.BoolAttribute{
-			Description: fmt.Sprintf("Whether scheduled %s is on.", subject),
+			Description: fmt.Sprintf("Whether %s is on. Set `interval_seconds` as well to run it on a schedule.", subject),
 			Required:    true,
 		},
 		"interval_seconds": schema.Int64Attribute{
@@ -389,7 +391,7 @@ func (r *pamAccountTemplateResource) Schema(_ context.Context, _ resource.Schema
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"length": schema.Int64Attribute{
-								Description: "The length of the password, from 1 to 250.",
+								Description: "The length of the password, from 1 to 250 (at most 30 for `oracledb` templates).",
 								Required:    true,
 								Validators:  []validator.Int64{int64validator.Between(1, 250)},
 							},
@@ -504,6 +506,11 @@ func (r *pamAccountTemplateResource) ValidateConfig(ctx context.Context, req res
 			}
 			total += count.ValueInt64()
 		}
+		if typeKnown && accountType == "oracledb" && requirements.Length.ValueInt64() > pamOracleMaxPasswordLength {
+			resp.Diagnostics.AddAttributeError(path.Root("settings").AtName("password_requirements").AtName("length"), "Invalid password requirements",
+				fmt.Sprintf("Oracle passwords are limited to %d characters.", pamOracleMaxPasswordLength))
+		}
+
 		requiredPath := path.Root("settings").AtName("password_requirements").AtName("required")
 		if total == 0 {
 			resp.Diagnostics.AddAttributeError(requiredPath, "Invalid password requirements", "At least one kind of character must be required.")

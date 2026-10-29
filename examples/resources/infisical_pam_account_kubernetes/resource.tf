@@ -17,10 +17,24 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
+resource "infisical_pam_folder" "devops_team" {
+  name = "devops-team"
+}
+
+resource "infisical_pam_account_template" "kubernetes" {
+  name         = "kubernetes-admin"
+  account_type = "kubernetes"
+  gateway_id   = data.infisical_gateway.main.id
+}
+
 resource "infisical_pam_account_kubernetes" "prod" {
   name        = "prod-cluster-admin"
-  folder_id   = "<folder-id>"
-  template_id = "<kubernetes-template-id>"
+  folder_id   = infisical_pam_folder.devops_team.id
+  template_id = infisical_pam_account_template.kubernetes.id
 
   connection_details = {
     url             = "https://k8s.prod.internal:6443"

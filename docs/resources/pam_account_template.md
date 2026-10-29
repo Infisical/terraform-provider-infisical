@@ -32,11 +32,15 @@ provider "infisical" {
   }
 }
 
+data "infisical_gateway" "main" {
+  name = "prod-gateway"
+}
+
 resource "infisical_pam_account_template" "ssh" {
   name         = "ssh-default"
   description  = "Standard SSH access"
   account_type = "ssh"
-  gateway_id   = "<gateway-id>"
+  gateway_id   = data.infisical_gateway.main.id
 
   policies = {
     requires_approval    = true
@@ -67,7 +71,7 @@ resource "infisical_pam_account_template" "ssh" {
 resource "infisical_pam_account_template" "postgres" {
   name         = "postgres-rotated"
   account_type = "postgres"
-  gateway_id   = "<gateway-id>"
+  gateway_id   = data.infisical_gateway.main.id
 
   settings = {
     rotation = {
@@ -137,7 +141,7 @@ Optional:
 
 Required:
 
-- `enabled` (Boolean) Whether scheduled credential health checking is on.
+- `enabled` (Boolean) Whether credential health checking is on. Set `interval_seconds` as well to run it on a schedule.
 
 Optional:
 
@@ -149,7 +153,7 @@ Optional:
 
 Required:
 
-- `length` (Number) The length of the password, from 1 to 250.
+- `length` (Number) The length of the password, from 1 to 250 (at most 30 for `oracledb` templates).
 - `required` (Attributes) The minimum number of each kind of character. At least one must be above 0, and together they can't exceed `length`. (see [below for nested schema](#nestedatt--settings--password_requirements--required))
 
 Optional:
@@ -197,7 +201,7 @@ Optional:
 
 Required:
 
-- `enabled` (Boolean) Whether scheduled credential rotation is on.
+- `enabled` (Boolean) Whether credential rotation is on. Set `interval_seconds` as well to run it on a schedule.
 
 Optional:
 

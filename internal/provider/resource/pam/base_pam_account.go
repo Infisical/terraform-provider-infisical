@@ -33,6 +33,7 @@ type PamAccountBaseResource struct {
 	AccountTypeName  string // e.g. "SSH"
 	ResourceTypeName string // terraform resource name suffix
 	SupportsRotation bool
+	Prerequisite     string // optional sentence added to the resource description
 	client           *infisical.Client
 
 	ConnectionDetailsAttributes map[string]schema.Attribute
@@ -177,8 +178,12 @@ func (r *PamAccountBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 		}
 	}
 
+	description := fmt.Sprintf("Create and manage %s accounts in Infisical PAM. The connection is tested when the account is created or its connection changes.", r.AccountTypeName)
+	if r.Prerequisite != "" {
+		description += " " + r.Prerequisite
+	}
 	resp.Schema = schema.Schema{
-		Description: fmt.Sprintf("Create and manage %s accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Only Machine Identity authentication is supported for this resource.", r.AccountTypeName),
+		Description: description + " Only Machine Identity authentication is supported for this resource.",
 		Attributes:  attributes,
 	}
 }
@@ -326,8 +331,13 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state.ConnectionDetails = connectionDetails
-	state.Credentials = credentials
+	state.ConnectionDetails, diags = keepTrimmedStrings(ctx, state.ConnectionDetails, connectionDetails)
+	resp.Diagnostics.Append(diags...)
+	state.Credentials, diags = keepTrimmedStrings(ctx, state.Credentials, credentials)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	if r.SupportsRotation {
 		current, err := r.client.GetPamAccountRotation(infisical.GetPamAccountRotationRequest{AccountID: account.ID})
