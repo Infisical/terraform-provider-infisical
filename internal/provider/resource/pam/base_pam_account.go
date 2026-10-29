@@ -51,6 +51,8 @@ type PamAccountBaseResource struct {
 	ValidateTypeConfig func(ctx context.Context, connectionDetails types.Object, credentials types.Object) diag.Diagnostics
 }
 
+var pamSecretCredentialKeys = []string{"password", "privateKey", "serviceAccountToken"}
+
 type PamAccountBaseResourceModel struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
@@ -369,7 +371,7 @@ func (r *PamAccountBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	// Only changed fields: connection fields trigger a connection test and credentials overwrite a rotated password.
+	// Only changed fields are sent, since connection fields trigger a connection test.
 	body := map[string]any{}
 	if !plan.Name.Equal(state.Name) {
 		body["name"] = plan.Name.ValueString()
@@ -397,6 +399,15 @@ func (r *PamAccountBaseResource) Update(ctx context.Context, req resource.Update
 	if !plan.Credentials.Equal(state.Credentials) {
 		credentials, diags := r.CredentialsToAPI(ctx, plan.Credentials)
 		resp.Diagnostics.Append(diags...)
+		if !state.Credentials.IsNull() {
+			prior, diags := r.CredentialsToAPI(ctx, state.Credentials)
+			resp.Diagnostics.Append(diags...)
+			for _, key := range pamSecretCredentialKeys {
+				if credentials[key] == prior[key] {
+					delete(credentials, key)
+				}
+			}
+		}
 		body["credentials"] = credentials
 	}
 	if resp.Diagnostics.HasError() {
