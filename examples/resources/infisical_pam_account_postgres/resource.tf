@@ -53,7 +53,7 @@ resource "infisical_pam_account_postgres" "admin" {
     password = var.orders_admin_password
   }
 
-  self_rotation = true
+  rotation_account_id = "self"
 }
 
 resource "infisical_pam_account_postgres" "app" {

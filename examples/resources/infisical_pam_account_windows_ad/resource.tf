@@ -60,7 +60,7 @@ resource "infisical_pam_account_windows_ad" "pamadmin" {
     password = var.pamadmin_password
   }
 
-  self_rotation = true
+  rotation_account_id = "self"
 }
 
 variable "pamadmin_password" {

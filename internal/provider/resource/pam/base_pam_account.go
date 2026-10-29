@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -53,6 +52,8 @@ type PamAccountBaseResource struct {
 
 var pamSecretCredentialKeys = []string{"password", "privateKey", "serviceAccountToken"}
 
+const pamSelfRotation = "self"
+
 type PamAccountBaseResourceModel struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
@@ -67,7 +68,6 @@ type PamAccountBaseResourceModel struct {
 
 type pamAccountRotationModel struct {
 	RotationAccountID types.String `tfsdk:"rotation_account_id"`
-	SelfRotation      types.Bool   `tfsdk:"self_rotation"`
 }
 
 // The model of account types that support credential rotation.
@@ -84,7 +84,7 @@ func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamModelGe
 	if !r.SupportsRotation {
 		var model PamAccountBaseResourceModel
 		diags := source.Get(ctx, &model)
-		return model, pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolNull()}, diags
+		return model, pamAccountRotationModel{RotationAccountID: types.StringNull()}, diags
 	}
 
 	var model pamRotatableAccountResourceModel
@@ -168,15 +168,11 @@ func (r *PamAccountBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 
 	if r.SupportsRotation {
 		attributes["rotation_account_id"] = schema.StringAttribute{
-			Description: "The ID of another account of the same type and target that rotates this account's password. Rotation is enabled on the template.",
+			Description: "The ID of another account of the same type and target that rotates this account's password, or `self` for the account to rotate its own. Rotation is enabled on the template.",
 			Optional:    true,
-			Validators:  []validator.String{infisicaltf.UuidValidator},
-		}
-		attributes["self_rotation"] = schema.BoolAttribute{
-			Description: "Whether the account rotates its own password with its own credentials. Can't be combined with `rotation_account_id`. Defaults to false.",
-			Optional:    true,
-			Computed:    true,
-			Default:     booldefault.StaticBool(false),
+			Validators: []validator.String{
+				stringvalidator.Any(stringvalidator.OneOf(pamSelfRotation), infisicaltf.UuidValidator),
+			},
 		}
 	}
 
@@ -197,15 +193,10 @@ func (r *PamAccountBaseResource) Configure(_ context.Context, req resource.Confi
 }
 
 func (r *PamAccountBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	model, rotation, diags := r.getModel(ctx, req.Config)
+	model, _, diags := r.getModel(ctx, req.Config)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	if rotation.SelfRotation.ValueBool() && !rotation.RotationAccountID.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("self_rotation"), "Conflicting rotation settings",
-			"An account rotates either itself or through `rotation_account_id`, not both.")
 	}
 
 	if r.ValidateTypeConfig != nil && !model.ConnectionDetails.IsUnknown() && !model.Credentials.IsNull() && !model.Credentials.IsUnknown() {
@@ -214,7 +205,7 @@ func (r *PamAccountBaseResource) ValidateConfig(ctx context.Context, req resourc
 }
 
 func desiredRotationAccountID(accountID string, rotation pamAccountRotationModel) *string {
-	if rotation.SelfRotation.ValueBool() {
+	if rotation.RotationAccountID.ValueString() == pamSelfRotation {
 		return &accountID
 	}
 	return optionalString(rotation.RotationAccountID)
@@ -348,10 +339,9 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 			return
 		}
 
-		rotation.SelfRotation = types.BoolValue(current.RotationAccountID != nil && *current.RotationAccountID == account.ID)
-		rotation.RotationAccountID = types.StringNull()
-		if current.RotationAccountID != nil && *current.RotationAccountID != account.ID {
-			rotation.RotationAccountID = types.StringValue(*current.RotationAccountID)
+		rotation.RotationAccountID = stringOrNull(current.RotationAccountID)
+		if current.RotationAccountID != nil && *current.RotationAccountID == account.ID {
+			rotation.RotationAccountID = types.StringValue(pamSelfRotation)
 		}
 	}
 

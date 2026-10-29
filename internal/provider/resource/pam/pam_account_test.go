@@ -228,7 +228,7 @@ func TestPamAccountRotationAccount(t *testing.T) {
 	r := asPamAccountResource(t, NewPamAccountPostgresResource())
 	configurePamResource(t, r, newPamTestClient(t, backend))
 
-	selfRotation := pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolValue(true)}
+	selfRotation := pamAccountRotationModel{RotationAccountID: types.StringValue(pamSelfRotation)}
 	state := createPamResource(t, r, newPamPostgresPlan(t, r, "db.internal", selfRotation))
 	created, _ := pamAccountModel(t, r, state)
 	accountID := created.ID.ValueString()
@@ -251,7 +251,7 @@ func TestPamAccountRotationAccount(t *testing.T) {
 		t.Errorf("expected the rotation account to be set again after the move, got %v", got)
 	}
 
-	delegated := pamAccountRotationModel{RotationAccountID: types.StringValue("77777777-7777-7777-7777-777777777777"), SelfRotation: types.BoolValue(false)}
+	delegated := pamAccountRotationModel{RotationAccountID: types.StringValue("77777777-7777-7777-7777-777777777777")}
 	delegatedPlan := newPamPostgresPlan(t, r, "db2.internal", delegated)
 	if diags := delegatedPlan.SetAttribute(context.Background(), path.Root("id"), accountID); diags.HasError() {
 		t.Fatal(diags)
@@ -261,13 +261,13 @@ func TestPamAccountRotationAccount(t *testing.T) {
 		t.Errorf("expected the delegated rotation account, got %v", got)
 	}
 	_, rotation := pamAccountModel(t, r, readPamResource(t, r, state))
-	if rotation.SelfRotation.ValueBool() || rotation.RotationAccountID.ValueString() != "77777777-7777-7777-7777-777777777777" {
+	if rotation.RotationAccountID.ValueString() != "77777777-7777-7777-7777-777777777777" {
 		t.Errorf("unexpected rotation read back: %+v", rotation)
 	}
 
 	backend.accounts[accountID].RotationAccountID = nil
 	_, rotation = pamAccountModel(t, r, readPamResource(t, r, state))
-	if rotation.SelfRotation.ValueBool() || !rotation.RotationAccountID.IsNull() {
+	if !rotation.RotationAccountID.IsNull() {
 		t.Errorf("expected a cleared rotation account to read back as none, got %+v", rotation)
 	}
 }
@@ -279,11 +279,11 @@ func TestPamAccountKeepsUpdateWhenRotationFails(t *testing.T) {
 	r := asPamAccountResource(t, NewPamAccountPostgresResource())
 	configurePamResource(t, r, newPamTestClient(t, backend))
 
-	noRotation := pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolValue(false)}
+	noRotation := pamAccountRotationModel{RotationAccountID: types.StringNull()}
 	state := createPamResource(t, r, newPamPostgresPlan(t, r, "db.internal", noRotation))
 	accountID := pamAccountID(t, r, state)
 
-	plan := newPamPostgresPlan(t, r, "db.internal", pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolValue(true)})
+	plan := newPamPostgresPlan(t, r, "db.internal", pamAccountRotationModel{RotationAccountID: types.StringValue(pamSelfRotation)})
 	if diags := plan.SetAttribute(ctx, path.Root("id"), accountID); diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -305,7 +305,7 @@ func TestPamAccountKeepsUpdateWhenRotationFails(t *testing.T) {
 	if got := stringAttribute(t, saved.Credentials.Attributes(), "password"); got != "new-password" {
 		t.Errorf("expected the new password to be saved in state, got %q", got)
 	}
-	if rotation.SelfRotation.ValueBool() {
+	if !rotation.RotationAccountID.IsNull() {
 		t.Error("expected the rotation that failed to stay unsaved")
 	}
 }
@@ -337,7 +337,7 @@ func TestPamAccountWindowsAdRoundTrip(t *testing.T) {
 	model := pamAccountBaseModel(connection, credentials)
 	model.Name = types.StringValue("corp-pamadmin")
 
-	state := createPamResource(t, r, pamAccountPlan(t, r, model, &pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolValue(false)}))
+	state := createPamResource(t, r, pamAccountPlan(t, r, model, &pamAccountRotationModel{RotationAccountID: types.StringNull()}))
 	sent := jsonObject(t, backend.requestsTo("POST", "/api/v1/pam/accounts/windows-ad")[0]["connectionDetails"])
 	if hosts, _ := sent["hosts"].([]any); sent["port"] != float64(389) || len(hosts) != 2 {
 		t.Errorf("expected ldap_port sent as port and both hosts, got %v", sent)
@@ -367,7 +367,7 @@ func TestPamAccountValidateConfig(t *testing.T) {
 			SslEnabled: types.BoolValue(sslEnabled), SslRejectUnauthorized: types.BoolValue(true), SslCertificate: types.StringNull(),
 		})
 	}
-	noRotation := &pamAccountRotationModel{RotationAccountID: types.StringNull(), SelfRotation: types.BoolNull()}
+	noRotation := &pamAccountRotationModel{RotationAccountID: types.StringNull()}
 
 	tests := map[string]struct {
 		resource  *PamAccountBaseResource
@@ -406,17 +406,6 @@ func TestPamAccountValidateConfig(t *testing.T) {
 			},
 			rotation:  noRotation,
 			wantError: "`ssl_enabled` must be true",
-		},
-		"postgres rotating itself and through another account": {
-			resource: postgres,
-			model: func(t *testing.T) PamAccountBaseResourceModel {
-				return pamAccountBaseModel(postgresConnection(t, true), pamAccountObject(t, postgres.CredentialsAttributes, PamAccountPostgresCredentialsModel{
-					AuthMethod: types.StringValue(pamPostgresAuthMethodPassword), Username: types.StringValue("app"), Password: types.StringValue("pw"),
-					AwsRegion: types.StringNull(), RoleArn: types.StringNull(),
-				}))
-			},
-			rotation:  &pamAccountRotationModel{RotationAccountID: types.StringValue("77777777-7777-7777-7777-777777777777"), SelfRotation: types.BoolValue(true)},
-			wantError: "either itself or through `rotation_account_id`",
 		},
 		"kubernetes token method without a token": {
 			resource: kubernetes,

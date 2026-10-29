@@ -75,7 +75,7 @@ resource "infisical_pam_account_windows_ad" "pamadmin" {
     password = var.pamadmin_password
   }
 
-  self_rotation = true
+  rotation_account_id = "self"
 }
 
 variable "pamadmin_password" {
@@ -100,8 +100,7 @@ variable "pamadmin_password" {
 - `description` (String) An optional description of the account.
 - `gateway_id` (String) The ID of the gateway to connect through instead of the template's.
 - `gateway_pool_id` (String) The ID of the gateway pool to connect through instead of the template's.
-- `rotation_account_id` (String) The ID of another account of the same type and target that rotates this account's password. Rotation is enabled on the template.
-- `self_rotation` (Boolean) Whether the account rotates its own password with its own credentials. Can't be combined with `rotation_account_id`. Defaults to false.
+- `rotation_account_id` (String) The ID of another account of the same type and target that rotates this account's password, or `self` for the account to rotate its own. Rotation is enabled on the template.
 
 ### Read-Only
 
