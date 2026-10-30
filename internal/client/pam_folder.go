@@ -7,31 +7,11 @@ import (
 )
 
 const (
-	operationGetPamProject   = "CallGetPamProject"
 	operationCreatePamFolder = "CallCreatePamFolder"
 	operationGetPamFolder    = "CallGetPamFolder"
 	operationUpdatePamFolder = "CallUpdatePamFolder"
 	operationDeletePamFolder = "CallDeletePamFolder"
 )
-
-func (client Client) GetPamProject() (GetPamProjectResponse, error) {
-	var body GetPamProjectResponse
-	response, err := client.Config.HttpClient.
-		R().
-		SetResult(&body).
-		SetHeader("User-Agent", USER_AGENT).
-		Get("api/v1/pam/project")
-
-	if err != nil {
-		return GetPamProjectResponse{}, errors.NewGenericRequestError(operationGetPamProject, err)
-	}
-
-	if response.IsError() {
-		return GetPamProjectResponse{}, errors.NewAPIErrorWithResponse(operationGetPamProject, response, nil)
-	}
-
-	return body, nil
-}
 
 func (client Client) CreatePamFolder(request CreatePamFolderRequest) (PamFolder, error) {
 	var body PamFolderResponse

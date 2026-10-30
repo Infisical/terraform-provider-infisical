@@ -22,8 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-const fakePamProjectID = "pam-project"
-
 type fakePamRequest struct {
 	Method string
 	Path   string
@@ -176,25 +174,6 @@ func optionalBodyString(body map[string]any, key string) *string {
 
 func (b *fakePamBackend) handler() http.Handler {
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /api/v1/pam/project", func(w http.ResponseWriter, _ *http.Request) {
-		b.writeJSON(w, http.StatusOK, map[string]any{"projectId": fakePamProjectID})
-	})
-
-	// The PAM project's memberships are its product user members.
-	mux.HandleFunc("GET /api/v1/projects/{projectId}/memberships", func(w http.ResponseWriter, r *http.Request) {
-		memberships := []map[string]any{}
-		for email, userID := range b.orgUsers {
-			if b.isProductMember("users", userID) {
-				memberships = append(memberships, map[string]any{
-					"id":     "pm-" + userID,
-					"userId": userID,
-					"user":   map[string]any{"id": userID, "email": email, "username": email},
-				})
-			}
-		}
-		b.writeJSON(w, http.StatusOK, map[string]any{"memberships": memberships})
-	})
 
 	mux.HandleFunc("POST /api/v1/pam/folders", func(w http.ResponseWriter, r *http.Request) {
 		body := b.body(r)
@@ -433,7 +412,13 @@ func (b *fakePamBackend) handleMembers(mux *http.ServeMux, prefix string, scopeO
 		}
 		members := []map[string]any{}
 		for memberID, membership := range b.membersOf(scope, kind) {
-			members = append(members, memberResult(kind, memberID, membership))
+			result := memberResult(kind, memberID, membership)
+			for email, userID := range b.orgUsers {
+				if kind == "users" && userID == memberID {
+					result["email"], result["username"] = email, email
+				}
+			}
+			members = append(members, result)
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"members": members})
 	})

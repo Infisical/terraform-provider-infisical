@@ -5043,10 +5043,6 @@ type CertRequestApprovalPolicyResponse struct {
 	Policy CertRequestApprovalPolicy `json:"policy"`
 }
 
-type GetPamProjectResponse struct {
-	ProjectID string `json:"projectId"`
-}
-
 type PamFolder struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
@@ -5214,6 +5210,8 @@ type PamMember struct {
 	IdentityID   *string    `json:"identityId"`
 	Role         string     `json:"role"`
 	ExpiresAt    *time.Time `json:"expiresAt"`
+	Email        *string    `json:"email"`
+	Username     *string    `json:"username"`
 }
 
 type ListPamMembersRequest struct {

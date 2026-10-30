@@ -124,26 +124,22 @@ func (client Client) RemovePamMember(request RemovePamMemberRequest) error {
 	return nil
 }
 
-// The PAM membership endpoints return no emails, so this reads the PAM project's memberships.
 func (client Client) FindPamProductUserByEmail(email string) (string, error) {
-	project, err := client.GetPamProject()
-	if err != nil {
-		return "", err
-	}
-
-	projectID := project.ProjectID
-	memberships, err := client.GetProjectMemberships(GetProjectMembershipsRequest{ProjectID: projectID})
+	members, err := client.ListPamMembers(ListPamMembersRequest{Kind: PamMemberKindUser})
 	if err != nil {
 		return "", err
 	}
 
 	// Email matches win over username matches, and more than one match is an error rather than a guess.
 	var byEmail, byUsername []string
-	for _, membership := range memberships.Memberships {
-		if strings.EqualFold(membership.User.Email, email) {
-			byEmail = append(byEmail, membership.UserID)
-		} else if strings.EqualFold(membership.User.Username, email) {
-			byUsername = append(byUsername, membership.UserID)
+	for _, member := range members.Members {
+		if member.UserID == nil {
+			continue
+		}
+		if member.Email != nil && strings.EqualFold(*member.Email, email) {
+			byEmail = append(byEmail, *member.UserID)
+		} else if member.Username != nil && strings.EqualFold(*member.Username, email) {
+			byUsername = append(byUsername, *member.UserID)
 		}
 	}
 
