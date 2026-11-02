@@ -150,6 +150,7 @@ func (client Client) GetSecretsRawV3(request GetRawSecretsV3Request) (GetRawSecr
 			"environment":            request.Environment,
 			"workspaceId":            request.WorkspaceId,
 			"expandSecretReferences": strconv.FormatBool(request.ExpandSecretReferences),
+			"include_imports":        strconv.FormatBool(request.IncludeImports),
 		})
 
 	if request.SecretPath != "" {
@@ -357,11 +358,12 @@ func (client Client) GetPlainTextSecretsViaServiceToken(secretFolderPath string,
 	return plainTextSecrets, &serviceTokenDetails, nil
 }
 
-func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, workspaceId string) ([]RawV3Secret, error) {
+func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, workspaceId string, includeImports bool) ([]RawV3Secret, error) {
 	request := GetRawSecretsV3Request{
 		Environment:            envSlug,
 		WorkspaceId:            workspaceId,
 		ExpandSecretReferences: true,
+		IncludeImports:         includeImports,
 	}
 
 	if secretFolderPath != "" {
@@ -374,7 +376,28 @@ func (client Client) GetRawSecrets(secretFolderPath string, envSlug string, work
 		return nil, err
 	}
 
-	return secrets.Secrets, nil
+	return mergeImportedRawSecrets(secrets.Secrets, secrets.Imports), nil
+}
+
+// mergeImportedRawSecrets appends imported secrets to the folder's own secrets with the same
+// precedence as the Infisical CLI: a secret defined in the folder always wins, and among imports
+// the one listed last wins.
+func mergeImportedRawSecrets(secrets []RawV3Secret, imports []ImportedRawSecretV3) []RawV3Secret {
+	seen := make(map[string]bool, len(secrets))
+	for _, secret := range secrets {
+		seen[secret.SecretKey] = true
+	}
+
+	for i := len(imports) - 1; i >= 0; i-- {
+		for _, secret := range imports[i].Secrets {
+			if !seen[secret.SecretKey] {
+				secrets = append(secrets, secret)
+				seen[secret.SecretKey] = true
+			}
+		}
+	}
+
+	return secrets
 }
 
 func GetPlainTextSecrets(key []byte, encryptedSecrets GetEncryptedSecretsV3Response) ([]SingleEnvironmentVariable, error) {
