@@ -14,6 +14,7 @@ import (
 	certificateSyncResource "terraform-provider-infisical/internal/provider/resource/certificate_sync"
 	dynamicSecretResource "terraform-provider-infisical/internal/provider/resource/dynamic_secret"
 	externalKmsResource "terraform-provider-infisical/internal/provider/resource/external_kms"
+	pamResource "terraform-provider-infisical/internal/provider/resource/pam"
 	secretRotationResource "terraform-provider-infisical/internal/provider/resource/secret_rotation"
 	secretSyncResource "terraform-provider-infisical/internal/provider/resource/secret_sync"
 	secretValidationRuleResource "terraform-provider-infisical/internal/provider/resource/secret_validation_rule"
@@ -545,6 +546,21 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		alertResource.NewAlertResource,
 		infisicalResource.NewGatewayResource,
 		infisicalResource.NewGatewayEnrollmentTokenResource,
+		pamResource.NewPamFolderResource,
+		pamResource.NewPamAccountTemplateResource,
+		pamResource.NewPamAccountSshResource,
+		pamResource.NewPamAccountPostgresResource,
+		pamResource.NewPamAccountKubernetesResource,
+		pamResource.NewPamAccountWindowsAdResource,
+		pamResource.NewPamUserResource,
+		pamResource.NewPamGroupResource,
+		pamResource.NewPamIdentityResource,
+		pamResource.NewPamFolderUserResource,
+		pamResource.NewPamFolderGroupResource,
+		pamResource.NewPamFolderIdentityResource,
+		pamResource.NewPamAccountUserResource,
+		pamResource.NewPamAccountGroupResource,
+		pamResource.NewPamAccountIdentityResource,
 	}
 }
 

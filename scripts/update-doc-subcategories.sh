@@ -110,6 +110,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # Gateways
         gateway|gateway_*)
             update_subcategory "$file" "Gateways";;
+
+        # PAM
+        pam_*)
+            update_subcategory "$file" "PAM";;
     esac
 done
 
