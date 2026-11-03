@@ -58,6 +58,8 @@ const (
 	certificateIssuedFromCSRKey  = "issued_from_csr"
 	certificatePendingRenewalKey = "pending_renewal"
 	certificateMissingKeyKey     = "private_key_missing"
+	certificateKeyNotReusableKey = "csr_key_not_reusable"
+	certificateCSRDriftKey       = "csr_key_drift"
 	certificateCaTypeInternal    = "internal"
 
 	certificateRenewalKeySourceCSR   = "csr"
@@ -151,7 +153,7 @@ func privateFlagSet(ctx context.Context, private privateStateReader, key string)
 func (r *certManagerCertificateResource) resolvePendingRenewal(ctx context.Context, cert infisical.Certificate, pending pendingRenewal, resp *resource.ReadResponse) bool {
 	if cert.RenewedByCertificateId == "" {
 		status, err := r.client.GetCertificateRequestStatus(infisical.GetCertificateRequestStatusRequest{RequestId: pending.RequestId})
-		if err != nil || !strings.EqualFold(status.Status, "failed") {
+		if err != nil || (!strings.EqualFold(status.Status, "failed") && !strings.EqualFold(status.Status, "rejected")) {
 			return false
 		}
 		message := "no reason given"
@@ -239,10 +241,16 @@ func certificateReplacementPlanned(plan, state certManagerCertificateResourceMod
 	return stateHasCSR != hasCSRValue(plan.CSR)
 }
 
+func certificateDestroySettingsChanged(plan, state certManagerCertificateResourceModel) bool {
+	return !plan.RevokeOnDestroy.Equal(state.RevokeOnDestroy) ||
+		!plan.RevocationReason.Equal(state.RevocationReason) ||
+		!plan.DeleteOnDestroy.Equal(state.DeleteOnDestroy)
+}
+
 func applyInPlaceChanges(state *certManagerCertificateResourceModel, plan certManagerCertificateResourceModel) {
 	state.CSR = plan.CSR
 	state.TimeoutSeconds = plan.TimeoutSeconds
-	state.ManualRenewDaysBeforeExpiry = plan.ManualRenewDaysBeforeExpiry
+	state.ManualRenewOnApplyWithinDays = plan.ManualRenewOnApplyWithinDays
 	state.RevokeOnDestroy = plan.RevokeOnDestroy
 	state.RevocationReason = plan.RevocationReason
 	state.DeleteOnDestroy = plan.DeleteOnDestroy
@@ -334,14 +342,14 @@ func certificateLifetimeDays(plan, state certManagerCertificateResourceModel) (f
 }
 
 func certificateRenewalDue(plan, state certManagerCertificateResourceModel) bool {
-	if plan.ManualRenewDaysBeforeExpiry.IsNull() || plan.ManualRenewDaysBeforeExpiry.IsUnknown() {
+	if plan.ManualRenewOnApplyWithinDays.IsNull() || plan.ManualRenewOnApplyWithinDays.IsUnknown() {
 		return false
 	}
 	notAfter, err := time.Parse(time.RFC3339, state.NotAfter.ValueString())
 	if err != nil {
 		return false
 	}
-	renewAt := notAfter.Add(-time.Duration(plan.ManualRenewDaysBeforeExpiry.ValueInt64()) * 24 * time.Hour)
+	renewAt := notAfter.Add(-time.Duration(plan.ManualRenewOnApplyWithinDays.ValueInt64()) * 24 * time.Hour)
 	return !nowFunc().Before(renewAt)
 }
 
@@ -353,15 +361,15 @@ func certificateExpired(state certManagerCertificateResourceModel) bool {
 func validateRenewalWindowOnCreate(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	var plan certManagerCertificateResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() || plan.ManualRenewDaysBeforeExpiry.IsNull() || plan.ManualRenewDaysBeforeExpiry.IsUnknown() || plan.TTL.IsNull() || plan.TTL.IsUnknown() {
+	if resp.Diagnostics.HasError() || plan.ManualRenewOnApplyWithinDays.IsNull() || plan.ManualRenewOnApplyWithinDays.IsUnknown() || plan.TTL.IsNull() || plan.TTL.IsUnknown() {
 		return
 	}
 	lifetimeDays, ok := parseCertificateTTLDays(plan.TTL.ValueString())
-	if ok && float64(plan.ManualRenewDaysBeforeExpiry.ValueInt64()) >= lifetimeDays {
+	if ok && float64(plan.ManualRenewOnApplyWithinDays.ValueInt64()) >= lifetimeDays {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("manual_renew_days_before_expiry"),
+			path.Root("manual_renew_on_apply_within_days"),
 			"Renewal window too large",
-			fmt.Sprintf("manual_renew_days_before_expiry (%d) must be smaller than the certificate lifetime (%.0f days), otherwise every apply renews the certificate again.", plan.ManualRenewDaysBeforeExpiry.ValueInt64(), lifetimeDays),
+			fmt.Sprintf("manual_renew_on_apply_within_days (%d) must be smaller than the certificate lifetime (%.0f days), otherwise every apply renews the certificate again.", plan.ManualRenewOnApplyWithinDays.ValueInt64(), lifetimeDays),
 		)
 	}
 }
@@ -372,6 +380,14 @@ func (r *certManagerCertificateResource) ModifyPlan(ctx context.Context, req res
 
 func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req resource.ModifyPlanRequest, private privateStateReader, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		var state certManagerCertificateResourceModel
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+		if state.Status.ValueString() == certificateStatusDeleted {
+			resp.Diagnostics.AddWarning(
+				"Certificate deleted outside Terraform",
+				fmt.Sprintf("Certificate %s was deleted outside Terraform but is not revoked. Because revoke_on_destroy is set, destroying it revokes the deleted certificate. To skip the revoke, set revoke_on_destroy = false and apply before destroying.", state.Id.ValueString()),
+			)
+		}
 		return
 	}
 	if req.State.Raw.IsNull() {
@@ -388,6 +404,17 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 	}
 
 	if state.Status.ValueString() == certificateStatusDeleted {
+		if certificateDestroySettingsChanged(plan, state) {
+			resp.Diagnostics.AddWarning(
+				"Certificate was deleted outside Terraform",
+				fmt.Sprintf("Certificate %s was deleted outside Terraform. This apply only saves the new revoke_on_destroy, revocation_reason_on_destroy and delete_on_destroy values, and the next plan replaces the certificate using them.", state.Id.ValueString()),
+			)
+			return
+		}
+		resp.Diagnostics.AddWarning(
+			"Certificate deleted outside Terraform",
+			fmt.Sprintf("Certificate %s was deleted outside Terraform but is not revoked. Because revoke_on_destroy is set, Terraform replaces it and revokes the deleted certificate. To skip the revoke, set revoke_on_destroy = false and apply first.", state.Id.ValueString()),
+		)
 		plan.Status = types.StringUnknown()
 		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("status"))
 		resp.Diagnostics.Append(resp.Plan.Set(ctx, plan)...)
@@ -406,8 +433,8 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 		return
 	}
 
-	csrChanged := certificateCSRChanged(plan, state)
-	renewDays := plan.ManualRenewDaysBeforeExpiry
+	csrChanged := certificateCSRChanged(plan, state) || (hasCSRValue(plan.CSR) && privateFlagSet(ctx, private, certificateCSRDriftKey))
+	renewDays := plan.ManualRenewOnApplyWithinDays
 	renewDaysSet := !renewDays.IsNull() && !renewDays.IsUnknown()
 	if !csrChanged && !renewDaysSet {
 		return
@@ -416,9 +443,9 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 	if renewDaysSet {
 		if lifetimeDays, ok := certificateLifetimeDays(plan, state); ok && float64(renewDays.ValueInt64()) >= lifetimeDays {
 			resp.Diagnostics.AddAttributeError(
-				path.Root("manual_renew_days_before_expiry"),
+				path.Root("manual_renew_on_apply_within_days"),
 				"Renewal window too large",
-				fmt.Sprintf("manual_renew_days_before_expiry (%d) must be smaller than the certificate lifetime (%.0f days), otherwise every apply renews the certificate again.", renewDays.ValueInt64(), lifetimeDays),
+				fmt.Sprintf("manual_renew_on_apply_within_days (%d) must be smaller than the certificate lifetime (%.0f days), otherwise every apply renews the certificate again.", renewDays.ValueInt64(), lifetimeDays),
 			)
 			return
 		}
@@ -462,7 +489,7 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 		}
 		resp.Diagnostics.AddWarning(
 			"Certificate can no longer be renewed",
-			fmt.Sprintf("Certificate %s is revoked, expired, or already renewed by a certificate that is revoked, deleted or not readable by this identity, so manual_renew_days_before_expiry has no effect on this resource. Create a new infisical_cert_manager_certificate resource to get a valid certificate.", state.Id.ValueString()),
+			fmt.Sprintf("Certificate %s is revoked, expired, or already renewed by a certificate that is revoked, deleted or not readable by this identity, so manual_renew_on_apply_within_days has no effect on this resource. Create a new infisical_cert_manager_certificate resource to get a valid certificate.", state.Id.ValueString()),
 		)
 		return
 	}
@@ -471,9 +498,17 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 		if !certificateRenewalDue(plan, state) {
 			return
 		}
+		if config.CSR.IsNull() && privateFlagSet(ctx, private, certificateKeyNotReusableKey) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("csr"),
+				"Certificate cannot be renewed without its CSR",
+				csrKeyNotReusableDetail(state.Id.ValueString()),
+			)
+			return
+		}
 		resp.Diagnostics.AddWarning(
 			"Certificate will be renewed",
-			fmt.Sprintf("Certificate %s expires at %s, which is within manual_renew_days_before_expiry (%d days). It will be renewed in place on apply.", state.Id.ValueString(), state.NotAfter.ValueString(), renewDays.ValueInt64()),
+			fmt.Sprintf("Certificate %s expires at %s, which is within manual_renew_on_apply_within_days (%d days). It will be renewed in place on apply.", state.Id.ValueString(), state.NotAfter.ValueString(), renewDays.ValueInt64()),
 		)
 	}
 
@@ -486,17 +521,21 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 	plan.Certificate = types.StringUnknown()
 	plan.CertificateChain = types.StringUnknown()
 	plan.PrivateKey = types.StringUnknown()
+	if config.KeyAlgorithm.IsNull() {
+		plan.KeyAlgorithm = types.StringUnknown()
+	}
+	if config.SignatureAlgorithm.IsNull() {
+		plan.SignatureAlgorithm = types.StringUnknown()
+	}
 
 	if csrChanged {
 		subjectStrings := map[*types.String]types.String{
-			&plan.CommonName:         config.CommonName,
-			&plan.Organization:       config.Organization,
-			&plan.OU:                 config.OU,
-			&plan.Country:            config.Country,
-			&plan.Province:           config.Province,
-			&plan.Locality:           config.Locality,
-			&plan.KeyAlgorithm:       config.KeyAlgorithm,
-			&plan.SignatureAlgorithm: config.SignatureAlgorithm,
+			&plan.CommonName:   config.CommonName,
+			&plan.Organization: config.Organization,
+			&plan.OU:           config.OU,
+			&plan.Country:      config.Country,
+			&plan.Province:     config.Province,
+			&plan.Locality:     config.Locality,
 		}
 		for planValue, configValue := range subjectStrings {
 			if configValue.IsNull() {
@@ -540,12 +579,19 @@ func (r *certManagerCertificateResource) keepCertificateWhileRenewalPending(ctx 
 	resp.Diagnostics.AddWarning("Certificate renewal still pending", detail)
 }
 
-func (r *certManagerCertificateResource) certificateHasInternalCa(certificateId string) bool {
-	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateId})
-	return err == nil && certResponse.Certificate.CaType != nil && *certResponse.Certificate.CaType == certificateCaTypeInternal
+func csrKeyNotReusableDetail(certificateId string) string {
+	return fmt.Sprintf("Certificate %s was issued from a CSR by a CA that cannot reuse its key, so renewing it without csr would generate a new private key in Infisical that no longer matches yours. Set csr to the CSR of your key to renew it.", certificateId)
 }
 
-func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, plan, state certManagerCertificateResourceModel, issuedFromCSR bool, pending pendingRenewal, resuming bool, resp *resource.UpdateResponse) {
+func (r *certManagerCertificateResource) certificateHasInternalCa(certificateId string) (bool, error) {
+	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateId})
+	if err != nil {
+		return false, err
+	}
+	return certResponse.Certificate.CaType != nil && *certResponse.Certificate.CaType == certificateCaTypeInternal, nil
+}
+
+func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, plan, state certManagerCertificateResourceModel, issuedFromCSR, drifted bool, pending pendingRenewal, resuming bool, resp *resource.UpdateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
 			"Unable to renew certificate",
@@ -556,8 +602,20 @@ func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, p
 
 	isCSRCertificate := hasCSRValue(plan.CSR)
 	renewRequest := infisical.RenewCertificateRequest{CertificateId: state.Id.ValueString()}
-	csrChanged := isCSRCertificate && certificateCSRChanged(plan, state)
-	if (isCSRCertificate || issuedFromCSR) && !csrChanged && r.certificateHasInternalCa(state.Id.ValueString()) {
+	csrChanged := isCSRCertificate && (certificateCSRChanged(plan, state) || drifted)
+	internalCa := false
+	if (isCSRCertificate || issuedFromCSR) && !csrChanged {
+		var err error
+		if internalCa, err = r.certificateHasInternalCa(state.Id.ValueString()); err != nil {
+			resp.Diagnostics.AddError("Error renewing certificate", fmt.Sprintf("Failed to read certificate %s before renewing it: %v", state.Id.ValueString(), err))
+			return
+		}
+	}
+	if issuedFromCSR && !isCSRCertificate && !internalCa {
+		resp.Diagnostics.AddAttributeError(path.Root("csr"), "Certificate cannot be renewed without its CSR", csrKeyNotReusableDetail(state.Id.ValueString()))
+		return
+	}
+	if internalCa {
 		renewRequest.RenewalKeySource = certificateRenewalKeySourceReuse
 	} else if isCSRCertificate {
 		renewRequest.RenewalKeySource = certificateRenewalKeySourceCSR
@@ -612,6 +670,9 @@ func (r *certManagerCertificateResource) renewCertificate(ctx context.Context, p
 
 	if resuming && resp.Private != nil {
 		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificatePendingRenewalKey, nil)...)
+	}
+	if drifted && resp.Private != nil {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateCSRDriftKey, nil)...)
 	}
 
 	var bundleErr error

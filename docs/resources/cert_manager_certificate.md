@@ -4,17 +4,17 @@ page_title: "infisical_cert_manager_certificate Resource - terraform-provider-in
 subcategory: "Certificate Management"
 description: |-
   Request and manage certificates from Infisical certificate profiles, either from a CSR or from subject fields. The resource polls until the certificate is issued or timeout_seconds is reached. Only Machine Identity authentication is supported.
-  manual_renew_days_before_expiry renews the certificate in place on terraform apply once it is close to expiry, and changing csr renews it in place with the new CSR. Renewal only runs when you apply, so apply regularly or use the profile's auto-renewal instead. The previous certificate stays valid until it expires.
-  revoke_on_destroy and delete_on_destroy act when the resource is destroyed or replaced, using the values from the last apply. With revoke_on_destroy, add lifecycle { create_before_destroy = true } so the replacement exists before the old certificate is revoked.
+  manual_renew_on_apply_within_days renews the certificate in place when you run terraform apply close to its expiry. Terraform only checks this during an apply, so if nobody applies before the certificate expires, it expires and can no longer be renewed this way; you then have to replace it with terraform apply -replace. Only use it if you apply on a schedule that runs more often than the renewal window. Otherwise, turn on auto_renew in the api_config of infisical_cert_manager_application_profile and Infisical renews the certificate for you. Changing csr also renews the certificate in place with the new CSR. The previous certificate stays valid until it expires.
+  revoke_on_destroy and delete_on_destroy act when the resource is destroyed or replaced, using the values from the last apply. delete_on_destroy does not revoke, so set both to revoke and then delete. With revoke_on_destroy, add lifecycle { create_before_destroy = true } so the replacement exists before the old certificate is revoked.
 ---
 
 # infisical_cert_manager_certificate (Resource)
 
 Request and manage certificates from Infisical certificate profiles, either from a CSR or from subject fields. The resource polls until the certificate is issued or `timeout_seconds` is reached. Only Machine Identity authentication is supported.
 
-`manual_renew_days_before_expiry` renews the certificate in place on `terraform apply` once it is close to expiry, and changing `csr` renews it in place with the new CSR. Renewal only runs when you apply, so apply regularly or use the profile's auto-renewal instead. The previous certificate stays valid until it expires.
+`manual_renew_on_apply_within_days` renews the certificate in place when you run `terraform apply` close to its expiry. Terraform only checks this during an apply, so if nobody applies before the certificate expires, it expires and can no longer be renewed this way; you then have to replace it with `terraform apply -replace`. Only use it if you apply on a schedule that runs more often than the renewal window. Otherwise, turn on `auto_renew` in the `api_config` of `infisical_cert_manager_application_profile` and Infisical renews the certificate for you. Changing `csr` also renews the certificate in place with the new CSR. The previous certificate stays valid until it expires.
 
-`revoke_on_destroy` and `delete_on_destroy` act when the resource is destroyed or replaced, using the values from the last apply. With `revoke_on_destroy`, add `lifecycle { create_before_destroy = true }` so the replacement exists before the old certificate is revoked.
+`revoke_on_destroy` and `delete_on_destroy` act when the resource is destroyed or replaced, using the values from the last apply. `delete_on_destroy` does not revoke, so set both to revoke and then delete. With `revoke_on_destroy`, add `lifecycle { create_before_destroy = true }` so the replacement exists before the old certificate is revoked.
 
 ## Example Usage
 
@@ -96,7 +96,7 @@ resource "infisical_cert_manager_certificate" "api_csr_renewed" {
   csr = file("./my-certificate.csr")
   ttl = "90d"
 
-  manual_renew_days_before_expiry = 30
+  manual_renew_on_apply_within_days = 30
 }
 
 resource "infisical_cert_manager_certificate" "api_revoked_on_destroy" {
@@ -152,18 +152,18 @@ output "cert_private_key" {
 - `common_name` (String) The common name (CN) for the certificate. Required when not using CSR
 - `country` (String) The country (C) for the certificate (2-letter code)
 - `csr` (String) Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file("./my-certificate.csr")). Changing the CSR renews the certificate in place with the new CSR. Adding or removing the CSR replaces the certificate.
-- `delete_on_destroy` (Boolean) Delete the certificate, and every other renewal of it, when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.
+- `delete_on_destroy` (Boolean) Delete the certificate when the resource is destroyed or replaced. Every renewal creates a new certificate in Infisical and this resource follows all of them, so earlier and later renewals are deleted too and none are left behind in the inventory. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.
 - `domain_components` (List of String) Domain components (DC) for the certificate. Multi-valued; each entry becomes a DC attribute in the subject.
 - `extended_key_usages` (List of String) Extended key usages for the certificate. Supported: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
 - `key_algorithm` (String) The key algorithm for the certificate. Supported: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
 - `key_usages` (List of String) Key usages for the certificate. Supported: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
 - `locality` (String) The locality (L) for the certificate
-- `manual_renew_days_before_expiry` (Number) Renew the certificate in place on `terraform apply` once it has fewer than this many days left before expiry. Must be at least 1 and smaller than the certificate lifetime. Renewal only happens when an apply runs. Not set by default.
+- `manual_renew_on_apply_within_days` (Number) Renew the certificate in place on `terraform apply` once it has fewer than this many days left before expiry. Nothing renews it between applies: if no apply runs before the certificate expires, it can no longer be renewed this way and has to be replaced. Only use it if you apply regularly; otherwise use `auto_renew` on the application profile. Must be at least 1 and smaller than the certificate lifetime. Not set by default.
 - `organization` (String) The organization (O) for the certificate
 - `ou` (String) The organizational unit (OU) for the certificate
 - `province` (String) The state/province (ST) for the certificate
 - `revocation_reason_on_destroy` (String) The reason sent when the certificate is revoked on destroy, used with `revoke_on_destroy`. Supported: unspecified, key_compromise, ca_compromise, affiliation_changed, superseded, cessation_of_operation, certificate_hold, privilege_withdrawn, aa_compromise. Defaults to unspecified.
-- `revoke_on_destroy` (Boolean) Revoke the certificate, and every other renewal of it that is still valid, when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.
+- `revoke_on_destroy` (Boolean) Revoke the certificate when the resource is destroyed or replaced. Every renewal creates a new certificate in Infisical and this resource follows all of them, so earlier and later renewals that are still valid are revoked too. Uses the value from the last apply; if the certificate was deleted in Infisical, apply the new value before destroying. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.
 - `signature_algorithm` (String) The signature algorithm for the certificate. Supported: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
 - `timeout_seconds` (Number) Maximum time to wait for certificate issuance in seconds. Defaults to 3600 (1 hour)
 - `ttl` (String) Time to live for the certificate (e.g., '30d', '90d', '1y').

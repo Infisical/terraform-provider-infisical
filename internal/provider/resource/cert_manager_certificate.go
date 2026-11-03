@@ -98,37 +98,37 @@ type certManagerCertificateResource struct {
 }
 
 type certManagerCertificateResourceModel struct {
-	ProfileId                   types.String `tfsdk:"profile_id"`
-	ApplicationId               types.String `tfsdk:"application_id"`
-	CSR                         types.String `tfsdk:"csr"`
-	CommonName                  types.String `tfsdk:"common_name"`
-	AltNames                    types.List   `tfsdk:"alt_names"`
-	Organization                types.String `tfsdk:"organization"`
-	OU                          types.String `tfsdk:"ou"`
-	Country                     types.String `tfsdk:"country"`
-	Province                    types.String `tfsdk:"province"`
-	Locality                    types.String `tfsdk:"locality"`
-	DomainComponents            types.List   `tfsdk:"domain_components"`
-	KeyAlgorithm                types.String `tfsdk:"key_algorithm"`
-	SignatureAlgorithm          types.String `tfsdk:"signature_algorithm"`
-	KeyUsages                   types.List   `tfsdk:"key_usages"`
-	ExtendedKeyUsages           types.List   `tfsdk:"extended_key_usages"`
-	TTL                         types.String `tfsdk:"ttl"`
-	TimeoutSeconds              types.Int64  `tfsdk:"timeout_seconds"`
-	ManualRenewDaysBeforeExpiry types.Int64  `tfsdk:"manual_renew_days_before_expiry"`
-	RevokeOnDestroy             types.Bool   `tfsdk:"revoke_on_destroy"`
-	RevocationReason            types.String `tfsdk:"revocation_reason_on_destroy"`
-	DeleteOnDestroy             types.Bool   `tfsdk:"delete_on_destroy"`
-	Id                          types.String `tfsdk:"id"`
-	OrderId                     types.String `tfsdk:"order_id"`
-	CertificateRequestId        types.String `tfsdk:"certificate_request_id"`
-	Status                      types.String `tfsdk:"status"`
-	SerialNumber                types.String `tfsdk:"serial_number"`
-	NotBefore                   types.String `tfsdk:"not_before"`
-	NotAfter                    types.String `tfsdk:"not_after"`
-	Certificate                 types.String `tfsdk:"certificate"`
-	PrivateKey                  types.String `tfsdk:"private_key"`
-	CertificateChain            types.String `tfsdk:"certificate_chain"`
+	ProfileId                    types.String `tfsdk:"profile_id"`
+	ApplicationId                types.String `tfsdk:"application_id"`
+	CSR                          types.String `tfsdk:"csr"`
+	CommonName                   types.String `tfsdk:"common_name"`
+	AltNames                     types.List   `tfsdk:"alt_names"`
+	Organization                 types.String `tfsdk:"organization"`
+	OU                           types.String `tfsdk:"ou"`
+	Country                      types.String `tfsdk:"country"`
+	Province                     types.String `tfsdk:"province"`
+	Locality                     types.String `tfsdk:"locality"`
+	DomainComponents             types.List   `tfsdk:"domain_components"`
+	KeyAlgorithm                 types.String `tfsdk:"key_algorithm"`
+	SignatureAlgorithm           types.String `tfsdk:"signature_algorithm"`
+	KeyUsages                    types.List   `tfsdk:"key_usages"`
+	ExtendedKeyUsages            types.List   `tfsdk:"extended_key_usages"`
+	TTL                          types.String `tfsdk:"ttl"`
+	TimeoutSeconds               types.Int64  `tfsdk:"timeout_seconds"`
+	ManualRenewOnApplyWithinDays types.Int64  `tfsdk:"manual_renew_on_apply_within_days"`
+	RevokeOnDestroy              types.Bool   `tfsdk:"revoke_on_destroy"`
+	RevocationReason             types.String `tfsdk:"revocation_reason_on_destroy"`
+	DeleteOnDestroy              types.Bool   `tfsdk:"delete_on_destroy"`
+	Id                           types.String `tfsdk:"id"`
+	OrderId                      types.String `tfsdk:"order_id"`
+	CertificateRequestId         types.String `tfsdk:"certificate_request_id"`
+	Status                       types.String `tfsdk:"status"`
+	SerialNumber                 types.String `tfsdk:"serial_number"`
+	NotBefore                    types.String `tfsdk:"not_before"`
+	NotAfter                     types.String `tfsdk:"not_after"`
+	Certificate                  types.String `tfsdk:"certificate"`
+	PrivateKey                   types.String `tfsdk:"private_key"`
+	CertificateChain             types.String `tfsdk:"certificate_chain"`
 }
 
 func (r *certManagerCertificateResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -138,8 +138,8 @@ func (r *certManagerCertificateResource) Metadata(_ context.Context, req resourc
 func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Request and manage certificates from Infisical certificate profiles, either from a CSR or from subject fields. The resource polls until the certificate is issued or `timeout_seconds` is reached. Only Machine Identity authentication is supported.\n\n" +
-			"`manual_renew_days_before_expiry` renews the certificate in place on `terraform apply` once it is close to expiry, and changing `csr` renews it in place with the new CSR. Renewal only runs when you apply, so apply regularly or use the profile's auto-renewal instead. The previous certificate stays valid until it expires.\n\n" +
-			"`revoke_on_destroy` and `delete_on_destroy` act when the resource is destroyed or replaced, using the values from the last apply. With `revoke_on_destroy`, add `lifecycle { create_before_destroy = true }` so the replacement exists before the old certificate is revoked.",
+			"`manual_renew_on_apply_within_days` renews the certificate in place when you run `terraform apply` close to its expiry. Terraform only checks this during an apply, so if nobody applies before the certificate expires, it expires and can no longer be renewed this way; you then have to replace it with `terraform apply -replace`. Only use it if you apply on a schedule that runs more often than the renewal window. Otherwise, turn on `auto_renew` in the `api_config` of `infisical_cert_manager_application_profile` and Infisical renews the certificate for you. Changing `csr` also renews the certificate in place with the new CSR. The previous certificate stays valid until it expires.\n\n" +
+			"`revoke_on_destroy` and `delete_on_destroy` act when the resource is destroyed or replaced, using the values from the last apply. `delete_on_destroy` does not revoke, so set both to revoke and then delete. With `revoke_on_destroy`, add `lifecycle { create_before_destroy = true }` so the replacement exists before the old certificate is revoked.",
 		Attributes: map[string]schema.Attribute{
 			"profile_id": schema.StringAttribute{
 				Description: "The ID of the certificate profile to use for issuance. Find it on the profile's page in Certificate Manager, or reference an `infisical_cert_manager_certificate_profile` resource.",
@@ -313,15 +313,15 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
-			"manual_renew_days_before_expiry": schema.Int64Attribute{
-				Description: "Renew the certificate in place on `terraform apply` once it has fewer than this many days left before expiry. Must be at least 1 and smaller than the certificate lifetime. Renewal only happens when an apply runs. Not set by default.",
+			"manual_renew_on_apply_within_days": schema.Int64Attribute{
+				Description: "Renew the certificate in place on `terraform apply` once it has fewer than this many days left before expiry. Nothing renews it between applies: if no apply runs before the certificate expires, it can no longer be renewed this way and has to be replaced. Only use it if you apply regularly; otherwise use `auto_renew` on the application profile. Must be at least 1 and smaller than the certificate lifetime. Not set by default.",
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
 			},
 			"revoke_on_destroy": schema.BoolAttribute{
-				Description: "Revoke the certificate, and every other renewal of it that is still valid, when the resource is destroyed or replaced. Uses the value from the last apply. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.",
+				Description: "Revoke the certificate when the resource is destroyed or replaced. Every renewal creates a new certificate in Infisical and this resource follows all of them, so earlier and later renewals that are still valid are revoked too. Uses the value from the last apply; if the certificate was deleted in Infisical, apply the new value before destroying. Certificates from Azure AD CS or Venafi TPP cannot be revoked, so destroying them fails while this is set. Self-signed certificates are skipped with a warning. Defaults to false.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -336,7 +336,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"delete_on_destroy": schema.BoolAttribute{
-				Description: "Delete the certificate, and every other renewal of it, when the resource is destroyed or replaced. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.",
+				Description: "Delete the certificate when the resource is destroyed or replaced. Every renewal creates a new certificate in Infisical and this resource follows all of them, so earlier and later renewals are deleted too and none are left behind in the inventory. Deleting does not revoke it. Set `revoke_on_destroy` as well to revoke it first. Uses the value from the last apply. Defaults to false.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -1007,6 +1007,7 @@ func (r *certManagerCertificateResource) read(ctx context.Context, req resource.
 	pendingResolved := hasPending && r.resolvePendingRenewal(ctx, cert, pending, resp)
 
 	followed := false
+	priorPrivateKey := state.PrivateKey.ValueString()
 	latestRenewalId := ""
 	if cert.LatestRenewalCertificateId != nil && *cert.LatestRenewalCertificateId != cert.Id {
 		latestRenewalId = *cert.LatestRenewalCertificateId
@@ -1027,15 +1028,35 @@ func (r *certManagerCertificateResource) read(ctx context.Context, req resource.
 		state.CSR = types.StringValue(pending.CSR)
 	}
 
+	if hasCSRValue(state.CSR) {
+		drifted := privateFlagSet(ctx, private, certificateCSRDriftKey)
+		matches := csrMatchesCertificateKey(state.CSR.ValueString(), state.Certificate.ValueString())
+		switch {
+		case !matches && (followed || drifted):
+			resp.Diagnostics.AddWarning(
+				"Certificate renewed outside Terraform with a different key",
+				fmt.Sprintf("Certificate %s was renewed outside Terraform with a key that does not match csr. The next apply renews it in place with the configured csr.", cert.Id),
+			)
+			if resp.Private != nil {
+				resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateCSRDriftKey, []byte("true"))...)
+			}
+		case matches && drifted && resp.Private != nil:
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateCSRDriftKey, nil)...)
+		}
+	}
+
+	if followed && !hasCSRValue(state.CSR) && priorPrivateKey != "" && state.PrivateKey.ValueString() == "" && cert.HasPrivateKey != nil && !*cert.HasPrivateKey {
+		resp.Diagnostics.AddWarning(
+			"Private key of certificate no longer held by Infisical",
+			fmt.Sprintf("Certificate %s was renewed outside Terraform from a CSR, so Infisical does not hold its private key and private_key is now empty. Set csr to manage it from a CSR, or renew it in Infisical with a new key pair.", cert.Id),
+		)
+	}
+
 	if cert.DeletedAt != "" {
 		if !certificateDeletedButRevocable(state, cert) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddWarning(
-			"Certificate deleted outside Terraform",
-			fmt.Sprintf("Certificate %s was deleted outside Terraform but is not revoked. Because revoke_on_destroy is set, Terraform replaces it and revokes the deleted certificate.", cert.Id),
-		)
 		state.Status = types.StringValue(certificateStatusDeleted)
 		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 		return
@@ -1051,8 +1072,16 @@ func (r *certManagerCertificateResource) read(ctx context.Context, req resource.
 		}
 	}
 
-	if !hasCSRValue(state.CSR) && cert.HasPrivateKey != nil && !*cert.HasPrivateKey && resp.Private != nil {
-		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateIssuedFromCSRKey, []byte("true"))...)
+	if !hasCSRValue(state.CSR) && cert.HasPrivateKey != nil && resp.Private != nil {
+		var issuedFromCSR, keyNotReusable []byte
+		if !*cert.HasPrivateKey {
+			issuedFromCSR = []byte("true")
+			if cert.CaType == nil || *cert.CaType != certificateCaTypeInternal {
+				keyNotReusable = []byte("true")
+			}
+		}
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateIssuedFromCSRKey, issuedFromCSR)...)
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, certificateKeyNotReusableKey, keyNotReusable)...)
 	}
 
 	state.Status = types.StringValue(cert.Status)
@@ -1187,14 +1216,15 @@ func (r *certManagerCertificateResource) update(ctx context.Context, req resourc
 		return
 	}
 
-	if !plan.Certificate.IsUnknown() || (!certificateCSRChanged(plan, state) && !certificateRenewalDue(plan, state)) {
+	drifted := hasCSRValue(plan.CSR) && privateFlagSet(ctx, private, certificateCSRDriftKey)
+	if !plan.Certificate.IsUnknown() || (!certificateCSRChanged(plan, state) && !drifted && !certificateRenewalDue(plan, state)) {
 		applyInPlaceChanges(&state, plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 		return
 	}
 
 	pending, resuming := readPendingRenewal(ctx, private)
-	r.renewCertificate(ctx, plan, state, privateFlagSet(ctx, private, certificateIssuedFromCSRKey), pending, resuming, resp)
+	r.renewCertificate(ctx, plan, state, privateFlagSet(ctx, private, certificateIssuedFromCSRKey), drifted, pending, resuming, resp)
 }
 
 func (r *certManagerCertificateResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -1208,6 +1238,17 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 		return
 	}
 
+	certificateId := state.Id.ValueString()
+
+	if pending, ok := readPendingRenewal(ctx, private); ok {
+		if err := r.client.CancelCertificateRequest(infisical.GetCertificateRequestStatusRequest{RequestId: pending.RequestId}); err != nil && err != infisical.ErrNotFound {
+			resp.Diagnostics.AddWarning(
+				"Pending renewal not cancelled",
+				fmt.Sprintf("The pending renewal request %s of certificate %s could not be cancelled: %v. If it is still issued, revoke that certificate in Infisical.", pending.RequestId, certificateId, err),
+			)
+		}
+	}
+
 	if !state.RevokeOnDestroy.ValueBool() && !state.DeleteOnDestroy.ValueBool() {
 		return
 	}
@@ -1218,17 +1259,6 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 			"Only Machine Identity authentication is supported for this operation",
 		)
 		return
-	}
-
-	certificateId := state.Id.ValueString()
-
-	if pending, ok := readPendingRenewal(ctx, private); ok {
-		if err := r.client.CancelCertificateRequest(infisical.GetCertificateRequestStatusRequest{RequestId: pending.RequestId}); err != nil && err != infisical.ErrNotFound {
-			resp.Diagnostics.AddWarning(
-				"Pending renewal not cancelled",
-				fmt.Sprintf("The pending renewal request %s of certificate %s could not be cancelled: %v. If it is still issued, revoke that certificate in Infisical.", pending.RequestId, certificateId, err),
-			)
-		}
 	}
 
 	certResponse, err := r.client.GetCertificate(infisical.GetCertificateRequest{CertificateId: certificateId, IncludeDeleted: true})

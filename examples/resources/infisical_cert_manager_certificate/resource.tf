@@ -75,7 +75,7 @@ resource "infisical_cert_manager_certificate" "api_csr_renewed" {
   csr = file("./my-certificate.csr")
   ttl = "90d"
 
-  manual_renew_days_before_expiry = 30
+  manual_renew_on_apply_within_days = 30
 }
 
 resource "infisical_cert_manager_certificate" "api_revoked_on_destroy" {

@@ -96,37 +96,37 @@ func failOnRequest(t *testing.T) http.HandlerFunc {
 
 func fieldCertModel() certManagerCertificateResourceModel {
 	return certManagerCertificateResourceModel{
-		ProfileId:                   types.StringValue("profile-1"),
-		ApplicationId:               types.StringValue("app-1"),
-		CSR:                         types.StringNull(),
-		CommonName:                  types.StringValue("api.example.com"),
-		AltNames:                    types.ListNull(types.StringType),
-		Organization:                types.StringNull(),
-		OU:                          types.StringNull(),
-		Country:                     types.StringNull(),
-		Province:                    types.StringNull(),
-		Locality:                    types.StringNull(),
-		DomainComponents:            types.ListNull(types.StringType),
-		KeyAlgorithm:                types.StringValue("RSA_2048"),
-		SignatureAlgorithm:          types.StringValue("RSA-SHA256"),
-		KeyUsages:                   types.ListNull(types.StringType),
-		ExtendedKeyUsages:           types.ListNull(types.StringType),
-		TTL:                         types.StringValue("30d"),
-		TimeoutSeconds:              types.Int64Value(3600),
-		ManualRenewDaysBeforeExpiry: types.Int64Null(),
-		RevokeOnDestroy:             types.BoolValue(false),
-		RevocationReason:            types.StringValue("unspecified"),
-		DeleteOnDestroy:             types.BoolValue(false),
-		Id:                          types.StringValue("cert-old"),
-		OrderId:                     types.StringValue("order-1"),
-		CertificateRequestId:        types.StringValue("req-old"),
-		Status:                      types.StringValue("active"),
-		SerialNumber:                types.StringValue("serial-old"),
-		NotBefore:                   types.StringValue(testCertNotBefore),
-		NotAfter:                    types.StringValue(testCertNotAfter),
-		Certificate:                 types.StringValue("CERT-OLD"),
-		PrivateKey:                  types.StringValue("KEY-OLD"),
-		CertificateChain:            types.StringValue("CHAIN-OLD"),
+		ProfileId:                    types.StringValue("profile-1"),
+		ApplicationId:                types.StringValue("app-1"),
+		CSR:                          types.StringNull(),
+		CommonName:                   types.StringValue("api.example.com"),
+		AltNames:                     types.ListNull(types.StringType),
+		Organization:                 types.StringNull(),
+		OU:                           types.StringNull(),
+		Country:                      types.StringNull(),
+		Province:                     types.StringNull(),
+		Locality:                     types.StringNull(),
+		DomainComponents:             types.ListNull(types.StringType),
+		KeyAlgorithm:                 types.StringValue("RSA_2048"),
+		SignatureAlgorithm:           types.StringValue("RSA-SHA256"),
+		KeyUsages:                    types.ListNull(types.StringType),
+		ExtendedKeyUsages:            types.ListNull(types.StringType),
+		TTL:                          types.StringValue("30d"),
+		TimeoutSeconds:               types.Int64Value(3600),
+		ManualRenewOnApplyWithinDays: types.Int64Null(),
+		RevokeOnDestroy:              types.BoolValue(false),
+		RevocationReason:             types.StringValue("unspecified"),
+		DeleteOnDestroy:              types.BoolValue(false),
+		Id:                           types.StringValue("cert-old"),
+		OrderId:                      types.StringValue("order-1"),
+		CertificateRequestId:         types.StringValue("req-old"),
+		Status:                       types.StringValue("active"),
+		SerialNumber:                 types.StringValue("serial-old"),
+		NotBefore:                    types.StringValue(testCertNotBefore),
+		NotAfter:                     types.StringValue(testCertNotAfter),
+		Certificate:                  types.StringValue("CERT-OLD"),
+		PrivateKey:                   types.StringValue("KEY-OLD"),
+		CertificateChain:             types.StringValue("CHAIN-OLD"),
 	}
 }
 
@@ -258,7 +258,7 @@ func hasWarning(resp resource.ModifyPlanResponse, summary string) bool {
 func TestCertModifyPlanCreateAndDestroyAreNoOps(t *testing.T) {
 	setTestNow(t, "2026-10-29T00:00:00Z")
 	model := fieldCertModel()
-	model.ManualRenewDaysBeforeExpiry = types.Int64Value(10)
+	model.ManualRenewOnApplyWithinDays = types.Int64Value(10)
 
 	resp, req := runModifyPlan(t, &model, nil)
 	assertPlanUnchanged(t, resp, req)
@@ -292,8 +292,8 @@ func TestCertModifyPlanRenewalWindow(t *testing.T) {
 				state.Status = types.StringValue(tt.status)
 			}
 			plan := state
-			plan.ManualRenewDaysBeforeExpiry = tt.renewDays
-			state.ManualRenewDaysBeforeExpiry = tt.renewDays
+			plan.ManualRenewOnApplyWithinDays = tt.renewDays
+			state.ManualRenewOnApplyWithinDays = tt.renewDays
 
 			resp, req := runModifyPlan(t, &plan, &state)
 			if resp.Diagnostics.HasError() {
@@ -314,6 +314,69 @@ func TestCertModifyPlanRenewalWindow(t *testing.T) {
 				t.Errorf("unexpected warnings: %v", resp.Diagnostics)
 			}
 		})
+	}
+}
+
+func TestCertModifyPlanRenewalLeavesUnconfiguredAlgorithmsUnknown(t *testing.T) {
+	setTestNow(t, "2026-10-25T00:00:00Z")
+	state := fieldCertModel()
+	state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
+	state.SignatureAlgorithm = types.StringValue("RSA_2048")
+	plan := state
+
+	for name, configured := range map[string]bool{"not_configured": false, "configured": true} {
+		t.Run(name, func(t *testing.T) {
+			config := configFromModel(plan)
+			if !configured {
+				config.KeyAlgorithm = types.StringNull()
+				config.SignatureAlgorithm = types.StringNull()
+			}
+			s := certTestSchema(t)
+			req := resource.ModifyPlanRequest{Plan: certPlan(t, s, &plan), State: certState(t, s, &state), Config: certConfig(t, s, &config)}
+			resp := resource.ModifyPlanResponse{Plan: req.Plan}
+			newCertTestResource(t, failOnRequest(t)).ModifyPlan(context.Background(), req, &resp)
+
+			planned := assertRenewalPlanned(t, resp)
+			if planned.KeyAlgorithm.IsUnknown() == configured || planned.SignatureAlgorithm.IsUnknown() == configured {
+				t.Errorf("algorithms unknown must be %t, got key %v signature %v", !configured, planned.KeyAlgorithm, planned.SignatureAlgorithm)
+			}
+		})
+	}
+}
+
+func TestCertModifyPlanDeletedCertificateSavesNewDestroySettingsFirst(t *testing.T) {
+	setTestNow(t, "2026-10-12T00:00:00Z")
+	state := fieldCertModel()
+	state.Status = types.StringValue(certificateStatusDeleted)
+	state.RevokeOnDestroy = types.BoolValue(true)
+	plan := state
+	plan.RevokeOnDestroy = types.BoolValue(false)
+
+	resp, req := runModifyPlan(t, &plan, &state)
+	assertPlanUnchanged(t, resp, req)
+	if !hasWarning(resp, "Certificate was deleted outside Terraform") || resp.Diagnostics.WarningsCount() != 1 {
+		t.Errorf("want only the warning that the new settings are saved first, got %v", resp.Diagnostics)
+	}
+
+	updateResp, got := runUpdate(t, newCertTestResource(t, failOnRequest(t)), resp.Plan, state)
+	if updateResp.Diagnostics.HasError() {
+		t.Fatal(updateResp.Diagnostics)
+	}
+	if got.RevokeOnDestroy.ValueBool() || got.Status.ValueString() != certificateStatusDeleted {
+		t.Errorf("apply must only save the new flag, got revoke_on_destroy %v status %v", got.RevokeOnDestroy, got.Status)
+	}
+
+	resp, _ = runModifyPlan(t, &got, &got)
+	if len(resp.RequiresReplace) != 1 || !resp.RequiresReplace[0].Equal(path.Root("status")) {
+		t.Errorf("once the flags are saved the deleted certificate must be replaced, RequiresReplace = %v", resp.RequiresReplace)
+	}
+
+	state.RevokeOnDestroy = types.BoolValue(true)
+	for name, planned := range map[string]*certManagerCertificateResourceModel{"replace": &state, "destroy": nil} {
+		resp, _ = runModifyPlan(t, planned, &state)
+		if !hasWarning(resp, "Certificate deleted outside Terraform") {
+			t.Errorf("%s of a deleted certificate must warn that it gets revoked, got %v", name, resp.Diagnostics)
+		}
 	}
 }
 
@@ -445,7 +508,7 @@ func TestCertUpdateFlagOnlyChangeMakesNoRequests(t *testing.T) {
 	plan.RevokeOnDestroy = types.BoolValue(true)
 	plan.RevocationReason = types.StringValue("superseded")
 	plan.DeleteOnDestroy = types.BoolValue(true)
-	plan.ManualRenewDaysBeforeExpiry = types.Int64Value(7)
+	plan.ManualRenewOnApplyWithinDays = types.Int64Value(7)
 	plan.TimeoutSeconds = types.Int64Value(60)
 	plan.Status = types.StringUnknown()
 
@@ -454,7 +517,7 @@ func TestCertUpdateFlagOnlyChangeMakesNoRequests(t *testing.T) {
 		t.Fatal(resp.Diagnostics)
 	}
 	if !got.RevokeOnDestroy.ValueBool() || !got.DeleteOnDestroy.ValueBool() || got.RevocationReason.ValueString() != "superseded" ||
-		got.ManualRenewDaysBeforeExpiry.ValueInt64() != 7 || got.TimeoutSeconds.ValueInt64() != 60 {
+		got.ManualRenewOnApplyWithinDays.ValueInt64() != 7 || got.TimeoutSeconds.ValueInt64() != 60 {
 		t.Errorf("in-place fields not applied: %+v", got)
 	}
 	if got.Id.ValueString() != "cert-old" || got.Status.ValueString() != "active" || got.Certificate.ValueString() != "CERT-OLD" {
@@ -608,7 +671,7 @@ func TestCertReadFollowsLatestRenewal(t *testing.T) {
 
 			state := fieldCertModel()
 			state.RevokeOnDestroy = types.BoolValue(true)
-			state.ManualRenewDaysBeforeExpiry = types.Int64Value(5)
+			state.ManualRenewOnApplyWithinDays = types.Int64Value(5)
 			resp := runRead(t, r, state)
 			if resp.Diagnostics.HasError() {
 				t.Fatal(resp.Diagnostics)
@@ -625,7 +688,7 @@ func TestCertReadFollowsLatestRenewal(t *testing.T) {
 				got.CertificateChain.ValueString() != "CHAIN-LATEST" || got.PrivateKey.ValueString() != wantKey || got.NotAfter.ValueString() != "2026-11-24T00:00:00Z" {
 				t.Errorf("unexpected state after following renewal: %+v", got)
 			}
-			if !got.RevokeOnDestroy.ValueBool() || got.ManualRenewDaysBeforeExpiry.ValueInt64() != 5 {
+			if !got.RevokeOnDestroy.ValueBool() || got.ManualRenewOnApplyWithinDays.ValueInt64() != 5 {
 				t.Errorf("Read must not overwrite lifecycle settings: %+v", got)
 			}
 		})
@@ -800,6 +863,179 @@ func testKeyMaterial(t *testing.T) (csrPEM, certificatePEM string) {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})), string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}))
 }
 
+func TestCertReadRenewalOutsideTerraformWithAnotherKeyRenewsBackWithTheCSR(t *testing.T) {
+	setTestNow(t, "2026-10-12T00:00:00Z")
+	configuredCSR, sameKeyCertificate := testKeyMaterial(t)
+	_, otherKeyCertificate := testKeyMaterial(t)
+	for _, tt := range []struct {
+		name        string
+		certificate string
+		wantDrift   bool
+	}{
+		{name: "renewed_with_the_same_key", certificate: sameKeyCertificate},
+		{name: "renewed_with_a_new_key", certificate: otherKeyCertificate, wantDrift: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			bundle, _ := json.Marshal(map[string]string{"certificate": tt.certificate, "certificateChain": "CHAIN", "privateKey": "UI-KEY", "serialNumber": "serial-latest"})
+			r := fakeAPI(t, nil, map[string]apiReply{
+				"GET " + certAPI + "cert-old":           reply(fmt.Sprintf(`{"certificate":{"id":"cert-old","status":"active","commonName":"api.example.com","notBefore":%q,"notAfter":%q,"renewedByCertificateId":"cert-latest","latestRenewalCertificateId":"cert-latest"}}`, testCertNotBefore, testCertNotAfter)),
+				"GET " + certAPI + "cert-latest":        reply(certDetailsJSON("cert-latest", "serial-latest")),
+				"GET " + certAPI + "cert-latest/bundle": reply(string(bundle)),
+			})
+			state := csrCertModel()
+			state.CSR = types.StringValue(configuredCSR)
+			resp := runRead(t, r, state)
+			if resp.Diagnostics.HasError() {
+				t.Fatal(resp.Diagnostics)
+			}
+			got := stateModel(t, resp.State)
+			if got.Id.ValueString() != "cert-latest" {
+				t.Fatalf("id = %q, want cert-latest", got.Id.ValueString())
+			}
+			warned := false
+			for _, d := range resp.Diagnostics.Warnings() {
+				warned = warned || d.Summary() == "Certificate renewed outside Terraform with a different key"
+			}
+			if warned != tt.wantDrift {
+				t.Fatalf("drift detected = %t, want %t", warned, tt.wantDrift)
+			}
+			if got.CSR.ValueString() != configuredCSR {
+				t.Fatalf("csr in state must stay the configured one, got %v", got.CSR)
+			}
+			if !tt.wantDrift {
+				return
+			}
+
+			s := certTestSchema(t)
+			plan := got
+			plan.CSR = types.StringValue(configuredCSR)
+			config := configFromModel(plan)
+			planReq := resource.ModifyPlanRequest{Plan: certPlan(t, s, &plan), State: certState(t, s, &got), Config: certConfig(t, s, &config)}
+			planResp := resource.ModifyPlanResponse{Plan: planReq.Plan}
+			newCertTestResource(t, failOnRequest(t)).modifyPlan(context.Background(), planReq, fakePrivateState{certificateCSRDriftKey: []byte("true")}, &planResp)
+			planned := assertRenewalPlanned(t, planResp)
+			if planned.CSR.ValueString() != configuredCSR {
+				t.Errorf("the renewal must use the configured csr, got %v", planned.CSR)
+			}
+		})
+	}
+}
+
+func TestCertUpdateRenewsBackWithTheConfiguredCSRAfterKeyDrift(t *testing.T) {
+	setTestNow(t, "2026-10-12T00:00:00Z")
+	ctx := context.Background()
+	s := certTestSchema(t)
+	state := csrCertModel()
+	plan := state
+	planReq := resource.ModifyPlanRequest{Plan: certPlan(t, s, &plan), State: certState(t, s, &state), Config: certConfig(t, s, ptr(configFromModel(plan)))}
+	planResp := resource.ModifyPlanResponse{Plan: planReq.Plan}
+	drift := fakePrivateState{certificateCSRDriftKey: []byte("true")}
+	newCertTestResource(t, failOnRequest(t)).modifyPlan(ctx, planReq, drift, &planResp)
+	assertRenewalPlanned(t, planResp)
+
+	r := fakeAPI(t, nil, map[string]apiReply{
+		"POST " + certAPI + "cert-old/renew": {body: syncRenewResponse, check: func(body map[string]interface{}) {
+			if body["renewalKeySource"] != "csr" || body["csr"] != normalizeCSR(testCSR) {
+				t.Errorf("a drifted certificate must renew from the configured csr, got %v", body)
+			}
+		}},
+		"GET " + certAPI + "cert-new": reply(certDetailsJSON("cert-new", "serial-new")),
+	})
+	priorState := certState(t, s, &state)
+	updateResp := resource.UpdateResponse{State: priorState}
+	r.update(ctx, resource.UpdateRequest{Plan: planResp.Plan, State: priorState}, drift, &updateResp)
+	if updateResp.Diagnostics.HasError() {
+		t.Fatal(updateResp.Diagnostics)
+	}
+	if got := stateModel(t, updateResp.State); got.Id.ValueString() != "cert-new" {
+		t.Errorf("id = %q, want cert-new", got.Id.ValueString())
+	}
+}
+
+func TestCertReadWarnsWhenAFollowedRenewalHasNoPrivateKey(t *testing.T) {
+	_, otherCertificate := testKeyMaterial(t)
+	r := fakeAPI(t, nil, map[string]apiReply{
+		"GET " + certAPI + "cert-old":                reply(fmt.Sprintf(`{"certificate":{"id":"cert-old","status":"active","commonName":"api.example.com","notBefore":%q,"notAfter":%q,"renewedByCertificateId":"cert-latest","latestRenewalCertificateId":"cert-latest"}}`, testCertNotBefore, testCertNotAfter)),
+		"GET " + certAPI + "cert-latest":             reply(`{"certificate":{"id":"cert-latest","status":"active","commonName":"api.example.com","serialNumber":"serial-latest","notBefore":"2026-10-25T00:00:00Z","notAfter":"2026-11-24T00:00:00Z","hasPrivateKey":false}}`),
+		"GET " + certAPI + "cert-latest/certificate": reply(fmt.Sprintf(`{"certificate":%q,"certificateChain":"CHAIN","serialNumber":"serial-latest"}`, otherCertificate)),
+	})
+	resp := runRead(t, r, fieldCertModel())
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	got := stateModel(t, resp.State)
+	if got.Id.ValueString() != "cert-latest" || got.PrivateKey.ValueString() != "" {
+		t.Fatalf("state = %s with private_key %q, want cert-latest with no key", got.Id.ValueString(), got.PrivateKey.ValueString())
+	}
+	warned := false
+	for _, d := range resp.Diagnostics.Warnings() {
+		warned = warned || d.Summary() == "Private key of certificate no longer held by Infisical"
+	}
+	if !warned {
+		t.Errorf("losing the private key must warn, got %v", resp.Diagnostics)
+	}
+}
+
+func TestCertDeleteCancelsAPendingRenewalEvenWithoutRevokeOrDelete(t *testing.T) {
+	log := &certRequestLog{}
+	r := fakeAPI(t, log, map[string]apiReply{
+		"POST " + certAPI + "certificate-requests/req-slow/cancel": reply(`{"status":"failed","cancelled":true,"errorMessage":null}`),
+	})
+	s := certTestSchema(t)
+	state := fieldCertModel()
+	priorState := certState(t, s, &state)
+	resp := resource.DeleteResponse{State: priorState}
+	value, _ := json.Marshal(pendingRenewal{RequestId: "req-slow"})
+	r.delete(context.Background(), resource.DeleteRequest{State: priorState}, fakePrivateState{certificatePendingRenewalKey: value}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	if got := strings.Join(log.all(), ","); got != "POST "+certAPI+"certificate-requests/req-slow/cancel" {
+		t.Errorf("requests = %v, want only the cancel", got)
+	}
+}
+
+func TestCertRenewalReportsAFailedCertificateReadInsteadOfAMissingCSR(t *testing.T) {
+	setTestNow(t, "2026-10-25T00:00:00Z")
+	ctx := context.Background()
+	s := certTestSchema(t)
+	state := csrCertModel()
+	state.CSR = types.StringNull()
+	state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
+	plan := state
+	planResp, _ := runModifyPlan(t, &plan, &state)
+	renewal := assertRenewalPlanned(t, planResp)
+
+	r := fakeAPI(t, nil, map[string]apiReply{"GET " + certAPI + "cert-old": {status: http.StatusInternalServerError, body: `{"message":"boom"}`}})
+	priorState := certState(t, s, &state)
+	updateResp := resource.UpdateResponse{State: priorState}
+	r.update(ctx, resource.UpdateRequest{Plan: certPlan(t, s, &renewal), State: priorState}, fakePrivateState{certificateIssuedFromCSRKey: []byte("true")}, &updateResp)
+	errs := updateResp.Diagnostics.Errors()
+	if len(errs) == 0 || errs[0].Summary() != "Error renewing certificate" || !strings.Contains(errs[0].Detail(), "before renewing") {
+		t.Fatalf("want the read error, got %v", updateResp.Diagnostics)
+	}
+}
+
+func TestCertReadClearsARejectedPendingRenewal(t *testing.T) {
+	r := fakeAPI(t, nil, map[string]apiReply{
+		"GET " + certAPI + "cert-old":                      reply(certDetailsJSON("cert-old", "serial-old")),
+		"GET " + certAPI + "certificate-requests/req-slow": reply(`{"status":"rejected","errorMessage":"denied"}`),
+	})
+	s := certTestSchema(t)
+	state := fieldCertModel()
+	priorState := certState(t, s, &state)
+	resp := resource.ReadResponse{State: priorState}
+	value, _ := json.Marshal(pendingRenewal{RequestId: "req-slow"})
+	r.read(context.Background(), resource.ReadRequest{State: priorState}, fakePrivateState{certificatePendingRenewalKey: value}, &resp)
+	warned := false
+	for _, d := range resp.Diagnostics.Warnings() {
+		warned = warned || d.Summary() == "Certificate renewal failed"
+	}
+	if !warned {
+		t.Errorf("a rejected renewal must be reported and dropped like a failed one, got %v", resp.Diagnostics)
+	}
+}
+
 func TestCertImportedCSRCertificateRenewsWhenANewKeyIsConfigured(t *testing.T) {
 	sameCSR, certificate := testKeyMaterial(t)
 	otherCSR, _ := testKeyMaterial(t)
@@ -863,7 +1099,7 @@ func TestCertModifyPlanResumesPendingRenewalWithTheSameCSR(t *testing.T) {
 func TestCertUpdateFailedRenewalKeepsThePriorState(t *testing.T) {
 	setTestNow(t, "2026-10-25T00:00:00Z")
 	state := fieldCertModel()
-	state.ManualRenewDaysBeforeExpiry = types.Int64Value(10)
+	state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
 	r := newCertTestResource(t, func(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, `{"message":"CA rejected the renewal"}`, http.StatusBadRequest)
 	})
@@ -1246,7 +1482,7 @@ func TestCertUpdateRenewal(t *testing.T) {
 				plan.CSR = types.StringValue(strings.ReplaceAll(testRotatedCSR, "\n", "\r\n") + "\n")
 			} else {
 				setTestNow(t, "2026-10-25T00:00:00Z")
-				state.ManualRenewDaysBeforeExpiry = types.Int64Value(10)
+				state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
 				plan = state
 			}
 			routes := map[string]apiReply{"POST " + certAPI + "cert-old/renew": {body: tt.renewBody, check: tt.renewCheck(t)}}
@@ -1281,7 +1517,7 @@ func TestCertUpdateRenewalStillPendingAtTimeout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			setTestNow(t, "2026-10-25T00:00:00Z")
 			state := fieldCertModel()
-			state.ManualRenewDaysBeforeExpiry = types.Int64Value(10)
+			state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
 			if tt.rotateCSR {
 				setTestNow(t, "2026-10-05T00:00:00Z")
 				state = csrCertModel()
@@ -1335,7 +1571,7 @@ func TestCertModifyPlanRenewalWindowSize(t *testing.T) {
 			state.TTL = tc.stateTTL
 			plan := state
 			plan.TTL = tc.planTTL
-			plan.ManualRenewDaysBeforeExpiry = types.Int64Value(tc.days)
+			plan.ManualRenewOnApplyWithinDays = types.Int64Value(tc.days)
 			var resp resource.ModifyPlanResponse
 			if tc.create {
 				resp, _ = runModifyPlan(t, &plan, nil)
@@ -1501,13 +1737,51 @@ func TestCertReadCopiesThePendingCSROnlyWhenTheRenewalUsesItsKey(t *testing.T) {
 	}
 }
 
+func TestCertImportedCSRCertificateFromExternalCANeedsItsCSRToRenew(t *testing.T) {
+	setTestNow(t, "2026-10-25T00:00:00Z")
+	ctx := context.Background()
+	s := certTestSchema(t)
+	state := csrCertModel()
+	state.CSR = types.StringNull()
+	state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
+	plan := state
+	config := configFromModel(plan)
+
+	planReq := resource.ModifyPlanRequest{Plan: certPlan(t, s, &plan), State: certState(t, s, &state), Config: certConfig(t, s, &config)}
+	planResp := resource.ModifyPlanResponse{Plan: planReq.Plan}
+	private := fakePrivateState{certificateIssuedFromCSRKey: []byte("true"), certificateKeyNotReusableKey: []byte("true")}
+	newCertTestResource(t, failOnRequest(t)).modifyPlan(ctx, planReq, private, &planResp)
+	if !planResp.Diagnostics.HasError() || planResp.Diagnostics.Errors()[0].Summary() != "Certificate cannot be renewed without its CSR" {
+		t.Fatalf("plan must fail before renewing with a new key, got %v", planResp.Diagnostics)
+	}
+
+	planResp = resource.ModifyPlanResponse{Plan: planReq.Plan}
+	newCertTestResource(t, failOnRequest(t)).modifyPlan(ctx, planReq, fakePrivateState{certificateIssuedFromCSRKey: []byte("true")}, &planResp)
+	renewal := assertRenewalPlanned(t, planResp)
+
+	log := &certRequestLog{}
+	r := fakeAPI(t, log, map[string]apiReply{"GET " + certAPI + "cert-old": caLookup("acme")})
+	priorState := certState(t, s, &state)
+	updateResp := resource.UpdateResponse{State: priorState}
+	r.update(ctx, resource.UpdateRequest{Plan: certPlan(t, s, &renewal), State: priorState}, fakePrivateState{certificateIssuedFromCSRKey: []byte("true")}, &updateResp)
+	if !updateResp.Diagnostics.HasError() || updateResp.Diagnostics.Errors()[0].Summary() != "Certificate cannot be renewed without its CSR" {
+		t.Fatalf("apply must refuse to renew with a new key when the plan missed it, got %v", updateResp.Diagnostics)
+	}
+	if got := strings.Join(log.all(), ","); got != "GET "+certAPI+"cert-old" {
+		t.Errorf("no renewal may be requested, requests = %v", got)
+	}
+	if got := stateModel(t, updateResp.State); got.Id.ValueString() != "cert-old" {
+		t.Errorf("state must keep the old certificate, id = %q", got.Id.ValueString())
+	}
+}
+
 func TestCertImportedCSRCertificateWithoutCSRInConfigRenewsWithReuse(t *testing.T) {
 	setTestNow(t, "2026-10-25T00:00:00Z")
 	ctx := context.Background()
 	s := certTestSchema(t)
 	state := csrCertModel()
 	state.CSR = types.StringNull()
-	state.ManualRenewDaysBeforeExpiry = types.Int64Value(10)
+	state.ManualRenewOnApplyWithinDays = types.Int64Value(10)
 	plan := state
 	config := configFromModel(plan)
 	private := fakePrivateState{certificateIssuedFromCSRKey: []byte("true")}
