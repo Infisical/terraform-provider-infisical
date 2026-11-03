@@ -952,6 +952,60 @@ func TestCertUpdateRenewsBackWithTheConfiguredCSRAfterKeyDrift(t *testing.T) {
 	}
 }
 
+func TestCertModifyPlanKeyDriftDoesNotBlockWhenCertificateCannotBeRenewed(t *testing.T) {
+	tests := []struct {
+		name   string
+		now    string
+		status string
+	}{
+		{name: "expired", now: "2026-11-02T00:00:00Z"},
+		{name: "revoked", now: "2026-10-12T00:00:00Z", status: "revoked"},
+		{name: "renewal_gone", now: "2026-10-12T00:00:00Z", status: "renewed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setTestNow(t, tt.now)
+			s := certTestSchema(t)
+			state := csrCertModel()
+			if tt.status != "" {
+				state.Status = types.StringValue(tt.status)
+			}
+			plan := state
+			plan.TimeoutSeconds = types.Int64Value(60)
+			req := resource.ModifyPlanRequest{Plan: certPlan(t, s, &plan), State: certState(t, s, &state), Config: certConfig(t, s, ptr(configFromModel(plan)))}
+			resp := resource.ModifyPlanResponse{Plan: req.Plan}
+			newCertTestResource(t, failOnRequest(t)).modifyPlan(context.Background(), req, fakePrivateState{certificateCSRDriftKey: []byte("true")}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("key drift alone must not block the plan: %v", resp.Diagnostics)
+			}
+			if !hasWarning(resp, "Certificate can no longer be renewed") {
+				t.Errorf("missing warning, got %v", resp.Diagnostics)
+			}
+			if got := planModel(t, resp.Plan); got.Certificate.IsUnknown() || got.TimeoutSeconds.ValueInt64() != 60 {
+				t.Errorf("plan must keep the certificate and apply the other change, got certificate unknown=%t timeout=%v", got.Certificate.IsUnknown(), got.TimeoutSeconds)
+			}
+		})
+	}
+}
+
+func TestCertModifyPlanKeyDriftWithPendingRenewalWithoutCSRDoesNotBlock(t *testing.T) {
+	setTestNow(t, "2026-10-12T00:00:00Z")
+	s := certTestSchema(t)
+	state := csrCertModel()
+	plan := state
+	req := resource.ModifyPlanRequest{Plan: certPlan(t, s, &plan), State: certState(t, s, &state), Config: certConfig(t, s, ptr(configFromModel(plan)))}
+	resp := resource.ModifyPlanResponse{Plan: req.Plan}
+	pending, _ := json.Marshal(pendingRenewal{RequestId: "req-1"})
+	private := fakePrivateState{certificateCSRDriftKey: []byte("true"), certificatePendingRenewalKey: pending}
+	newCertTestResource(t, failOnRequest(t)).modifyPlan(context.Background(), req, private, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("key drift with a pending renewal must not report a CSR change: %v", resp.Diagnostics)
+	}
+	if got := planModel(t, resp.Plan); got.Certificate.IsUnknown() {
+		t.Error("no second renewal may be planned while one is pending")
+	}
+}
+
 func TestCertReadWarnsWhenAFollowedRenewalHasNoPrivateKey(t *testing.T) {
 	_, otherCertificate := testKeyMaterial(t)
 	r := fakeAPI(t, nil, map[string]apiReply{

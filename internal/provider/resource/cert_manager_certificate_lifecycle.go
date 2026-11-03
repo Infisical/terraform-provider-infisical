@@ -433,7 +433,9 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 		return
 	}
 
-	csrChanged := certificateCSRChanged(plan, state) || (hasCSRValue(plan.CSR) && privateFlagSet(ctx, private, certificateCSRDriftKey))
+	csrConfigChanged := certificateCSRChanged(plan, state)
+	csrKeyDrifted := hasCSRValue(plan.CSR) && privateFlagSet(ctx, private, certificateCSRDriftKey)
+	csrChanged := csrConfigChanged || csrKeyDrifted
 	renewDays := plan.ManualRenewOnApplyWithinDays
 	renewDaysSet := !renewDays.IsNull() && !renewDays.IsUnknown()
 	if !csrChanged && !renewDaysSet {
@@ -460,7 +462,7 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 				"Certificate renewal still pending",
 				fmt.Sprintf("Certificate %s has a renewal with this CSR from a previous apply that is still pending (request %s). Applying resumes it instead of requesting a second one.", state.Id.ValueString(), pending.RequestId),
 			)
-		case csrChanged:
+		case csrConfigChanged:
 			resp.Diagnostics.AddAttributeError(
 				path.Root("csr"),
 				"Certificate renewal still pending",
@@ -479,11 +481,18 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 	}
 
 	if !resumePending && (state.Status.ValueString() == certificateStatusRevoked || state.Status.ValueString() == certificateStatusRenewed || certificateExpired(state)) {
-		if csrChanged {
+		if csrConfigChanged {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("csr"),
 				"Certificate can no longer be renewed",
 				fmt.Sprintf("Certificate %s is revoked, expired, or already renewed by a certificate that is revoked, deleted or not readable by this identity, so it cannot be renewed with the new CSR. Create a new infisical_cert_manager_certificate resource instead.", state.Id.ValueString()),
+			)
+			return
+		}
+		if csrKeyDrifted {
+			resp.Diagnostics.AddWarning(
+				"Certificate can no longer be renewed",
+				fmt.Sprintf("Certificate %s was renewed outside Terraform with a key that does not match csr, and it is now revoked, expired, or already renewed by a certificate that is revoked, deleted or not readable by this identity, so Terraform cannot renew it back to csr. Run terraform apply -replace on this resource to issue a new certificate from csr.", state.Id.ValueString()),
 			)
 			return
 		}
