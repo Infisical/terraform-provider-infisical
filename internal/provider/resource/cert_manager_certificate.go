@@ -1319,6 +1319,13 @@ func (r *certManagerCertificateResource) delete(ctx context.Context, req resourc
 				resp.Diagnostics.AddError("Error revoking certificate", fmt.Sprintf("Revoking certificate %s returned not found, but the certificate still exists. Check that its certificate authority and app connection still exist.", generation.Id))
 				return
 			}
+			if badRequestSays(err, "was not issued by the certificate authority behind its profile") {
+				resp.Diagnostics.AddWarning(
+					"Certificate not revoked",
+					fmt.Sprintf("Certificate %s was not issued by the certificate authority behind its profile, so Infisical cannot revoke it. Revoke it with the authority that issued it.", generation.Id),
+				)
+				continue
+			}
 			permanent := badRequestSays(err, "not supported by this certificate authority type") || badRequestSays(err, "because it was imported and then deleted")
 			if permanent && generation.DeletedAt != "" {
 				resp.Diagnostics.AddWarning(

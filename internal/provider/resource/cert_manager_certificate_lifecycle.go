@@ -482,11 +482,11 @@ func (r *certManagerCertificateResource) modifyPlan(ctx context.Context, req res
 
 	if !resumePending && (state.Status.ValueString() == certificateStatusRevoked || state.Status.ValueString() == certificateStatusRenewed || certificateExpired(state)) {
 		if csrConfigChanged {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("csr"),
-				"Certificate can no longer be renewed",
-				fmt.Sprintf("Certificate %s is revoked, expired, or already renewed by a certificate that is revoked, deleted or not readable by this identity, so it cannot be renewed with the new CSR. Create a new infisical_cert_manager_certificate resource instead.", state.Id.ValueString()),
+			resp.Diagnostics.AddWarning(
+				"Certificate will be replaced",
+				fmt.Sprintf("Certificate %s is revoked, expired, or already renewed by a certificate that is revoked, deleted or not readable by this identity, so it cannot be renewed with the new CSR. Terraform replaces it with a new certificate issued from the new CSR.", state.Id.ValueString()),
 			)
+			resp.RequiresReplace = append(resp.RequiresReplace, path.Root("csr"))
 			return
 		}
 		if csrKeyDrifted {

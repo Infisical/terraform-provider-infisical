@@ -436,19 +436,6 @@ func TestCertModifyPlanRemovingCSRReplaces(t *testing.T) {
 	}
 }
 
-func TestCertModifyPlanCSRChangeOnRevokedCertificateFails(t *testing.T) {
-	setTestNow(t, "2026-10-05T00:00:00Z")
-	state := csrCertModel()
-	state.Status = types.StringValue("revoked")
-	plan := state
-	plan.CSR = types.StringValue(testRotatedCSR)
-
-	resp, _ := runModifyPlan(t, &plan, &state)
-	if !resp.Diagnostics.HasError() {
-		t.Fatal("expected an error for a CSR change on a revoked certificate")
-	}
-}
-
 func TestCertCSRReplacementOnlyWhenIssuanceModeChanges(t *testing.T) {
 	ctx := context.Background()
 	s := certTestSchema(t)
@@ -983,6 +970,39 @@ func TestCertModifyPlanKeyDriftDoesNotBlockWhenCertificateCannotBeRenewed(t *tes
 			}
 			if got := planModel(t, resp.Plan); got.Certificate.IsUnknown() || got.TimeoutSeconds.ValueInt64() != 60 {
 				t.Errorf("plan must keep the certificate and apply the other change, got certificate unknown=%t timeout=%v", got.Certificate.IsUnknown(), got.TimeoutSeconds)
+			}
+		})
+	}
+}
+
+func TestCertModifyPlanCSRChangeOnUnrenewableCertificatePlansReplacement(t *testing.T) {
+	tests := []struct {
+		name   string
+		now    string
+		status string
+	}{
+		{name: "expired", now: "2026-11-02T00:00:00Z"},
+		{name: "revoked", now: "2026-10-12T00:00:00Z", status: "revoked"},
+		{name: "renewal_gone", now: "2026-10-12T00:00:00Z", status: "renewed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setTestNow(t, tt.now)
+			state := csrCertModel()
+			if tt.status != "" {
+				state.Status = types.StringValue(tt.status)
+			}
+			plan := state
+			plan.CSR = types.StringValue(testRotatedCSR)
+			resp, _ := runModifyPlan(t, &plan, &state)
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("a new csr on a certificate that cannot be renewed must not block the plan: %v", resp.Diagnostics)
+			}
+			if len(resp.RequiresReplace) != 1 || !resp.RequiresReplace[0].Equal(path.Root("csr")) {
+				t.Errorf("RequiresReplace = %v, want csr", resp.RequiresReplace)
+			}
+			if !hasWarning(resp, "Certificate will be replaced") {
+				t.Errorf("missing warning, got %v", resp.Diagnostics)
 			}
 		})
 	}
@@ -1983,6 +2003,39 @@ func TestCertDeleteRevokeErrorsOnDeletedCertificates(t *testing.T) {
 		resp := runDelete(t, r, state)
 		if resp.Diagnostics.HasError() != tc.wantError || resp.Diagnostics.WarningsCount() != tc.wantWarnings {
 			t.Errorf("revoke HTTP %d %q on a deleted certificate: diagnostics = %v, want error %t and %d warnings", tc.status, tc.message, resp.Diagnostics, tc.wantError, tc.wantWarnings)
+		}
+	}
+}
+
+func TestCertDeleteWarnsWhenTheProfileCADidNotIssueTheCertificate(t *testing.T) {
+	setTestNow(t, "2026-10-05T00:00:00Z")
+	for _, tc := range []struct {
+		status    int
+		message   string
+		wantError bool
+	}{
+		{http.StatusBadRequest, "This certificate was not issued by the certificate authority behind its profile, so revoking it here would have no effect.", false},
+		{http.StatusInternalServerError, "Something went wrong", true},
+	} {
+		deleted := false
+		r := fakeAPI(t, nil, map[string]apiReply{
+			"GET " + certAPI + "cert-old":         reply(`{"certificate":{"id":"cert-old","status":"active","caId":"ca-1","notAfter":"2026-10-31T00:00:00Z"}}`),
+			"POST " + certAPI + "cert-old/revoke": {status: tc.status, body: fmt.Sprintf(`{"message":%q}`, tc.message)},
+			"DELETE " + certAPI + "cert-old":      {body: `{}`, check: func(map[string]interface{}) { deleted = true }},
+		})
+		state := fieldCertModel()
+		state.RevokeOnDestroy = types.BoolValue(true)
+		state.DeleteOnDestroy = types.BoolValue(true)
+		resp := runDelete(t, r, state)
+		if resp.Diagnostics.HasError() != tc.wantError {
+			t.Errorf("revoke HTTP %d %q: diagnostics = %v, want error %t", tc.status, tc.message, resp.Diagnostics, tc.wantError)
+		}
+		warned := false
+		for _, d := range resp.Diagnostics.Warnings() {
+			warned = warned || d.Summary() == "Certificate not revoked"
+		}
+		if !tc.wantError && (!warned || !deleted) {
+			t.Errorf("a certificate from another CA must warn and still be deleted, got deleted=%t %v", deleted, resp.Diagnostics)
 		}
 	}
 }
