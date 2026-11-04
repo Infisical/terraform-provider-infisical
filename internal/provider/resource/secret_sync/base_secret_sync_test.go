@@ -11,6 +11,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
+func asSecretSyncBaseResource(t *testing.T, r resource.Resource) *SecretSyncBaseResource {
+	t.Helper()
+	base, ok := r.(*SecretSyncBaseResource)
+	if !ok {
+		t.Fatalf("expected *SecretSyncBaseResource, got %T", r)
+	}
+	return base
+}
+
+func asObjectType(t *testing.T, typ tftypes.Type) tftypes.Object {
+	t.Helper()
+	obj, ok := typ.(tftypes.Object)
+	if !ok {
+		t.Fatalf("expected tftypes.Object, got %T", typ)
+	}
+	return obj
+}
+
 // secretSyncTestConfig builds a raw config for the given sync with every attribute null except the
 // sync_options attributes passed in.
 func secretSyncTestConfig(t *testing.T, r *SecretSyncBaseResource, syncOptions map[string]tftypes.Value) tfsdk.Config {
@@ -23,8 +41,8 @@ func secretSyncTestConfig(t *testing.T, r *SecretSyncBaseResource, syncOptions m
 		t.Fatal(schemaResp.Diagnostics)
 	}
 
-	rootType := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
-	syncOptionsType := rootType.AttributeTypes["sync_options"].(tftypes.Object)
+	rootType := asObjectType(t, schemaResp.Schema.Type().TerraformType(ctx))
+	syncOptionsType := asObjectType(t, rootType.AttributeTypes["sync_options"])
 
 	syncOptionsVals := map[string]tftypes.Value{}
 	for name, attrType := range syncOptionsType.AttributeTypes {
@@ -48,7 +66,6 @@ func TestSecretSyncValidateConfigIncludeAllSubFolders(t *testing.T) {
 	subFolders := func(v bool) tftypes.Value { return tftypes.NewValue(tftypes.Bool, v) }
 
 	for name, tc := range map[string]struct {
-		resource             *SecretSyncBaseResource
 		includeAllSubFolders tftypes.Value
 		initialSyncBehavior  tftypes.Value
 		wantError            bool
@@ -61,7 +78,7 @@ func TestSecretSyncValidateConfigIncludeAllSubFolders(t *testing.T) {
 		"subfolders with unknown behavior": {includeAllSubFolders: subFolders(true), initialSyncBehavior: tftypes.NewValue(tftypes.String, tftypes.UnknownValue)},
 	} {
 		t.Run(name, func(t *testing.T) {
-			r := NewSecretSyncAwsSecretsManagerResource().(*SecretSyncBaseResource)
+			r := asSecretSyncBaseResource(t, NewSecretSyncAwsSecretsManagerResource())
 			config := secretSyncTestConfig(t, r, map[string]tftypes.Value{
 				"include_all_sub_folders": tc.includeAllSubFolders,
 				"initial_sync_behavior":   tc.initialSyncBehavior,
@@ -85,7 +102,7 @@ func TestSecretSyncValidateConfigIncludeAllSubFolders(t *testing.T) {
 
 // Spacelift has include_all_sub_folders but no initial_sync_behavior, since it always overwrites.
 func TestSecretSyncValidateConfigSkipsSyncsWithoutInitialSyncBehavior(t *testing.T) {
-	r := NewSecretSyncSpaceliftResource().(*SecretSyncBaseResource)
+	r := asSecretSyncBaseResource(t, NewSecretSyncSpaceliftResource())
 	config := secretSyncTestConfig(t, r, map[string]tftypes.Value{
 		"include_all_sub_folders": tftypes.NewValue(tftypes.Bool, true),
 	})
@@ -101,10 +118,10 @@ func TestSecretSyncValidateConfigSkipsSyncsWithoutInitialSyncBehavior(t *testing
 // A null sync_options block must not make ValidateConfig fail on the nested lookups.
 func TestSecretSyncValidateConfigNullSyncOptions(t *testing.T) {
 	ctx := context.Background()
-	r := NewSecretSyncAwsSecretsManagerResource().(*SecretSyncBaseResource)
+	r := asSecretSyncBaseResource(t, NewSecretSyncAwsSecretsManagerResource())
 	config := secretSyncTestConfig(t, r, nil)
 
-	rootType := config.Raw.Type().(tftypes.Object)
+	rootType := asObjectType(t, config.Raw.Type())
 	rootVals := map[string]tftypes.Value{}
 	for name, attrType := range rootType.AttributeTypes {
 		rootVals[name] = tftypes.NewValue(attrType, nil)
