@@ -33,6 +33,7 @@ type SecretSyncAwsSecretsManagerSyncOptionsModel struct {
 	SyncSecretMetadataAsTags types.Bool   `tfsdk:"sync_secret_metadata_as_tags"`
 	KeySchema                types.String `tfsdk:"key_schema"`
 	Tags                     types.Set    `tfsdk:"tags"`
+	IncludeAllSubFolders     types.Bool   `tfsdk:"include_all_sub_folders"`
 }
 
 func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
@@ -83,6 +84,12 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 				Optional:    true,
 				Description: "The format to use for structuring secret keys in the AWS Secrets Manager destination.",
 			},
+			"include_all_sub_folders": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.",
+				Default:     booldefault.StaticBool(false),
+			},
 			"tags": schema.SetNestedAttribute{
 				Optional:    true,
 				Description: "The tags to sync to the secret",
@@ -114,6 +121,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
+			syncOptionsMap["includeAllSubFolders"] = syncOptions.IncludeAllSubFolders.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
 				syncOptionsMap["keyId"] = syncOptions.KeyID.ValueString()
@@ -192,6 +200,9 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 
 			syncOptionsMap["sync_secret_metadata_as_tags"] = types.BoolValue(syncSecretMetadataAsTags)
 
+			includeAllSubFolders, _ := secretSync.SyncOptions["includeAllSubFolders"].(bool)
+			syncOptionsMap["include_all_sub_folders"] = types.BoolValue(includeAllSubFolders)
+
 			if secretSync.SyncOptions["tags"] != nil {
 				rawTags, ok := secretSync.SyncOptions["tags"].([]interface{})
 				if !ok {
@@ -261,6 +272,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 				"key_schema":                   types.StringType,
 				"aws_kms_key_id":               types.StringType,
 				"sync_secret_metadata_as_tags": types.BoolType,
+				"include_all_sub_folders":      types.BoolType,
 				"tags": types.SetType{
 					ElemType: types.ObjectType{
 						AttrTypes: map[string]attr.Type{
@@ -285,6 +297,7 @@ func NewSecretSyncAwsSecretsManagerResource() resource.Resource {
 			syncOptionsMap["disableSecretDeletion"] = syncOptions.DisableSecretDeletion.ValueBool()
 			syncOptionsMap["syncSecretMetadataAsTags"] = syncOptions.SyncSecretMetadataAsTags.ValueBool()
 			syncOptionsMap["keySchema"] = syncOptions.KeySchema.ValueString()
+			syncOptionsMap["includeAllSubFolders"] = syncOptions.IncludeAllSubFolders.ValueBool()
 
 			if syncOptions.KeyID.ValueString() != "" {
 				syncOptionsMap["keyId"] = syncOptions.KeyID.ValueString()
