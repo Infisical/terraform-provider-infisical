@@ -147,7 +147,7 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"template_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt`, `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead: a connection setting the configuration leaves out is cleared, and the plan shows it. To unlink and keep the template's settings, set them here to the template's values (for example from the `infisical_identity_kubernetes_auth_template` data source); an unlink that changes nothing else then only needs the `unlink-templates` permission on auth templates, or `edit-auth` on the identity. A token reviewer JWT copied from the template is kept unless `token_reviewer_jwt` is set to a new value, or to `\"\"` to remove it.",
+				Description: "The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt` (or `token_reviewer_jwt_wo` and `token_reviewer_jwt_wo_version`), `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead: a connection setting the configuration leaves out is cleared, and the plan shows it. To unlink and keep the template's settings, set them here to the template's values (for example from the `infisical_identity_kubernetes_auth_template` data source); an unlink that changes nothing else then only needs the `unlink-templates` permission on auth templates, or `edit-auth` on the identity. A token reviewer JWT copied from the template is kept unless `token_reviewer_jwt` or `token_reviewer_jwt_wo` supplies a new one, or `token_reviewer_jwt` is set to `\"\"` to remove it.",
 				Validators: []validator.String{
 					infisicaltf.UuidValidator,
 					stringvalidator.ConflictsWith(
@@ -172,7 +172,7 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 				PlanModifiers:       []planmodifier.String{clearWhenUnlinking{}},
 			},
 			"has_template_sourced_token_reviewer_jwt": schema.BoolAttribute{
-				Description: "Whether this identity holds a token reviewer JWT copied from an auth template. That JWT is write-only and reads back as empty, so this is the only sign it is there. It is kept after `template_id` is removed unless `token_reviewer_jwt` replaces it, or is set to `\"\"` to remove it.",
+				Description: "Whether this identity holds a token reviewer JWT copied from an auth template. That JWT is write-only and reads back as empty, so this is the only sign it is there. It is kept after `template_id` is removed unless `token_reviewer_jwt` or `token_reviewer_jwt_wo` replaces it, or `token_reviewer_jwt` is set to `\"\"` to remove it.",
 				Computed:    true,
 			},
 			"has_token_reviewer_jwt": schema.BoolAttribute{
