@@ -55,9 +55,9 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-1" {
 }
 
 
-# Using a write-only token reviewer JWT (Terraform 1.11+), kept out of plan and state.
-# To rotate it, supply the new JWT and increment token_reviewer_jwt_wo_version: the next apply
-# updates the auth method in place, so access tokens already issued stay valid.
+# Write-only token reviewer JWT (Terraform 1.11+), never stored in plan or state.
+# To rotate, pass the new JWT and bump token_reviewer_jwt_wo_version. It updates in place,
+# so issued access tokens keep working.
 variable "token_reviewer_jwt" {
   type      = string
   sensitive = true

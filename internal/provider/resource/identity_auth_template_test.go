@@ -466,7 +466,7 @@ func TestKubernetesAuthUnlinksOnly(t *testing.T) {
 		}), false},
 		"JWT replaced":                  {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.TokenReviewerJWT = types.StringValue("eyJ.new") }), false},
 		"JWT removed with empty string": {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.TokenReviewerJWT = types.StringValue("") }), false},
-		// A write-only JWT is null in the plan; its version is what shows it is configured.
+		// Write-only JWT is null in the plan, so the version is what flags it.
 		"write-only JWT set": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
 			p.TokenReviewerJWTWOVersion = types.Int64Value(1)
 		}), false},

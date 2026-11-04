@@ -206,8 +206,7 @@ type IdentityKubernetesAuth struct {
 	AllowedServiceAccountNames string                  `json:"allowedNames"`
 	AllowedAudience            string                  `json:"allowedAudience"`
 	CACERT                     string                  `json:"caCert"`
-	// Always "": the reviewer JWT is write-only. HasTokenReviewerJwt says whether one is stored.
-	TokenReviewerJwt    string  `json:"tokenReviewerJwt"`
+	// The JWT itself never comes back, only whether one is stored.
 	HasTokenReviewerJwt bool    `json:"hasTokenReviewerJwt"`
 	TokenReviewerMode   string  `json:"tokenReviewMode"`
 	GatewayID           string  `json:"gatewayId"`

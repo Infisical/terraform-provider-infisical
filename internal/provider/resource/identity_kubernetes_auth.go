@@ -41,7 +41,7 @@ type IdentityKubernetesAuthResourceModel struct {
 	KubernetesHost   types.String                   `tfsdk:"kubernetes_host"`
 	CaCertificate    customtypes.TrimmedStringValue `tfsdk:"kubernetes_ca_certificate"`
 	TokenReviewerJWT types.String                   `tfsdk:"token_reviewer_jwt"`
-	// Always null in plan and state: the framework keeps write-only values out of both.
+	// Write-only, so always null here. Read it from the config.
 	TokenReviewerJWTWO         types.String `tfsdk:"token_reviewer_jwt_wo"`
 	TokenReviewerJWTWOVersion  types.Int64  `tfsdk:"token_reviewer_jwt_wo_version"`
 	AllowedServiceAccountNames types.List   `tfsdk:"allowed_service_account_names"`
@@ -366,7 +366,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 	} else if tokenReviewerMode == TOKEN_REVIEWER_MODE_API {
-		// The token reviewer JWT is optional. if set to nothing, the auth method will act as self-reviewer.
+		// JWT is optional. Without one, the auth method reviews tokens itself.
 
 		if strings.TrimSpace(plan.KubernetesHost.ValueString()) == "" {
 			diagnose.AddError(
@@ -384,8 +384,8 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 	}
 }
 
-// configuredTokenReviewerJwt returns the JWT the configuration supplies, from token_reviewer_jwt or
-// token_reviewer_jwt_wo, or null when it supplies none. A write-only value is only in the config.
+// configuredTokenReviewerJwt returns token_reviewer_jwt, or token_reviewer_jwt_wo from the config
+// since write-only values never make it into the plan.
 func configuredTokenReviewerJwt(ctx context.Context, diagnostics *diag.Diagnostics, config tfsdk.Config, plan *IdentityKubernetesAuthResourceModel) types.String {
 	if !plan.TokenReviewerJWT.IsNull() {
 		return plan.TokenReviewerJWT
@@ -585,14 +585,13 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 			AllowedNames:            strings.Join(allowedNames, ","),
 		})
 	} else {
-		// The configured JWT is sent on every update, not only when it changes: the API never returns
-		// it, and rejects a connection change (host, gateway, CA, TLS) that does not resupply it.
+		// Always send the JWT, not just when it changes: the API never returns it and rejects
+		// connection changes (host, gateway, CA, TLS) without it.
 		tokenReviewerJwt := configuredTokenReviewerJwt(ctx, &resp.Diagnostics, req.Config, &plan)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		// An unset JWT keeps one copied from a template: leaving it out of the configuration
-		// cannot mean "remove it", since the configuration never held it. "" removes it.
+		// No JWT in config keeps one copied from a template, since the config never had it. "" removes it.
 		keepTemplateJwt := tokenReviewerJwt.IsNull() && state.HasTemplateSourcedTokenReviewerJWT.ValueBool()
 		updatedIdentityKubernetesAuth, err = r.updateCustomKubernetesAuth(&resp.Diagnostics, &plan, tokenReviewerJwt, accessTokenTrustedIps, allowedNamespacpes, allowedNames, keepTemplateJwt)
 		if resp.Diagnostics.HasError() {
@@ -635,7 +634,7 @@ func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics 
 		gatewayID = &gId
 	}
 
-	// Null (and "") is sent as null, which removes the stored JWT.
+	// "" goes out as null too, which removes the stored JWT.
 	var tokenReviewerJwt *string = nil
 	if !configuredJwt.IsNull() && !configuredJwt.IsUnknown() && configuredJwt.ValueString() != "" {
 		reviewerJwt := configuredJwt.ValueString()
@@ -670,8 +669,7 @@ func kubernetesAuthUnlinksOnly(plan, state IdentityKubernetesAuthResourceModel) 
 		return false
 	}
 
-	// A configured JWT replaces the stored one and "" removes it; both are edits. A write-only JWT
-	// is null in the plan, but its version, which must be set alongside it, is not.
+	// Any JWT in config (even "") is an edit. Write-only ones are null in the plan, so check the version.
 	if !plan.TokenReviewerJWT.IsNull() || !plan.TokenReviewerJWTWOVersion.IsNull() {
 		return false
 	}
