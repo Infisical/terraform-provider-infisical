@@ -29,6 +29,8 @@ type IdentityGcpAuthResource struct {
 	client *infisical.Client
 }
 
+var _ resource.ResourceWithImportState = &IdentityGcpAuthResource{}
+
 // IdentityGcpAuthResourceSourceModel describes the data source data model.
 type IdentityGcpAuthResourceModel struct {
 	ID                          types.String `tfsdk:"id"`
@@ -346,6 +348,40 @@ func (r *IdentityGcpAuthResource) Update(ctx context.Context, req resource.Updat
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// ImportState imports an existing auth configuration by its identity ID.
+func (r *IdentityGcpAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity gcp auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	identityAuth, err := r.client.GetIdentityGcpAuth(infisical.GetIdentityGcpAuthRequest{IdentityID: req.ID})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity gcp auth not found",
+				"The identity with the given ID does not have gcp auth configured",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity gcp auth",
+				"Couldn't read identity gcp auth from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	var state IdentityGcpAuthResourceModel
+	state.ID = types.StringValue(identityAuth.ID)
+	state.IdentityID = types.StringValue(req.ID)
+	state.Type = types.StringValue(identityAuth.Type)
+	updateGcpAuthStateByApi(ctx, resp.Diagnostics, &state, &identityAuth)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
