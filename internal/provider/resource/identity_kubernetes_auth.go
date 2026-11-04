@@ -10,6 +10,7 @@ import (
 	infisicalstrings "terraform-provider-infisical/internal/pkg/strings"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -34,24 +36,28 @@ type IdentityKubernetesAuthResource struct {
 
 // IdentityKubernetesAuthResourceSourceModel describes the data source data model.
 type IdentityKubernetesAuthResourceModel struct {
-	ID                         types.String                   `tfsdk:"id"`
-	IdentityID                 types.String                   `tfsdk:"identity_id"`
-	KubernetesHost             types.String                   `tfsdk:"kubernetes_host"`
-	CaCertificate              customtypes.TrimmedStringValue `tfsdk:"kubernetes_ca_certificate"`
-	TokenReviewerJWT           types.String                   `tfsdk:"token_reviewer_jwt"`
-	AllowedServiceAccountNames types.List                     `tfsdk:"allowed_service_account_names"`
-	AllowedAudience            types.String                   `tfsdk:"allowed_audience"`
-	AllowedNamespaces          types.List                     `tfsdk:"allowed_namespaces"`
-	AccessTokenTTL             types.Int64                    `tfsdk:"access_token_ttl"`
-	AccessTokenMaxTTL          types.Int64                    `tfsdk:"access_token_max_ttl"`
-	AccessTokenNumUsesLimit    types.Int64                    `tfsdk:"access_token_num_uses_limit"`
-	AccessTokenTrustedIps      types.List                     `tfsdk:"access_token_trusted_ips"`
+	ID               types.String                   `tfsdk:"id"`
+	IdentityID       types.String                   `tfsdk:"identity_id"`
+	KubernetesHost   types.String                   `tfsdk:"kubernetes_host"`
+	CaCertificate    customtypes.TrimmedStringValue `tfsdk:"kubernetes_ca_certificate"`
+	TokenReviewerJWT types.String                   `tfsdk:"token_reviewer_jwt"`
+	// Always null in plan and state: the framework keeps write-only values out of both.
+	TokenReviewerJWTWO         types.String `tfsdk:"token_reviewer_jwt_wo"`
+	TokenReviewerJWTWOVersion  types.Int64  `tfsdk:"token_reviewer_jwt_wo_version"`
+	AllowedServiceAccountNames types.List   `tfsdk:"allowed_service_account_names"`
+	AllowedAudience            types.String `tfsdk:"allowed_audience"`
+	AllowedNamespaces          types.List   `tfsdk:"allowed_namespaces"`
+	AccessTokenTTL             types.Int64  `tfsdk:"access_token_ttl"`
+	AccessTokenMaxTTL          types.Int64  `tfsdk:"access_token_max_ttl"`
+	AccessTokenNumUsesLimit    types.Int64  `tfsdk:"access_token_num_uses_limit"`
+	AccessTokenTrustedIps      types.List   `tfsdk:"access_token_trusted_ips"`
 
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	TokenReviewerMode types.String `tfsdk:"token_reviewer_mode"` // api|gateway (default is api)
 	TemplateID        types.String `tfsdk:"template_id"`
 
 	HasTemplateSourcedTokenReviewerJWT types.Bool `tfsdk:"has_template_sourced_token_reviewer_jwt"`
+	HasTokenReviewerJWT                types.Bool `tfsdk:"has_token_reviewer_jwt"`
 }
 
 type IdentityKubernetesAuthResourceTrustedIps struct {
@@ -93,8 +99,33 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"token_reviewer_jwt": schema.StringAttribute{
 				Description:         "A long-lived service account JWT token for Infisical to access the TokenReview API to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5.",
-				MarkdownDescription: "A long-lived service account JWT token for Infisical to access the [TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5.",
+				MarkdownDescription: "A long-lived service account JWT token for Infisical to access the [TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5. Infisical never returns it, so a change made outside Terraform is not detected; prefer `token_reviewer_jwt_wo`, which also keeps the JWT out of state. Set it to `\"\"`, or leave both unset, to remove the stored JWT.",
 				Optional:            true,
+				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(
+						path.MatchRoot("token_reviewer_jwt_wo"),
+						path.MatchRoot("token_reviewer_jwt_wo_version"),
+					),
+				},
+			},
+			"token_reviewer_jwt_wo": schema.StringAttribute{
+				Description:         "The token reviewer JWT as a write-only value: it is sent to Infisical but never stored in the plan or state. It is sent on every update, so it must stay set for as long as the JWT should be kept. Changing it alone is not detected, so increment `token_reviewer_jwt_wo_version` to rotate it. Requires Terraform 1.11.0 or higher.",
+				MarkdownDescription: "The token reviewer JWT as a [write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) value: it is sent to Infisical but never stored in the plan or state. It is sent on every update, so it must stay set for as long as the JWT should be kept. Changing it alone is not detected, so increment `token_reviewer_jwt_wo_version` to rotate it. Requires Terraform 1.11.0 or higher.",
+				Optional:            true,
+				Sensitive:           true,
+				WriteOnly:           true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("token_reviewer_jwt_wo_version")),
+				},
+			},
+			"token_reviewer_jwt_wo_version": schema.Int64Attribute{
+				Description: "Used with `token_reviewer_jwt_wo` to roll out a new JWT. Increment it whenever `token_reviewer_jwt_wo` changes, and the next apply sends the new JWT in an update; the auth method is not recreated and issued access tokens stay valid.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AlsoRequires(path.MatchRoot("token_reviewer_jwt_wo")),
+				},
 			},
 
 			// Computed so a linked template can supply it.
@@ -123,6 +154,8 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 						path.MatchRoot("kubernetes_host"),
 						path.MatchRoot("kubernetes_ca_certificate"),
 						path.MatchRoot("token_reviewer_jwt"),
+						path.MatchRoot("token_reviewer_jwt_wo"),
+						path.MatchRoot("token_reviewer_jwt_wo_version"),
 						path.MatchRoot("token_reviewer_mode"),
 						path.MatchRoot("gateway_id"),
 						path.MatchRoot("allowed_audience"),
@@ -140,6 +173,10 @@ func (r *IdentityKubernetesAuthResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"has_template_sourced_token_reviewer_jwt": schema.BoolAttribute{
 				Description: "Whether this identity holds a token reviewer JWT copied from an auth template. That JWT is write-only and reads back as empty, so this is the only sign it is there. It is kept after `template_id` is removed unless `token_reviewer_jwt` replaces it, or is set to `\"\"` to remove it.",
+				Computed:    true,
+			},
+			"has_token_reviewer_jwt": schema.BoolAttribute{
+				Description: "Whether Infisical holds a token reviewer JWT for this identity. The JWT itself is write-only and never read back.",
 				Computed:    true,
 			},
 			"allowed_service_account_names": schema.ListAttribute{
@@ -244,6 +281,7 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 		}
 	}
 	plan.HasTemplateSourcedTokenReviewerJWT = types.BoolValue(newIdentityKubernetesAuth.IsTokenReviewerJwtTemplateSourced)
+	plan.HasTokenReviewerJWT = types.BoolValue(newIdentityKubernetesAuth.HasTokenReviewerJwt)
 
 	planAccessTokenTrustedIps := make([]IdentityKubernetesAuthResourceTrustedIps, len(newIdentityKubernetesAuth.AccessTokenTrustedIPS))
 	for i, el := range newIdentityKubernetesAuth.AccessTokenTrustedIPS {
@@ -283,7 +321,7 @@ func updateKubernetesAuthStateByApi(ctx context.Context, diagnose diag.Diagnosti
 	plan.AccessTokenTrustedIps = stateAccessTokenTrustedIps
 }
 
-func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel) {
+func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, tokenReviewerJwt types.String) {
 
 	if plan == nil {
 		diagnose.AddError(
@@ -320,7 +358,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 
-		if strings.TrimSpace(plan.TokenReviewerJWT.ValueString()) != "" {
+		if strings.TrimSpace(tokenReviewerJwt.ValueString()) != "" {
 			diagnose.AddError(
 				"Cannot set Token reviewer JWT",
 				"Token reviewer JWT is not allowed when token reviewer mode is gateway. Please remove the Token reviewer JWT.",
@@ -328,7 +366,7 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 			return
 		}
 	} else if tokenReviewerMode == TOKEN_REVIEWER_MODE_API {
-		// plan.TokenReviewerJWT is optional. if set to nothing, the auth method will act as self-reviewer.
+		// The token reviewer JWT is optional. if set to nothing, the auth method will act as self-reviewer.
 
 		if strings.TrimSpace(plan.KubernetesHost.ValueString()) == "" {
 			diagnose.AddError(
@@ -344,6 +382,18 @@ func validateTokenReviewerMode(diagnose *diag.Diagnostics, plan *IdentityKuberne
 		)
 		return
 	}
+}
+
+// configuredTokenReviewerJwt returns the JWT the configuration supplies, from token_reviewer_jwt or
+// token_reviewer_jwt_wo, or null when it supplies none. A write-only value is only in the config.
+func configuredTokenReviewerJwt(ctx context.Context, diagnostics *diag.Diagnostics, config tfsdk.Config, plan *IdentityKubernetesAuthResourceModel) types.String {
+	if !plan.TokenReviewerJWT.IsNull() {
+		return plan.TokenReviewerJWT
+	}
+
+	var writeOnlyJwt types.String
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("token_reviewer_jwt_wo"), &writeOnlyJwt)...)
+	return writeOnlyJwt
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -382,7 +432,11 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 			AllowedNames:            strings.Join(allowedNames, ","),
 		})
 	} else {
-		newIdentityKubernetesAuth, err = r.createCustomKubernetesAuth(&resp.Diagnostics, &plan, accessTokenTrustedIps, allowedNamespacpes, allowedNames)
+		tokenReviewerJwt := configuredTokenReviewerJwt(ctx, &resp.Diagnostics, req.Config, &plan)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		newIdentityKubernetesAuth, err = r.createCustomKubernetesAuth(&resp.Diagnostics, &plan, tokenReviewerJwt, accessTokenTrustedIps, allowedNamespacpes, allowedNames)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -406,8 +460,8 @@ func (r *IdentityKubernetesAuthResource) Create(ctx context.Context, req resourc
 
 }
 
-func (r *IdentityKubernetesAuthResource) createCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string) (infisical.IdentityKubernetesAuth, error) {
-	validateTokenReviewerMode(diagnostics, plan)
+func (r *IdentityKubernetesAuthResource) createCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, tokenReviewerJwt types.String, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string) (infisical.IdentityKubernetesAuth, error) {
+	validateTokenReviewerMode(diagnostics, plan, tokenReviewerJwt)
 	if diagnostics.HasError() {
 		return infisical.IdentityKubernetesAuth{}, nil
 	}
@@ -434,7 +488,7 @@ func (r *IdentityKubernetesAuthResource) createCustomKubernetesAuth(diagnostics 
 		AccessTokenTrustedIPS:   accessTokenTrustedIps,
 		KubernetesHost:          kubernetesHost,
 		CACERT:                  plan.CaCertificate.ValueString(),
-		TokenReviewerJwt:        plan.TokenReviewerJWT.ValueString(),
+		TokenReviewerJwt:        tokenReviewerJwt.ValueString(),
 		AllowedNamespaces:       strings.Join(allowedNamespacpes, ","),
 		AllowedNames:            strings.Join(allowedNames, ","),
 		AllowedAudience:         plan.AllowedAudience.ValueString(),
@@ -531,10 +585,16 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 			AllowedNames:            strings.Join(allowedNames, ","),
 		})
 	} else {
-		// An unset JWT keeps one copied from a template: it reads back
-		// as empty, so leaving it out of the configuration cannot mean "remove it". "" removes it.
-		keepTemplateJwt := plan.TokenReviewerJWT.IsNull() && state.HasTemplateSourcedTokenReviewerJWT.ValueBool()
-		updatedIdentityKubernetesAuth, err = r.updateCustomKubernetesAuth(&resp.Diagnostics, &plan, accessTokenTrustedIps, allowedNamespacpes, allowedNames, keepTemplateJwt)
+		// The configured JWT is sent on every update, not only when it changes: the API never returns
+		// it, and rejects a connection change (host, gateway, CA, TLS) that does not resupply it.
+		tokenReviewerJwt := configuredTokenReviewerJwt(ctx, &resp.Diagnostics, req.Config, &plan)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		// An unset JWT keeps one copied from a template: leaving it out of the configuration
+		// cannot mean "remove it", since the configuration never held it. "" removes it.
+		keepTemplateJwt := tokenReviewerJwt.IsNull() && state.HasTemplateSourcedTokenReviewerJWT.ValueBool()
+		updatedIdentityKubernetesAuth, err = r.updateCustomKubernetesAuth(&resp.Diagnostics, &plan, tokenReviewerJwt, accessTokenTrustedIps, allowedNamespacpes, allowedNames, keepTemplateJwt)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -557,8 +617,8 @@ func (r *IdentityKubernetesAuthResource) Update(ctx context.Context, req resourc
 	}
 }
 
-func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string, keepTokenReviewerJwt bool) (infisical.IdentityKubernetesAuth, error) {
-	validateTokenReviewerMode(diagnostics, plan)
+func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics *diag.Diagnostics, plan *IdentityKubernetesAuthResourceModel, configuredJwt types.String, accessTokenTrustedIps []infisical.IdentityAuthTrustedIpRequest, allowedNamespacpes []string, allowedNames []string, keepTokenReviewerJwt bool) (infisical.IdentityKubernetesAuth, error) {
+	validateTokenReviewerMode(diagnostics, plan, configuredJwt)
 	if diagnostics.HasError() {
 		return infisical.IdentityKubernetesAuth{}, nil
 	}
@@ -575,9 +635,10 @@ func (r *IdentityKubernetesAuthResource) updateCustomKubernetesAuth(diagnostics 
 		gatewayID = &gId
 	}
 
+	// Null (and "") is sent as null, which removes the stored JWT.
 	var tokenReviewerJwt *string = nil
-	if !plan.TokenReviewerJWT.IsNull() && !plan.TokenReviewerJWT.IsUnknown() && plan.TokenReviewerJWT.ValueString() != "" {
-		reviewerJwt := plan.TokenReviewerJWT.ValueString()
+	if !configuredJwt.IsNull() && !configuredJwt.IsUnknown() && configuredJwt.ValueString() != "" {
+		reviewerJwt := configuredJwt.ValueString()
 		tokenReviewerJwt = &reviewerJwt
 	}
 
@@ -609,8 +670,9 @@ func kubernetesAuthUnlinksOnly(plan, state IdentityKubernetesAuthResourceModel) 
 		return false
 	}
 
-	// A configured JWT replaces the stored one and "" removes it; both are edits.
-	if !plan.TokenReviewerJWT.IsNull() {
+	// A configured JWT replaces the stored one and "" removes it; both are edits. A write-only JWT
+	// is null in the plan, but its version, which must be set alongside it, is not.
+	if !plan.TokenReviewerJWT.IsNull() || !plan.TokenReviewerJWTWOVersion.IsNull() {
 		return false
 	}
 

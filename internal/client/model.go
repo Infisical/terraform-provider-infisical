@@ -206,10 +206,12 @@ type IdentityKubernetesAuth struct {
 	AllowedServiceAccountNames string                  `json:"allowedNames"`
 	AllowedAudience            string                  `json:"allowedAudience"`
 	CACERT                     string                  `json:"caCert"`
-	TokenReviewerJwt           string                  `json:"tokenReviewerJwt"`
-	TokenReviewerMode          string                  `json:"tokenReviewMode"`
-	GatewayID                  string                  `json:"gatewayId"`
-	TemplateID                 *string                 `json:"templateId"`
+	// Always "": the reviewer JWT is write-only. HasTokenReviewerJwt says whether one is stored.
+	TokenReviewerJwt    string  `json:"tokenReviewerJwt"`
+	HasTokenReviewerJwt bool    `json:"hasTokenReviewerJwt"`
+	TokenReviewerMode   string  `json:"tokenReviewMode"`
+	GatewayID           string  `json:"gatewayId"`
+	TemplateID          *string `json:"templateId"`
 	// A JWT copied from a linked template reads back as "", so this is the only sign one is stored.
 	IsTokenReviewerJwtTemplateSourced bool `json:"isTokenReviewerJwtTemplateSourced"`
 }

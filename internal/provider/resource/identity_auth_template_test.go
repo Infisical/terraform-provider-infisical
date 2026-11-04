@@ -466,7 +466,11 @@ func TestKubernetesAuthUnlinksOnly(t *testing.T) {
 		}), false},
 		"JWT replaced":                  {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.TokenReviewerJWT = types.StringValue("eyJ.new") }), false},
 		"JWT removed with empty string": {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.TokenReviewerJWT = types.StringValue("") }), false},
-		"TTL changed":                   {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.AccessTokenTTL = types.Int64Value(60) }), false},
+		// A write-only JWT is null in the plan; its version is what shows it is configured.
+		"write-only JWT set": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
+			p.TokenReviewerJWTWOVersion = types.Int64Value(1)
+		}), false},
+		"TTL changed": {unlinked(func(p *IdentityKubernetesAuthResourceModel) { p.AccessTokenTTL = types.Int64Value(60) }), false},
 		// An unknown allowlist is sent as empty, which clears the entries state holds.
 		"namespaces unknown": {unlinked(func(p *IdentityKubernetesAuthResourceModel) {
 			p.AllowedNamespaces = types.ListUnknown(types.StringType)
