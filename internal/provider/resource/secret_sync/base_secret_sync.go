@@ -203,34 +203,6 @@ func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.Mo
 	}
 }
 
-// ValidateConfig rejects including subfolders together with an import initial sync behavior, which the
-// API refuses for every destination. It only applies to syncs that expose both attributes; destinations
-// without initial_sync_behavior always overwrite, so they can include subfolders freely.
-func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	if _, ok := r.SyncOptionsAttributes["include_all_sub_folders"]; !ok {
-		return
-	}
-	if _, ok := r.SyncOptionsAttributes["initial_sync_behavior"]; !ok {
-		return
-	}
-
-	var includeAllSubFolders types.Bool
-	var initialSyncBehavior types.String
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options").AtName("include_all_sub_folders"), &includeAllSubFolders)...)
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options").AtName("initial_sync_behavior"), &initialSyncBehavior)...)
-	if resp.Diagnostics.HasError() || !includeAllSubFolders.ValueBool() || initialSyncBehavior.IsNull() || initialSyncBehavior.IsUnknown() {
-		return
-	}
-
-	if initialSyncBehavior.ValueString() != string(infisical.SecretSyncBehaviorOverwriteDestination) {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("sync_options").AtName("include_all_sub_folders"),
-			"Invalid include_all_sub_folders",
-			"include_all_sub_folders can only be enabled when initial_sync_behavior is 'overwrite-destination', because there is no single folder to import existing destination secrets into.",
-		)
-	}
-}
-
 // addOverwriteDestinationWarnings adds warnings when using overwrite destination initial sync behavior.
 func (r *SecretSyncBaseResource) addOverwriteDestinationWarnings(ctx context.Context, plan SecretSyncBaseResourceModel, resp *resource.ModifyPlanResponse) {
 	syncOptions, diags := r.ReadSyncOptionsForCreateFromPlan(ctx, plan)
