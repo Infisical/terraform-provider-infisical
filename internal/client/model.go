@@ -567,6 +567,7 @@ type GetRawSecretsV3Request struct {
 	WorkspaceId            string `json:"workspaceId"`
 	SecretPath             string `json:"secretPath"`
 	ExpandSecretReferences bool   `json:"expandSecretReferences"`
+	IncludeImports         bool   `json:"include_imports"`
 }
 
 type CreateRawSecretsV3Response struct {
@@ -603,7 +604,15 @@ type RawV3Secret struct {
 }
 
 type GetRawSecretsV3Response struct {
-	Secrets []RawV3Secret `json:"secrets"`
+	Secrets []RawV3Secret         `json:"secrets"`
+	Imports []ImportedRawSecretV3 `json:"imports"`
+}
+
+type ImportedRawSecretV3 struct {
+	SecretPath  string        `json:"secretPath"`
+	Environment string        `json:"environment"`
+	FolderId    string        `json:"folderId"`
+	Secrets     []RawV3Secret `json:"secrets"`
 }
 
 type GetSingleRawSecretByNameSecretResponse struct {
