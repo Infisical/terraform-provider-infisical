@@ -44,7 +44,6 @@ resource "infisical_secret_sync_aws_secrets_manager" "aws-secrets-manager-secret
     initial_sync_behavior        = "overwrite-destination", # Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
     aws_kms_key_id               = "<aws-kms-key-id>",
     sync_secret_metadata_as_tags = false,
-    include_all_sub_folders      = false, # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
     tags = [
       {
         key   = "tag-1"
@@ -111,7 +110,6 @@ Optional:
 
 - `aws_kms_key_id` (String) The AWS KMS key ID to use for encryption
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from AWS Secrets Manager. Enable this option if you intend to manage some secrets manually outside of Infisical.
-- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
 - `key_schema` (String) The format to use for structuring secret keys in the AWS Secrets Manager destination.
 - `sync_secret_metadata_as_tags` (Boolean) Whether to sync the secret metadata as tags. This is only supported for the 'one-to-one' mapping behavior.
 - `tags` (Attributes Set) The tags to sync to the secret (see [below for nested schema](#nestedatt--sync_options--tags))

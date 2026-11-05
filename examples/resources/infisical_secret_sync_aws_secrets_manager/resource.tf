@@ -29,7 +29,6 @@ resource "infisical_secret_sync_aws_secrets_manager" "aws-secrets-manager-secret
     initial_sync_behavior        = "overwrite-destination", # Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
     aws_kms_key_id               = "<aws-kms-key-id>",
     sync_secret_metadata_as_tags = false,
-    include_all_sub_folders      = false, # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
     tags = [
       {
         key   = "tag-1"
