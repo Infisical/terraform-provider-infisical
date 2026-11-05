@@ -55,6 +55,35 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-1" {
 }
 
 
+# Write-only token reviewer JWT (Terraform 1.11+), never stored in plan or state.
+# To rotate, pass the new JWT and bump token_reviewer_jwt_wo_version. It updates in place,
+# so issued access tokens keep working.
+variable "token_reviewer_jwt" {
+  type      = string
+  sensitive = true
+  ephemeral = true
+}
+
+resource "infisical_identity" "machine-identity-demo-wo" {
+  name   = "machine-identity-demo-wo"
+  role   = "admin"
+  org_id = "<your-org-id>"
+}
+
+resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-wo" {
+  identity_id                   = infisical_identity.machine-identity-demo-wo.id
+  kubernetes_host               = "http://<your-kubernetes-host>"
+  token_reviewer_jwt_wo         = var.token_reviewer_jwt
+  token_reviewer_jwt_wo_version = 1
+  kubernetes_ca_certificate     = "<your-kubernetes-ca-certificate>"
+
+  allowed_namespaces            = ["infisical-ns"]
+  allowed_service_account_names = ["infisical-sa"]
+
+  token_reviewer_mode = "api"
+}
+
+
 # Using gateway as token reviewer mode
 resource "infisical_identity" "machine-identity-demo-2" {
   name   = "machine-identity-demo-2"
@@ -112,13 +141,16 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-3" {
 - `gateway_id` (String) Select a gateway for private cluster access. If not specified, the Internet Gateway will be used.
 - `kubernetes_ca_certificate` (String) The PEM-encoded CA cert for the Kubernetes API server. This is used by the TLS client for secure communication with the Kubernetes API server.
 - `kubernetes_host` (String) The host string, host:port pair, or URL to the base of the Kubernetes API server. This can usually be obtained by running `kubectl cluster-info`.
-- `template_id` (String) The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt`, `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead: a connection setting the configuration leaves out is cleared, and the plan shows it. To unlink and keep the template's settings, set them here to the template's values (for example from the `infisical_identity_kubernetes_auth_template` data source); an unlink that changes nothing else then only needs the `unlink-templates` permission on auth templates, or `edit-auth` on the identity. A token reviewer JWT copied from the template is kept unless `token_reviewer_jwt` is set to a new value, or to `""` to remove it.
-- `token_reviewer_jwt` (String) A long-lived service account JWT token for Infisical to access the [TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5.
+- `template_id` (String) The ID of an `infisical_identity_kubernetes_auth_template` to take the Kubernetes connection settings from. When set, `kubernetes_host`, `kubernetes_ca_certificate`, `token_reviewer_jwt` (or `token_reviewer_jwt_wo` and `token_reviewer_jwt_wo_version`), `token_reviewer_mode`, `gateway_id` and `allowed_audience` come from the template and must not be set here, and later edits to the template propagate to this identity. Removing it unlinks the template and applies the settings in this configuration instead: a connection setting the configuration leaves out is cleared, and the plan shows it. To unlink and keep the template's settings, set them here to the template's values (for example from the `infisical_identity_kubernetes_auth_template` data source); an unlink that changes nothing else then only needs the `unlink-templates` permission on auth templates, or `edit-auth` on the identity. A token reviewer JWT copied from the template is kept unless `token_reviewer_jwt` or `token_reviewer_jwt_wo` supplies a new one, or `token_reviewer_jwt` is set to `""` to remove it.
+- `token_reviewer_jwt` (String, Sensitive) A long-lived service account JWT token for Infisical to access the [TokenReview API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-review-v1/) to validate other service account JWT tokens submitted by applications/pods. This is the JWT token obtained from step 1.5. Infisical never returns it, so a change made outside Terraform is not detected; prefer `token_reviewer_jwt_wo`, which also keeps the JWT out of state. Set it to `""`, or leave both unset, to remove the stored JWT.
+- `token_reviewer_jwt_wo` (String, Sensitive) The token reviewer JWT as a [write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) value: it is sent to Infisical but never stored in the plan or state. It is sent on every update, so it must stay set for as long as the JWT should be kept. Changing it alone is not detected, so increment `token_reviewer_jwt_wo_version` to rotate it. Requires Terraform 1.11.0 or higher.
+- `token_reviewer_jwt_wo_version` (Number) Used with `token_reviewer_jwt_wo` to roll out a new JWT. Increment it whenever `token_reviewer_jwt_wo` changes, and the next apply sends the new JWT in an update; the auth method is not recreated and issued access tokens stay valid.
 - `token_reviewer_mode` (String) Choose between Token ('api') or 'gateway' authentication. If using Gateway, the Gateway must be deployed in your Kubernetes cluster. Defaults to `api`, or to the linked template's mode when `template_id` is set.
 
 ### Read-Only
 
-- `has_template_sourced_token_reviewer_jwt` (Boolean) Whether this identity holds a token reviewer JWT copied from an auth template. That JWT is write-only and reads back as empty, so this is the only sign it is there. It is kept after `template_id` is removed unless `token_reviewer_jwt` replaces it, or is set to `""` to remove it.
+- `has_template_sourced_token_reviewer_jwt` (Boolean) Whether this identity holds a token reviewer JWT copied from an auth template. That JWT is write-only and reads back as empty, so this is the only sign it is there. It is kept after `template_id` is removed unless `token_reviewer_jwt` or `token_reviewer_jwt_wo` replaces it, or `token_reviewer_jwt` is set to `""` to remove it.
+- `has_token_reviewer_jwt` (Boolean) Whether Infisical holds a token reviewer JWT for this identity. The JWT itself is write-only and never read back.
 - `id` (String) The ID of the kubernetes auth
 
 <a id="nestedatt--access_token_trusted_ips"></a>

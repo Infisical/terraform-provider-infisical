@@ -40,6 +40,35 @@ resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-1" {
 }
 
 
+# Write-only token reviewer JWT (Terraform 1.11+), never stored in plan or state.
+# To rotate, pass the new JWT and bump token_reviewer_jwt_wo_version. It updates in place,
+# so issued access tokens keep working.
+variable "token_reviewer_jwt" {
+  type      = string
+  sensitive = true
+  ephemeral = true
+}
+
+resource "infisical_identity" "machine-identity-demo-wo" {
+  name   = "machine-identity-demo-wo"
+  role   = "admin"
+  org_id = "<your-org-id>"
+}
+
+resource "infisical_identity_kubernetes_auth" "kubernetes-auth-demo-wo" {
+  identity_id                   = infisical_identity.machine-identity-demo-wo.id
+  kubernetes_host               = "http://<your-kubernetes-host>"
+  token_reviewer_jwt_wo         = var.token_reviewer_jwt
+  token_reviewer_jwt_wo_version = 1
+  kubernetes_ca_certificate     = "<your-kubernetes-ca-certificate>"
+
+  allowed_namespaces            = ["infisical-ns"]
+  allowed_service_account_names = ["infisical-sa"]
+
+  token_reviewer_mode = "api"
+}
+
+
 # Using gateway as token reviewer mode
 resource "infisical_identity" "machine-identity-demo-2" {
   name   = "machine-identity-demo-2"
