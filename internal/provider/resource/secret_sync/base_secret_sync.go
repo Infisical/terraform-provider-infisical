@@ -36,16 +36,17 @@ type SecretSyncBaseResource struct {
 }
 
 type SecretSyncBaseResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	ConnectionID      types.String `tfsdk:"connection_id"`
-	Name              types.String `tfsdk:"name"`
-	ProjectID         types.String `tfsdk:"project_id"`
-	Description       types.String `tfsdk:"description"`
-	Environment       types.String `tfsdk:"environment"`
-	SecretPath        types.String `tfsdk:"secret_path"`
-	SyncOptions       types.Object `tfsdk:"sync_options"`
-	AutoSyncEnabled   types.Bool   `tfsdk:"auto_sync_enabled"`
-	DestinationConfig types.Object `tfsdk:"destination_config"`
+	ID                   types.String `tfsdk:"id"`
+	ConnectionID         types.String `tfsdk:"connection_id"`
+	Name                 types.String `tfsdk:"name"`
+	ProjectID            types.String `tfsdk:"project_id"`
+	Description          types.String `tfsdk:"description"`
+	Environment          types.String `tfsdk:"environment"`
+	SecretPath           types.String `tfsdk:"secret_path"`
+	IncludeAllSubFolders types.Bool   `tfsdk:"include_all_sub_folders"`
+	SyncOptions          types.Object `tfsdk:"sync_options"`
+	AutoSyncEnabled      types.Bool   `tfsdk:"auto_sync_enabled"`
+	DestinationConfig    types.Object `tfsdk:"destination_config"`
 }
 
 // Metadata returns the resource type name.
@@ -96,6 +97,12 @@ func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Required:    true,
 				Description: "The folder path to sync secrets from.",
 			},
+			"include_all_sub_folders": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.",
+				Default:     booldefault.StaticBool(false),
+			},
 			"description": schema.StringAttribute{
 				Optional:    true,
 				Description: fmt.Sprintf("An optional description for the %s sync.", r.SyncName),
@@ -141,7 +148,16 @@ func (r *SecretSyncBaseResource) Configure(_ context.Context, req resource.Confi
 }
 
 func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	if req.Plan.Raw.IsNull() || r.client == nil || !r.client.Config.IsMachineIdentityAuth {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	r.planDeprecatedIncludeAllSubFolders(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if r.client == nil || !r.client.Config.IsMachineIdentityAuth {
 		return
 	}
 
@@ -199,6 +215,99 @@ func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.Mo
 		resp.Diagnostics.AddWarning(
 			"Duplicate destination configuration detected",
 			"A secret sync with the same destination configuration already exists in this project. Proceeding with this operation may result in conflicts or unexpected behavior.",
+		)
+	}
+}
+
+// deprecatedIncludeAllSubFoldersPath points at the sync_options.include_all_sub_folders attribute some
+// syncs (Spacelift) shipped before include_all_sub_folders moved to the root of the sync.
+var deprecatedIncludeAllSubFoldersPath = path.Root("sync_options").AtName("include_all_sub_folders")
+
+func (r *SecretSyncBaseResource) hasDeprecatedIncludeAllSubFolders() bool {
+	_, ok := r.SyncOptionsAttributes["include_all_sub_folders"]
+	return ok
+}
+
+// planDeprecatedIncludeAllSubFolders keeps the root include_all_sub_folders and the deprecated
+// sync_options.include_all_sub_folders in agreement. Whichever one is left out of the config is planned
+// as the other's value, so configs that still use the deprecated attribute keep including subfolders,
+// and neither attribute drifts once Read fills both from the API.
+func (r *SecretSyncBaseResource) planDeprecatedIncludeAllSubFolders(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !r.hasDeprecatedIncludeAllSubFolders() {
+		return
+	}
+
+	var syncOptions types.Object
+	var rootValue, deprecatedValue types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options"), &syncOptions)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("include_all_sub_folders"), &rootValue)...)
+	if resp.Diagnostics.HasError() || syncOptions.IsNull() || syncOptions.IsUnknown() {
+		return
+	}
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, &deprecatedValue)...)
+	if resp.Diagnostics.HasError() || rootValue.IsUnknown() || deprecatedValue.IsUnknown() {
+		return
+	}
+
+	includeAllSubFolders := types.BoolValue(rootValue.ValueBool() || deprecatedValue.ValueBool())
+	if rootValue.IsNull() {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), includeAllSubFolders)...)
+	}
+	if deprecatedValue.IsNull() {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, includeAllSubFolders)...)
+	}
+}
+
+// ValidateConfig rejects including subfolders together with an import initial sync behavior, which the
+// API refuses for every destination. Syncs without initial_sync_behavior always overwrite, so they can
+// include subfolders freely. It also rejects conflicting values for the root and the deprecated
+// sync_options include_all_sub_folders.
+func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	r.validateDeprecatedIncludeAllSubFolders(ctx, req, resp)
+
+	if _, ok := r.SyncOptionsAttributes["initial_sync_behavior"]; !ok {
+		return
+	}
+
+	var includeAllSubFolders types.Bool
+	var initialSyncBehavior types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("include_all_sub_folders"), &includeAllSubFolders)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options").AtName("initial_sync_behavior"), &initialSyncBehavior)...)
+	if resp.Diagnostics.HasError() || !includeAllSubFolders.ValueBool() || initialSyncBehavior.IsNull() || initialSyncBehavior.IsUnknown() {
+		return
+	}
+
+	if initialSyncBehavior.ValueString() != string(infisical.SecretSyncBehaviorOverwriteDestination) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("include_all_sub_folders"),
+			"Invalid include_all_sub_folders",
+			"include_all_sub_folders can only be enabled when initial_sync_behavior is 'overwrite-destination', because there is no single folder to import existing destination secrets into.",
+		)
+	}
+}
+
+func (r *SecretSyncBaseResource) validateDeprecatedIncludeAllSubFolders(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if !r.hasDeprecatedIncludeAllSubFolders() {
+		return
+	}
+
+	var syncOptions types.Object
+	var rootValue, deprecatedValue types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options"), &syncOptions)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("include_all_sub_folders"), &rootValue)...)
+	if resp.Diagnostics.HasError() || syncOptions.IsNull() || syncOptions.IsUnknown() {
+		return
+	}
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, &deprecatedValue)...)
+	if resp.Diagnostics.HasError() || rootValue.IsNull() || rootValue.IsUnknown() || deprecatedValue.IsNull() || deprecatedValue.IsUnknown() {
+		return
+	}
+
+	if rootValue.ValueBool() != deprecatedValue.ValueBool() {
+		resp.Diagnostics.AddAttributeError(
+			deprecatedIncludeAllSubFoldersPath,
+			"Conflicting include_all_sub_folders",
+			"include_all_sub_folders and the deprecated sync_options.include_all_sub_folders are set to different values. Remove sync_options.include_all_sub_folders and set only include_all_sub_folders.",
 		)
 	}
 }
@@ -288,16 +397,17 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 	}
 
 	secretSync, err := r.client.CreateSecretSync(infisical.CreateSecretSyncRequest{
-		App:               r.App,
-		Name:              plan.Name.ValueString(),
-		Description:       plan.Description.ValueString(),
-		ProjectID:         plan.ProjectID.ValueString(),
-		ConnectionID:      plan.ConnectionID.ValueString(),
-		Environment:       plan.Environment.ValueString(),
-		SecretPath:        plan.SecretPath.ValueString(),
-		AutoSyncEnabled:   plan.AutoSyncEnabled.ValueBool(),
-		SyncOptions:       syncOptions,
-		DestinationConfig: destinationConfigMap,
+		App:                  r.App,
+		Name:                 plan.Name.ValueString(),
+		Description:          plan.Description.ValueString(),
+		ProjectID:            plan.ProjectID.ValueString(),
+		ConnectionID:         plan.ConnectionID.ValueString(),
+		Environment:          plan.Environment.ValueString(),
+		SecretPath:           plan.SecretPath.ValueString(),
+		IncludeAllSubFolders: plan.IncludeAllSubFolders.ValueBool(),
+		AutoSyncEnabled:      plan.AutoSyncEnabled.ValueBool(),
+		SyncOptions:          syncOptions,
+		DestinationConfig:    destinationConfigMap,
 	})
 
 	if err != nil {
@@ -358,6 +468,7 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 	state.ProjectID = types.StringValue(secretSync.ProjectID)
 	state.Environment = types.StringValue(secretSync.Environment.Slug)
 	state.SecretPath = types.StringValue(secretSync.SecretFolder.Path)
+	state.IncludeAllSubFolders = types.BoolValue(secretSync.IncludeAllSubFolders)
 	state.AutoSyncEnabled = types.BoolValue(secretSync.AutoSyncEnabled)
 
 	if !(state.Description.IsNull() && secretSync.Description == "") {
@@ -443,17 +554,18 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 	}
 
 	_, err := r.client.UpdateSecretSync(infisical.UpdateSecretSyncRequest{
-		App:               r.App,
-		ID:                state.ID.ValueString(),
-		Name:              plan.Name.ValueString(),
-		Description:       plan.Description.ValueString(),
-		ProjectID:         plan.ProjectID.ValueString(),
-		ConnectionID:      plan.ConnectionID.ValueString(),
-		Environment:       plan.Environment.ValueString(),
-		SecretPath:        plan.SecretPath.ValueString(),
-		AutoSyncEnabled:   plan.AutoSyncEnabled.ValueBool(),
-		SyncOptions:       secretSyncPlan,
-		DestinationConfig: destinationConfigMap,
+		App:                  r.App,
+		ID:                   state.ID.ValueString(),
+		Name:                 plan.Name.ValueString(),
+		Description:          plan.Description.ValueString(),
+		ProjectID:            plan.ProjectID.ValueString(),
+		ConnectionID:         plan.ConnectionID.ValueString(),
+		Environment:          plan.Environment.ValueString(),
+		SecretPath:           plan.SecretPath.ValueString(),
+		IncludeAllSubFolders: plan.IncludeAllSubFolders.ValueBool(),
+		AutoSyncEnabled:      plan.AutoSyncEnabled.ValueBool(),
+		SyncOptions:          secretSyncPlan,
+		DestinationConfig:    destinationConfigMap,
 	})
 
 	if err != nil {

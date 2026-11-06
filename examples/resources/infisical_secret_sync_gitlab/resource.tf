@@ -19,12 +19,13 @@ provider "infisical" {
 
 # Example 1: Sync secrets to a GitLab project
 resource "infisical_secret_sync_gitlab" "gitlab-project-sync" {
-  name          = "gitlab-project-sync-demo"
-  description   = "Demo of GitLab project secret sync"
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "/" # Root folder is /
-  connection_id = "<gitlab-app-connection-id>"
+  name                    = "gitlab-project-sync-demo"
+  description             = "Demo of GitLab project secret sync"
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "/"   # Root folder is /
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<gitlab-app-connection-id>"
 
   sync_options = {
     initial_sync_behavior   = "overwrite-destination", # Supported options: overwrite-destination
@@ -45,12 +46,13 @@ resource "infisical_secret_sync_gitlab" "gitlab-project-sync" {
 
 # Example 2: Sync secrets to a GitLab group
 resource "infisical_secret_sync_gitlab" "gitlab-group-sync" {
-  name          = "gitlab-group-sync-demo"
-  description   = "Demo of GitLab group secret sync"
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "/"
-  connection_id = "<gitlab-app-connection-id>"
+  name                    = "gitlab-group-sync-demo"
+  description             = "Demo of GitLab group secret sync"
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "/"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<gitlab-app-connection-id>"
 
   sync_options = {
     initial_sync_behavior   = "overwrite-destination",

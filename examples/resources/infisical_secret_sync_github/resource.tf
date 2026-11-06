@@ -18,12 +18,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_github" "example-github-secret-sync" {
-  name          = "github-secret-sync-demo"
-  description   = "Demo of Github secret sync"
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "/" # Root folder is /
-  connection_id = "<github-app-connection-id>"
+  name                    = "github-secret-sync-demo"
+  description             = "Demo of Github secret sync"
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "/"   # Root folder is /
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<github-app-connection-id>"
 
   sync_options = {
     initial_sync_behavior   = "overwrite-destination", # Supported options: overwrite-destination

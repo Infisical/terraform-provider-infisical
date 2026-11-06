@@ -18,12 +18,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_flyio" "example" {
-  name          = "flyio-secret-sync"
-  description   = "Sync secrets to Fly.io app"
-  project_id    = "<your-infisical-project-id>"
-  connection_id = "<app-connection-id>" # The ID of your Fly.io App Connection
-  environment   = "<env-slug>"
-  secret_path   = "<infisical-secret-path>"
+  name                    = "flyio-secret-sync"
+  description             = "Sync secrets to Fly.io app"
+  project_id              = "<your-infisical-project-id>"
+  connection_id           = "<app-connection-id>" # The ID of your Fly.io App Connection
+  environment             = "<env-slug>"
+  secret_path             = "<infisical-secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
 
   auto_sync_enabled = true
 

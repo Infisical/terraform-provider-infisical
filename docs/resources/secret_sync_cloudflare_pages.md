@@ -33,12 +33,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_cloudflare_pages" "cloudflare-pages-secret-sync" {
-  name          = "cloudflare-pages-secret-sync-demo"
-  description   = "Demo of Cloudflare Pages secret sync"
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "<secret-path>" # Root folder is /
-  connection_id = "<cloudflare-app-connection-id>"
+  name                    = "cloudflare-pages-secret-sync-demo"
+  description             = "Demo of Cloudflare Pages secret sync"
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "<secret-path>" # Root folder is /
+  include_all_sub_folders = false           # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<cloudflare-app-connection-id>"
 
   sync_options = {
     initial_sync_behavior   = "overwrite-destination" # Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination
@@ -70,6 +71,7 @@ resource "infisical_secret_sync_cloudflare_pages" "cloudflare-pages-secret-sync"
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the Cloudflare Pages sync.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
 
 ### Read-Only
 
