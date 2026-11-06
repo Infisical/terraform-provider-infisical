@@ -33,12 +33,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_azure_devops" "app-configuration-demo" {
-  name          = "demo-sync"
-  description   = "This is a demo sync."
-  project_id    = "<project-id>"
-  environment   = "dev"
-  secret_path   = "/"
-  connection_id = "<app-connection-id>" # The ID of your Azure DevOps App Connection
+  name                    = "demo-sync"
+  description             = "This is a demo sync."
+  project_id              = "<project-id>"
+  environment             = "dev"
+  secret_path             = "/"
+  include_all_sub_folders = false                 # Also sync secrets from folders beneath secret_path
+  connection_id           = "<app-connection-id>" # The ID of your Azure DevOps App Connection
 
   sync_options = {}
 
@@ -65,6 +66,7 @@ resource "infisical_secret_sync_azure_devops" "app-configuration-demo" {
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the Azure DevOps sync.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
 
 ### Read-Only
 

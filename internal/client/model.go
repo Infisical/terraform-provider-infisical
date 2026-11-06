@@ -2664,31 +2664,33 @@ type SecretSyncFolder struct {
 }
 
 type SecretSync struct {
-	ID                string                 `json:"id"`
-	Name              string                 `json:"name"`
-	Description       string                 `json:"description"`
-	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled"`
-	Version           int                    `json:"version"`
-	ProjectID         string                 `json:"projectId"`
-	ConnectionID      string                 `json:"connectionId"`
-	Connection        SecretSyncConnection   `json:"connection"`
-	Environment       SecretSyncEnvironment  `json:"environment"`
-	SecretFolder      SecretSyncFolder       `json:"folder"`
-	SyncOptions       map[string]interface{} `json:"syncOptions"`
-	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	ID                   string                 `json:"id"`
+	Name                 string                 `json:"name"`
+	Description          string                 `json:"description"`
+	AutoSyncEnabled      bool                   `json:"isAutoSyncEnabled"`
+	Version              int                    `json:"version"`
+	ProjectID            string                 `json:"projectId"`
+	ConnectionID         string                 `json:"connectionId"`
+	Connection           SecretSyncConnection   `json:"connection"`
+	Environment          SecretSyncEnvironment  `json:"environment"`
+	SecretFolder         SecretSyncFolder       `json:"folder"`
+	IncludeAllSubFolders bool                   `json:"includeAllSubFolders"`
+	SyncOptions          map[string]interface{} `json:"syncOptions"`
+	DestinationConfig    map[string]interface{} `json:"destinationConfig"`
 }
 
 type CreateSecretSyncRequest struct {
-	App               SecretSyncApp
-	Name              string                 `json:"name"`
-	ProjectID         string                 `json:"projectId"`
-	ConnectionID      string                 `json:"connectionId"`
-	Environment       string                 `json:"environment"`
-	SecretPath        string                 `json:"secretPath"`
-	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled"`
-	Description       string                 `json:"description"`
-	SyncOptions       map[string]interface{} `json:"syncOptions"`
-	DestinationConfig map[string]interface{} `json:"destinationConfig"`
+	App                  SecretSyncApp
+	Name                 string                 `json:"name"`
+	ProjectID            string                 `json:"projectId"`
+	ConnectionID         string                 `json:"connectionId"`
+	Environment          string                 `json:"environment"`
+	SecretPath           string                 `json:"secretPath"`
+	IncludeAllSubFolders bool                   `json:"includeAllSubFolders"`
+	AutoSyncEnabled      bool                   `json:"isAutoSyncEnabled"`
+	Description          string                 `json:"description"`
+	SyncOptions          map[string]interface{} `json:"syncOptions"`
+	DestinationConfig    map[string]interface{} `json:"destinationConfig"`
 }
 
 type CreateSecretSyncResponse struct {
@@ -2705,17 +2707,18 @@ type GetSecretSyncByIdResponse struct {
 }
 
 type UpdateSecretSyncRequest struct {
-	App               SecretSyncApp
-	ID                string
-	Name              string                 `json:"name,omitempty"`
-	ProjectID         string                 `json:"projectId,omitempty"`
-	ConnectionID      string                 `json:"connectionId,omitempty"`
-	Environment       string                 `json:"environment,omitempty"`
-	SecretPath        string                 `json:"secretPath,omitempty"`
-	AutoSyncEnabled   bool                   `json:"isAutoSyncEnabled,omitempty"`
-	Description       string                 `json:"description"`
-	SyncOptions       map[string]interface{} `json:"syncOptions,omitempty"`
-	DestinationConfig map[string]interface{} `json:"destinationConfig,omitempty"`
+	App                  SecretSyncApp
+	ID                   string
+	Name                 string                 `json:"name,omitempty"`
+	ProjectID            string                 `json:"projectId,omitempty"`
+	ConnectionID         string                 `json:"connectionId,omitempty"`
+	Environment          string                 `json:"environment,omitempty"`
+	SecretPath           string                 `json:"secretPath,omitempty"`
+	IncludeAllSubFolders bool                   `json:"includeAllSubFolders"`
+	AutoSyncEnabled      bool                   `json:"isAutoSyncEnabled,omitempty"`
+	Description          string                 `json:"description"`
+	SyncOptions          map[string]interface{} `json:"syncOptions,omitempty"`
+	DestinationConfig    map[string]interface{} `json:"destinationConfig,omitempty"`
 }
 
 type UpdateSecretSyncResponse struct {

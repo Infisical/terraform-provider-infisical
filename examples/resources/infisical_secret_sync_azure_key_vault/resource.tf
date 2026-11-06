@@ -18,12 +18,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_azure_key_vault" "app-configuration-demo" {
-  name          = "demo-sync"
-  description   = "This is a demo sync."
-  project_id    = "<project-id>"
-  environment   = "dev"
-  secret_path   = "/"
-  connection_id = "<app-connection-id>" # The ID of your Azure App Connection
+  name                    = "demo-sync"
+  description             = "This is a demo sync."
+  project_id              = "<project-id>"
+  environment             = "dev"
+  secret_path             = "/"
+  include_all_sub_folders = false                 # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<app-connection-id>" # The ID of your Azure App Connection
 
   sync_options = {
     initial_sync_behavior = "overwrite-destination"

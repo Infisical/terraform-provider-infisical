@@ -129,10 +129,11 @@ func NewSecretSyncSpaceliftResource() resource.Resource {
 				Default:     booldefault.StaticBool(false),
 			},
 			"include_all_sub_folders": schema.BoolAttribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "Whether to sync secrets from folders beneath the source path as well.",
-				Default:     booldefault.StaticBool(false),
+				Optional:           true,
+				Computed:           true,
+				Description:        "Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead.",
+				DeprecationMessage: "Use the top-level include_all_sub_folders attribute instead. This attribute will be removed in a future major version.",
+				Default:            booldefault.StaticBool(false),
 			},
 		},
 
