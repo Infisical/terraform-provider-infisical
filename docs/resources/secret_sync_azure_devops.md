@@ -66,7 +66,7 @@ resource "infisical_secret_sync_azure_devops" "app-configuration-demo" {
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the Azure DevOps sync.
-- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
 
 ### Read-Only
 

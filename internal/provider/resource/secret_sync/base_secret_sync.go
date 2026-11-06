@@ -68,6 +68,13 @@ func (r *SecretSyncBaseResource) ImportState(ctx context.Context, req resource.I
 }
 
 func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	includeAllSubFoldersDescription := "Whether to sync secrets from folders beneath the source path as well."
+	// Syncs without initial_sync_behavior always overwrite the destination, so the requirement only
+	// applies to syncs that expose the setting.
+	if _, ok := r.SyncOptionsAttributes["initial_sync_behavior"]; ok {
+		includeAllSubFoldersDescription += " Requires initial_sync_behavior to be 'overwrite-destination'."
+	}
+
 	resp.Schema = schema.Schema{
 		Description: fmt.Sprintf("Create and manage %s secret syncs", r.SyncName),
 		Attributes: map[string]schema.Attribute{
@@ -100,7 +107,7 @@ func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"include_all_sub_folders": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.",
+				Description: includeAllSubFoldersDescription,
 				Default:     booldefault.StaticBool(false),
 			},
 			"description": schema.StringAttribute{
@@ -241,19 +248,27 @@ func (r *SecretSyncBaseResource) planDeprecatedIncludeAllSubFolders(ctx context.
 	var rootValue, deprecatedValue types.Bool
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options"), &syncOptions)...)
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("include_all_sub_folders"), &rootValue)...)
-	if resp.Diagnostics.HasError() || syncOptions.IsNull() || syncOptions.IsUnknown() {
+	if resp.Diagnostics.HasError() || syncOptions.IsNull() {
 		return
 	}
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, &deprecatedValue)...)
-	if resp.Diagnostics.HasError() || rootValue.IsUnknown() || deprecatedValue.IsUnknown() {
-		return
+	if !syncOptions.IsUnknown() {
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, &deprecatedValue)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
-	includeAllSubFolders := types.BoolValue(rootValue.ValueBool() || deprecatedValue.ValueBool())
+	// While either value is unknown, the omitted one stays unknown too. Planning it as false would let
+	// the apply-time plan turn it into true, which Terraform rejects as an inconsistent final plan.
+	includeAllSubFolders := types.BoolUnknown()
+	if !syncOptions.IsUnknown() && !rootValue.IsUnknown() && !deprecatedValue.IsUnknown() {
+		includeAllSubFolders = types.BoolValue(rootValue.ValueBool() || deprecatedValue.ValueBool())
+	}
 	if rootValue.IsNull() {
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), includeAllSubFolders)...)
 	}
-	if deprecatedValue.IsNull() {
+	// An unknown sync_options is already planned as unknown as a whole, nested flag included.
+	if !syncOptions.IsUnknown() && deprecatedValue.IsNull() {
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, includeAllSubFolders)...)
 	}
 }

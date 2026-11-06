@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -194,6 +196,82 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFolders(t *testing.T) {
 			}
 			if plan.IncludeAllSubFolders.ValueBool() != tc.wantRoot || syncOptions.IncludeAllSubFolders.ValueBool() != tc.wantDeprecated {
 				t.Errorf("expected root=%v deprecated=%v, got root=%v deprecated=%v", tc.wantRoot, tc.wantDeprecated, plan.IncludeAllSubFolders, syncOptions.IncludeAllSubFolders)
+			}
+		})
+	}
+}
+
+// A flag that is unknown during planning must leave the omitted one unknown too. Planning it as a known
+// value would let the apply-time plan change it, which Terraform rejects as an inconsistent final plan.
+func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFoldersUnknown(t *testing.T) {
+	ctx := context.Background()
+	unknown := tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)
+	null := tftypes.NewValue(tftypes.Bool, nil)
+
+	for name, tc := range map[string]struct {
+		root, deprecated   tftypes.Value
+		unknownSyncOptions bool
+		checkPath          path.Path
+	}{
+		"unknown deprecated, omitted root": {root: null, deprecated: unknown, checkPath: path.Root("include_all_sub_folders")},
+		"unknown root, omitted deprecated": {root: unknown, deprecated: null, checkPath: deprecatedIncludeAllSubFoldersPath},
+		"unknown sync_options, omitted root": {
+			root: null, deprecated: null, unknownSyncOptions: true, checkPath: path.Root("include_all_sub_folders"),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := asSecretSyncBaseResource(t, NewSecretSyncSpaceliftResource())
+			config := secretSyncTestConfig(t, r, tc.root, map[string]tftypes.Value{
+				"include_all_sub_folders": tc.deprecated,
+			})
+
+			if tc.unknownSyncOptions {
+				rootType := asObjectType(t, config.Raw.Type())
+				rootVals := map[string]tftypes.Value{}
+				if err := config.Raw.As(&rootVals); err != nil {
+					t.Fatal(err)
+				}
+				rootVals["sync_options"] = tftypes.NewValue(rootType.AttributeTypes["sync_options"], tftypes.UnknownValue)
+				config.Raw = tftypes.NewValue(rootType, rootVals)
+			}
+
+			// The framework fills static defaults into the plan before ModifyPlan runs.
+			plan := tfsdk.Plan{Schema: config.Schema, Raw: config.Raw}
+			if diags := plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), false); diags.HasError() {
+				t.Fatal(diags)
+			}
+			if !tc.unknownSyncOptions {
+				if diags := plan.SetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, false); diags.HasError() {
+					t.Fatal(diags)
+				}
+			}
+			if !tc.root.IsKnown() {
+				if diags := plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), types.BoolUnknown()); diags.HasError() {
+					t.Fatal(diags)
+				}
+			}
+			if !tc.unknownSyncOptions && !tc.deprecated.IsKnown() {
+				if diags := plan.SetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, types.BoolUnknown()); diags.HasError() {
+					t.Fatal(diags)
+				}
+			}
+
+			resp := resource.ModifyPlanResponse{Plan: plan}
+			r.ModifyPlan(ctx, resource.ModifyPlanRequest{
+				Config: config,
+				Plan:   plan,
+				State:  tfsdk.State{Schema: config.Schema, Raw: tftypes.NewValue(config.Raw.Type(), nil)},
+			}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatal(resp.Diagnostics)
+			}
+
+			var got types.Bool
+			if diags := resp.Plan.GetAttribute(ctx, tc.checkPath, &got); diags.HasError() {
+				t.Fatal(diags)
+			}
+			if !got.IsUnknown() {
+				t.Errorf("expected %s to be planned as unknown, got %v", tc.checkPath, got)
 			}
 		})
 	}

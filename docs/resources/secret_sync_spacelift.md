@@ -74,7 +74,7 @@ resource "infisical_secret_sync_spacelift" "example" {
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the Spacelift sync.
-- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
 
 ### Read-Only
 
