@@ -128,7 +128,9 @@ func emptyCertificateFilters(orderIDsOnly bool) types.Object {
 	attrTypes := certificateFiltersAttrTypes(orderIDsOnly)
 	values := make(map[string]attr.Value, len(attrTypes))
 	for name, attrType := range attrTypes {
-		values[name] = types.SetNull(attrType.(types.SetType).ElemType)
+		if setType, ok := attrType.(types.SetType); ok {
+			values[name] = types.SetNull(setType.ElemType)
+		}
 	}
 	return types.ObjectValueMust(attrTypes, values)
 }
@@ -147,7 +149,7 @@ func derefStrings(values *[]string) []string {
 	return *values
 }
 
-func validateCertificateFilters(ctx context.Context, filters types.Object) diag.Diagnostics {
+func validateCertificateFilters(filters types.Object) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if filters.IsNull() || filters.IsUnknown() {
 		return diags

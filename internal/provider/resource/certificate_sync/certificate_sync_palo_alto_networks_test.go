@@ -126,7 +126,10 @@ func TestPaloAltoNetworksCertificateFiltersShape(t *testing.T) {
 	for _, c := range cases {
 		schemaResp := &resource.SchemaResponse{}
 		c.resource.Schema(ctx, resource.SchemaRequest{}, schemaResp)
-		filters := schemaResp.Schema.Attributes[attrCertificateFilters].GetType().(types.ObjectType)
+		filters, ok := schemaResp.Schema.Attributes[attrCertificateFilters].GetType().(types.ObjectType)
+		if !ok {
+			t.Fatalf("%s: certificate_filters is not an object", c.name)
+		}
 		got := make([]string, 0, len(filters.AttrTypes))
 		for name := range filters.AttrTypes {
 			got = append(got, name)

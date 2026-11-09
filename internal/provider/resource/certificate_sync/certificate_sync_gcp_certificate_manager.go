@@ -212,7 +212,7 @@ func NewCertificateSyncGcpCertificateManagerResource() resource.Resource {
 			}
 
 			if locationKnown && scopeKnown {
-				enforceCertificateCap(ctx, certificateCap{
+				enforceCertificateCap(certificateCap{
 					max:    gcpCertificateManagerMaxCertificatesPerMapEntry,
 					reason: "a certificate map binding holds at most that many certificates in one map entry",
 				}, config.CertificateFilters, diags)

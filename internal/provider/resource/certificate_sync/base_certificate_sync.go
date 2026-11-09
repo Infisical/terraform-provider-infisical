@@ -418,10 +418,10 @@ func (r *CertificateSyncBaseResource) ValidateConfig(ctx context.Context, req re
 		return
 	}
 
-	resp.Diagnostics.Append(validateCertificateFilters(ctx, config.CertificateFilters)...)
+	resp.Diagnostics.Append(validateCertificateFilters(config.CertificateFilters)...)
 
 	if r.SupportsDefaultCertificate {
-		resp.Diagnostics.Append(validateDefaultCertificateInFilters(ctx, config.DefaultCertificateOrderID, config.CertificateFilters)...)
+		resp.Diagnostics.Append(validateDefaultCertificateInFilters(config.DefaultCertificateOrderID, config.CertificateFilters)...)
 	}
 
 	r.validateCertificateNamesAndCap(ctx, config, &resp.Diagnostics)
@@ -763,7 +763,7 @@ func defaultCertificateFromApi(linked *linkedCertificates) (types.String, diag.D
 	return types.StringValue(current.CertificateOrderID), diags
 }
 
-func validateDefaultCertificateInFilters(ctx context.Context, defaultOrderID types.String, filters types.Object) diag.Diagnostics {
+func validateDefaultCertificateInFilters(defaultOrderID types.String, filters types.Object) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if defaultOrderID.IsNull() || defaultOrderID.IsUnknown() || filters.IsNull() || filters.IsUnknown() {
 		return diags

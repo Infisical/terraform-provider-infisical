@@ -155,7 +155,7 @@ func (r *CertificateSyncBaseResource) certificateCapFromConfig(ctx context.Conte
 
 // enforceCertificateCap rejects filters the backend refuses on a capped sync: it only accepts an
 // explicit certificate list, no longer than the cap.
-func enforceCertificateCap(ctx context.Context, limit certificateCap, filters types.Object, diags *diag.Diagnostics) {
+func enforceCertificateCap(limit certificateCap, filters types.Object, diags *diag.Diagnostics) {
 	if filters.IsNull() || filters.IsUnknown() {
 		return
 	}
@@ -179,7 +179,7 @@ func enforceCertificateCap(ctx context.Context, limit certificateCap, filters ty
 
 // warnOnNameCollisions flags schemas that can give two certificates the same name, which makes one
 // silently overwrite the other at the destination.
-func warnOnNameCollisions(ctx context.Context, schema string, filters types.Object, diags *diag.Diagnostics) {
+func warnOnNameCollisions(schema string, filters types.Object, diags *diag.Diagnostics) {
 	if hasCertificateIdentifier(schema) || !anyNamePlaceholderPattern.MatchString(schema) || filters.IsNull() || filters.IsUnknown() {
 		return
 	}
@@ -206,13 +206,13 @@ func (r *CertificateSyncBaseResource) validateCertificateNamesAndCap(ctx context
 	}
 
 	if limit, capped := r.certificateCapFromConfig(ctx, config); capped {
-		enforceCertificateCap(ctx, limit, config.CertificateFilters, diags)
+		enforceCertificateCap(limit, config.CertificateFilters, diags)
 		return
 	}
 
 	rule := r.CertificateNameRule
 	if schemaKnown && schemaSet && (rule == nil || !(rule.requireIdentifier || rule.requireLiteralCertificateID)) {
-		warnOnNameCollisions(ctx, schema, config.CertificateFilters, diags)
+		warnOnNameCollisions(schema, config.CertificateFilters, diags)
 	}
 }
 
