@@ -6,8 +6,8 @@ Read this file before you write code or review a pull request. It applies to eve
 
 ## The rules that matter most
 
-1. **The API must be ready before it goes into Terraform.** When a resource ships, its API shape is locked into user configurations and state files. We cannot change it later without a new API version. Audit the Infisical API first (see [step 2](#2-audit-the-api-before-you-build)). If the API is not in good shape, stop and fix the API in Infisical core first.
-2. **Mirror the API, the UI and the docs.** Read the route, the zod schema, the service and the UI form in Infisical core before you design the schema. Put each field in the same place that the API puts it.
+1. **The API must be ready before it goes into Terraform.** When a resource ships, its API shape is locked into user configurations and state files. We cannot change it later without a new API version. Audit the Infisical API against the [API acceptance criteria](#api-acceptance-criteria) first. If the API fails a criterion, do not build the resource and do not change Infisical core on your own. Write an [API change proposal](#if-the-api-fails-a-criterion) and wait until a person accepts it.
+2. **Mirror the API, the UI and the docs.** Read the route, the request and response schemas, the service and the UI form in Infisical core before you design the schema. Put each field in the same place that the API puts it.
 3. **Use the base resources.** Secret syncs, app connections, secret rotations, dynamic secrets, secret validation rules, certificate syncs, external KMS and PAM accounts share a base implementation. A field that the API defines for all variants goes into the base, not into one variant. If you find a new group of resources with one shared API shape, create a new base.
 4. **Every resource must be Crossplane-compatible by default.** Follow the [Read rules](#crossplane-compatibility). Do not create Crossplane-specific copies of resources.
 5. **Generated docs, examples and tests are part of the change.** Run `go generate ./...` and commit the result.
@@ -30,7 +30,6 @@ Read this file before you write code or review a pull request. It applies to eve
 | `templates/` | Custom doc templates for pages that need more than the default layout. |
 | `docs/` | **Generated.** Do not edit by hand. |
 | `scripts/update-doc-subcategories.sh` | Sets the Terraform Registry sidebar category for each doc page. |
-| `crossplane/`, `scripts/prepare-crossplane.sh` | **Legacy.** Do not add to or depend on these. See [Crossplane compatibility](#crossplane-compatibility). |
 
 ## Commands
 
@@ -65,34 +64,27 @@ Then run `go install` and run `terraform plan` in a directory that uses the prov
 
 - If the task has a Linear issue, read the issue and all of its comments.
 - Find the matching code in Infisical core. The core repository is usually a sibling of this one (`../infisical`). If you do not have it, ask for it. Do not guess API shapes from the docs or from memory.
+- Read the `AGENTS.md` files in Infisical core before you search it (see [step 2](#2-audit-the-api-before-you-build)).
 - Find the newest sibling resource in this repository that does a similar thing. Use it as your template. Old resources often have patterns that we no longer want.
 
 ### 2. Audit the API before you build
 
 When a resource ships in Terraform, users write its attributes into their configurations and Terraform writes the API responses into state. After that, a change to the API shape breaks users. The only safe way to change it is a new API version. So the API must be correct **before** we build on it. Features often ship in the UI with an API that did not get enough attention. Find those problems now, not after release.
 
-**Where to look in Infisical core.** All paths are relative to the root of the core repository.
+**Where to look in Infisical core.** Infisical core describes its own architecture in `AGENTS.md` files: one at the root, one in `backend/` and in `frontend/`, and more in module directories. The core architecture changes over time, so this file does not list core paths. Read the core `AGENTS.md` files first, then find these items for the feature:
 
-| Family | Route factory | Schemas | UI form |
-| --- | --- | --- | --- |
-| Secret syncs | `registerSyncSecretsEndpoints` in `backend/src/server/routes/v1/secret-sync-routers/secret-sync-endpoints.ts` | `BaseSyncOptionsSchema` and `BaseSecretSyncSchema` in `backend/src/services/secret-sync/secret-sync-schemas.ts`; per destination in `backend/src/services/secret-sync/<destination>/` | `frontend/src/components/secret-syncs/forms/` |
-| App connections | `registerAppConnectionEndpoints` in `backend/src/server/routes/v1/app-connection-routers/app-connection-endpoints.ts` | `backend/src/services/app-connection/app-connection-schemas.ts`; per app in `backend/src/services/app-connection/<app>/` | `frontend/src/pages/organization/AppConnections/AppConnectionsPage/components/AppConnectionForm/` |
-| Secret rotations | `registerSecretRotationEndpoints` in `backend/src/ee/routes/v2/secret-rotation-v2-routers/secret-rotation-v2-endpoints.ts` | `backend/src/ee/services/secret-rotation-v2/secret-rotation-v2-schemas.ts`; per type in `backend/src/ee/services/secret-rotation-v2/<type>/` | `frontend/src/components/secret-rotations-v2/forms/` |
-| Dynamic secrets | `backend/src/ee/routes/v1/dynamic-secret-router.ts` | `backend/src/ee/services/dynamic-secret/providers/models.ts`; per provider in `providers/<provider>.ts` | `frontend/src/components/dynamic-secrets/DynamicSecretProviderForm/` |
-| Secret validation rules | `registerSecretValidationRuleEndpoints` in `backend/src/server/routes/v1/secret-validation-rule-routers/secret-validation-rule-endpoints.ts` | `backend/src/services/secret-validation-rule/` | `frontend/src/pages/secret-manager/SettingsPage/components/SecretValidationRulesSection/` |
-| Anything else | `backend/src/server/routes/v<N>/` and `backend/src/ee/routes/v<N>/` (mounted in `backend/src/server/routes/index.ts`) | `backend/src/services/<feature>/` and `backend/src/ee/services/<feature>/` | `frontend/src/` |
+- The routes: method, path, and the request and response schemas.
+- The shared route factory and shared schemas, when the feature is a family (for example, one set of routes for every secret sync destination).
+- The service code. Many rules (permission checks, conflicts, rules across fields) live there and not in the request schema.
+- The API field descriptions. They are a good source for Terraform attribute descriptions.
+- The errors that the routes return, and their status codes.
+- The UI form for the feature, and the API types that the UI uses.
+- The public docs for the feature.
+- The API design rules that core defines (the core `AGENTS.md` files point to them). Audit the API against those rules and against the criteria below.
 
-Also useful:
+#### API acceptance criteria
 
-- Business rules: the `*-service.ts` and `*-fns.ts` files of the feature. Many rules (permission checks, conflicts, cross-field checks) live there and not in the zod schema.
-- Field descriptions: `backend/src/lib/api-docs/constants.ts`. These descriptions are a good source for Terraform attribute descriptions.
-- Shared response shapes: `backend/src/server/routes/sanitizedSchemas.ts`.
-- Errors: `backend/src/lib/errors/index.ts` and `backend/src/server/plugins/error-handler.ts`. `NotFoundError` is a 404, zod validation failures are a 422.
-- API types used by the UI: `frontend/src/hooks/api/<feature>/`.
-- Public docs: `docs/integrations/` and `docs/documentation/`. The API reference is generated from the live OpenAPI spec (`/api/docs/json`), which comes from the route zod schemas.
-- The API design standard: the "Intuitive API Interfaces" and "Validate Every API Input" sections of `backend/CODE_QUALITY.md`, and `backend/AGENTS.md`. Audit the API against them.
-
-**Check every item and write the result into the pull request description.**
+The API is in good shape when it meets every criterion below. Check each one and write the result into the pull request description.
 
 - [ ] **Full lifecycle.** There is a create, a get by ID, an update and a delete endpoint. The get by ID endpoint returns **404** when the object does not exist (not 400, 403 or 500).
 - [ ] **Round trip.** The get response returns every field that create and update accept, in the same shape and with the same names. If a field does not come back, Terraform cannot detect drift or import it. Secret values are the exception: for those, the API must return something that changes when the secret changes (for example `credentialsHash` on app connections).
@@ -101,13 +93,23 @@ Also useful:
 - [ ] **Consistent naming.** New endpoints use `projectId` (not `workspaceId`), camelCase keys, and the same names that sibling endpoints use for the same concept.
 - [ ] **Update semantics are clear.** We know what happens when a field is omitted from a PATCH, and what happens when it is sent as `null`. Terraform must be able to clear an optional field and set a boolean to `false`. We know which fields PATCH cannot change, so they can use `RequiresReplace()`. We know whether PATCH replaces a nested object as a whole or merges it.
 - [ ] **No silent changes to values.** The API does not trim, lowercase, reorder or fill in values without a documented rule. If it does, the provider must handle it with a custom type, a plan modifier or a computed attribute. Lists come back in a stable order.
-- [ ] **Defaults are explicit.** Server-side defaults are in the zod schema, so the provider can use the same default.
+- [ ] **Defaults are explicit.** Server-side defaults are in the request schema, so the provider can use the same default.
 - [ ] **Clear validation.** Enums are explicit. Validation errors tell the user what is wrong.
 - [ ] **Machine identities can call it.** The provider authenticates as a machine identity. The endpoints must accept machine identity tokens and the permission checks must work for them.
 - [ ] **Public and current.** The route does not set `hide: true` (hidden routes are internal and can change at any time). The route is not deprecated, and there is no newer version of it.
 - [ ] **UI parity.** The UI form and the API expose the same options. If the UI has an option that the API does not have (or the opposite), find out why.
 
-If any check fails, **stop**. Tell the user what is wrong and propose the fix in Infisical core. Do not work around an API defect in the provider. A workaround becomes permanent behavior that users depend on.
+#### If the API fails a criterion
+
+Do not build the Terraform resource, and do not work around the problem in the provider. A workaround becomes permanent behavior that users depend on. Do not change Infisical core on your own either. Write an API change proposal and give it to the person who asked for the task. The proposal contains:
+
+1. **The criterion that fails**, from the list above.
+2. **The evidence:** the route, the schema or service code in core, and an example request or response that shows the problem.
+3. **The effect on Terraform:** what users cannot do, or what we lock in, if we build on the API as it is.
+4. **The proposed change:** the API shape before and after. Keep the change backward compatible when you can, for example with the old field kept as a deprecated mirror.
+5. **Open questions** that a person must answer.
+
+A person must accept the proposal before anyone changes the API. The Terraform work starts after the accepted API change is released.
 
 ### 3. Design the Terraform schema
 
@@ -185,16 +187,16 @@ All paths are relative to `internal/provider/resource/`.
 ### Rules for base resources
 
 - **A field that the API defines for every variant goes into the base.** Add it to the base model, the base schema, the create and update requests, and `Read`. Do not add it to one variant. If you add it to one variant, every other variant becomes inconsistent, and someone must find and fix them later.
-- **A field that only some variants support goes behind a capability flag on the base**, like `SupportsGateway` or `CanImportSecrets`. The API often has the same kind of flag (for example `TSyncOptionsConfig` for secret syncs, and the `supportsGateways` option of the generic app connection schemas). Use the same split. Do not copy the same attribute code into many variant files. If the same code would appear in two or more variant files, move it into the base or into a shared helper in the same package.
+- **A field that only some variants support goes behind a capability flag on the base**, like `SupportsGateway` or `CanImportSecrets`. The API often has the same kind of flag (for example, which shared sync options a destination supports, or whether an app connection supports gateways). Use the same split. Do not copy the same attribute code into many variant files. If the same code would appear in two or more variant files, move it into the base or into a shared helper in the same package.
 - **Before you change a base, read all of its variants.** A base change affects every variant at the same time. Check that each variant still builds the correct request, run all tests, and run `go generate ./...` so that the docs of every variant update.
-- **Make a new base when you see a new family.** If you implement two or more resources that share one API shape (one route factory in Infisical core with a variant segment in the path), build a base type first and make each resource a small variant. Abstraction wins here: it gives consistent behavior, docs and fixes across many resources.
+- **Make a new base when you see a new family.** If you implement two or more resources that share one API shape (one set of routes in Infisical core with a variant segment in the path), build a base type first and make each resource a small variant. Abstraction wins here: it gives consistent behavior, docs and fixes across many resources.
 - **A new variant copies the newest variant**, not the oldest.
 
 ### API facts per family
 
-These facts come from Infisical core. Check them again in the code before you depend on them, because the API can change.
+These facts describe API behavior in Infisical core. Check them again in the code before you depend on them, because the API can change.
 
-- **Secret syncs.** Shared fields are defined once in `BaseSecretSyncSchema` and `BaseSyncOptionsSchema`. A destination adds its own `destinationConfig` and can add extra sync options. `TSyncOptionsConfig` (`canImportSecrets`, `supportsKeySchema`, `supportsDisableSecretDeletion`) says which shared sync options a destination supports. For most destinations, PATCH replaces `syncOptions` as a whole, so always send the full object.
+- **Secret syncs.** The API defines the shared fields and the shared sync options once, for all destinations. A destination adds its own `destinationConfig` and can add extra sync options. Each destination has flags that say which shared sync options it supports (importing secrets, key schema, disabling secret deletion). For most destinations, PATCH replaces `syncOptions` as a whole, so always send the full object.
 - **App connections.** Responses never contain secret credentials. The provider uses `credentialsHash` to detect a change to the credentials outside of Terraform (see `Read` in the base). `projectId` is optional: without it, the connection belongs to the organization.
 - **Secret rotations.** PATCH cannot change `connectionId`, `environment` or `secretPath`. A rotation moves with a separate endpoint.
 - **Dynamic secrets.** This API is older. It finds a dynamic secret by name, project slug, environment slug and path, not by ID, and PATCH nests changes under `data`. Read responses hide secret fields, and an update that omits them keeps the stored values. A new API with this shape would not pass the audit in step 2.
@@ -208,7 +210,7 @@ These facts come from Infisical core. Check them again in the code before you de
 
 **The fix, in order:**
 
-1. **Fix the API first.** Infisical core moves `includeAllSubFolders` to the top level of the sync, next to `environment` and `secretPath`. GET returns it at the top level. If an update leaves it out, the API keeps the current value. The API still accepts and returns `syncOptions.includeAllSubFolders` as a deprecated mirror, so released provider versions keep working. When both are set, the top-level value wins.
+1. **Change the API first.** The team accepted a proposal to move the field. Infisical core moves `includeAllSubFolders` to the top level of the sync, next to `environment` and `secretPath`. GET returns it at the top level. If an update leaves it out, the API keeps the current value. The API still accepts and returns `syncOptions.includeAllSubFolders` as a deprecated mirror, so released provider versions keep working. When both are set, the top-level value wins.
 2. **Then change Terraform, after the API change is released.**
    - The base secret sync resource gets one top-level `include_all_sub_folders` attribute (optional, default `false`) for every destination.
    - The base sends and reads the top-level API field, never the mirror. It always sends the value, because an update that leaves the field out cannot set it back to `false`.
@@ -219,7 +221,7 @@ Before you add a field to one variant of a family:
 
 1. Find where the field is defined in Infisical core. Is it in the shared schema of the family, or in the schema of one variant? Is it at the top level of the body, in `syncOptions`, or in `destinationConfig`? Where does the UI show it?
 2. If it is shared, add it to the base resource once, in the same position as in the API.
-3. If the API placement is wrong or inconsistent, fix the API first.
+3. If the API placement is wrong or inconsistent, write an [API change proposal](#if-the-api-fails-a-criterion).
 
 ## Crossplane compatibility
 
@@ -254,7 +256,7 @@ if err != nil {
 
 Many older resources check for 404 but not for an empty ID. When you change one of them, add the empty ID check.
 
-The `crossplane/` directory and `scripts/prepare-crossplane.sh` are a **legacy** mechanism. They swap in modified copies of some resources when a `crossplane-tf-provider/v*` tag is released. Do not add new copies there, do not add new entries to the script, and do not write Crossplane-specific versions of a resource. Make the normal resource follow the rules above instead.
+Crossplane uses the normal provider release (the `v*` tags). There is no separate Crossplane build, so never write a Crossplane-specific version of a resource. Make the normal resource follow the rules above.
 
 ## Code style
 
@@ -270,8 +272,8 @@ The `crossplane/` directory and `scripts/prepare-crossplane.sh` are a **legacy**
 
 A reviewer (human or agent) checks these items. The implementer checks them before asking for review.
 
-- [ ] The PR describes the API audit: the endpoints, the Infisical core files that were read, and the result of each check in [step 2](#2-audit-the-api-before-you-build). Any API problem is fixed in core first, or the PR explains why it is acceptable.
-- [ ] Each attribute matches the API: name, nesting, type, required or optional, and default. Compare with the zod schema, not only with the docs.
+- [ ] The PR describes the API audit: the endpoints, the Infisical core files that were read, and the result of each [API acceptance criterion](#api-acceptance-criteria). For each failed criterion, a person accepted an API change proposal and the API change is released, or the PR explains why the gap is acceptable.
+- [ ] Each attribute matches the API: name, nesting, type, required or optional, and default. Compare with the request and response schemas, not only with the docs.
 - [ ] The UI and the API agree on the options that the resource exposes, and on where each option belongs.
 - [ ] Shared fields are in the base resource. No attribute code is copied across variants. When a base changed, all variants were checked.
 - [ ] Update requests can send `false`, `0` and `null` where the user can set them (no `omitempty` traps). Fields that PATCH does not accept use `RequiresReplace()`.
@@ -283,4 +285,3 @@ A reviewer (human or agent) checks these items. The implementer checks them befo
 - [ ] No breaking schema changes without deprecation (and a state upgrade where needed), unless the team decided on the break. A decided break has release notes that tell users what to change.
 - [ ] Examples (`resource.tf`, `import.sh`) exist, `go generate ./...` was run, and `docs/` is committed. New families have a subcategory in `scripts/update-doc-subcategories.sh`.
 - [ ] Tests cover the request body, the API-to-state mapping, 404 on read, an empty ID on read, and import.
-- [ ] Nothing new under `crossplane/`.
