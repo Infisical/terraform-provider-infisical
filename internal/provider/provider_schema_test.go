@@ -33,6 +33,8 @@ func TestProviderSchemaIsValid(t *testing.T) {
 		"infisical_pam_user", "infisical_pam_group", "infisical_pam_identity",
 		"infisical_pam_folder_user", "infisical_pam_folder_group", "infisical_pam_folder_identity",
 		"infisical_pam_account_user", "infisical_pam_account_group", "infisical_pam_account_identity",
+		"infisical_app_connection_palo_alto_networks", "infisical_certificate_sync_palo_alto_networks",
+		"infisical_certificate_sync_palo_alto_networks_ssl_tls_profile",
 	} {
 		if _, ok := resp.ResourceSchemas[name]; !ok {
 			t.Errorf("expected %s to be registered on the provider", name)
