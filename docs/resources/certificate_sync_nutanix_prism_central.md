@@ -63,7 +63,7 @@ resource "infisical_certificate_sync_nutanix_prism_central" "example" {
 ### Optional
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
-- `certificate_filters` (Attributes) Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates. (see [below for nested schema](#nestedatt--certificate_filters))
+- `certificate_filters` (Attributes) Which certificate this sync holds. Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI. (see [below for nested schema](#nestedatt--certificate_filters))
 - `description` (String) An optional description for the Nutanix Prism Central sync.
 
 ### Read-Only
@@ -84,20 +84,7 @@ Required:
 
 Optional:
 
-- `certificate_order_ids` (Set of String) The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order.
-- `metadata` (Attributes Set) Sync certificates carrying every one of these metadata pairs. (see [below for nested schema](#nestedatt--certificate_filters--metadata))
-- `profile_ids` (Set of String) Sync certificates issued from any one of these certificate profiles.
-
-<a id="nestedatt--certificate_filters--metadata"></a>
-### Nested Schema for `certificate_filters.metadata`
-
-Required:
-
-- `key` (String) The metadata key the certificate must carry.
-
-Optional:
-
-- `value` (String) The value the key must have. Leave unset to match any value.
+- `certificate_order_ids` (Set of String) The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set exactly one order: this sync holds a single certificate, and keeps holding the newest renewal of that order.
 
 ## Import
 

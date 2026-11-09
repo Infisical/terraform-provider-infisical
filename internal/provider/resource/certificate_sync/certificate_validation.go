@@ -159,12 +159,7 @@ func enforceCertificateCap(ctx context.Context, limit certificateCap, filters ty
 	if filters.IsNull() || filters.IsUnknown() {
 		return
 	}
-	var model certificateFiltersModel
-	decodeDiags := filters.As(ctx, &model, objectAsOptions)
-	diags.Append(decodeDiags...)
-	if decodeDiags.HasError() {
-		return
-	}
+	model := decodeCertificateFilters(filters)
 
 	if !model.ProfileIDs.IsNull() || !model.Metadata.IsNull() {
 		diags.AddAttributeError(
@@ -188,12 +183,7 @@ func warnOnNameCollisions(ctx context.Context, schema string, filters types.Obje
 	if hasCertificateIdentifier(schema) || !anyNamePlaceholderPattern.MatchString(schema) || filters.IsNull() || filters.IsUnknown() {
 		return
 	}
-	var model certificateFiltersModel
-	decodeDiags := filters.As(ctx, &model, objectAsOptions)
-	diags.Append(decodeDiags...)
-	if decodeDiags.HasError() {
-		return
-	}
+	model := decodeCertificateFilters(filters)
 	multiple := !model.ProfileIDs.IsNull() || !model.Metadata.IsNull() ||
 		(!model.CertificateOrderIDs.IsNull() && !model.CertificateOrderIDs.IsUnknown() && len(model.CertificateOrderIDs.Elements()) > 1)
 	if !multiple {

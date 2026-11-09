@@ -197,6 +197,13 @@ type attributeGetter interface {
 	GetAttribute(ctx context.Context, p path.Path, target interface{}) diag.Diagnostics
 }
 
+// filtersByOrderOnly reports whether certificate_filters only offers certificate_order_ids. A sync
+// with a fixed certificate cap only accepts an explicit certificate list, because profile and
+// metadata filters match a set that can grow past the cap.
+func (r *CertificateSyncBaseResource) filtersByOrderOnly() bool {
+	return r.MaxCertificates > 0
+}
+
 func (r *CertificateSyncBaseResource) hasSyncOptions() bool {
 	return r.SyncOptionsAttributes != nil
 }
@@ -230,7 +237,7 @@ func (r *CertificateSyncBaseResource) newModel() CertificateSyncBaseResourceMode
 		Name:                      customtypes.NewTrimmedStringNull(),
 		Description:               customtypes.NewTrimmedStringNull(),
 		SyncOptions:               types.ObjectNull(map[string]attr.Type{}),
-		CertificateFilters:        types.ObjectNull(certificateFiltersAttrTypes),
+		CertificateFilters:        types.ObjectNull(certificateFiltersAttrTypes(r.filtersByOrderOnly())),
 		DefaultCertificateOrderID: types.StringNull(),
 		ExportPassword:            types.StringNull(),
 		ExportPasswordWO:          types.StringNull(),
@@ -329,7 +336,7 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 			Description: "The destination configuration for the certificate sync.",
 			Attributes:  r.DestinationConfigAttributes,
 		},
-		attrCertificateFilters: certificateFiltersSchema(),
+		attrCertificateFilters: certificateFiltersSchema(r.filtersByOrderOnly()),
 	}
 
 	if r.hasSyncOptions() {
@@ -579,9 +586,9 @@ func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.Rea
 
 	priorFilters := state.CertificateFilters
 	if isImport && priorFilters.IsNull() && hasAnyCertificateFilter(certificateSync.Filters) {
-		priorFilters = emptyCertificateFilters()
+		priorFilters = emptyCertificateFilters(r.filtersByOrderOnly())
 	}
-	state.CertificateFilters, diags = certificateFiltersFromApi(priorFilters, certificateSync.Filters)
+	state.CertificateFilters, diags = certificateFiltersFromApi(ctx, priorFilters, certificateSync.Filters)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -762,9 +769,8 @@ func validateDefaultCertificateInFilters(ctx context.Context, defaultOrderID typ
 		return diags
 	}
 
-	var model certificateFiltersModel
-	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
-	if diags.HasError() || model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
+	model := decodeCertificateFilters(filters)
+	if model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
 		return diags
 	}
 

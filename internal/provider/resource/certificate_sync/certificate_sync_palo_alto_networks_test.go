@@ -2,7 +2,9 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
+	"sort"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	customtypes "terraform-provider-infisical/internal/pkg/customtypes"
@@ -107,6 +109,96 @@ func TestPaloAltoNetworksResourcesValidateConfig(t *testing.T) {
 		diags := paloAltoNetworksValidateConfig(t, c.resource, c.nameSchema, c.orderIDs...)
 		if diags.HasError() != c.wantError {
 			t.Errorf("%s: wantError=%v, got diagnostics %v", c.name, c.wantError, diags)
+		}
+	}
+}
+
+func TestPaloAltoNetworksCertificateFiltersShape(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name     string
+		resource resource.Resource
+		want     []string
+	}{
+		{"multi", NewCertificateSyncPaloAltoNetworksResource(), []string{"certificate_order_ids", "metadata", "profile_ids"}},
+		{"profile", NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(), []string{"certificate_order_ids"}},
+	}
+	for _, c := range cases {
+		schemaResp := &resource.SchemaResponse{}
+		c.resource.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+		filters := schemaResp.Schema.Attributes[attrCertificateFilters].GetType().(types.ObjectType)
+		got := make([]string, 0, len(filters.AttrTypes))
+		for name := range filters.AttrTypes {
+			got = append(got, name)
+		}
+		sort.Strings(got)
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: certificate_filters attributes = %v, want %v", c.name, got, c.want)
+		}
+	}
+
+	orderIDs := []string{"order-1"}
+	state, diags := certificateFiltersFromApi(ctx, emptyCertificateFilters(true), &infisical.CertificateSyncFilters{CertificateOrderIDs: &orderIDs})
+	if diags.HasError() {
+		t.Fatalf("certificateFiltersFromApi() diagnostics = %v", diags)
+	}
+	want := types.ObjectValueMust(certificateFiltersAttrTypes(true), map[string]attr.Value{
+		"certificate_order_ids": types.SetValueMust(types.StringType, []attr.Value{types.StringValue("order-1")}),
+	})
+	if !state.Equal(want) {
+		t.Errorf("certificateFiltersFromApi() = %v, want %v", state, want)
+	}
+}
+
+func TestCertificateFiltersForRequest(t *testing.T) {
+	ctx := context.Background()
+	stringSet := func(values ...string) types.Set {
+		elements := make([]attr.Value, 0, len(values))
+		for _, value := range values {
+			elements = append(elements, types.StringValue(value))
+		}
+		return types.SetValueMust(types.StringType, elements)
+	}
+	metadata := types.SetValueMust(certificateMetadataFilterType, []attr.Value{
+		types.ObjectValueMust(certificateMetadataFilterAttrTypes, map[string]attr.Value{
+			"key":   types.StringValue("env"),
+			"value": types.StringValue("prod"),
+		}),
+	})
+
+	cases := []struct {
+		name    string
+		filters types.Object
+		want    string
+	}{
+		{"block left out", types.ObjectNull(certificateFiltersAttrTypes(false)), "null"},
+		{"all selectors", types.ObjectValueMust(certificateFiltersAttrTypes(false), map[string]attr.Value{
+			"certificate_order_ids": stringSet("order-1"),
+			"profile_ids":           stringSet("profile-1"),
+			"metadata":              metadata,
+		}), `{"profileIds":["profile-1"],"certificateOrderIds":["order-1"],"metadata":[{"key":"env","value":"prod"}]}`},
+		{"empty block", emptyCertificateFilters(false), `{}`},
+		{"explicit empty orders", types.ObjectValueMust(certificateFiltersAttrTypes(false), map[string]attr.Value{
+			"certificate_order_ids": stringSet(),
+			"profile_ids":           types.SetNull(types.StringType),
+			"metadata":              types.SetNull(certificateMetadataFilterType),
+		}), `{"certificateOrderIds":[]}`},
+		{"order-only block", types.ObjectValueMust(certificateFiltersAttrTypes(true), map[string]attr.Value{
+			"certificate_order_ids": stringSet("order-1"),
+		}), `{"certificateOrderIds":["order-1"]}`},
+		{"order-only empty block", emptyCertificateFilters(true), `{}`},
+	}
+	for _, c := range cases {
+		request, diags := certificateFiltersForRequest(ctx, c.filters)
+		if diags.HasError() {
+			t.Fatalf("%s: diagnostics = %v", c.name, diags)
+		}
+		got, err := json.Marshal(request)
+		if err != nil {
+			t.Fatalf("%s: marshal: %v", c.name, err)
+		}
+		if string(got) != c.want {
+			t.Errorf("%s: request filters = %s, want %s", c.name, got, c.want)
 		}
 	}
 }
