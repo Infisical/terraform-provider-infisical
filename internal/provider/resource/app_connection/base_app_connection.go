@@ -24,6 +24,7 @@ type AppConnectionBaseResource struct {
 	App                              infisical.AppConnectionApp // used for identifying secret sync route
 	ResourceTypeName                 string                     // terraform resource name suffix
 	AppConnectionName                string                     // complete descriptive name of the app connection
+	DocsURL                          string                     // optional Infisical guide linked from the resource description
 	SupportsGateway                  bool                       // when true, exposes gateway_id and sends it to the API
 	RequiresGateway                  bool                       // when true, gateway_id is required
 	client                           *infisical.Client
@@ -228,8 +229,13 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 		}
 	}
 
+	description := fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName)
+	if r.DocsURL != "" {
+		description += fmt.Sprintf(". For setup, see the [%s app connection guide](%s).", r.AppConnectionName, r.DocsURL)
+	}
+
 	resp.Schema = schema.Schema{
-		Description: fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName),
+		Description: description,
 		Attributes:  attributes,
 	}
 }

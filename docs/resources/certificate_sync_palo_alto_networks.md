@@ -3,22 +3,12 @@
 page_title: "infisical_certificate_sync_palo_alto_networks Resource - terraform-provider-infisical"
 subcategory: "Certificate Syncs"
 description: |-
-  Create and manage Palo Alto Networks certificate syncs
+  Create and manage Palo Alto Networks certificate syncs. For setup, see the Palo Alto Networks certificate sync guide https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks.
 ---
 
 # infisical_certificate_sync_palo_alto_networks (Resource)
 
-Create and manage Palo Alto Networks certificate syncs
-
-Syncs certificates to a PAN-OS firewall or a Panorama template. To also bind a certificate to an SSL/TLS service profile, use `infisical_certificate_sync_palo_alto_networks_ssl_tls_profile`.
-
-Before you start, you need:
-
-- An `infisical_app_connection_palo_alto_networks` connection.
-- On a Panorama, the template to sync to. The template must also belong to a template stack, unless you set `push_to_devices` to `false`.
-- Certificates that include a private key. The sync skips a certificate without one.
-
-See the [Palo Alto Networks certificate sync guide](https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks) for details.
+Create and manage Palo Alto Networks certificate syncs. For setup, see the [Palo Alto Networks certificate sync guide](https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks).
 
 ## Example Usage
 
@@ -101,7 +91,7 @@ Optional:
 
 Required:
 
-- `certificate_name_schema` (String) The naming scheme for synced certificates, which must compile to 1-31 letters, digits, hyphens, or underscores. Available placeholders: {{shortCertificateId}}, {{commonName}} and {{applicationName}}. {{certificateId}}, {{profileId}} and {{applicationId}} are too long to fit. A schema with placeholders must include {{shortCertificateId}} or {{commonName}} so each certificate gets its own name. A schema with no placeholder can be linked to only one certificate.
+- `certificate_name_schema` (String) The naming scheme for synced certificates, which must compile to 1-31 letters, digits, hyphens, or underscores. Available placeholders: {{shortCertificateId}}, {{commonName}} and {{applicationName}}. A schema with placeholders must include {{shortCertificateId}} or {{commonName}} so each certificate gets its own name. A schema with no placeholder can be linked to only one certificate.
 
 Optional:
 

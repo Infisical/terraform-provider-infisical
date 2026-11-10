@@ -55,6 +55,7 @@ func NewAppConnectionPaloAltoNetworksResource() resource.Resource {
 	return &AppConnectionBaseResource{
 		App:               infisical.AppConnectionAppPaloAltoNetworks,
 		AppConnectionName: "Palo Alto Networks",
+		DocsURL:           "https://infisical.com/docs/integrations/app-connections/palo-alto-networks",
 		ResourceTypeName:  "_app_connection_palo_alto_networks",
 		SupportsGateway:   true,
 		AllowedMethods:    []string{PaloAltoNetworksAppConnectionBasicAuthMethod},

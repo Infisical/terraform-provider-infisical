@@ -61,7 +61,7 @@ var (
 	paloAltoNetworksCertificateNameRule = &certificateNameRule{pattern: regexp.MustCompile(`^[a-zA-Z0-9_-]{1,31}$`), requirement: "1-31 letters, digits, hyphens or underscores (use {{shortCertificateId}} rather than {{certificateId}} to stay within the limit)", placeholders: "{{shortCertificateId}}, {{commonName}}, {{applicationName}}"}
 )
 
-const paloAltoNetworksCertificateNameSchemaDescription = "The naming scheme for synced certificates, which must compile to 1-31 letters, digits, hyphens, or underscores. Available placeholders: {{shortCertificateId}}, {{commonName}} and {{applicationName}}. {{certificateId}}, {{profileId}} and {{applicationId}} are too long to fit."
+const paloAltoNetworksCertificateNameSchemaDescription = "The naming scheme for synced certificates, which must compile to 1-31 letters, digits, hyphens, or underscores. Available placeholders: {{shortCertificateId}}, {{commonName}} and {{applicationName}}."
 
 func panOsObjectNameValidators() []validator.String {
 	return []validator.String{
@@ -167,6 +167,7 @@ func NewCertificateSyncPaloAltoNetworksResource() resource.Resource {
 	return &CertificateSyncBaseResource{
 		App:                         infisical.CertificateSyncAppPaloAltoNetworks,
 		SyncName:                    "Palo Alto Networks",
+		DocsURL:                     "https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks",
 		ResourceTypeName:            "_certificate_sync_palo_alto_networks",
 		CertificateNameRule:         paloAltoNetworksCertificateNameRule,
 		AppConnection:               infisical.AppConnectionAppPaloAltoNetworks,
@@ -221,6 +222,7 @@ func NewCertificateSyncPaloAltoNetworksSslTlsProfileResource() resource.Resource
 	return &CertificateSyncBaseResource{
 		App:                         infisical.CertificateSyncAppPaloAltoNetworksSslTlsProfile,
 		SyncName:                    "Palo Alto Networks SSL/TLS Profile",
+		DocsURL:                     "https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks-ssl-tls-profile",
 		ResourceTypeName:            "_certificate_sync_palo_alto_networks_ssl_tls_profile",
 		CertificateNameRule:         paloAltoNetworksCertificateNameRule,
 		AppConnection:               infisical.AppConnectionAppPaloAltoNetworks,

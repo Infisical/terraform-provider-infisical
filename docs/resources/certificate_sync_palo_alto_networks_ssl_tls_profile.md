@@ -3,23 +3,12 @@
 page_title: "infisical_certificate_sync_palo_alto_networks_ssl_tls_profile Resource - terraform-provider-infisical"
 subcategory: "Certificate Syncs"
 description: |-
-  Create and manage Palo Alto Networks SSL/TLS Profile certificate syncs
+  Create and manage Palo Alto Networks SSL/TLS Profile certificate syncs. For setup, see the Palo Alto Networks SSL/TLS Profile certificate sync guide https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks-ssl-tls-profile.
 ---
 
 # infisical_certificate_sync_palo_alto_networks_ssl_tls_profile (Resource)
 
-Create and manage Palo Alto Networks SSL/TLS Profile certificate syncs
-
-Syncs one certificate to a PAN-OS firewall or a Panorama template and binds it to an SSL/TLS service profile. To sync several certificates without binding them, use `infisical_certificate_sync_palo_alto_networks`.
-
-Before you start, you need:
-
-- An `infisical_app_connection_palo_alto_networks` connection.
-- An existing SSL/TLS service profile. The sync doesn't create it.
-- On a Panorama, the template to sync to. The template must also belong to a template stack, unless you set `push_to_devices` to `false`.
-- A certificate that includes a private key. The sync skips a certificate without one.
-
-See the [Palo Alto Networks SSL/TLS Profile certificate sync guide](https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks-ssl-tls-profile) for details.
+Create and manage Palo Alto Networks SSL/TLS Profile certificate syncs. For setup, see the [Palo Alto Networks SSL/TLS Profile certificate sync guide](https://infisical.com/docs/documentation/platform/pki/applications/certificate-syncs/palo-alto-networks-ssl-tls-profile).
 
 ## Example Usage
 
@@ -110,7 +99,7 @@ Optional:
 
 Required:
 
-- `certificate_name_schema` (String) The naming scheme for synced certificates, which must compile to 1-31 letters, digits, hyphens, or underscores. Available placeholders: {{shortCertificateId}}, {{commonName}} and {{applicationName}}. {{certificateId}}, {{profileId}} and {{applicationId}} are too long to fit.
+- `certificate_name_schema` (String) The naming scheme for synced certificates, which must compile to 1-31 letters, digits, hyphens, or underscores. Available placeholders: {{shortCertificateId}}, {{commonName}} and {{applicationName}}.
 
 Optional:
 

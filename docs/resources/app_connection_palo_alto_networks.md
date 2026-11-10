@@ -3,14 +3,12 @@
 page_title: "infisical_app_connection_palo_alto_networks Resource - terraform-provider-infisical"
 subcategory: "App Connections"
 description: |-
-  Create and manage Palo Alto Networks App Connection
+  Create and manage Palo Alto Networks App Connection. For setup, see the Palo Alto Networks app connection guide https://infisical.com/docs/integrations/app-connections/palo-alto-networks.
 ---
 
 # infisical_app_connection_palo_alto_networks (Resource)
 
-Create and manage Palo Alto Networks App Connection
-
-Before you start, create a dedicated PAN-OS administrator for this connection whose Admin Role allows only the XML API **Configuration**, **Operational Requests**, **Commit** and **Import** permissions. Each sync commits every pending change made with this account, so don't reuse a person's account. See the [Palo Alto Networks connection guide](https://infisical.com/docs/integrations/app-connections/palo-alto-networks) for the steps.
+Create and manage Palo Alto Networks App Connection. For setup, see the [Palo Alto Networks app connection guide](https://infisical.com/docs/integrations/app-connections/palo-alto-networks).
 
 ## Example Usage
 

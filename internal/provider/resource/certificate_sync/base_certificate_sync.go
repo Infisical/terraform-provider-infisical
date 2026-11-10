@@ -149,6 +149,7 @@ type CertificateSyncBaseResource struct {
 	App              infisical.CertificateSyncApp // destination segment of the API path, e.g. "aws-certificate-manager"
 	ResourceTypeName string                       // appended to the provider name, e.g. "_certificate_sync_aws_certificate_manager"
 	SyncName         string                       // destination name as it appears in docs and errors, e.g. "AWS Certificate Manager"
+	DocsURL          string                       // optional Infisical guide linked from the resource description
 	AppConnection    infisical.AppConnectionApp   // app connection type this destination authenticates with
 	// AdditionalConnections lists other app connection types the destination also accepts.
 	AdditionalConnections []infisical.AppConnectionApp
@@ -388,8 +389,13 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 		}
 	}
 
+	description := fmt.Sprintf("Create and manage %s certificate syncs", r.SyncName)
+	if r.DocsURL != "" {
+		description += fmt.Sprintf(". For setup, see the [%s certificate sync guide](%s).", r.SyncName, r.DocsURL)
+	}
+
 	resp.Schema = schema.Schema{
-		Description: fmt.Sprintf("Create and manage %s certificate syncs", r.SyncName),
+		Description: description,
 		Attributes:  attributes,
 	}
 }
