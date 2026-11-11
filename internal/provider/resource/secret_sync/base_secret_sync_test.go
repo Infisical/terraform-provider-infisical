@@ -170,10 +170,10 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFolders(t *testing.T) {
 				"include_all_sub_folders": tc.deprecated,
 			})
 
-			resp := resource.ModifyPlanResponse{Plan: tfsdk.Plan{Schema: config.Schema, Raw: config.Raw}}
+			resp := resource.ModifyPlanResponse{Plan: tfsdk.Plan(config)}
 			r.ModifyPlan(ctx, resource.ModifyPlanRequest{
 				Config: config,
-				Plan:   tfsdk.Plan{Schema: config.Schema, Raw: config.Raw},
+				Plan:   tfsdk.Plan(config),
 				State:  tfsdk.State{Schema: config.Schema, Raw: tftypes.NewValue(config.Raw.Type(), nil)},
 			}, &resp)
 			if resp.Diagnostics.HasError() {
@@ -236,7 +236,7 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFoldersUnknown(t *testing.T)
 			}
 
 			// The framework fills static defaults into the plan before ModifyPlan runs.
-			plan := tfsdk.Plan{Schema: config.Schema, Raw: config.Raw}
+			plan := tfsdk.Plan(config)
 			if diags := plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), false); diags.HasError() {
 				t.Fatal(diags)
 			}
