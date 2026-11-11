@@ -361,7 +361,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 			}
 
 			// Read the secret state after merge.
-			readResponse, readErr := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+			readResponse, readErr := r.client.GetSingleSecretByIDV4(infisical.GetSingleSecretByIDV4Request{
 				ID:              secretID,
 				ViewSecretValue: !secretData.IsWriteOnly,
 			})
@@ -449,8 +449,8 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	// Read by ID instead of name+path so folder renames don't cause a spurious deletion.
 	// A write-only secret keeps its value out of state, so the refresh does not need it and works without Read Value.
-	isWriteOnly := state.Value.IsNull()
-	response, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+	isWriteOnly := state.Value.IsNull() || state.Value.IsUnknown()
+	response, err := r.client.GetSingleSecretByIDV4(infisical.GetSingleSecretByIDV4Request{
 		ID:              state.ID.ValueString(),
 		ViewSecretValue: !isWriteOnly,
 	})
@@ -640,7 +640,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 			}
 
 			// Read the secret state after merge using the existing ID from state.
-			readResponse, readErr := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+			readResponse, readErr := r.client.GetSingleSecretByIDV4(infisical.GetSingleSecretByIDV4Request{
 				ID:              state.ID.ValueString(),
 				ViewSecretValue: !secretData.IsWriteOnly,
 			})
@@ -884,7 +884,7 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 	}
 
 	if _, err := uuid.ParseUUID(importID); err == nil {
-		secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
+		secret, err := r.client.GetSingleSecretByIDV4(infisical.GetSingleSecretByIDV4Request{
 			ID:              importID,
 			ViewSecretValue: !isWriteOnly,
 		})
