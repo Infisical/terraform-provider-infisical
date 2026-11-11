@@ -17,7 +17,7 @@ const (
 	operationDeleteSecretsV3            = "CallDeleteSecretsV3"
 	operationUpdateSecretsV3            = "CallUpdateSecretsV3"
 	operationGetSingleSecretByNameV3    = "CallGetSingleSecretByNameV3"
-	operationGetSingleSecretByIDV3      = "CallGetSingleSecretByIDV3"
+	operationGetSingleSecretByIDV4      = "CallGetSingleSecretByIDV4"
 	operationGetSecretsRawV3            = "CallGetSecretsRawV3"
 	operationCreateRawSecretsV3         = "CallCreateRawSecretsV3"
 	operationDeleteRawSecretV3          = "CallDeleteRawSecretV3"
@@ -117,23 +117,24 @@ func (client Client) UpdateSecretsV3(request UpdateSecretByNameV3Request) error 
 	return nil
 }
 
-func (client Client) GetSingleSecretByIDV3(request GetSingleSecretByIDV3Request) (GetSingleSecretByIDV3Response, error) {
-	var secretsResponse GetSingleSecretByIDV3Response
+func (client Client) GetSingleSecretByIDV4(request GetSingleSecretByIDV4Request) (GetSingleSecretByIDV4Response, error) {
+	var secretsResponse GetSingleSecretByIDV4Response
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&secretsResponse).
 		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("api/v3/secrets/raw/id/%s", request.ID))
+		SetQueryParam("viewSecretValue", strconv.FormatBool(request.ViewSecretValue)).
+		Get(fmt.Sprintf("api/v4/secrets/id/%s", request.ID))
 
 	if err != nil {
-		return GetSingleSecretByIDV3Response{}, errors.NewGenericRequestError(operationGetSingleSecretByIDV3, err)
+		return GetSingleSecretByIDV4Response{}, errors.NewGenericRequestError(operationGetSingleSecretByIDV4, err)
 	}
 
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
-			return GetSingleSecretByIDV3Response{}, ErrNotFound
+			return GetSingleSecretByIDV4Response{}, ErrNotFound
 		}
-		return GetSingleSecretByIDV3Response{}, errors.NewAPIErrorWithResponse(operationGetSingleSecretByIDV3, response, nil)
+		return GetSingleSecretByIDV4Response{}, errors.NewAPIErrorWithResponse(operationGetSingleSecretByIDV4, response, nil)
 	}
 
 	return secretsResponse, nil

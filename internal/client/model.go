@@ -554,8 +554,9 @@ type GetSingleSecretByNameV3Request struct {
 	SecretPath  string `json:"secretPath"`
 }
 
-type GetSingleSecretByIDV3Request struct {
-	ID string
+type GetSingleSecretByIDV4Request struct {
+	ID              string
+	ViewSecretValue bool
 }
 
 type GetSingleSecretByNameSecretResponse struct {
@@ -610,7 +611,7 @@ type GetSingleRawSecretByNameSecretResponse struct {
 	Secret RawV3Secret `json:"secret"`
 }
 
-type GetSingleSecretByIDV3Response = struct {
+type GetSingleSecretByIDV4Response = struct {
 	Secret struct {
 		ID            string `json:"id"`
 		Version       int    `json:"version"`
