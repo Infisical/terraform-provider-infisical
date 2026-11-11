@@ -447,6 +447,11 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	// Read by ID instead of name+path so folder renames don't cause a spurious deletion.
 	// A write-only secret keeps its value out of state, so the refresh does not need it and works without Read Value.
 	isWriteOnly := state.Value.IsNull() || state.Value.IsUnknown()
