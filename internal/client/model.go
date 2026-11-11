@@ -555,7 +555,8 @@ type GetSingleSecretByNameV3Request struct {
 }
 
 type GetSingleSecretByIDV3Request struct {
-	ID string
+	ID              string
+	ViewSecretValue bool
 }
 
 type GetSingleSecretByNameSecretResponse struct {

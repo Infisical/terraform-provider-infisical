@@ -123,6 +123,7 @@ func (client Client) GetSingleSecretByIDV3(request GetSingleSecretByIDV3Request)
 		R().
 		SetResult(&secretsResponse).
 		SetHeader("User-Agent", USER_AGENT).
+		SetQueryParam("viewSecretValue", strconv.FormatBool(request.ViewSecretValue)).
 		Get(fmt.Sprintf("api/v3/secrets/raw/id/%s", request.ID))
 
 	if err != nil {

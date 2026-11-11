@@ -362,7 +362,8 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 			// Read the secret state after merge.
 			readResponse, readErr := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
-				ID: secretID,
+				ID:              secretID,
+				ViewSecretValue: !secretData.IsWriteOnly,
 			})
 			if readErr != nil {
 				resp.Diagnostics.AddError(
@@ -447,8 +448,11 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	// Read by ID instead of name+path so folder renames don't cause a spurious deletion.
+	// A write-only secret keeps its value out of state, so the refresh does not need it and works without Read Value.
+	isWriteOnly := state.Value.IsNull()
 	response, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
-		ID: state.ID.ValueString(),
+		ID:              state.ID.ValueString(),
+		ViewSecretValue: !isWriteOnly,
 	})
 
 	if err != nil {
@@ -470,8 +474,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if response.Secret.UpdatedAt != "" {
 		state.LastUpdated = types.StringValue(response.Secret.UpdatedAt)
 	}
-	if !state.Value.IsNull() && !state.Value.IsUnknown() {
-		// Resource was configured with regular Value field
+	if !isWriteOnly {
 		state.Value = types.StringValue(response.Secret.SecretValue)
 	}
 
@@ -638,7 +641,8 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 			// Read the secret state after merge using the existing ID from state.
 			readResponse, readErr := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
-				ID: state.ID.ValueString(),
+				ID:              state.ID.ValueString(),
+				ViewSecretValue: !secretData.IsWriteOnly,
 			})
 			if readErr != nil {
 				resp.Diagnostics.AddError(
@@ -881,7 +885,8 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 
 	if _, err := uuid.ParseUUID(importID); err == nil {
 		secret, err := r.client.GetSingleSecretByIDV3(infisical.GetSingleSecretByIDV3Request{
-			ID: importID,
+			ID:              importID,
+			ViewSecretValue: !isWriteOnly,
 		})
 
 		if err != nil {
@@ -926,13 +931,14 @@ func (r *secretResource) ImportState(ctx context.Context, req resource.ImportSta
 			return
 		}
 
+		viewSecretValue := !isWriteOnly
 		secret, err := r.client.GetSingleRawSecretByNameV3(infisical.GetSingleSecretByNameV3Request{
 			WorkspaceId: parts[0],
 			Environment: parts[1],
 			SecretPath:  parts[2],
 			SecretName:  parts[3],
 			Type:        "shared", // Just use the secret uuid instead if (type is 'personal')
-		}, nil)
+		}, &viewSecretValue)
 
 		if err != nil {
 			if err == infisical.ErrNotFound {
