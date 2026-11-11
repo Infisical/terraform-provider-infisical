@@ -132,7 +132,7 @@ func NewSecretSyncSpaceliftResource() resource.Resource {
 				Optional:           true,
 				Computed:           true,
 				Description:        "Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead.",
-				DeprecationMessage: "Use the top-level include_all_sub_folders attribute instead. This attribute will be removed in a future major version.",
+				DeprecationMessage: "Use the top-level include_all_sub_folders attribute instead. This attribute will be removed in a future version.",
 				Default:            booldefault.StaticBool(false),
 			},
 		},
