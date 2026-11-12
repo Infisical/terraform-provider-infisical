@@ -140,7 +140,7 @@ resource "infisical_alert" "payments_certificates_expiring" {
 
 # Email the project's admins when a scheduled secret rotation fails after all of its retries.
 # Rotations created through Terraform have no failure alert until you add one like this.
-resource "infisical_alert" "postgres_rotation_failed" {
+resource "infisical_alert" "rotation_failed" {
   resource_type = "secret.rotation"
   resource_id   = "<your-secret-rotation-id>"
   name          = "Rotation failure alert"

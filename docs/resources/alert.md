@@ -155,7 +155,7 @@ resource "infisical_alert" "payments_certificates_expiring" {
 
 # Email the project's admins when a scheduled secret rotation fails after all of its retries.
 # Rotations created through Terraform have no failure alert until you add one like this.
-resource "infisical_alert" "postgres_rotation_failed" {
+resource "infisical_alert" "rotation_failed" {
   resource_type = "secret.rotation"
   resource_id   = "<your-secret-rotation-id>"
   name          = "Rotation failure alert"
@@ -250,8 +250,8 @@ Required:
 
 Required:
 
-- `id` (String) The ID of the recipient user or group, which must belong to the scope the alert is created in. For an email recipient this is the email address, which must be on one of your organization's verified email domains. For a project-admins recipient this is the ID of the project the resource belongs to.
-- `type` (String) The type of the recipient. Options: user, group, email, project-admins. The email type is only for cert-manager, cert-manager.application, cert-manager.signer alerts, and the project-admins type, which notifies the members who have the admin role directly on the project, is only for secret.rotation alerts.
+- `id` (String) The ID of the recipient user or group, which must belong to the scope the alert is created in. For an email recipient this is the email address, which must be on one of your organization's verified email domains. For a project-admins or project-members recipient this is the ID of the project the resource belongs to.
+- `type` (String) The type of the recipient. Options: user, group, email, project-admins, project-members. The email type is only for cert-manager, cert-manager.application, cert-manager.signer alerts. The project-admins type notifies the members who have the admin role directly on the project, the project-members type notifies everyone in the project, directly or through a group, and both are only for secret.rotation alerts.
 
 
 

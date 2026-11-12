@@ -42,10 +42,11 @@ var alertChannelTypes = []string{
 }
 
 const (
-	AlertRecipientTypeUser          = "user"
-	AlertRecipientTypeGroup         = "group"
-	AlertRecipientTypeEmail         = "email"
-	AlertRecipientTypeProjectAdmins = "project-admins"
+	AlertRecipientTypeUser           = "user"
+	AlertRecipientTypeGroup          = "group"
+	AlertRecipientTypeEmail          = "email"
+	AlertRecipientTypeProjectAdmins  = "project-admins"
+	AlertRecipientTypeProjectMembers = "project-members"
 )
 
 const (
@@ -232,14 +233,14 @@ func alertChannelsSchema() schema.MapNestedAttribute {
 								Attributes: map[string]schema.Attribute{
 									"type": schema.StringAttribute{
 										Required:    true,
-										Description: "The type of the recipient. Options: " + AlertRecipientTypeUser + ", " + AlertRecipientTypeGroup + ", " + AlertRecipientTypeEmail + ", " + AlertRecipientTypeProjectAdmins + ". The " + AlertRecipientTypeEmail + " type is only for " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsEmailRecipients }), ", ") + " alerts, and the " + AlertRecipientTypeProjectAdmins + " type, which notifies the members who have the admin role directly on the project, is only for " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsProjectAdminRecipients }), ", ") + " alerts.",
+										Description: "The type of the recipient. Options: " + AlertRecipientTypeUser + ", " + AlertRecipientTypeGroup + ", " + AlertRecipientTypeEmail + ", " + AlertRecipientTypeProjectAdmins + ", " + AlertRecipientTypeProjectMembers + ". The " + AlertRecipientTypeEmail + " type is only for " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsEmailRecipients }), ", ") + " alerts. The " + AlertRecipientTypeProjectAdmins + " type notifies the members who have the admin role directly on the project, the " + AlertRecipientTypeProjectMembers + " type notifies everyone in the project, directly or through a group, and both are only for " + strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsProjectRecipients }), ", ") + " alerts.",
 										Validators: []validator.String{
-											stringvalidator.OneOf(AlertRecipientTypeUser, AlertRecipientTypeGroup, AlertRecipientTypeEmail, AlertRecipientTypeProjectAdmins),
+											stringvalidator.OneOf(AlertRecipientTypeUser, AlertRecipientTypeGroup, AlertRecipientTypeEmail, AlertRecipientTypeProjectAdmins, AlertRecipientTypeProjectMembers),
 										},
 									},
 									"id": schema.StringAttribute{
 										Required:    true,
-										Description: "The ID of the recipient user or group, which must belong to the scope the alert is created in. For an " + AlertRecipientTypeEmail + " recipient this is the email address, which must be on one of your organization's verified email domains. For a " + AlertRecipientTypeProjectAdmins + " recipient this is the ID of the project the resource belongs to.",
+										Description: "The ID of the recipient user or group, which must belong to the scope the alert is created in. For an " + AlertRecipientTypeEmail + " recipient this is the email address, which must be on one of your organization's verified email domains. For a " + AlertRecipientTypeProjectAdmins + " or " + AlertRecipientTypeProjectMembers + " recipient this is the ID of the project the resource belongs to.",
 										Validators: []validator.String{
 											stringvalidator.RegexMatches(regexp.MustCompile(`^\S(.*\S)?$`), "must not be empty or start or end with whitespace"),
 										},
@@ -349,7 +350,7 @@ func validateChannelsHaveOneType(ctx context.Context, config tfsdk.Config) diag.
 	return diags
 }
 
-func channelHasRecipientOfType(value attr.Value, recipientType string) bool {
+func channelHasRecipientOfType(value attr.Value, recipientTypes ...string) bool {
 	channel, ok := value.(types.Object)
 	if !ok || channel.IsNull() || channel.IsUnknown() {
 		return false
@@ -368,7 +369,7 @@ func channelHasRecipientOfType(value attr.Value, recipientType string) bool {
 		if !ok || recipient.IsNull() || recipient.IsUnknown() {
 			continue
 		}
-		if typeValue, ok := recipient.Attributes()["type"].(types.String); ok && typeValue.ValueString() == recipientType {
+		if typeValue, ok := recipient.Attributes()["type"].(types.String); ok && slices.Contains(recipientTypes, typeValue.ValueString()) {
 			return true
 		}
 	}
@@ -399,13 +400,13 @@ func validateRecipientTypesForResourceType(ctx context.Context, config tfsdk.Con
 			)
 			return diags
 		}
-		if !traits.allowsProjectAdminRecipients && channelHasRecipientOfType(elements[key], AlertRecipientTypeProjectAdmins) {
+		if !traits.allowsProjectRecipients && channelHasRecipientOfType(elements[key], AlertRecipientTypeProjectAdmins, AlertRecipientTypeProjectMembers) {
 			diags.AddAttributeError(
 				recipientsPath,
 				"Unsupported alert recipient",
 				fmt.Sprintf(
-					"%s alerts cannot notify project admins. Use a user or group recipient instead. Project admin recipients are only for: %s.",
-					resourceType, strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsProjectAdminRecipients }), ", "),
+					"%s alerts cannot notify project admins or all project members. Use a user or group recipient instead. Project recipients are only for: %s.",
+					resourceType, strings.Join(alertResourceTypesWhere(func(traits alertResourceTypeTraits) bool { return traits.allowsProjectRecipients }), ", "),
 				),
 			)
 			return diags

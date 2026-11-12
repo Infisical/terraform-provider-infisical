@@ -40,10 +40,10 @@ const (
 )
 
 type alertResourceTypeTraits struct {
-	resolvesProject              bool
-	allowsEmailRecipients        bool
-	allowsProjectAdminRecipients bool
-	scopeWide                    bool
+	resolvesProject         bool
+	allowsEmailRecipients   bool
+	allowsProjectRecipients bool
+	scopeWide               bool
 }
 
 var alertResourceTypes = map[string]alertResourceTypeTraits{
@@ -51,7 +51,7 @@ var alertResourceTypes = map[string]alertResourceTypeTraits{
 	alertResourceTypeCertManagerApplication: {resolvesProject: true, allowsEmailRecipients: true},
 	alertResourceTypeCertManager:            {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
 	alertResourceTypeCertManagerSigner:      {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
-	alertResourceTypeSecretRotation:         {resolvesProject: true, allowsProjectAdminRecipients: true},
+	alertResourceTypeSecretRotation:         {resolvesProject: true, allowsProjectRecipients: true},
 }
 
 type alertEvent struct {
