@@ -602,6 +602,15 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 				)
 				return
 			}
+			// The final read at the deadline can report the earlier sync as finished. The timeout is used up by then,
+			// so an update sent now could only end in a timeout error after it was applied.
+			if waitCtx.Err() != nil {
+				resp.Diagnostics.AddError(
+					"Error updating secret sync",
+					fmt.Sprintf("Couldn't update the %s secret sync: the update timeout ran out while waiting for the sync that was already in progress to finish. Terraform did not send the update. To wait longer, increase the values in timeouts.", r.SyncName),
+				)
+				return
+			}
 		}
 	}
 

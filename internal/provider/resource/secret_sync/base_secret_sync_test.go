@@ -50,6 +50,9 @@ type fakeSecretSyncBackend struct {
 	// nextRun is the status script for the job that the next create or update queues.
 	nextRun []fakeSyncStep
 
+	// stallGets is the number of next status reads that hang until the client gives up, like a stalled connection.
+	stallGets int
+
 	gets          int
 	patches       int
 	createBodies  []map[string]any
@@ -127,6 +130,20 @@ func (b *fakeSecretSyncBackend) handler() http.Handler {
 	})
 
 	mux.HandleFunc("GET /api/v1/secret-syncs/{app}/{id}", func(w http.ResponseWriter, r *http.Request) {
+		b.mu.Lock()
+		stall := b.stallGets > 0
+		if stall {
+			b.stallGets--
+		}
+		b.mu.Unlock()
+		if stall {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-time.After(10 * time.Second):
+			}
+		}
+
 		b.mu.Lock()
 		defer b.mu.Unlock()
 
@@ -795,6 +812,52 @@ func TestSecretSyncWaitReadsOnceMoreAtTheDeadline(t *testing.T) {
 		}
 		if got := h.gets(); got != 1 {
 			t.Errorf("expected one read at the deadline, got %d", got)
+		}
+	})
+}
+
+// A status read that stalls must not hold the wait past timeouts.create.
+func TestSecretSyncCreateWaitStopsStalledReadAtDeadline(t *testing.T) {
+	forEachSecretSyncVariant(t, func(t *testing.T, v secretSyncTestVariant) {
+		h := newSecretSyncTestHarness(t, v)
+		h.backend.stallGets = 1
+
+		start := time.Now()
+		resp := h.create(h.model(true, map[string]string{"create": "100ms"}))
+		elapsed := time.Since(start)
+
+		expectDiagnosticError(t, resp.Diagnostics, "timed out", "status: pending")
+		if elapsed > 5*time.Second {
+			t.Errorf("expected the create to stop near the deadline, it took %s", elapsed)
+		}
+	})
+}
+
+// The stalled pre-wait read ends at the deadline. The final read then sees the earlier sync finished, but the
+// timeout is used up, so the update must not be sent.
+func TestSecretSyncUpdateDoesNotPatchAfterDeadline(t *testing.T) {
+	forEachSecretSyncVariant(t, func(t *testing.T, v secretSyncTestVariant) {
+		h := newSecretSyncTestHarness(t, v)
+		state := h.applied()
+		h.backend.setStatus(state.ID.ValueString(), infisical.SecretSyncStatusSucceeded)
+		h.backend.stallGets = 1
+		h.resetCounters()
+
+		plan := state
+		plan.WaitForSyncCompletion = types.BoolValue(true)
+		plan.Timeouts = secretSyncTimeouts(map[string]string{"update": "100ms"})
+		plan.Name = types.StringValue("renamed-sync")
+
+		start := time.Now()
+		resp := h.update(state, plan)
+		elapsed := time.Since(start)
+
+		expectDiagnosticError(t, resp.Diagnostics, "timeout ran out", "did not send the update")
+		if count, _, _ := h.patches(); count != 0 {
+			t.Errorf("expected no PATCH after the deadline, got %d", count)
+		}
+		if elapsed > 5*time.Second {
+			t.Errorf("expected the update to stop near the deadline, it took %s", elapsed)
 		}
 	})
 }
