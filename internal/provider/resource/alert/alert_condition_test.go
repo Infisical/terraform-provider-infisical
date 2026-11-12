@@ -46,6 +46,7 @@ func TestResolveAlertEvent(t *testing.T) {
 		{alertResourceTypeCertManagerSigner, "certificate.expiry", alertEventTypeCertManagerSignerCertExpiry},
 		{alertResourceTypeIdentityAuthentication, "auth-method-changed", alertEventTypeIdentityAuthenticationAuthMethodChanged},
 		{alertResourceTypeIdentityAuthentication, "expiry", alertEventTypeIdentityAuthenticationExpiry},
+		{alertResourceTypeSecretRotation, "failed", alertEventTypeSecretRotationFailed},
 	}
 	for _, c := range cases {
 		event, ok := resolveAlertEvent(c.resourceType, c.eventType)

@@ -886,6 +886,39 @@ func TestValidateRecipientTypesForResourceType(t *testing.T) {
 	}
 }
 
+func TestValidateProjectAdminRecipientsForResourceType(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+
+	model := func(resourceType string) alertResourceModel {
+		m := alertModel(t, map[string]alertChannelModel{"admins": {
+			ID:      types.StringValue("channel-1"),
+			Name:    types.StringValue("Project admins"),
+			Enabled: types.BoolValue(true),
+			Email: emailChannel(t,
+				alertChannelRecipientModel{Type: types.StringValue(AlertRecipientTypeProjectAdmins), ID: types.StringValue("project-1")},
+			),
+		}})
+		m.ResourceType = types.StringValue(resourceType)
+		return m
+	}
+
+	if diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(alertResourceTypeSecretRotation)), alertResourceTypeSecretRotation); diags.HasError() {
+		t.Errorf("project admins on a rotation alert: diagnostics = %v, want none", diags)
+	}
+
+	for _, resourceType := range []string{alertResourceTypeIdentityAuthentication, alertResourceTypeCertManagerApplication} {
+		diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(resourceType)), resourceType)
+		if !diags.HasError() {
+			t.Fatalf("project admins on a %s alert: no error, want one", resourceType)
+		}
+		want := path.Root("channels").AtMapKey("admins").AtName("email").AtName("recipients")
+		if got := errorPath(t, diags); !got.Equal(want) {
+			t.Errorf("%s: error path = %v, want %v", resourceType, got, want)
+		}
+	}
+}
+
 func TestRecipientIDRejectsSurroundingWhitespace(t *testing.T) {
 	s := alertSchema(t)
 	channels := as[schema.MapNestedAttribute](t, s.Attributes["channels"])

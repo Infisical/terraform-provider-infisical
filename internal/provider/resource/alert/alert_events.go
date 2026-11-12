@@ -19,6 +19,7 @@ const (
 	alertResourceTypeCertManagerApplication = "cert-manager.application"
 	alertResourceTypeCertManager            = "cert-manager"
 	alertResourceTypeCertManagerSigner      = "cert-manager.signer"
+	alertResourceTypeSecretRotation         = "secret.rotation"
 
 	alertEventTypeIdentityAuthenticationExpiry            = "identity.authentication.expiry"
 	alertEventTypeIdentityAuthenticationAuthMethodChanged = "identity.authentication.auth-method-changed"
@@ -34,12 +35,15 @@ const (
 	alertEventTypeCertManagerCertRevocation = "cert-manager.certificate.revocation"
 
 	alertEventTypeCertManagerSignerCertExpiry = "cert-manager.signer.certificate.expiry"
+
+	alertEventTypeSecretRotationFailed = "secret.rotation.failed"
 )
 
 type alertResourceTypeTraits struct {
-	resolvesProject       bool
-	allowsEmailRecipients bool
-	scopeWide             bool
+	resolvesProject              bool
+	allowsEmailRecipients        bool
+	allowsProjectAdminRecipients bool
+	scopeWide                    bool
 }
 
 var alertResourceTypes = map[string]alertResourceTypeTraits{
@@ -47,6 +51,7 @@ var alertResourceTypes = map[string]alertResourceTypeTraits{
 	alertResourceTypeCertManagerApplication: {resolvesProject: true, allowsEmailRecipients: true},
 	alertResourceTypeCertManager:            {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
 	alertResourceTypeCertManagerSigner:      {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
+	alertResourceTypeSecretRotation:         {resolvesProject: true, allowsProjectAdminRecipients: true},
 }
 
 type alertEvent struct {
@@ -86,6 +91,8 @@ var alertEvents = []alertEvent{
 	{resourceType: alertResourceTypeCertManager, eventType: alertEventTypeCertManagerCertRevocation, filters: certificateFilters},
 
 	{resourceType: alertResourceTypeCertManagerSigner, eventType: alertEventTypeCertManagerSignerCertExpiry, maxAlertBeforeDays: 365, filters: []string{"signer_ids"}},
+
+	{resourceType: alertResourceTypeSecretRotation, eventType: alertEventTypeSecretRotationFailed},
 }
 
 func alertResourceTypesWhere(match func(alertResourceTypeTraits) bool) []string {
