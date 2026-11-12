@@ -33,12 +33,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_spacelift" "example" {
-  name          = "spacelift-secret-sync"
-  description   = "Sync secrets to a Spacelift context"
-  project_id    = "<your-infisical-project-id>"
-  connection_id = "<app-connection-id>" # The ID of your Spacelift App Connection
-  environment   = "<env-slug>"
-  secret_path   = "<infisical-secret-path>"
+  name                    = "spacelift-secret-sync"
+  description             = "Sync secrets to a Spacelift context"
+  project_id              = "<your-infisical-project-id>"
+  connection_id           = "<app-connection-id>" # The ID of your Spacelift App Connection
+  environment             = "<env-slug>"
+  secret_path             = "<infisical-secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path
 
   auto_sync_enabled = true
 
@@ -73,6 +74,7 @@ resource "infisical_secret_sync_spacelift" "example" {
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the Spacelift sync.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
 
 ### Read-Only
 
@@ -99,7 +101,7 @@ Optional:
 Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Spacelift. Enable this option if you intend to manage some secrets manually outside of Infisical.
-- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
+- `include_all_sub_folders` (Boolean, Deprecated) Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead. When both are set, the top-level include_all_sub_folders takes precedence.
 - `key_schema` (String) The format to use for structuring secret keys in the Spacelift destination.
 - `write_only` (Boolean) Whether secrets should be marked as secret in Spacelift. Secret values are only available to Runs and Tasks and are not accessible in the web GUI or through the API.
 

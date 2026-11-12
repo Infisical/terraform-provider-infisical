@@ -33,12 +33,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_supabase" "example" {
-  name          = "supabase-secret-sync"
-  description   = "Sync secrets to Supabase project"
-  project_id    = "<your-infisical-project-id>"
-  connection_id = "<app-connection-id>" # The ID of your Supabase App Connection
-  environment   = "<env-slug>"
-  secret_path   = "<infisical-secret-path>"
+  name                    = "supabase-secret-sync"
+  description             = "Sync secrets to Supabase project"
+  project_id              = "<your-infisical-project-id>"
+  connection_id           = "<app-connection-id>" # The ID of your Supabase App Connection
+  environment             = "<env-slug>"
+  secret_path             = "<infisical-secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
 
   auto_sync_enabled = true
 
@@ -72,6 +73,7 @@ resource "infisical_secret_sync_supabase" "example" {
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the Supabase sync.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
 
 ### Read-Only
 

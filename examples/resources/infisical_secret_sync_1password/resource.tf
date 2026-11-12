@@ -28,12 +28,13 @@ resource "infisical_app_connection_1password" "one-password-app-connection-demo"
 }
 
 resource "infisical_secret_sync_1password" "one-password-secret-sync-demo" {
-  name          = "1password-secret-sync-demo"
-  description   = "This is a demo 1Password Secret Sync."
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "<secret-path>"
-  connection_id = infisical_app_connection_1password.one-password-app-connection-demo.id
+  name                    = "1password-secret-sync-demo"
+  description             = "This is a demo 1Password Secret Sync."
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "<secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = infisical_app_connection_1password.one-password-app-connection-demo.id
   destination_config = {
     vault_id    = "<vault-id>"
     value_label = "<value-label>" # Optional, defaults to `value`
