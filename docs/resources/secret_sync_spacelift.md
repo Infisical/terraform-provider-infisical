@@ -101,7 +101,7 @@ Optional:
 Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Spacelift. Enable this option if you intend to manage some secrets manually outside of Infisical.
-- `include_all_sub_folders` (Boolean, Deprecated) Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead.
+- `include_all_sub_folders` (Boolean, Deprecated) Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead. When both are set, the top-level include_all_sub_folders takes precedence.
 - `key_schema` (String) The format to use for structuring secret keys in the Spacelift destination.
 - `write_only` (Boolean) Whether secrets should be marked as secret in Spacelift. Secret values are only available to Runs and Tasks and are not accessible in the web GUI or through the API.
 

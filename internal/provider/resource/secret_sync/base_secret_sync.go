@@ -235,51 +235,57 @@ func (r *SecretSyncBaseResource) hasDeprecatedIncludeAllSubFolders() bool {
 	return ok
 }
 
-// planDeprecatedIncludeAllSubFolders keeps the root include_all_sub_folders and the deprecated
-// sync_options.include_all_sub_folders in agreement. Whichever one is left out of the config is planned
-// as the other's value, so configs that still use the deprecated attribute keep including subfolders,
-// and neither attribute drifts once Read fills both from the API.
+// planDeprecatedIncludeAllSubFolders plans the root include_all_sub_folders from the deprecated
+// sync_options.include_all_sub_folders when the root is left out of the config, so configs that still use
+// the deprecated attribute keep including subfolders. The root always wins when it is set.
 func (r *SecretSyncBaseResource) planDeprecatedIncludeAllSubFolders(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if !r.hasDeprecatedIncludeAllSubFolders() {
 		return
 	}
 
+	var rootValue types.Bool
 	var syncOptions types.Object
-	var rootValue, deprecatedValue types.Bool
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options"), &syncOptions)...)
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("include_all_sub_folders"), &rootValue)...)
-	if resp.Diagnostics.HasError() || syncOptions.IsNull() {
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options"), &syncOptions)...)
+	if resp.Diagnostics.HasError() || !rootValue.IsNull() || syncOptions.IsNull() {
 		return
 	}
+
+	// While the deprecated value is unknown the root stays unknown too. Planning it as false would let
+	// the apply-time plan turn it into true, which Terraform rejects as an inconsistent final plan.
+	includeAllSubFolders := types.BoolUnknown()
 	if !syncOptions.IsUnknown() {
+		var deprecatedValue types.Bool
 		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, &deprecatedValue)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		if !deprecatedValue.IsUnknown() {
+			includeAllSubFolders = types.BoolValue(deprecatedValue.ValueBool())
+		}
+	}
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), includeAllSubFolders)...)
+}
+
+// keepDeprecatedIncludeAllSubFolders carries the deprecated sync_options.include_all_sub_folders over from
+// the prior state. The API only reports the resolved value, which follows the root attribute whenever both
+// are set, so reading it back would make a deprecated value that differs from the root drift forever. The
+// root attribute is still read from the API, so real drift is caught there.
+func keepDeprecatedIncludeAllSubFolders(ctx context.Context, fromApi, prior types.Object) (types.Object, diag.Diagnostics) {
+	priorValue, ok := prior.Attributes()["include_all_sub_folders"]
+	if fromApi.IsNull() || fromApi.IsUnknown() || !ok || priorValue.IsNull() || priorValue.IsUnknown() {
+		return fromApi, nil
 	}
 
-	// While either value is unknown, the omitted one stays unknown too. Planning it as false would let
-	// the apply-time plan turn it into true, which Terraform rejects as an inconsistent final plan.
-	includeAllSubFolders := types.BoolUnknown()
-	if !syncOptions.IsUnknown() && !rootValue.IsUnknown() && !deprecatedValue.IsUnknown() {
-		includeAllSubFolders = types.BoolValue(rootValue.ValueBool() || deprecatedValue.ValueBool())
-	}
-	if rootValue.IsNull() {
-		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("include_all_sub_folders"), includeAllSubFolders)...)
-	}
-	// An unknown sync_options is already planned as unknown as a whole, nested flag included.
-	if !syncOptions.IsUnknown() && deprecatedValue.IsNull() {
-		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, includeAllSubFolders)...)
-	}
+	attrs := fromApi.Attributes()
+	attrs["include_all_sub_folders"] = priorValue
+	return types.ObjectValue(fromApi.AttributeTypes(ctx), attrs)
 }
 
 // ValidateConfig rejects including subfolders together with an import initial sync behavior, which the
 // API refuses for every destination. Syncs without initial_sync_behavior always overwrite, so they can
-// include subfolders freely. It also rejects conflicting values for the root and the deprecated
-// sync_options include_all_sub_folders.
+// include subfolders freely.
 func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	r.validateDeprecatedIncludeAllSubFolders(ctx, req, resp)
-
 	if _, ok := r.SyncOptionsAttributes["initial_sync_behavior"]; !ok {
 		return
 	}
@@ -297,32 +303,6 @@ func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resourc
 			path.Root("include_all_sub_folders"),
 			"Invalid include_all_sub_folders",
 			"include_all_sub_folders can only be enabled when initial_sync_behavior is 'overwrite-destination', because there is no single folder to import existing destination secrets into.",
-		)
-	}
-}
-
-func (r *SecretSyncBaseResource) validateDeprecatedIncludeAllSubFolders(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	if !r.hasDeprecatedIncludeAllSubFolders() {
-		return
-	}
-
-	var syncOptions types.Object
-	var rootValue, deprecatedValue types.Bool
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("sync_options"), &syncOptions)...)
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("include_all_sub_folders"), &rootValue)...)
-	if resp.Diagnostics.HasError() || syncOptions.IsNull() || syncOptions.IsUnknown() {
-		return
-	}
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedIncludeAllSubFoldersPath, &deprecatedValue)...)
-	if resp.Diagnostics.HasError() || rootValue.IsNull() || rootValue.IsUnknown() || deprecatedValue.IsNull() || deprecatedValue.IsUnknown() {
-		return
-	}
-
-	if rootValue.ValueBool() != deprecatedValue.ValueBool() {
-		resp.Diagnostics.AddAttributeError(
-			deprecatedIncludeAllSubFoldersPath,
-			"Conflicting include_all_sub_folders",
-			"include_all_sub_folders and the deprecated sync_options.include_all_sub_folders are set to different values. Remove sync_options.include_all_sub_folders and set only include_all_sub_folders.",
 		)
 	}
 }
@@ -490,10 +470,19 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		state.Description = types.StringValue(secretSync.Description)
 	}
 
+	priorSyncOptions := state.SyncOptions
 	state.SyncOptions, diags = r.ReadSyncOptionsFromApi(ctx, secretSync)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if r.hasDeprecatedIncludeAllSubFolders() {
+		state.SyncOptions, diags = keepDeprecatedIncludeAllSubFolders(ctx, state.SyncOptions, priorSyncOptions)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	state.DestinationConfig, diags = r.ReadDestinationConfigFromApi(ctx, secretSync)

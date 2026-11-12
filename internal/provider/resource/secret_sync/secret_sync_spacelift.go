@@ -131,7 +131,7 @@ func NewSecretSyncSpaceliftResource() resource.Resource {
 			"include_all_sub_folders": schema.BoolAttribute{
 				Optional:           true,
 				Computed:           true,
-				Description:        "Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead.",
+				Description:        "Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead. When both are set, the top-level include_all_sub_folders takes precedence.",
 				DeprecationMessage: "Use the top-level include_all_sub_folders attribute instead. This attribute will be removed in a future version.",
 				Default:            booldefault.StaticBool(false),
 			},
@@ -144,7 +144,9 @@ func NewSecretSyncSpaceliftResource() resource.Resource {
 		ReadSyncOptionsFromApi: func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics) {
 			disableSecretDeletion, _ := secretSync.SyncOptions["disableSecretDeletion"].(bool)
 			writeOnly, _ := secretSync.SyncOptions["writeOnly"].(bool)
-			includeAllSubFolders, _ := secretSync.SyncOptions["includeAllSubFolders"].(bool)
+			// Older backends only return the flag inside syncOptions.
+			includeAllSubFoldersOption, _ := secretSync.SyncOptions["includeAllSubFolders"].(bool)
+			includeAllSubFolders := secretSync.IncludeAllSubFolders || includeAllSubFoldersOption
 
 			keySchema := types.StringNull()
 			if v, ok := secretSync.SyncOptions["keySchema"].(string); ok {

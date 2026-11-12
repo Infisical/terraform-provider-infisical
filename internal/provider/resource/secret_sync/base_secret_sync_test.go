@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -149,8 +150,8 @@ func TestSecretSyncValidateConfigNullSyncOptions(t *testing.T) {
 	}
 }
 
-// Spacelift still accepts the deprecated sync_options.include_all_sub_folders. Whichever of the two
-// attributes is left out of the config must be planned as the other's value.
+// Spacelift still accepts the deprecated sync_options.include_all_sub_folders. The root attribute wins
+// when it is set; otherwise it is planned as the deprecated value.
 func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFolders(t *testing.T) {
 	ctx := context.Background()
 	boolVal := func(v interface{}) tftypes.Value { return tftypes.NewValue(tftypes.Bool, v) }
@@ -160,7 +161,8 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFolders(t *testing.T) {
 		wantRoot, wantDeprecated bool
 	}{
 		"only deprecated true": {root: boolVal(nil), deprecated: boolVal(true), wantRoot: true, wantDeprecated: true},
-		"only root true":       {root: boolVal(true), deprecated: boolVal(nil), wantRoot: true, wantDeprecated: true},
+		"only root true":       {root: boolVal(true), deprecated: boolVal(nil), wantRoot: true},
+		"root wins":            {root: boolVal(false), deprecated: boolVal(true), wantDeprecated: true},
 		"neither set":          {root: boolVal(nil), deprecated: boolVal(nil)},
 		"both true":            {root: boolVal(true), deprecated: boolVal(true), wantRoot: true, wantDeprecated: true},
 	} {
@@ -201,7 +203,7 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFolders(t *testing.T) {
 	}
 }
 
-// A flag that is unknown during planning must leave the omitted one unknown too. Planning it as a known
+// An unknown deprecated flag must leave the omitted root unknown too. Planning it as a known
 // value would let the apply-time plan change it, which Terraform rejects as an inconsistent final plan.
 func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFoldersUnknown(t *testing.T) {
 	ctx := context.Background()
@@ -214,7 +216,6 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFoldersUnknown(t *testing.T)
 		checkPath          path.Path
 	}{
 		"unknown deprecated, omitted root": {root: null, deprecated: unknown, checkPath: path.Root("include_all_sub_folders")},
-		"unknown root, omitted deprecated": {root: unknown, deprecated: null, checkPath: deprecatedIncludeAllSubFoldersPath},
 		"unknown sync_options, omitted root": {
 			root: null, deprecated: null, unknownSyncOptions: true, checkPath: path.Root("include_all_sub_folders"),
 		},
@@ -277,30 +278,32 @@ func TestSecretSyncModifyPlanDeprecatedIncludeAllSubFoldersUnknown(t *testing.T)
 	}
 }
 
-func TestSecretSyncValidateConfigConflictingDeprecatedIncludeAllSubFolders(t *testing.T) {
-	boolVal := func(v interface{}) tftypes.Value { return tftypes.NewValue(tftypes.Bool, v) }
+func TestKeepDeprecatedIncludeAllSubFolders(t *testing.T) {
+	ctx := context.Background()
+	attrTypes := map[string]attr.Type{"include_all_sub_folders": types.BoolType, "write_only": types.BoolType}
+	object := func(includeAllSubFolders, writeOnly types.Bool) types.Object {
+		return types.ObjectValueMust(attrTypes, map[string]attr.Value{"include_all_sub_folders": includeAllSubFolders, "write_only": writeOnly})
+	}
+	fromApi := object(types.BoolValue(false), types.BoolValue(true))
 
 	for name, tc := range map[string]struct {
-		root, deprecated tftypes.Value
-		wantError        bool
+		prior types.Object
+		want  types.Bool
 	}{
-		"root false, deprecated true": {root: boolVal(false), deprecated: boolVal(true), wantError: true},
-		"root true, deprecated false": {root: boolVal(true), deprecated: boolVal(false), wantError: true},
-		"both true":                   {root: boolVal(true), deprecated: boolVal(true)},
-		"only deprecated":             {root: boolVal(nil), deprecated: boolVal(true)},
-		"unknown root":                {root: tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue), deprecated: boolVal(true)},
+		"keeps prior deprecated value": {prior: object(types.BoolValue(true), types.BoolValue(false)), want: types.BoolValue(true)},
+		"null prior state (import)":    {prior: types.ObjectNull(attrTypes), want: types.BoolValue(false)},
+		"null prior deprecated value":  {prior: object(types.BoolNull(), types.BoolValue(false)), want: types.BoolValue(false)},
 	} {
 		t.Run(name, func(t *testing.T) {
-			r := asSecretSyncBaseResource(t, NewSecretSyncSpaceliftResource())
-			config := secretSyncTestConfig(t, r, tc.root, map[string]tftypes.Value{
-				"include_all_sub_folders": tc.deprecated,
-			})
-
-			resp := resource.ValidateConfigResponse{}
-			r.ValidateConfig(context.Background(), resource.ValidateConfigRequest{Config: config}, &resp)
-
-			if resp.Diagnostics.HasError() != tc.wantError {
-				t.Errorf("expected error=%v, got: %v", tc.wantError, resp.Diagnostics)
+			got, diags := keepDeprecatedIncludeAllSubFolders(ctx, fromApi, tc.prior)
+			if diags.HasError() {
+				t.Fatal(diags)
+			}
+			if v := got.Attributes()["include_all_sub_folders"]; !v.Equal(tc.want) {
+				t.Errorf("expected include_all_sub_folders=%v, got %v", tc.want, v)
+			}
+			if v := got.Attributes()["write_only"]; !v.Equal(types.BoolValue(true)) {
+				t.Errorf("expected other attributes to come from the API, got write_only=%v", v)
 			}
 		})
 	}
