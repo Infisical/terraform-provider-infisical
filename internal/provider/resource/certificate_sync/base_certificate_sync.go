@@ -174,6 +174,9 @@ type CertificateSyncBaseResource struct {
 
 	// ValidateConfigFunc runs destination-specific plan-time checks against the configuration.
 	ValidateConfigFunc func(ctx context.Context, config CertificateSyncBaseResourceModel, diags *diag.Diagnostics)
+	// ModifyPlanFunc runs destination-specific plan-time checks that need prior state. It runs only on
+	// updates, never on create or destroy.
+	ModifyPlanFunc func(ctx context.Context, plan, state CertificateSyncBaseResourceModel, diags *diag.Diagnostics)
 }
 
 // CertificateSyncBaseResourceModel holds every attribute any destination can declare. Attributes a
@@ -196,13 +199,6 @@ type CertificateSyncBaseResourceModel struct {
 
 type attributeGetter interface {
 	GetAttribute(ctx context.Context, p path.Path, target interface{}) diag.Diagnostics
-}
-
-// filtersByOrderOnly reports whether certificate_filters only offers certificate_order_ids. A sync
-// with a fixed certificate cap only accepts an explicit certificate list, because profile and
-// metadata filters match a set that can grow past the cap.
-func (r *CertificateSyncBaseResource) filtersByOrderOnly() bool {
-	return r.MaxCertificates > 0
 }
 
 func (r *CertificateSyncBaseResource) hasSyncOptions() bool {
@@ -238,7 +234,7 @@ func (r *CertificateSyncBaseResource) newModel() CertificateSyncBaseResourceMode
 		Name:                      customtypes.NewTrimmedStringNull(),
 		Description:               customtypes.NewTrimmedStringNull(),
 		SyncOptions:               types.ObjectNull(map[string]attr.Type{}),
-		CertificateFilters:        types.ObjectNull(certificateFiltersAttrTypes(r.filtersByOrderOnly())),
+		CertificateFilters:        types.ObjectNull(certificateFiltersAttrTypes),
 		DefaultCertificateOrderID: types.StringNull(),
 		ExportPassword:            types.StringNull(),
 		ExportPasswordWO:          types.StringNull(),
@@ -337,7 +333,7 @@ func (r *CertificateSyncBaseResource) Schema(_ context.Context, _ resource.Schem
 			Description: "The destination configuration for the certificate sync.",
 			Attributes:  r.DestinationConfigAttributes,
 		},
-		attrCertificateFilters: certificateFiltersSchema(r.filtersByOrderOnly()),
+		attrCertificateFilters: certificateFiltersSchema(r.MaxCertificates),
 	}
 
 	if r.hasSyncOptions() {
@@ -424,10 +420,10 @@ func (r *CertificateSyncBaseResource) ValidateConfig(ctx context.Context, req re
 		return
 	}
 
-	resp.Diagnostics.Append(validateCertificateFilters(config.CertificateFilters)...)
+	resp.Diagnostics.Append(validateCertificateFilters(ctx, config.CertificateFilters)...)
 
 	if r.SupportsDefaultCertificate {
-		resp.Diagnostics.Append(validateDefaultCertificateInFilters(config.DefaultCertificateOrderID, config.CertificateFilters)...)
+		resp.Diagnostics.Append(validateDefaultCertificateInFilters(ctx, config.DefaultCertificateOrderID, config.CertificateFilters)...)
 	}
 
 	r.validateCertificateNamesAndCap(ctx, config, &resp.Diagnostics)
@@ -435,6 +431,22 @@ func (r *CertificateSyncBaseResource) ValidateConfig(ctx context.Context, req re
 	if r.ValidateConfigFunc != nil {
 		r.ValidateConfigFunc(ctx, config, &resp.Diagnostics)
 	}
+}
+
+func (r *CertificateSyncBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if r.ModifyPlanFunc == nil || req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	plan, diags := r.getModel(ctx, req.Plan)
+	resp.Diagnostics.Append(diags...)
+	state, diags := r.getModel(ctx, req.State)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	r.ModifyPlanFunc(ctx, plan, state, &resp.Diagnostics)
 }
 
 func (r *CertificateSyncBaseResource) syncOptionsForRequest(ctx context.Context, plan CertificateSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics) {
@@ -592,9 +604,9 @@ func (r *CertificateSyncBaseResource) Read(ctx context.Context, req resource.Rea
 
 	priorFilters := state.CertificateFilters
 	if isImport && priorFilters.IsNull() && hasAnyCertificateFilter(certificateSync.Filters) {
-		priorFilters = emptyCertificateFilters(r.filtersByOrderOnly())
+		priorFilters = emptyCertificateFilters()
 	}
-	state.CertificateFilters, diags = certificateFiltersFromApi(ctx, priorFilters, certificateSync.Filters)
+	state.CertificateFilters, diags = certificateFiltersFromApi(priorFilters, certificateSync.Filters)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -769,14 +781,15 @@ func defaultCertificateFromApi(linked *linkedCertificates) (types.String, diag.D
 	return types.StringValue(current.CertificateOrderID), diags
 }
 
-func validateDefaultCertificateInFilters(defaultOrderID types.String, filters types.Object) diag.Diagnostics {
+func validateDefaultCertificateInFilters(ctx context.Context, defaultOrderID types.String, filters types.Object) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if defaultOrderID.IsNull() || defaultOrderID.IsUnknown() || filters.IsNull() || filters.IsUnknown() {
 		return diags
 	}
 
-	model := decodeCertificateFilters(filters)
-	if model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
+	var model certificateFiltersModel
+	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
+	if diags.HasError() || model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
 		return diags
 	}
 

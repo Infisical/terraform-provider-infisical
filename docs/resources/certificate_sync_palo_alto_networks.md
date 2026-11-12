@@ -96,7 +96,7 @@ Required:
 Optional:
 
 - `can_remove_certificates` (Boolean) Whether Infisical should remove certificates from PAN-OS when their certificates leave this sync, for example when `certificate_filters` stops matching them. Destroying the sync leaves them in place. Defaults to `true`.
-- `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to `false`.
+- `include_root_ca` (Boolean) Has no effect for Palo Alto Networks: the sync always imports the full chain, root CA included. Defaults to `false`.
 - `preserve_item_on_renewal` (Boolean) Whether a renewed certificate replaces its existing PAN-OS certificate instead of creating a new one. Defaults to `true`.
 
 

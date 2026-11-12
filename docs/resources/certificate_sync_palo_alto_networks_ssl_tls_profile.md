@@ -73,7 +73,7 @@ resource "infisical_certificate_sync_palo_alto_networks_ssl_tls_profile" "exampl
 ### Optional
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
-- `certificate_filters` (Attributes) Which certificate this sync holds. Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI. (see [below for nested schema](#nestedatt--certificate_filters))
+- `certificate_filters` (Attributes) Which certificate this sync holds. Set `certificate_order_ids` to one certificate order. Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI. (see [below for nested schema](#nestedatt--certificate_filters))
 - `description` (String) An optional description for the Palo Alto Networks SSL/TLS Profile sync.
 
 ### Read-Only
@@ -103,8 +103,8 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove the certificate from PAN-OS when it leaves this sync. Infisical refuses to empty the sync while this is `true`, because the SSL/TLS service profile would be left without a certificate; to change the profile's certificate, set `certificate_order_ids` to another certificate order instead. Destroying the sync leaves the certificate in place. Defaults to `true`.
-- `include_root_ca` (Boolean) Whether to include the root CA certificate in the synced certificate chain. Defaults to `false`.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove the certificate from PAN-OS when it leaves this sync. Removing the sync's certificate order while this is `true` fails the plan, because the SSL/TLS service profile would be left without a certificate; to change the profile's certificate, set `certificate_order_ids` to another certificate order instead. Destroying the sync leaves the certificate in place. Defaults to `true`.
+- `include_root_ca` (Boolean) Has no effect for Palo Alto Networks: the sync always imports the full chain, root CA included. Defaults to `false`.
 - `preserve_item_on_renewal` (Boolean) Whether a renewed certificate replaces its existing PAN-OS certificate instead of creating a new one. Defaults to `true`.
 
 
@@ -113,7 +113,20 @@ Optional:
 
 Optional:
 
-- `certificate_order_ids` (Set of String) The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set exactly one order: this sync holds a single certificate, and keeps holding the newest renewal of that order.
+- `certificate_order_ids` (Set of String) The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set one order. The sync keeps holding the newest renewal of that order.
+- `metadata` (Attributes Set) Not supported on this sync. Setting it fails the plan. (see [below for nested schema](#nestedatt--certificate_filters--metadata))
+- `profile_ids` (Set of String) Not supported on this sync. Setting it fails the plan.
+
+<a id="nestedatt--certificate_filters--metadata"></a>
+### Nested Schema for `certificate_filters.metadata`
+
+Required:
+
+- `key` (String) The metadata key the certificate must carry.
+
+Optional:
+
+- `value` (String) The value the key must have. Leave unset to match any value.
 
 ## Import
 

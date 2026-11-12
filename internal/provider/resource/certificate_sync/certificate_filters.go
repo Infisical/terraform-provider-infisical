@@ -24,26 +24,16 @@ var certificateMetadataFilterAttrTypes = map[string]attr.Type{
 	"value": types.StringType,
 }
 
-var certificateMetadataFilterType = types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}
-
-// certificateFiltersAttrTypes returns the certificate_filters attributes a sync declares. A sync
-// limited to a fixed number of certificates only accepts an explicit certificate list, so it has no
-// profile_ids or metadata.
-func certificateFiltersAttrTypes(orderIDsOnly bool) map[string]attr.Type {
-	attrTypes := map[string]attr.Type{
-		"certificate_order_ids": types.SetType{ElemType: types.StringType},
-	}
-	if !orderIDsOnly {
-		attrTypes["profile_ids"] = types.SetType{ElemType: types.StringType}
-		attrTypes["metadata"] = types.SetType{ElemType: certificateMetadataFilterType}
-	}
-	return attrTypes
+var certificateFiltersAttrTypes = map[string]attr.Type{
+	"certificate_order_ids": types.SetType{ElemType: types.StringType},
+	"profile_ids":           types.SetType{ElemType: types.StringType},
+	"metadata":              types.SetType{ElemType: types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}},
 }
 
 type certificateFiltersModel struct {
-	CertificateOrderIDs types.Set
-	ProfileIDs          types.Set
-	Metadata            types.Set
+	CertificateOrderIDs types.Set `tfsdk:"certificate_order_ids"`
+	ProfileIDs          types.Set `tfsdk:"profile_ids"`
+	Metadata            types.Set `tfsdk:"metadata"`
 }
 
 type certificateMetadataFilterModel struct {
@@ -51,60 +41,40 @@ type certificateMetadataFilterModel struct {
 	Value types.String `tfsdk:"value"`
 }
 
-// decodeCertificateFilters reads a non-null certificate_filters block. Attributes the sync does not
-// declare read as null.
-func decodeCertificateFilters(filters types.Object) certificateFiltersModel {
-	model := certificateFiltersModel{
-		CertificateOrderIDs: types.SetNull(types.StringType),
-		ProfileIDs:          types.SetNull(types.StringType),
-		Metadata:            types.SetNull(certificateMetadataFilterType),
-	}
-	for name, target := range map[string]*types.Set{
-		"certificate_order_ids": &model.CertificateOrderIDs,
-		"profile_ids":           &model.ProfileIDs,
-		"metadata":              &model.Metadata,
-	} {
-		if value, ok := filters.Attributes()[name].(types.Set); ok {
-			*target = value
-		}
-	}
-	return model
-}
-
-func certificateFiltersSchema(orderIDsOnly bool) schema.SingleNestedAttribute {
-	certificateOrderIDs := schema.SetAttribute{
-		Optional:    true,
-		ElementType: types.StringType,
-		Description: "The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order.",
-	}
-	unmanaged := "Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates."
-
-	if orderIDsOnly {
-		return schema.SingleNestedAttribute{
-			Optional:    true,
-			Description: "Which certificate this sync holds. Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI.",
-			Attributes: map[string]schema.Attribute{"certificate_order_ids": schema.SetAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set exactly one order: this sync holds a single certificate, and keeps holding the newest renewal of that order.",
-			}},
-		}
+// certificateFiltersSchema declares the same attributes for every sync, so existing state keeps
+// decoding. A sync capped at one certificate says in its descriptions that only
+// certificate_order_ids applies; enforceCertificateCap rejects the other filters at plan time.
+func certificateFiltersSchema(maxCertificates int) schema.SingleNestedAttribute {
+	description := "Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. " +
+		"Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates."
+	orderIDsDescription := "The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order."
+	profileIDsDescription := "Sync certificates issued from any one of these certificate profiles."
+	metadataDescription := "Sync certificates carrying every one of these metadata pairs."
+	if maxCertificates == 1 {
+		description = "Which certificate this sync holds. Set `certificate_order_ids` to one certificate order. " +
+			"Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI."
+		orderIDsDescription = "The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set one order. The sync keeps holding the newest renewal of that order."
+		profileIDsDescription = "Not supported on this sync. Setting it fails the plan."
+		metadataDescription = "Not supported on this sync. Setting it fails the plan."
 	}
 
 	return schema.SingleNestedAttribute{
-		Optional: true,
-		Description: "Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. " +
-			unmanaged,
+		Optional:    true,
+		Description: description,
 		Attributes: map[string]schema.Attribute{
-			"certificate_order_ids": certificateOrderIDs,
+			"certificate_order_ids": schema.SetAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: orderIDsDescription,
+			},
 			"profile_ids": schema.SetAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Sync certificates issued from any one of these certificate profiles.",
+				Description: profileIDsDescription,
 			},
 			"metadata": schema.SetNestedAttribute{
 				Optional:    true,
-				Description: "Sync certificates carrying every one of these metadata pairs.",
+				Description: metadataDescription,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
@@ -124,15 +94,12 @@ func certificateFiltersSchema(orderIDsOnly bool) schema.SingleNestedAttribute {
 	}
 }
 
-func emptyCertificateFilters(orderIDsOnly bool) types.Object {
-	attrTypes := certificateFiltersAttrTypes(orderIDsOnly)
-	values := make(map[string]attr.Value, len(attrTypes))
-	for name, attrType := range attrTypes {
-		if setType, ok := attrType.(types.SetType); ok {
-			values[name] = types.SetNull(setType.ElemType)
-		}
-	}
-	return types.ObjectValueMust(attrTypes, values)
+func emptyCertificateFilters() types.Object {
+	return types.ObjectValueMust(certificateFiltersAttrTypes, map[string]attr.Value{
+		"certificate_order_ids": types.SetNull(types.StringType),
+		"profile_ids":           types.SetNull(types.StringType),
+		"metadata":              types.SetNull(types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}),
+	})
 }
 
 func hasAnyCertificateFilter(filters *infisical.CertificateSyncFilters) bool {
@@ -149,14 +116,15 @@ func derefStrings(values *[]string) []string {
 	return *values
 }
 
-func validateCertificateFilters(filters types.Object) diag.Diagnostics {
+func validateCertificateFilters(ctx context.Context, filters types.Object) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if filters.IsNull() || filters.IsUnknown() {
 		return diags
 	}
 
-	model := decodeCertificateFilters(filters)
-	if model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
+	var model certificateFiltersModel
+	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
+	if diags.HasError() || model.CertificateOrderIDs.IsNull() || model.CertificateOrderIDs.IsUnknown() {
 		return diags
 	}
 
@@ -199,7 +167,12 @@ func certificateFiltersForRequest(ctx context.Context, filters types.Object) (*i
 		return nil, diags
 	}
 
-	model := decodeCertificateFilters(filters)
+	var model certificateFiltersModel
+	diags.Append(filters.As(ctx, &model, objectAsOptions)...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
 	request := &infisical.CertificateSyncFilters{}
 
 	if !model.CertificateOrderIDs.IsNull() && !model.CertificateOrderIDs.IsUnknown() {
@@ -232,9 +205,8 @@ func certificateFiltersForRequest(ctx context.Context, filters types.Object) (*i
 	return request, diags
 }
 
-// certificateFiltersFromApi reads the API's filters into the block, keeping it null while it is
-// unmanaged. It fills only the attributes the prior block declares.
-func certificateFiltersFromApi(ctx context.Context, prior types.Object, api *infisical.CertificateSyncFilters) (types.Object, diag.Diagnostics) {
+// certificateFiltersFromApi reads the API's filters into the block, keeping it null while it is unmanaged.
+func certificateFiltersFromApi(prior types.Object, api *infisical.CertificateSyncFilters) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if prior.IsNull() {
 		return prior, diags
@@ -246,7 +218,8 @@ func certificateFiltersFromApi(ctx context.Context, prior types.Object, api *inf
 	orderIDSet := setFromApi(api.CertificateOrderIDs != nil, derefStrings(api.CertificateOrderIDs))
 	profileIDSet := setFromApi(api.ProfileIDs != nil, derefStrings(api.ProfileIDs))
 
-	metadataSet := types.SetNull(certificateMetadataFilterType)
+	metadataType := types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}
+	metadataSet := types.SetNull(metadataType)
 	if api.Metadata != nil {
 		elements := make([]attr.Value, 0, len(*api.Metadata))
 		for _, pair := range *api.Metadata {
@@ -259,20 +232,14 @@ func certificateFiltersFromApi(ctx context.Context, prior types.Object, api *inf
 				"value": value,
 			}))
 		}
-		metadataSet = types.SetValueMust(certificateMetadataFilterType, elements)
+		metadataSet = types.SetValueMust(metadataType, elements)
 	}
 
-	all := map[string]attr.Value{
+	result, d := types.ObjectValue(certificateFiltersAttrTypes, map[string]attr.Value{
 		"certificate_order_ids": orderIDSet,
 		"profile_ids":           profileIDSet,
 		"metadata":              metadataSet,
-	}
-	attrTypes := prior.AttributeTypes(ctx)
-	values := make(map[string]attr.Value, len(attrTypes))
-	for name := range attrTypes {
-		values[name] = all[name]
-	}
-	result, d := types.ObjectValue(attrTypes, values)
+	})
 	diags.Append(d...)
 	return result, diags
 }

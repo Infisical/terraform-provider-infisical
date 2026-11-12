@@ -155,11 +155,16 @@ func (r *CertificateSyncBaseResource) certificateCapFromConfig(ctx context.Conte
 
 // enforceCertificateCap rejects filters the backend refuses on a capped sync: it only accepts an
 // explicit certificate list, no longer than the cap.
-func enforceCertificateCap(limit certificateCap, filters types.Object, diags *diag.Diagnostics) {
+func enforceCertificateCap(ctx context.Context, limit certificateCap, filters types.Object, diags *diag.Diagnostics) {
 	if filters.IsNull() || filters.IsUnknown() {
 		return
 	}
-	model := decodeCertificateFilters(filters)
+	var model certificateFiltersModel
+	decodeDiags := filters.As(ctx, &model, objectAsOptions)
+	diags.Append(decodeDiags...)
+	if decodeDiags.HasError() {
+		return
+	}
 
 	if !model.ProfileIDs.IsNull() || !model.Metadata.IsNull() {
 		diags.AddAttributeError(
@@ -179,11 +184,16 @@ func enforceCertificateCap(limit certificateCap, filters types.Object, diags *di
 
 // warnOnNameCollisions flags schemas that can give two certificates the same name, which makes one
 // silently overwrite the other at the destination.
-func warnOnNameCollisions(schema string, filters types.Object, diags *diag.Diagnostics) {
+func warnOnNameCollisions(ctx context.Context, schema string, filters types.Object, diags *diag.Diagnostics) {
 	if hasCertificateIdentifier(schema) || !anyNamePlaceholderPattern.MatchString(schema) || filters.IsNull() || filters.IsUnknown() {
 		return
 	}
-	model := decodeCertificateFilters(filters)
+	var model certificateFiltersModel
+	decodeDiags := filters.As(ctx, &model, objectAsOptions)
+	diags.Append(decodeDiags...)
+	if decodeDiags.HasError() {
+		return
+	}
 	multiple := !model.ProfileIDs.IsNull() || !model.Metadata.IsNull() ||
 		(!model.CertificateOrderIDs.IsNull() && !model.CertificateOrderIDs.IsUnknown() && len(model.CertificateOrderIDs.Elements()) > 1)
 	if !multiple {
@@ -206,13 +216,13 @@ func (r *CertificateSyncBaseResource) validateCertificateNamesAndCap(ctx context
 	}
 
 	if limit, capped := r.certificateCapFromConfig(ctx, config); capped {
-		enforceCertificateCap(limit, config.CertificateFilters, diags)
+		enforceCertificateCap(ctx, limit, config.CertificateFilters, diags)
 		return
 	}
 
 	rule := r.CertificateNameRule
 	if schemaKnown && schemaSet && (rule == nil || !(rule.requireIdentifier || rule.requireLiteralCertificateID)) {
-		warnOnNameCollisions(schema, config.CertificateFilters, diags)
+		warnOnNameCollisions(ctx, schema, config.CertificateFilters, diags)
 	}
 }
 

@@ -104,6 +104,8 @@ func TestPaloAltoNetworksResourcesValidateConfig(t *testing.T) {
 		{"profile valid", NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(), "infisical-cert", []string{"a"}, false},
 		{"profile name too long", NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(), "infisical-{{certificateId}}", []string{"a"}, true},
 		{"profile two orders", NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(), "INF-{{shortCertificateId}}", []string{"a", "b"}, true},
+		// Emptying is checked in ModifyPlan against prior state, since an empty sync that holds nothing is allowed.
+		{"profile empty", NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(), "infisical-cert", []string{}, false},
 	}
 	for _, c := range cases {
 		diags := paloAltoNetworksValidateConfig(t, c.resource, c.nameSchema, c.orderIDs...)
@@ -113,43 +115,88 @@ func TestPaloAltoNetworksResourcesValidateConfig(t *testing.T) {
 	}
 }
 
-func TestPaloAltoNetworksCertificateFiltersShape(t *testing.T) {
-	ctx := context.Background()
+func TestValidateSslTlsProfileNotEmptied(t *testing.T) {
+	stringSet := func(values ...string) types.Set {
+		elements := make([]attr.Value, 0, len(values))
+		for _, value := range values {
+			elements = append(elements, types.StringValue(value))
+		}
+		return types.SetValueMust(types.StringType, elements)
+	}
+	filtersWith := func(orderIDs types.Set) types.Object {
+		return types.ObjectValueMust(certificateFiltersAttrTypes, map[string]attr.Value{
+			"certificate_order_ids": orderIDs,
+			"profile_ids":           types.SetNull(types.StringType),
+			"metadata":              types.SetNull(types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}),
+		})
+	}
+	canRemove := func(value types.Bool) types.Object {
+		return types.ObjectValueMust(map[string]attr.Type{"can_remove_certificates": types.BoolType}, map[string]attr.Value{"can_remove_certificates": value})
+	}
+	noSyncOptions := types.ObjectNull(map[string]attr.Type{"can_remove_certificates": types.BoolType})
+
+	withOrder := filtersWith(stringSet("order-1"))
+
 	cases := []struct {
-		name     string
-		resource resource.Resource
-		want     []string
+		name         string
+		stateFilters types.Object
+		filters      types.Object
+		syncOptions  types.Object
+		wantError    bool
 	}{
-		{"multi", NewCertificateSyncPaloAltoNetworksResource(), []string{"certificate_order_ids", "metadata", "profile_ids"}},
-		{"profile", NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(), []string{"certificate_order_ids"}},
+		{"already empty stays empty", filtersWith(stringSet()), filtersWith(stringSet()), noSyncOptions, false},
+		{"no prior block, empty orders", types.ObjectNull(certificateFiltersAttrTypes), filtersWith(stringSet()), noSyncOptions, false},
+		{"block left out", withOrder, types.ObjectNull(certificateFiltersAttrTypes), noSyncOptions, false},
+		{"one order", withOrder, filtersWith(stringSet("order-1")), noSyncOptions, false},
+		{"empty orders, default can_remove", withOrder, filtersWith(stringSet()), noSyncOptions, true},
+		{"empty block, default can_remove", withOrder, emptyCertificateFilters(), noSyncOptions, true},
+		{"empty orders, can_remove unset", withOrder, filtersWith(stringSet()), canRemove(types.BoolNull()), true},
+		{"empty orders, can_remove true", withOrder, filtersWith(stringSet()), canRemove(types.BoolValue(true)), true},
+		{"empty orders, can_remove false", withOrder, filtersWith(stringSet()), canRemove(types.BoolValue(false)), false},
+		{"empty orders, can_remove unknown", withOrder, filtersWith(stringSet()), canRemove(types.BoolUnknown()), false},
+		{"unknown orders", withOrder, filtersWith(types.SetUnknown(types.StringType)), noSyncOptions, false},
+		{"profile_ids only, left to the cap check", withOrder, types.ObjectValueMust(certificateFiltersAttrTypes, map[string]attr.Value{
+			"certificate_order_ids": types.SetNull(types.StringType),
+			"profile_ids":           stringSet("profile-1"),
+			"metadata":              types.SetNull(types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}),
+		}), noSyncOptions, false},
 	}
 	for _, c := range cases {
+		var diags diag.Diagnostics
+		plan := CertificateSyncBaseResourceModel{CertificateFilters: c.filters, SyncOptions: c.syncOptions}
+		state := CertificateSyncBaseResourceModel{CertificateFilters: c.stateFilters}
+		validateSslTlsProfileNotEmptied(context.Background(), plan, state, &diags)
+		if diags.HasError() != c.wantError {
+			t.Errorf("%s: wantError=%v, got diagnostics %v", c.name, c.wantError, diags)
+		}
+	}
+}
+
+// Every sync declares the full certificate_filters block, so state written by an earlier provider
+// version (which had profile_ids and metadata on every sync) still decodes after an upgrade.
+func TestCertificateFiltersShapeIsSharedBySingleCertificateSyncs(t *testing.T) {
+	ctx := context.Background()
+	want := []string{"certificate_order_ids", "metadata", "profile_ids"}
+	resources := map[string]resource.Resource{
+		"palo alto":         NewCertificateSyncPaloAltoNetworksResource(),
+		"palo alto profile": NewCertificateSyncPaloAltoNetworksSslTlsProfileResource(),
+		"nutanix":           NewCertificateSyncNutanixPrismCentralResource(),
+	}
+	for name, r := range resources {
 		schemaResp := &resource.SchemaResponse{}
-		c.resource.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+		r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
 		filters, ok := schemaResp.Schema.Attributes[attrCertificateFilters].GetType().(types.ObjectType)
 		if !ok {
-			t.Fatalf("%s: certificate_filters is not an object", c.name)
+			t.Fatalf("%s: certificate_filters is not an object", name)
 		}
 		got := make([]string, 0, len(filters.AttrTypes))
-		for name := range filters.AttrTypes {
-			got = append(got, name)
+		for attrName := range filters.AttrTypes {
+			got = append(got, attrName)
 		}
 		sort.Strings(got)
-		if !reflect.DeepEqual(got, c.want) {
-			t.Errorf("%s: certificate_filters attributes = %v, want %v", c.name, got, c.want)
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: certificate_filters attributes = %v, want %v", name, got, want)
 		}
-	}
-
-	orderIDs := []string{"order-1"}
-	state, diags := certificateFiltersFromApi(ctx, emptyCertificateFilters(true), &infisical.CertificateSyncFilters{CertificateOrderIDs: &orderIDs})
-	if diags.HasError() {
-		t.Fatalf("certificateFiltersFromApi() diagnostics = %v", diags)
-	}
-	want := types.ObjectValueMust(certificateFiltersAttrTypes(true), map[string]attr.Value{
-		"certificate_order_ids": types.SetValueMust(types.StringType, []attr.Value{types.StringValue("order-1")}),
-	})
-	if !state.Equal(want) {
-		t.Errorf("certificateFiltersFromApi() = %v, want %v", state, want)
 	}
 }
 
@@ -162,7 +209,8 @@ func TestCertificateFiltersForRequest(t *testing.T) {
 		}
 		return types.SetValueMust(types.StringType, elements)
 	}
-	metadata := types.SetValueMust(certificateMetadataFilterType, []attr.Value{
+	metadataType := types.ObjectType{AttrTypes: certificateMetadataFilterAttrTypes}
+	metadata := types.SetValueMust(metadataType, []attr.Value{
 		types.ObjectValueMust(certificateMetadataFilterAttrTypes, map[string]attr.Value{
 			"key":   types.StringValue("env"),
 			"value": types.StringValue("prod"),
@@ -174,22 +222,18 @@ func TestCertificateFiltersForRequest(t *testing.T) {
 		filters types.Object
 		want    string
 	}{
-		{"block left out", types.ObjectNull(certificateFiltersAttrTypes(false)), "null"},
-		{"all selectors", types.ObjectValueMust(certificateFiltersAttrTypes(false), map[string]attr.Value{
+		{"block left out", types.ObjectNull(certificateFiltersAttrTypes), "null"},
+		{"all selectors", types.ObjectValueMust(certificateFiltersAttrTypes, map[string]attr.Value{
 			"certificate_order_ids": stringSet("order-1"),
 			"profile_ids":           stringSet("profile-1"),
 			"metadata":              metadata,
 		}), `{"profileIds":["profile-1"],"certificateOrderIds":["order-1"],"metadata":[{"key":"env","value":"prod"}]}`},
-		{"empty block", emptyCertificateFilters(false), `{}`},
-		{"explicit empty orders", types.ObjectValueMust(certificateFiltersAttrTypes(false), map[string]attr.Value{
+		{"empty block", emptyCertificateFilters(), `{}`},
+		{"explicit empty orders", types.ObjectValueMust(certificateFiltersAttrTypes, map[string]attr.Value{
 			"certificate_order_ids": stringSet(),
 			"profile_ids":           types.SetNull(types.StringType),
-			"metadata":              types.SetNull(certificateMetadataFilterType),
+			"metadata":              types.SetNull(metadataType),
 		}), `{"certificateOrderIds":[]}`},
-		{"order-only block", types.ObjectValueMust(certificateFiltersAttrTypes(true), map[string]attr.Value{
-			"certificate_order_ids": stringSet("order-1"),
-		}), `{"certificateOrderIds":["order-1"]}`},
-		{"order-only empty block", emptyCertificateFilters(true), `{}`},
 	}
 	for _, c := range cases {
 		request, diags := certificateFiltersForRequest(ctx, c.filters)

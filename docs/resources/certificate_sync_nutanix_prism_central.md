@@ -63,7 +63,7 @@ resource "infisical_certificate_sync_nutanix_prism_central" "example" {
 ### Optional
 
 - `auto_sync_enabled` (Boolean) Whether certificates should be automatically synced to the destination when they are added or renewed.
-- `certificate_filters` (Attributes) Which certificate this sync holds. Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI. (see [below for nested schema](#nestedatt--certificate_filters))
+- `certificate_filters` (Attributes) Which certificate this sync holds. Set `certificate_order_ids` to one certificate order. Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI. (see [below for nested schema](#nestedatt--certificate_filters))
 - `description` (String) An optional description for the Nutanix Prism Central sync.
 
 ### Read-Only
@@ -84,7 +84,20 @@ Required:
 
 Optional:
 
-- `certificate_order_ids` (Set of String) The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set exactly one order: this sync holds a single certificate, and keeps holding the newest renewal of that order.
+- `certificate_order_ids` (Set of String) The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set one order. The sync keeps holding the newest renewal of that order.
+- `metadata` (Attributes Set) Not supported on this sync. Setting it fails the plan. (see [below for nested schema](#nestedatt--certificate_filters--metadata))
+- `profile_ids` (Set of String) Not supported on this sync. Setting it fails the plan.
+
+<a id="nestedatt--certificate_filters--metadata"></a>
+### Nested Schema for `certificate_filters.metadata`
+
+Required:
+
+- `key` (String) The metadata key the certificate must carry.
+
+Optional:
+
+- `value` (String) The value the key must have. Leave unset to match any value.
 
 ## Import
 

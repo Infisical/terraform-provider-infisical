@@ -104,7 +104,7 @@ func paloAltoNetworksSyncOptionsAttributes(certificateNameSchemaDescription, can
 		"include_root_ca": schema.BoolAttribute{
 			Optional:    true,
 			Computed:    true,
-			Description: "Whether to include the root CA certificate in the synced certificate chain. Defaults to `false`.",
+			Description: "Has no effect for Palo Alto Networks: the sync always imports the full chain, root CA included. Defaults to `false`.",
 			Default:     booldefault.StaticBool(false),
 		},
 		"preserve_item_on_renewal": schema.BoolAttribute{
@@ -161,6 +161,57 @@ func validatePaloAltoNetworksNamePlaceholders(ctx context.Context, config Certif
 			"It must include {{shortCertificateId}} or {{commonName}} so each certificate gets its own name, or use no placeholder for a single certificate.",
 		)
 	}
+}
+
+// validateSslTlsProfileNotEmptied fails the plan when an update removes the sync's certificate
+// order while can_remove_certificates is true (its default): the backend refuses that, because it
+// would leave the SSL/TLS service profile without a certificate, and Terraform has no way to send a
+// replacement. A sync that holds no order already can stay empty, as the backend allows that.
+// A block with profile_ids or metadata is left to enforceCertificateCap, which already rejects it.
+func validateSslTlsProfileNotEmptied(_ context.Context, plan, state CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
+	if !hasCertificateOrders(state.CertificateFilters) {
+		return
+	}
+
+	filters := plan.CertificateFilters
+	if filters.IsNull() || filters.IsUnknown() {
+		return
+	}
+	attributes := filters.Attributes()
+	profileIDs, _ := attributes["profile_ids"].(types.Set)
+	metadata, _ := attributes["metadata"].(types.Set)
+	if !profileIDs.IsNull() || !metadata.IsNull() {
+		return
+	}
+	orderIDs, _ := attributes["certificate_order_ids"].(types.Set)
+	if orderIDs.IsUnknown() || len(orderIDs.Elements()) > 0 {
+		return
+	}
+
+	if plan.SyncOptions.IsUnknown() {
+		return
+	}
+	if !plan.SyncOptions.IsNull() {
+		canRemove, _ := plan.SyncOptions.Attributes()["can_remove_certificates"].(types.Bool)
+		if canRemove.IsUnknown() || (!canRemove.IsNull() && !canRemove.ValueBool()) {
+			return
+		}
+	}
+
+	diags.AddAttributeError(
+		path.Root(attrCertificateFilters).AtName("certificate_order_ids"),
+		"SSL/TLS service profile needs a certificate",
+		"PAN-OS won't leave the SSL/TLS service profile without a certificate, so this sync's certificate order can't be removed while can_remove_certificates is true. Set certificate_order_ids to another certificate order, set can_remove_certificates to false, or remove the certificate_filters block to manage the certificate outside Terraform.",
+	)
+}
+
+// hasCertificateOrders reports whether certificate_filters lists at least one certificate order.
+func hasCertificateOrders(filters types.Object) bool {
+	if filters.IsNull() || filters.IsUnknown() {
+		return false
+	}
+	orderIDs, _ := filters.Attributes()["certificate_order_ids"].(types.Set)
+	return !orderIDs.IsNull() && !orderIDs.IsUnknown() && len(orderIDs.Elements()) > 0
 }
 
 func NewCertificateSyncPaloAltoNetworksResource() resource.Resource {
@@ -229,10 +280,11 @@ func NewCertificateSyncPaloAltoNetworksSslTlsProfileResource() resource.Resource
 		DestinationConfigAttributes: destinationConfigAttributes,
 		SyncOptionsAttributes: paloAltoNetworksSyncOptionsAttributes(
 			paloAltoNetworksCertificateNameSchemaDescription,
-			"Whether Infisical should remove the certificate from PAN-OS when it leaves this sync. Infisical refuses to empty the sync while this is `true`, because the SSL/TLS service profile would be left without a certificate; to change the profile's certificate, set `certificate_order_ids` to another certificate order instead. Destroying the sync leaves the certificate in place. Defaults to `true`.",
+			"Whether Infisical should remove the certificate from PAN-OS when it leaves this sync. Removing the sync's certificate order while this is `true` fails the plan, because the SSL/TLS service profile would be left without a certificate; to change the profile's certificate, set `certificate_order_ids` to another certificate order instead. Destroying the sync leaves the certificate in place. Defaults to `true`.",
 		),
 
 		MaxCertificates: 1,
+		ModifyPlanFunc:  validateSslTlsProfileNotEmptied,
 
 		ReadSyncOptionsFromPlan: readPaloAltoNetworksSyncOptionsFromPlan,
 		ReadSyncOptionsFromApi:  readPaloAltoNetworksSyncOptionsFromApi,
