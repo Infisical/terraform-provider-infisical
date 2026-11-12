@@ -103,7 +103,7 @@ Required:
 
 Optional:
 
-- `can_remove_certificates` (Boolean) Whether Infisical should remove the certificate from PAN-OS when it leaves this sync. Removing the sync's certificate order while this is `true` fails the plan, because the SSL/TLS service profile would be left without a certificate; to change the profile's certificate, set `certificate_order_ids` to another certificate order instead. Destroying the sync leaves the certificate in place. Defaults to `true`.
+- `can_remove_certificates` (Boolean) Whether Infisical should remove the certificate from PAN-OS when it leaves this sync. If removing the sync's certificate order while this is `true` would leave the SSL/TLS service profile without a certificate, Infisical rejects the apply. To change the profile's certificate, set `certificate_order_ids` to another certificate order instead. Destroying the sync leaves the certificate in place. Defaults to `true`.
 - `include_root_ca` (Boolean) Has no effect for Palo Alto Networks: the sync always imports the full chain, root CA included. Defaults to `false`.
 - `preserve_item_on_renewal` (Boolean) Whether a renewed certificate replaces its existing PAN-OS certificate instead of creating a new one. Defaults to `true`.
 
