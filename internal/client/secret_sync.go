@@ -37,6 +37,16 @@ const (
 	SecretSyncBehaviorPrioritizeDestination SecretSyncBehavior = "import-prioritize-destination"
 )
 
+// SecretSyncStatus mirrors SecretSyncStatus in Infisical core (secret-sync-types.ts).
+type SecretSyncStatus string
+
+const (
+	SecretSyncStatusPending   SecretSyncStatus = "pending"
+	SecretSyncStatusRunning   SecretSyncStatus = "running"
+	SecretSyncStatusSucceeded SecretSyncStatus = "succeeded"
+	SecretSyncStatusFailed    SecretSyncStatus = "failed"
+)
+
 const (
 	operationCreateSecretSync          = "CallCreateSecretSync"
 	operationUpdateSecretSync          = "CallUpdateSecretSync"

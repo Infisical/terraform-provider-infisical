@@ -73,6 +73,8 @@ resource "infisical_secret_sync_circleci" "example" {
 
 - `auto_sync_enabled` (Boolean) Whether secrets should be automatically synced when changes occur at the source location or not.
 - `description` (String) An optional description for the CircleCI sync.
+- `timeouts` (Attributes) How long Terraform waits for syncs when wait_for_sync_completion is true. (see [below for nested schema](#nestedatt--timeouts))
+- `wait_for_sync_completion` (Boolean) Whether Terraform waits for the sync to finish before it continues. On create, Terraform waits for the first sync. On update, Terraform first waits for a sync that is already in progress, then sends the update and waits for the sync that the update starts. If the sync fails, the apply fails with the error from Infisical. If the wait fails on create, Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync. If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. Terraform waits up to the create and update values in timeouts (default: 10m). Defaults to false.
 
 ### Read-Only
 
@@ -99,6 +101,15 @@ Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from CircleCI. Enable this option if you intend to manage some secrets manually outside of Infisical.
 - `key_schema` (String) The format to use for structuring secret keys in the CircleCI destination.
+
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) How long to wait for the first sync when wait_for_sync_completion is true, as a duration string such as "30s" or "15m". Defaults to 10m.
+- `update` (String) How long to wait for syncs during an update when wait_for_sync_completion is true, as a duration string such as "30s" or "15m". Covers both the sync already in progress and the sync that the update starts. Defaults to 10m.
 
 ## Import
 

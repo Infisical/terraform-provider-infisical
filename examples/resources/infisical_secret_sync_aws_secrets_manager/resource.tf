@@ -46,4 +46,11 @@ resource "infisical_secret_sync_aws_secrets_manager" "aws-secrets-manager-secret
     mapping_behavior                = "many-to-one"       # Supported options: many-to-one, one-to-one
     aws_secrets_manager_secret_name = "<aws-secret-name>" # Only required when mapping behavior is 'many-to-one'
   }
+
+  # Optional: fail the apply if the sync fails, instead of continuing while it runs in the background.
+  wait_for_sync_completion = true
+  timeouts = {
+    create = "15m" # Default: 10m
+    update = "15m" # Default: 10m
+  }
 }

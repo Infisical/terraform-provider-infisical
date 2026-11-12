@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	infisical "terraform-provider-infisical/internal/client"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -33,7 +35,15 @@ type SecretSyncBaseResource struct {
 	ReadSyncOptionsForCreateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadSyncOptionsForUpdateFromPlan func(ctx context.Context, plan SecretSyncBaseResourceModel, state SecretSyncBaseResourceModel) (map[string]interface{}, diag.Diagnostics)
 	ReadSyncOptionsFromApi           func(ctx context.Context, secretSync infisical.SecretSync) (types.Object, diag.Diagnostics)
+
+	pollInterval time.Duration // fixed interval between status reads, for tests; zero means the default backoff
 }
+
+var (
+	_ resource.ResourceWithImportState    = &SecretSyncBaseResource{}
+	_ resource.ResourceWithModifyPlan     = &SecretSyncBaseResource{}
+	_ resource.ResourceWithValidateConfig = &SecretSyncBaseResource{}
+)
 
 type SecretSyncBaseResourceModel struct {
 	ID                types.String `tfsdk:"id"`
@@ -46,6 +56,10 @@ type SecretSyncBaseResourceModel struct {
 	SyncOptions       types.Object `tfsdk:"sync_options"`
 	AutoSyncEnabled   types.Bool   `tfsdk:"auto_sync_enabled"`
 	DestinationConfig types.Object `tfsdk:"destination_config"`
+
+	// Provider-only settings. The API doesn't know them, so Read keeps them from state.
+	WaitForSyncCompletion types.Bool     `tfsdk:"wait_for_sync_completion"`
+	Timeouts              timeouts.Value `tfsdk:"timeouts"`
 }
 
 // Metadata returns the resource type name.
@@ -66,7 +80,27 @@ func (r *SecretSyncBaseResource) ImportState(ctx context.Context, req resource.I
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *SecretSyncBaseResource) waitForSyncCompletionDescription() string {
+	description := "Whether Terraform waits for the sync to finish before it continues. " +
+		"On create, Terraform waits for the first sync. " +
+		"On update, Terraform first waits for a sync that is already in progress, then sends the update and waits for the sync that the update starts. " +
+		"If the sync fails, the apply fails with the error from Infisical. " +
+		"If the wait fails on create, Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync."
+
+	if r.CanImportSecrets {
+		description += " The recreated sync runs initial_sync_behavior again: the import behaviors bring secrets that exist only in the destination back into Infisical, " +
+			"and import-prioritize-destination also overwrites Infisical values with the values in the destination."
+	}
+
+	description += " If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. " +
+		"The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. " +
+		fmt.Sprintf("Terraform waits up to the create and update values in timeouts (default: %s). ", defaultSecretSyncWaitTimeoutText) +
+		"Defaults to false."
+
+	return description
+}
+
+func (r *SecretSyncBaseResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: fmt.Sprintf("Create and manage %s secret syncs", r.SyncName),
 		Attributes: map[string]schema.Attribute{
@@ -116,7 +150,49 @@ func (r *SecretSyncBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Description: "The destination configuration for the secret sync.",
 				Attributes:  r.DestinationConfigAttributes,
 			},
+			"wait_for_sync_completion": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: r.waitForSyncCompletionDescription(),
+			},
+			"timeouts": r.timeoutsAttribute(ctx),
 		},
+	}
+}
+
+func (r *SecretSyncBaseResource) timeoutsAttribute(ctx context.Context) schema.Attribute {
+	attribute := timeouts.Attributes(ctx, timeouts.Opts{
+		Create:            true,
+		Update:            true,
+		CreateDescription: fmt.Sprintf("How long to wait for the first sync when wait_for_sync_completion is true, as a duration string such as \"30s\" or \"15m\". Defaults to %s.", defaultSecretSyncWaitTimeoutText),
+		UpdateDescription: fmt.Sprintf("How long to wait for syncs during an update when wait_for_sync_completion is true, as a duration string such as \"30s\" or \"15m\". Covers both the sync already in progress and the sync that the update starts. Defaults to %s.", defaultSecretSyncWaitTimeoutText),
+	})
+
+	nested, ok := attribute.(schema.SingleNestedAttribute)
+	if !ok {
+		return attribute
+	}
+	nested.Description = "How long Terraform waits for syncs when wait_for_sync_completion is true."
+	return nested
+}
+
+// ValidateConfig warns about a wait that can't happen: with auto sync off, create and update don't queue a sync.
+func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var waitForSyncCompletion, autoSyncEnabled types.Bool
+
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("wait_for_sync_completion"), &waitForSyncCompletion)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("auto_sync_enabled"), &autoSyncEnabled)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if waitForSyncCompletion.ValueBool() && !autoSyncEnabled.IsNull() && !autoSyncEnabled.IsUnknown() && !autoSyncEnabled.ValueBool() {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("wait_for_sync_completion"),
+			"wait_for_sync_completion has no effect",
+			"auto_sync_enabled is false, so Infisical doesn't run a sync when the secret sync is created or updated, and Terraform has nothing to wait for.",
+		)
 	}
 }
 
@@ -310,10 +386,34 @@ func (r *SecretSyncBaseResource) Create(ctx context.Context, req resource.Create
 
 	plan.ID = types.StringValue(secretSync.ID)
 
+	// Save state before waiting, so a failed wait still tracks the secret sync that now exists.
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !plan.WaitForSyncCompletion.ValueBool() || !secretSync.AutoSyncEnabled {
+		return
+	}
+
+	timeout, diags := plan.Timeouts.Create(ctx, defaultSecretSyncWaitTimeout)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := r.waitForSyncResult(waitCtx, secretSync.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Error waiting for secret sync",
+			fmt.Sprintf("The %s secret sync was created, but %s.\n\n"+
+				"Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync. "+
+				"If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource, fix the destination, and trigger the sync again from Infisical.",
+				r.SyncName, err.Error()),
+		)
 	}
 }
 
@@ -333,6 +433,16 @@ func (r *SecretSyncBaseResource) Read(ctx context.Context, req resource.ReadRequ
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	// Import starts from an ID only. Set the default, so the next plan shows no change.
+	if state.WaitForSyncCompletion.IsNull() {
+		state.WaitForSyncCompletion = types.BoolValue(false)
 	}
 
 	secretSync, err := r.client.GetSecretSyncById(infisical.GetSecretSyncByIdRequest{
@@ -404,6 +514,13 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
+	// Every PATCH queues a sync, so a change to a provider-only setting must not call the API.
+	if !secretSyncApiFieldsChanged(plan, state) {
+		diags = resp.State.Set(ctx, plan)
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
 	secretSyncPlan, diags := r.ReadSyncOptionsForUpdateFromPlan(ctx, plan, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -442,7 +559,32 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	_, err := r.client.UpdateSecretSync(infisical.UpdateSecretSyncRequest{
+	waitForSync := plan.WaitForSyncCompletion.ValueBool()
+	waitCtx := ctx
+	if waitForSync {
+		timeout, diags := plan.Timeouts.Update(ctx, defaultSecretSyncWaitTimeout)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// One deadline covers both waits, so the update never takes longer than the configured timeout.
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		if plan.AutoSyncEnabled.ValueBool() {
+			if err := r.waitForSyncIdle(waitCtx, state.ID.ValueString()); err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating secret sync",
+					fmt.Sprintf("Couldn't update the %s secret sync: %s. Terraform did not send the update.", r.SyncName, err.Error()),
+				)
+				return
+			}
+		}
+	}
+
+	updatedSecretSync, err := r.client.UpdateSecretSync(infisical.UpdateSecretSyncRequest{
 		App:               r.App,
 		ID:                state.ID.ValueString(),
 		Name:              plan.Name.ValueString(),
@@ -464,11 +606,36 @@ func (r *SecretSyncBaseResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
+	// Save state before waiting: the update is applied, whatever the sync result is.
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	if !waitForSync || !updatedSecretSync.AutoSyncEnabled {
+		return
+	}
+
+	if err := r.waitForSyncResult(waitCtx, state.ID.ValueString()); err != nil {
+		resp.Diagnostics.AddError(
+			"Error waiting for secret sync",
+			fmt.Sprintf("The %s secret sync was updated, but %s.", r.SyncName, err.Error()),
+		)
+	}
+}
+
+// secretSyncApiFieldsChanged reports whether the plan changes anything that the API stores.
+func secretSyncApiFieldsChanged(plan, state SecretSyncBaseResourceModel) bool {
+	return !plan.Name.Equal(state.Name) ||
+		!plan.Description.Equal(state.Description) ||
+		!plan.ProjectID.Equal(state.ProjectID) ||
+		!plan.ConnectionID.Equal(state.ConnectionID) ||
+		!plan.Environment.Equal(state.Environment) ||
+		!plan.SecretPath.Equal(state.SecretPath) ||
+		!plan.AutoSyncEnabled.Equal(state.AutoSyncEnabled) ||
+		!plan.SyncOptions.Equal(state.SyncOptions) ||
+		!plan.DestinationConfig.Equal(state.DestinationConfig)
 }
 
 func (r *SecretSyncBaseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
