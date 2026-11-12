@@ -170,6 +170,15 @@ func TestValidateSslTlsProfileNotEmptied(t *testing.T) {
 			t.Errorf("%s: wantError=%v, got diagnostics %v", c.name, c.wantError, diags)
 		}
 	}
+
+	// A changed application_id replaces the sync, and a new sync may start empty.
+	var diags diag.Diagnostics
+	plan := CertificateSyncBaseResourceModel{ApplicationID: types.StringValue("app-2"), CertificateFilters: filtersWith(stringSet()), SyncOptions: noSyncOptions}
+	state := CertificateSyncBaseResourceModel{ApplicationID: types.StringValue("app-1"), CertificateFilters: withOrder}
+	validateSslTlsProfileNotEmptied(context.Background(), plan, state, &diags)
+	if diags.HasError() {
+		t.Errorf("replacement: want no error, got diagnostics %v", diags)
+	}
 }
 
 // Every sync declares the full certificate_filters block, so state written by an earlier provider

@@ -168,8 +168,9 @@ func validatePaloAltoNetworksNamePlaceholders(ctx context.Context, config Certif
 // would leave the SSL/TLS service profile without a certificate, and Terraform has no way to send a
 // replacement. A sync that holds no order already can stay empty, as the backend allows that.
 // A block with profile_ids or metadata is left to enforceCertificateCap, which already rejects it.
+// A changed application_id replaces the sync, and a new sync may start empty.
 func validateSslTlsProfileNotEmptied(_ context.Context, plan, state CertificateSyncBaseResourceModel, diags *diag.Diagnostics) {
-	if !hasCertificateOrders(state.CertificateFilters) {
+	if !hasCertificateOrders(state.CertificateFilters) || !plan.ApplicationID.Equal(state.ApplicationID) {
 		return
 	}
 
