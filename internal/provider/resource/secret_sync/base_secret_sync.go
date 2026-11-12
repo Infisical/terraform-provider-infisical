@@ -165,8 +165,8 @@ func (r *SecretSyncBaseResource) timeoutsAttribute(ctx context.Context) schema.A
 	attribute := timeouts.Attributes(ctx, timeouts.Opts{
 		Create:            true,
 		Update:            true,
-		CreateDescription: fmt.Sprintf("How long to wait for the first sync when wait_for_sync_completion is true, as a duration string such as \"30s\" or \"15m\". Defaults to %s.", defaultSecretSyncWaitTimeoutText),
-		UpdateDescription: fmt.Sprintf("How long to wait for syncs during an update when wait_for_sync_completion is true, as a duration string such as \"30s\" or \"15m\". Covers both the sync already in progress and the sync that the update starts. Defaults to %s.", defaultSecretSyncWaitTimeoutText),
+		CreateDescription: fmt.Sprintf("How long to wait for the first sync when wait_for_sync_completion is true, as a positive duration string such as \"30s\" or \"15m\". Defaults to %s.", defaultSecretSyncWaitTimeoutText),
+		UpdateDescription: fmt.Sprintf("How long to wait for syncs during an update when wait_for_sync_completion is true, as a positive duration string such as \"30s\" or \"15m\". Covers both the sync already in progress and the sync that the update starts. Defaults to %s.", defaultSecretSyncWaitTimeoutText),
 	})
 
 	nested, ok := attribute.(schema.SingleNestedAttribute)
@@ -177,8 +177,29 @@ func (r *SecretSyncBaseResource) timeoutsAttribute(ctx context.Context) schema.A
 	return nested
 }
 
-// ValidateConfig warns about a wait that can't happen: with auto sync off, create and update don't queue a sync.
+// ValidateConfig rejects timeouts that end the wait before it starts, and warns about a wait that can't happen: with
+// auto sync off, create and update don't queue a sync.
 func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var configTimeouts timeouts.Value
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("timeouts"), &configTimeouts)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	// The timeouts module only checks the syntax, and an unparsable value already has its own error.
+	for _, name := range []string{"create", "update"} {
+		get := configTimeouts.Create
+		if name == "update" {
+			get = configTimeouts.Update
+		}
+		if timeout, diags := get(ctx, defaultSecretSyncWaitTimeout); !diags.HasError() && timeout <= 0 {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("timeouts").AtName(name),
+				"Invalid timeout",
+				fmt.Sprintf("timeouts.%s must be greater than zero, got %s.", name, timeout),
+			)
+		}
+	}
+
 	var waitForSyncCompletion, autoSyncEnabled types.Bool
 
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("wait_for_sync_completion"), &waitForSyncCompletion)...)

@@ -117,8 +117,8 @@ Optional:
 
 Optional:
 
-- `create` (String) How long to wait for the first sync when wait_for_sync_completion is true, as a duration string such as "30s" or "15m". Defaults to 10m.
-- `update` (String) How long to wait for syncs during an update when wait_for_sync_completion is true, as a duration string such as "30s" or "15m". Covers both the sync already in progress and the sync that the update starts. Defaults to 10m.
+- `create` (String) How long to wait for the first sync when wait_for_sync_completion is true, as a positive duration string such as "30s" or "15m". Defaults to 10m.
+- `update` (String) How long to wait for syncs during an update when wait_for_sync_completion is true, as a positive duration string such as "30s" or "15m". Covers both the sync already in progress and the sync that the update starts. Defaults to 10m.
 
 ## Import
 

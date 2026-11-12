@@ -469,7 +469,7 @@ func TestSecretSyncCreateWaitTimesOut(t *testing.T) {
 		// No steps: the job never leaves the queue, as when no worker picks it up.
 
 		resp := h.create(h.model(true, map[string]string{"create": "50ms"}))
-		expectDiagnosticError(t, resp.Diagnostics, "timed out", "last status: pending")
+		expectDiagnosticError(t, resp.Diagnostics, "timed out", "(status: pending)")
 		if h.stateModel(resp.State).ID.ValueString() == "" {
 			t.Error("expected the created sync to stay in state after a timeout")
 		}
@@ -777,6 +777,50 @@ func TestSecretSyncCreateWaitDoesNotReadImmediately(t *testing.T) {
 		}
 		if elapsed := time.Since(start); elapsed < 200*time.Millisecond {
 			t.Errorf("expected the first read to wait one interval, but create returned after %s", elapsed)
+		}
+	})
+}
+
+// The last read can be one backoff interval old, so the deadline triggers one more read: a sync that finished by then
+// counts as done.
+func TestSecretSyncWaitReadsOnceMoreAtTheDeadline(t *testing.T) {
+	forEachSecretSyncVariant(t, func(t *testing.T, v secretSyncTestVariant) {
+		h := newSecretSyncTestHarness(t, v)
+		h.r.pollInterval = time.Second
+		h.backend.nextRun = []fakeSyncStep{{status: infisical.SecretSyncStatusSucceeded}}
+
+		resp := h.create(h.model(true, map[string]string{"create": "50ms"}))
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("expected the sync that finished by the deadline to count, got: %v", resp.Diagnostics)
+		}
+		if got := h.gets(); got != 1 {
+			t.Errorf("expected one read at the deadline, got %d", got)
+		}
+	})
+}
+
+func TestSecretSyncValidateConfigRejectsNonPositiveTimeouts(t *testing.T) {
+	forEachSecretSyncVariant(t, func(t *testing.T, v secretSyncTestVariant) {
+		h := newSecretSyncTestHarness(t, v)
+
+		for name, tc := range map[string]struct {
+			timeouts map[string]string
+			errors   int
+		}{
+			"unset":             {},
+			"positive":          {timeouts: map[string]string{"create": "5m", "update": "30s"}},
+			"negative create":   {timeouts: map[string]string{"create": "-1m"}, errors: 1},
+			"zero update":       {timeouts: map[string]string{"update": "0s"}, errors: 1},
+			"both non-positive": {timeouts: map[string]string{"create": "0s", "update": "-5s"}, errors: 2},
+			// The timeouts module's own validator reports this one; ValidateConfig must not add a second error.
+			"unparsable": {timeouts: map[string]string{"create": "abc"}},
+		} {
+			config := tfsdk.Config{Schema: h.schema, Raw: h.plan(h.model(true, tc.timeouts)).Raw}
+			var resp resource.ValidateConfigResponse
+			h.r.ValidateConfig(context.Background(), resource.ValidateConfigRequest{Config: config}, &resp)
+			if got := resp.Diagnostics.ErrorsCount(); got != tc.errors {
+				t.Errorf("%s: expected %d errors, got %d: %v", name, tc.errors, got, resp.Diagnostics)
+			}
 		}
 	})
 }

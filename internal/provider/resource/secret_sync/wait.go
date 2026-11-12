@@ -60,24 +60,41 @@ func (r *SecretSyncBaseResource) pollSecretSync(ctx context.Context, id string, 
 		wait = initial
 	}
 
-	for {
-		if wait > 0 {
-			select {
-			case <-ctx.Done():
-				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-					return infisical.SecretSync{}, fmt.Errorf("timed out waiting for %s (last status: %s). The sync keeps running in Infisical. To wait longer, increase the values in timeouts", waitingFor, lastStatus)
-				}
-				return infisical.SecretSync{}, fmt.Errorf("stopped waiting for %s because the operation was cancelled (last status: %s)", waitingFor, lastStatus)
-			case <-time.After(wait):
-			}
-		}
-
+	read := func() (infisical.SecretSync, error) {
 		secretSync, err := r.client.GetSecretSyncById(infisical.GetSecretSyncByIdRequest{App: r.App, ID: id})
 		if err != nil {
 			if errors.Is(err, infisical.ErrNotFound) {
 				return infisical.SecretSync{}, fmt.Errorf("the secret sync was deleted while Terraform was waiting for %s", waitingFor)
 			}
 			return infisical.SecretSync{}, fmt.Errorf("couldn't read the secret sync while waiting for %s: %w", waitingFor, err)
+		}
+		return secretSync, nil
+	}
+
+	for {
+		if wait > 0 {
+			select {
+			case <-ctx.Done():
+				if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					return infisical.SecretSync{}, fmt.Errorf("stopped waiting for %s because the operation was cancelled (last status: %s)", waitingFor, lastStatus)
+				}
+				// The last read can be up to one backoff interval old: read once more, so a sync that finished by the
+				// deadline counts and the error shows the current status.
+				secretSync, err := read()
+				if err != nil {
+					return infisical.SecretSync{}, err
+				}
+				if done(secretSync) {
+					return secretSync, nil
+				}
+				return secretSync, fmt.Errorf("timed out waiting for %s (status: %s). The sync keeps running in Infisical. To wait longer, increase the values in timeouts", waitingFor, syncStatusString(secretSync))
+			case <-time.After(wait):
+			}
+		}
+
+		secretSync, err := read()
+		if err != nil {
+			return infisical.SecretSync{}, err
 		}
 
 		if done(secretSync) {
