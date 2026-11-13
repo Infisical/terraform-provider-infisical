@@ -1,6 +1,7 @@
 package infisicalclient
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"terraform-provider-infisical/internal/errors"
@@ -35,6 +36,16 @@ const (
 	SecretSyncBehaviorOverwriteDestination  SecretSyncBehavior = "overwrite-destination"
 	SecretSyncBehaviorPrioritizeSource      SecretSyncBehavior = "import-prioritize-source"
 	SecretSyncBehaviorPrioritizeDestination SecretSyncBehavior = "import-prioritize-destination"
+)
+
+// SecretSyncStatus mirrors SecretSyncStatus in Infisical core (secret-sync-types.ts).
+type SecretSyncStatus string
+
+const (
+	SecretSyncStatusPending   SecretSyncStatus = "pending"
+	SecretSyncStatusRunning   SecretSyncStatus = "running"
+	SecretSyncStatusSucceeded SecretSyncStatus = "succeeded"
+	SecretSyncStatusFailed    SecretSyncStatus = "failed"
 )
 
 const (
@@ -86,9 +97,15 @@ func (client Client) UpdateSecretSync(request UpdateSecretSyncRequest) (SecretSy
 }
 
 func (client Client) GetSecretSyncById(request GetSecretSyncByIdRequest) (SecretSync, error) {
+	return client.GetSecretSyncByIdWithContext(context.Background(), request)
+}
+
+// GetSecretSyncByIdWithContext stops the request, and any 429 retry wait, when ctx ends.
+func (client Client) GetSecretSyncByIdWithContext(ctx context.Context, request GetSecretSyncByIdRequest) (SecretSync, error) {
 	var body GetSecretSyncByIdResponse
 	response, err := client.Config.HttpClient.
 		R().
+		SetContext(ctx).
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		Get(fmt.Sprintf("api/v1/secret-syncs/%s/%s", string(request.App), request.ID))
