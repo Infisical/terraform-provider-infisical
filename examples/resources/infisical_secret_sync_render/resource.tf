@@ -27,12 +27,13 @@ resource "infisical_app_connection_render" "render-app-connection-demo" {
 }
 
 resource "infisical_secret_sync_render" "render-secret-sync-demo" {
-  name          = "render-secret-sync-demo"
-  description   = "This is a demo Render Secret Sync."
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "<secret-path>"
-  connection_id = infisical_app_connection_render.render-app-connection-demo.id
+  name                    = "render-secret-sync-demo"
+  description             = "This is a demo Render Secret Sync."
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "<secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = infisical_app_connection_render.render-app-connection-demo.id
   destination_config = {
     service_id = "<service-id>"
     scope      = "<scope>" // Supported options: service

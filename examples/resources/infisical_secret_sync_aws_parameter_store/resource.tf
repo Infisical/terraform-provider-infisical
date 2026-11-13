@@ -18,12 +18,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_aws_parameter_store" "aws-parameter-store-secret-sync" {
-  name          = "aws-parameter-store-secret-sync-demo"
-  description   = "Demo of AWS Parameter Store secret sync"
-  project_id    = "<project-id>"
-  environment   = "<environment-slug>"
-  secret_path   = "<secret-path>" # Root folder is /
-  connection_id = "<app-connection-id>"
+  name                    = "aws-parameter-store-secret-sync-demo"
+  description             = "Demo of AWS Parameter Store secret sync"
+  project_id              = "<project-id>"
+  environment             = "<environment-slug>"
+  secret_path             = "<secret-path>" # Root folder is /
+  include_all_sub_folders = false           # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<app-connection-id>"
 
   sync_options = {
     initial_sync_behavior        = "overwrite-destination", # Supported options: overwrite-destination, import-prioritize-source, import-prioritize-destination

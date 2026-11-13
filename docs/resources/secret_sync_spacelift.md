@@ -33,12 +33,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_spacelift" "example" {
-  name          = "spacelift-secret-sync"
-  description   = "Sync secrets to a Spacelift context"
-  project_id    = "<your-infisical-project-id>"
-  connection_id = "<app-connection-id>" # The ID of your Spacelift App Connection
-  environment   = "<env-slug>"
-  secret_path   = "<infisical-secret-path>"
+  name                    = "spacelift-secret-sync"
+  description             = "Sync secrets to a Spacelift context"
+  project_id              = "<your-infisical-project-id>"
+  connection_id           = "<app-connection-id>" # The ID of your Spacelift App Connection
+  environment             = "<env-slug>"
+  secret_path             = "<infisical-secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path
 
   auto_sync_enabled = true
 
@@ -75,6 +76,7 @@ resource "infisical_secret_sync_spacelift" "example" {
 - `description` (String) An optional description for the Spacelift sync.
 - `timeouts` (Attributes) How long Terraform waits for syncs when wait_for_sync_completion is true. (see [below for nested schema](#nestedatt--timeouts))
 - `wait_for_sync_completion` (Boolean) Whether Terraform waits for the sync to finish before it continues. On create, Terraform waits for the first sync. On update, Terraform first waits for a sync that is already in progress, then sends the update and waits for the sync that the update starts. If the sync fails, the apply fails with the error from Infisical. If the wait fails on create, Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync. If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. Terraform waits up to the create and update values in timeouts (default: 10m). Defaults to false.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
 
 ### Read-Only
 
@@ -101,7 +103,7 @@ Optional:
 Optional:
 
 - `disable_secret_deletion` (Boolean) When set to true, Infisical will not remove secrets from Spacelift. Enable this option if you intend to manage some secrets manually outside of Infisical.
-- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well.
+- `include_all_sub_folders` (Boolean, Deprecated) Whether to sync secrets from folders beneath the source path as well. Deprecated: use the top-level include_all_sub_folders instead. When both are set, the top-level include_all_sub_folders takes precedence.
 - `key_schema` (String) The format to use for structuring secret keys in the Spacelift destination.
 - `write_only` (Boolean) Whether secrets should be marked as secret in Spacelift. Secret values are only available to Runs and Tasks and are not accessible in the web GUI or through the API.
 

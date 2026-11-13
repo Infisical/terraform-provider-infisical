@@ -18,12 +18,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_spacelift" "example" {
-  name          = "spacelift-secret-sync"
-  description   = "Sync secrets to a Spacelift context"
-  project_id    = "<your-infisical-project-id>"
-  connection_id = "<app-connection-id>" # The ID of your Spacelift App Connection
-  environment   = "<env-slug>"
-  secret_path   = "<infisical-secret-path>"
+  name                    = "spacelift-secret-sync"
+  description             = "Sync secrets to a Spacelift context"
+  project_id              = "<your-infisical-project-id>"
+  connection_id           = "<app-connection-id>" # The ID of your Spacelift App Connection
+  environment             = "<env-slug>"
+  secret_path             = "<infisical-secret-path>"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path
 
   auto_sync_enabled = true
 

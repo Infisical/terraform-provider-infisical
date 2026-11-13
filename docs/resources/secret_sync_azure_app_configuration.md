@@ -33,12 +33,13 @@ provider "infisical" {
 }
 
 resource "infisical_secret_sync_azure_app_configuration" "app-configuration-demo" {
-  name          = "demo-sync"
-  description   = "This is a demo sync"
-  project_id    = "<project-id>"
-  environment   = "dev"
-  secret_path   = "/"
-  connection_id = "<app-connection-id>" # The ID of your Azure App Connection
+  name                    = "demo-sync"
+  description             = "This is a demo sync"
+  project_id              = "<project-id>"
+  environment             = "dev"
+  secret_path             = "/"
+  include_all_sub_folders = false                 # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = "<app-connection-id>" # The ID of your Azure App Connection
 
   sync_options = {
     initial_sync_behavior = "overwrite-destination"
@@ -68,6 +69,7 @@ resource "infisical_secret_sync_azure_app_configuration" "app-configuration-demo
 - `description` (String) An optional description for the Azure App Configuration sync.
 - `timeouts` (Attributes) How long Terraform waits for syncs when wait_for_sync_completion is true. (see [below for nested schema](#nestedatt--timeouts))
 - `wait_for_sync_completion` (Boolean) Whether Terraform waits for the sync to finish before it continues. On create, Terraform waits for the first sync. On update, Terraform first waits for a sync that is already in progress, then sends the update and waits for the sync that the update starts. If the sync fails, the apply fails with the error from Infisical. If the wait fails on create, Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync. The recreated sync runs initial_sync_behavior again: the import behaviors bring secrets that exist only in the destination back into Infisical, and import-prioritize-destination also overwrites Infisical values with the values in the destination. If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. Terraform waits up to the create and update values in timeouts (default: 10m). Defaults to false.
+- `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
 
 ### Read-Only
 

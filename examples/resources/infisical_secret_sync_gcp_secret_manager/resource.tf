@@ -27,12 +27,13 @@ resource "infisical_app_connection_gcp" "app-connection-gcp" {
 }
 
 resource "infisical_secret_sync_gcp_secret_manager" "secret_manager_test" {
-  name          = "gcp-sync-tests-automatic"
-  description   = "I am a test secret sync"
-  project_id    = "f4517f4c-8b61-4727-8aef-5ae2807126fb"
-  environment   = "prod"
-  secret_path   = "/"
-  connection_id = infisical_app_connection_gcp.app-connection-gcp.id
+  name                    = "gcp-sync-tests-automatic"
+  description             = "I am a test secret sync"
+  project_id              = "f4517f4c-8b61-4727-8aef-5ae2807126fb"
+  environment             = "prod"
+  secret_path             = "/"
+  include_all_sub_folders = false # Also sync secrets from folders beneath secret_path. Requires initial_sync_behavior = "overwrite-destination"
+  connection_id           = infisical_app_connection_gcp.app-connection-gcp.id
 
   sync_options = {
     initial_sync_behavior = "import-prioritize-destination"
