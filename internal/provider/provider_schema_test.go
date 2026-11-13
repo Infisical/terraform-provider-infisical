@@ -38,4 +38,10 @@ func TestProviderSchemaIsValid(t *testing.T) {
 			t.Errorf("expected %s to be registered on the provider", name)
 		}
 	}
+
+	for _, name := range []string{"infisical_instance_details"} {
+		if _, ok := resp.DataSourceSchemas[name]; !ok {
+			t.Errorf("expected data source %s to be registered on the provider", name)
+		}
+	}
 }
