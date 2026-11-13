@@ -191,9 +191,15 @@ func (r *SecretSyncBaseResource) timeoutsAttribute(ctx context.Context) schema.A
 	return nested
 }
 
-// ValidateConfig rejects timeouts that end the wait before it starts, and warns about a wait that can't happen: with
-// auto sync off, create and update don't queue a sync.
+// ValidateConfig runs the checks that need more than one attribute.
 func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	r.validateSyncWaitConfig(ctx, req, resp)
+	r.validateIncludeAllSubFoldersConfig(ctx, req, resp)
+}
+
+// validateSyncWaitConfig rejects timeouts that end the wait before it starts, and warns about a wait that can't
+// happen: with auto sync off, create and update don't queue a sync.
+func (r *SecretSyncBaseResource) validateSyncWaitConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var configTimeouts timeouts.Value
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("timeouts"), &configTimeouts)...)
 	if resp.Diagnostics.HasError() {
@@ -379,10 +385,10 @@ func keepDeprecatedIncludeAllSubFolders(ctx context.Context, fromApi, prior type
 	return types.ObjectValue(fromApi.AttributeTypes(ctx), attrs)
 }
 
-// ValidateConfig rejects including subfolders together with an import initial sync behavior, which the
-// API refuses for every destination. Syncs without initial_sync_behavior always overwrite, so they can
+// validateIncludeAllSubFoldersConfig rejects including subfolders together with an import initial sync behavior,
+// which the API refuses for every destination. Syncs without initial_sync_behavior always overwrite, so they can
 // include subfolders freely.
-func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+func (r *SecretSyncBaseResource) validateIncludeAllSubFoldersConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	if _, ok := r.SyncOptionsAttributes["initial_sync_behavior"]; !ok {
 		return
 	}
@@ -779,6 +785,7 @@ func secretSyncApiFieldsChanged(plan, state SecretSyncBaseResourceModel) bool {
 		!plan.ConnectionID.Equal(state.ConnectionID) ||
 		!plan.Environment.Equal(state.Environment) ||
 		!plan.SecretPath.Equal(state.SecretPath) ||
+		!plan.IncludeAllSubFolders.Equal(state.IncludeAllSubFolders) ||
 		!plan.AutoSyncEnabled.Equal(state.AutoSyncEnabled) ||
 		!plan.SyncOptions.Equal(state.SyncOptions) ||
 		!plan.DestinationConfig.Equal(state.DestinationConfig)

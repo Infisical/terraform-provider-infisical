@@ -2719,7 +2719,7 @@ type UpdateSecretSyncRequest struct {
 	Environment          string                 `json:"environment,omitempty"`
 	SecretPath           string                 `json:"secretPath,omitempty"`
 	IncludeAllSubFolders bool                   `json:"includeAllSubFolders"`
-	AutoSyncEnabled      bool                   `json:"isAutoSyncEnabled,omitempty"`
+	AutoSyncEnabled      bool                   `json:"isAutoSyncEnabled"` // no omitempty: it would drop false, so auto sync could never be turned off
 	Description          string                 `json:"description"`
 	SyncOptions          map[string]interface{} `json:"syncOptions,omitempty"`
 	DestinationConfig    map[string]interface{} `json:"destinationConfig,omitempty"`
