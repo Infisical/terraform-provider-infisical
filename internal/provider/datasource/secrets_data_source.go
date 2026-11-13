@@ -25,10 +25,11 @@ type SecretsDataSource struct {
 
 // ExampleDataSourceModel describes the data source data model.
 type SecretDataSourceModel struct {
-	FolderPath  types.String                      `tfsdk:"folder_path"`
-	WorkspaceId types.String                      `tfsdk:"workspace_id"`
-	EnvSlug     types.String                      `tfsdk:"env_slug"`
-	Secrets     map[string]InfisicalSecretDetails `tfsdk:"secrets"`
+	FolderPath     types.String                      `tfsdk:"folder_path"`
+	WorkspaceId    types.String                      `tfsdk:"workspace_id"`
+	EnvSlug        types.String                      `tfsdk:"env_slug"`
+	IncludeImports types.Bool                        `tfsdk:"include_imports"`
+	Secrets        map[string]InfisicalSecretDetails `tfsdk:"secrets"`
 }
 
 type InfisicalSecretDetails struct {
@@ -61,6 +62,11 @@ func (d *SecretsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				Description: "The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)",
 				Optional:    true,
 				Computed:    true,
+			},
+
+			"include_imports": schema.BoolAttribute{
+				Description: "Whether to also return secrets imported into the folder. A secret defined in the folder takes precedence over an imported one with the same key, and a later import takes precedence over an earlier one. Only supported with Machine Identity auth. Defaults to `false`",
+				Optional:    true,
 			},
 
 			"secrets": schema.MapNestedAttribute{
@@ -118,6 +124,13 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	if d.client.Config.AuthStrategy == infisical.AuthStrategy.SERVICE_TOKEN {
+		if data.IncludeImports.ValueBool() {
+			resp.Diagnostics.AddError(
+				"Unsupported attribute for service token auth",
+				"include_imports is only supported with Machine Identity auth",
+			)
+			return
+		}
 
 		plainTextSecrets, _, err := d.client.GetPlainTextSecretsViaServiceToken(data.FolderPath.ValueString(), data.EnvSlug.ValueString())
 		if err != nil {
@@ -138,7 +151,7 @@ func (d *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			data.Secrets[secret.Key] = InfisicalSecretDetails{Value: types.StringValue(secret.Value), Comment: types.StringValue(secret.Comment), SecretType: types.StringValue(secret.Type)}
 		}
 	} else if d.client.Config.IsMachineIdentityAuth {
-		secrets, err := d.client.GetRawSecrets(data.FolderPath.ValueString(), data.EnvSlug.ValueString(), data.WorkspaceId.ValueString())
+		secrets, err := d.client.GetRawSecrets(data.FolderPath.ValueString(), data.EnvSlug.ValueString(), data.WorkspaceId.ValueString(), data.IncludeImports.ValueBool())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Something went wrong while fetching secrets",

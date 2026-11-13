@@ -38,6 +38,13 @@ data "infisical_secrets" "common_secrets" {
   folder_path  = "/"
 }
 
+data "infisical_secrets" "secrets_with_imports" {
+  env_slug        = "dev"
+  workspace_id    = "<project id>" // project ID
+  folder_path     = "/backend"
+  include_imports = true // also return the secrets imported into /backend
+}
+
 output "all-project-secrets" {
   value = nonsensitive(data.infisical_secrets.common_secrets.secrets["SECRET-NAME"].value)
 }
@@ -57,6 +64,7 @@ output "all-project-secrets" {
 
 ### Optional
 
+- `include_imports` (Boolean) Whether to also return secrets imported into the folder. A secret defined in the folder takes precedence over an imported one with the same key, and a later import takes precedence over an earlier one. Only supported with Machine Identity auth. Defaults to `false`
 - `workspace_id` (String) The Infisical project ID (Required for Machine Identity auth, and service tokens with multiple scopes)
 
 ### Read-Only
