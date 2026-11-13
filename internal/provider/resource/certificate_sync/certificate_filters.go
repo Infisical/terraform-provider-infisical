@@ -41,25 +41,40 @@ type certificateMetadataFilterModel struct {
 	Value types.String `tfsdk:"value"`
 }
 
-func certificateFiltersSchema() schema.SingleNestedAttribute {
+// certificateFiltersSchema declares the same attributes for every sync, so existing state keeps
+// decoding. A sync capped at one certificate says in its descriptions that only
+// certificate_order_ids applies; enforceCertificateCap rejects the other filters at plan time.
+func certificateFiltersSchema(maxCertificates int) schema.SingleNestedAttribute {
+	description := "Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. " +
+		"Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates."
+	orderIDsDescription := "The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order."
+	profileIDsDescription := "Sync certificates issued from any one of these certificate profiles."
+	metadataDescription := "Sync certificates carrying every one of these metadata pairs."
+	if maxCertificates == 1 {
+		description = "Which certificate this sync holds. Set `certificate_order_ids` to one certificate order. " +
+			"Leave the block out to manage the certificate outside Terraform, for example in the Infisical UI."
+		orderIDsDescription = "The certificate order to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. Set one order. The sync keeps holding the newest renewal of that order."
+		profileIDsDescription = "Not supported on this sync. Setting it fails the plan."
+		metadataDescription = "Not supported on this sync. Setting it fails the plan."
+	}
+
 	return schema.SingleNestedAttribute{
-		Optional: true,
-		Description: "Which of the application's certificates this sync holds. A certificate must match every field that is set: setting both `certificate_order_ids` and `profile_ids` selects only the certificates in both. " +
-			"Leave the block out to manage the certificates outside Terraform, for example in the Infisical UI. An empty block, or an empty `certificate_order_ids`, makes the sync hold no certificates.",
+		Optional:    true,
+		Description: description,
 		Attributes: map[string]schema.Attribute{
 			"certificate_order_ids": schema.SetAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "The certificate orders to sync, from the `order_id` attribute of `infisical_cert_manager_certificate`. A certificate and all of its renewals share one order, so the sync keeps holding the newest certificate of each order.",
+				Description: orderIDsDescription,
 			},
 			"profile_ids": schema.SetAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Sync certificates issued from any one of these certificate profiles.",
+				Description: profileIDsDescription,
 			},
 			"metadata": schema.SetNestedAttribute{
 				Optional:    true,
-				Description: "Sync certificates carrying every one of these metadata pairs.",
+				Description: metadataDescription,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{

@@ -46,6 +46,7 @@ const (
 	AppConnectionAppKempLoadMaster        AppConnectionApp = "kemp-loadmaster"
 	AppConnectionAppNetScaler             AppConnectionApp = "netscaler"
 	AppConnectionAppNutanixPrismCentral   AppConnectionApp = "nutanix-prism-central"
+	AppConnectionAppPaloAltoNetworks      AppConnectionApp = "palo-alto-networks"
 	AppConnectionAppSSH                   AppConnectionApp = "ssh"
 	AppConnectionAppWinRM                 AppConnectionApp = "winrm"
 	AppConnectionAppSpacelift             AppConnectionApp = "spacelift"

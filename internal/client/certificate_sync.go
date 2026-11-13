@@ -10,19 +10,21 @@ import (
 type CertificateSyncApp string
 
 const (
-	CertificateSyncAppAWSCertificateManager       CertificateSyncApp = "aws-certificate-manager"
-	CertificateSyncAppAWSElasticLoadBalancer      CertificateSyncApp = "aws-elastic-load-balancer"
-	CertificateSyncAppAWSSecretsManager           CertificateSyncApp = "aws-secrets-manager"
-	CertificateSyncAppAzureKeyVault               CertificateSyncApp = "azure-key-vault"
-	CertificateSyncAppChef                        CertificateSyncApp = "chef"
-	CertificateSyncAppCloudflareCustomCertificate CertificateSyncApp = "cloudflare-custom-certificate"
-	CertificateSyncAppF5BigIp                     CertificateSyncApp = "f5-big-ip"
-	CertificateSyncAppGCPCertificateManager       CertificateSyncApp = "gcp-certificate-manager"
-	CertificateSyncAppKempLoadMaster              CertificateSyncApp = "kemp-loadmaster"
-	CertificateSyncAppLinuxServer                 CertificateSyncApp = "linux-server"
-	CertificateSyncAppNetScaler                   CertificateSyncApp = "netscaler"
-	CertificateSyncAppNutanixPrismCentral         CertificateSyncApp = "nutanix-prism-central"
-	CertificateSyncAppWindowsServer               CertificateSyncApp = "windows-server"
+	CertificateSyncAppAWSCertificateManager         CertificateSyncApp = "aws-certificate-manager"
+	CertificateSyncAppAWSElasticLoadBalancer        CertificateSyncApp = "aws-elastic-load-balancer"
+	CertificateSyncAppAWSSecretsManager             CertificateSyncApp = "aws-secrets-manager"
+	CertificateSyncAppAzureKeyVault                 CertificateSyncApp = "azure-key-vault"
+	CertificateSyncAppChef                          CertificateSyncApp = "chef"
+	CertificateSyncAppCloudflareCustomCertificate   CertificateSyncApp = "cloudflare-custom-certificate"
+	CertificateSyncAppF5BigIp                       CertificateSyncApp = "f5-big-ip"
+	CertificateSyncAppGCPCertificateManager         CertificateSyncApp = "gcp-certificate-manager"
+	CertificateSyncAppKempLoadMaster                CertificateSyncApp = "kemp-loadmaster"
+	CertificateSyncAppLinuxServer                   CertificateSyncApp = "linux-server"
+	CertificateSyncAppNetScaler                     CertificateSyncApp = "netscaler"
+	CertificateSyncAppNutanixPrismCentral           CertificateSyncApp = "nutanix-prism-central"
+	CertificateSyncAppPaloAltoNetworks              CertificateSyncApp = "palo-alto-networks"
+	CertificateSyncAppPaloAltoNetworksSslTlsProfile CertificateSyncApp = "palo-alto-networks-ssl-tls-profile"
+	CertificateSyncAppWindowsServer                 CertificateSyncApp = "windows-server"
 )
 
 const (

@@ -36,6 +36,7 @@ type certificateNameRule struct {
 	requireLiteralCertificateID bool
 	requireLeadingLowercase     bool
 	requirement                 string
+	placeholders                string
 }
 
 // compileCertificateNameSchemaTest fills placeholders with the same stand-in values the backend uses
@@ -76,7 +77,11 @@ func (rule certificateNameRule) validate(schema string) []string {
 	compiled := compileCertificateNameSchemaTest(schema)
 	length := len(compiled)
 	if !rule.pattern.MatchString(compiled) || (rule.minLength > 0 && length < rule.minLength) || (rule.maxLength > 0 && length > rule.maxLength) {
-		problems = append(problems, fmt.Sprintf("With placeholders filled in it must be %s. Available placeholders: %s.", rule.requirement, availableNamePlaceholders))
+		placeholders := rule.placeholders
+		if placeholders == "" {
+			placeholders = availableNamePlaceholders
+		}
+		problems = append(problems, fmt.Sprintf("With placeholders filled in it must be %s. Available placeholders: %s.", rule.requirement, placeholders))
 	}
 	return problems
 }
