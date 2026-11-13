@@ -80,7 +80,7 @@ resource "infisical_secret_sync_render" "render-secret-sync-demo" {
 - `description` (String) An optional description for the Render sync.
 - `include_all_sub_folders` (Boolean) Whether to sync secrets from folders beneath the source path as well. Requires initial_sync_behavior to be 'overwrite-destination'.
 - `timeouts` (Attributes) How long Terraform waits for syncs when wait_for_sync_completion is true. (see [below for nested schema](#nestedatt--timeouts))
-- `wait_for_sync_completion` (Boolean) Whether Terraform waits for the sync to finish before it continues. On create, Terraform waits for the first sync. On update, Terraform first waits for a sync that is already in progress, then sends the update and waits for the sync that the update starts. If the sync fails, the apply fails with the error from Infisical. If the wait fails on create, Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync. The recreated sync runs initial_sync_behavior again: the import behaviors bring secrets that exist only in the destination back into Infisical, and import-prioritize-destination also overwrites Infisical values with the values in the destination. If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. Terraform waits up to the create and update values in timeouts (default: 10m). Defaults to false.
+- `wait_for_sync_completion` (Boolean) Whether Terraform waits for the sync to finish before it continues. On create, Terraform waits for the first sync. On update, Terraform first waits for a sync that is already in progress, then sends the update and waits for the sync that the update starts. If the sync fails, the apply fails with the error from Infisical. If the wait fails on create, Terraform marks the resource as tainted, and the next apply deletes and recreates the secret sync. The recreated sync runs initial_sync_behavior again: the import behaviors bring secrets that exist only in the destination back into Infisical, and import-prioritize-destination also overwrites Infisical values with the values in the destination. If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. Terraform waits up to the create and update values in timeouts (default: 10m). Every change to a secret in the source folder also starts a sync, so if those secrets change often, an update can wait longer for a sync that is already in progress. Set larger timeouts in that case. Defaults to false.
 
 ### Read-Only
 
@@ -114,8 +114,8 @@ Optional:
 
 Optional:
 
-- `create` (String) How long to wait for the first sync when wait_for_sync_completion is true, as a positive duration string such as "30s" or "15m". Defaults to 10m.
-- `update` (String) How long to wait for syncs during an update when wait_for_sync_completion is true, as a positive duration string such as "30s" or "15m". Covers both the sync already in progress and the sync that the update starts. Defaults to 10m.
+- `create` (String) How long Terraform waits for Infisical to finish the sync that creating the secret sync starts, when wait_for_sync_completion is true. A duration of at least 1m, such as "5m" or "15m". Defaults to 10m.
+- `update` (String) How long Terraform waits during an update for a sync that is already running to finish, and then for the sync that the update starts to finish, when wait_for_sync_completion is true. Both waits share this one timeout, and Terraform does not send the update until the running sync has finished. A duration of at least 1m, such as "5m" or "15m". Defaults to 10m.
 
 ## Import
 

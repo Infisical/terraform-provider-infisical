@@ -96,6 +96,7 @@ func (r *SecretSyncBaseResource) waitForSyncCompletionDescription() string {
 	description += " If the configuration is correct and only the destination needs a fix, run `terraform untaint` on the resource instead. " +
 		"The wait has no effect when auto_sync_enabled is false, because Infisical then doesn't run a sync. " +
 		fmt.Sprintf("Terraform waits up to the create and update values in timeouts (default: %s). ", defaultSecretSyncWaitTimeoutText) +
+		"Every change to a secret in the source folder also starts a sync, so if those secrets change often, an update can wait longer for a sync that is already in progress. Set larger timeouts in that case. " +
 		"Defaults to false."
 
 	return description
@@ -179,8 +180,8 @@ func (r *SecretSyncBaseResource) timeoutsAttribute(ctx context.Context) schema.A
 	attribute := timeouts.Attributes(ctx, timeouts.Opts{
 		Create:            true,
 		Update:            true,
-		CreateDescription: fmt.Sprintf("How long to wait for the first sync when wait_for_sync_completion is true, as a positive duration string such as \"30s\" or \"15m\". Defaults to %s.", defaultSecretSyncWaitTimeoutText),
-		UpdateDescription: fmt.Sprintf("How long to wait for syncs during an update when wait_for_sync_completion is true, as a positive duration string such as \"30s\" or \"15m\". Covers both the sync already in progress and the sync that the update starts. Defaults to %s.", defaultSecretSyncWaitTimeoutText),
+		CreateDescription: fmt.Sprintf("How long Terraform waits for Infisical to finish the sync that creating the secret sync starts, when wait_for_sync_completion is true. A duration of at least %s, such as \"5m\" or \"15m\". Defaults to %s.", minSecretSyncWaitTimeoutText, defaultSecretSyncWaitTimeoutText),
+		UpdateDescription: fmt.Sprintf("How long Terraform waits during an update for a sync that is already running to finish, and then for the sync that the update starts to finish, when wait_for_sync_completion is true. Both waits share this one timeout, and Terraform does not send the update until the running sync has finished. A duration of at least %s, such as \"5m\" or \"15m\". Defaults to %s.", minSecretSyncWaitTimeoutText, defaultSecretSyncWaitTimeoutText),
 	})
 
 	nested, ok := attribute.(schema.SingleNestedAttribute)
@@ -197,8 +198,8 @@ func (r *SecretSyncBaseResource) ValidateConfig(ctx context.Context, req resourc
 	r.validateIncludeAllSubFoldersConfig(ctx, req, resp)
 }
 
-// validateSyncWaitConfig rejects timeouts that end the wait before it starts, and warns about a wait that can't
-// happen: with auto sync off, create and update don't queue a sync.
+// validateSyncWaitConfig rejects timeouts shorter than a sync that Infisical retries can take, and warns about a wait
+// that can't happen: with auto sync off, create and update don't queue a sync.
 func (r *SecretSyncBaseResource) validateSyncWaitConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var configTimeouts timeouts.Value
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("timeouts"), &configTimeouts)...)
@@ -211,11 +212,11 @@ func (r *SecretSyncBaseResource) validateSyncWaitConfig(ctx context.Context, req
 		if name == "update" {
 			get = configTimeouts.Update
 		}
-		if timeout, diags := get(ctx, defaultSecretSyncWaitTimeout); !diags.HasError() && timeout <= 0 {
+		if timeout, diags := get(ctx, defaultSecretSyncWaitTimeout); !diags.HasError() && timeout < minSecretSyncWaitTimeout {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("timeouts").AtName(name),
 				"Invalid timeout",
-				fmt.Sprintf("timeouts.%s must be greater than zero, got %s.", name, timeout),
+				fmt.Sprintf("timeouts.%s must be at least %s, because Infisical can take about a minute to start and retry a sync. Got %s.", name, minSecretSyncWaitTimeoutText, timeout),
 			)
 		}
 	}

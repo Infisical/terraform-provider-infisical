@@ -754,10 +754,15 @@ func TestSecretSyncWaitDescriptionMatchesImportSupport(t *testing.T) {
 	})
 }
 
-func TestSecretSyncDefaultTimeoutTextMatchesDuration(t *testing.T) {
-	parsed, err := time.ParseDuration(defaultSecretSyncWaitTimeoutText)
-	if err != nil || parsed != defaultSecretSyncWaitTimeout {
-		t.Errorf("expected the documented default %q to equal %s, got %s (err: %v)", defaultSecretSyncWaitTimeoutText, defaultSecretSyncWaitTimeout, parsed, err)
+func TestSecretSyncTimeoutTextMatchesDuration(t *testing.T) {
+	for text, want := range map[string]time.Duration{
+		defaultSecretSyncWaitTimeoutText: defaultSecretSyncWaitTimeout,
+		minSecretSyncWaitTimeoutText:     minSecretSyncWaitTimeout,
+	} {
+		parsed, err := time.ParseDuration(text)
+		if err != nil || parsed != want {
+			t.Errorf("expected the documented %q to equal %s, got %s (err: %v)", text, want, parsed, err)
+		}
 	}
 }
 
@@ -766,7 +771,7 @@ func TestSecretSyncPollBackoff(t *testing.T) {
 	var waits []time.Duration
 	var wait time.Duration
 	for range 6 {
-		wait = nextSyncPollWait(wait, secretSyncPollInitialInterval, secretSyncPollMaxInterval)
+		wait = nextSyncPollWait(wait, defaultSecretSyncPollInitialInterval, defaultSecretSyncPollMaxInterval)
 		waits = append(waits, wait)
 	}
 	want := []time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second, 30 * time.Second, 30 * time.Second, 30 * time.Second}
@@ -865,7 +870,8 @@ func TestSecretSyncUpdateDoesNotPatchAfterDeadline(t *testing.T) {
 	})
 }
 
-func TestSecretSyncValidateConfigRejectsNonPositiveTimeouts(t *testing.T) {
+// Infisical can take about a minute to start and retry a sync, so shorter timeouts are rejected.
+func TestSecretSyncValidateConfigRejectsShortTimeouts(t *testing.T) {
 	forEachSecretSyncVariant(t, func(t *testing.T, v secretSyncTestVariant) {
 		h := newSecretSyncTestHarness(t, v)
 
@@ -873,11 +879,13 @@ func TestSecretSyncValidateConfigRejectsNonPositiveTimeouts(t *testing.T) {
 			timeouts map[string]string
 			errors   int
 		}{
-			"unset":             {},
-			"positive":          {timeouts: map[string]string{"create": "5m", "update": "30s"}},
-			"negative create":   {timeouts: map[string]string{"create": "-1m"}, errors: 1},
-			"zero update":       {timeouts: map[string]string{"update": "0s"}, errors: 1},
-			"both non-positive": {timeouts: map[string]string{"create": "0s", "update": "-5s"}, errors: 2},
+			"unset":           {},
+			"long enough":     {timeouts: map[string]string{"create": "5m", "update": "15m"}},
+			"exactly minimum": {timeouts: map[string]string{"create": "1m", "update": "60s"}},
+			"below minimum":   {timeouts: map[string]string{"update": "59s"}, errors: 1},
+			"negative create": {timeouts: map[string]string{"create": "-1m"}, errors: 1},
+			"zero update":     {timeouts: map[string]string{"update": "0s"}, errors: 1},
+			"both too short":  {timeouts: map[string]string{"create": "30s", "update": "-5s"}, errors: 2},
 			// The timeouts module's own validator reports this one; ValidateConfig must not add a second error.
 			"unparsable": {timeouts: map[string]string{"create": "abc"}},
 		} {
