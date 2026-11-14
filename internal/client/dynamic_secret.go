@@ -14,6 +14,7 @@ const (
 	DynamicSecretProviderKubernetes  DynamicSecretProvider = "kubernetes"
 	DynamicSecretProviderMongoAtlas  DynamicSecretProvider = "mongo-db-atlas"
 	DynamicSecretProviderMongoDb     DynamicSecretProvider = "mongo-db"
+	DynamicSecretProviderOpenRouter  DynamicSecretProvider = "openrouter"
 )
 
 const (
