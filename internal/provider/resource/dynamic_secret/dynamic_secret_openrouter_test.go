@@ -321,3 +321,22 @@ func TestDynamicSecretOpenRouterWriteOnlyManagementKey(t *testing.T) {
 		t.Errorf("expected management_key_wo_version to be kept, got %v", configuration.ManagementKeyWOVersion)
 	}
 }
+
+// The write-only test above drives Create directly, so it relies on the schema to keep Terraform from
+// putting management_key_wo into the plan or state.
+func TestDynamicSecretOpenRouterManagementKeySchema(t *testing.T) {
+	_, _, s := newOpenRouterTestResource(t)
+	configuration, ok := s.Attributes["configuration"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatal("expected configuration to be a single nested attribute")
+	}
+
+	writeOnly, ok := configuration.Attributes["management_key_wo"].(schema.StringAttribute)
+	if !ok || !writeOnly.WriteOnly || !writeOnly.Sensitive {
+		t.Errorf("expected management_key_wo to be write-only and sensitive, got %+v", configuration.Attributes["management_key_wo"])
+	}
+	managementKey, ok := configuration.Attributes["management_key"].(schema.StringAttribute)
+	if !ok || !managementKey.Sensitive {
+		t.Errorf("expected management_key to be sensitive, got %+v", configuration.Attributes["management_key"])
+	}
+}
