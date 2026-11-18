@@ -37,6 +37,12 @@ func NewExternalKmsAwsResource() resource.Resource {
 		Provider:                infisical.ExternalKmsProviderAWS,
 		ExternalKmsProviderName: "AWS",
 		ResourceTypeName:        "_external_kms_aws",
+		LegacyExternalIdWarning: "This AWS external KMS was saved with an assume-role external ID that is not your Infisical organization ID. " +
+			"It keeps working until its credential changes. After that, Infisical only accepts your organization ID, and it already refuses to use a key whose external ID belongs to another organization or one of its projects.\n\n" +
+			"To move the key without interrupting encryption: add your organization ID to the sts:ExternalId condition in the IAM role's trust policy, next to the current value. " +
+			"Then set role_external_id to your organization ID and apply. Then remove the old value from the trust policy. " +
+			"If the trust policy has no sts:ExternalId condition, set role_external_id and apply first, then add the condition.\n\n" +
+			"For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#update-the-external-id-of-an-existing-aws-kms-key",
 		ConfigurationAttributes: map[string]schema.Attribute{
 			"aws_region": schema.StringAttribute{
 				Required:    true,
@@ -66,7 +72,7 @@ func NewExternalKmsAwsResource() resource.Resource {
 					},
 					"role_external_id": schema.StringAttribute{
 						Optional:    true,
-						Description: "The external ID of the role to assume for performing operations. Required for assume-role type. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-assume-role-external-id",
+						Description: "The external ID that Infisical sends when it assumes the IAM role. Required for assume-role type. Must be your Infisical organization ID, shown under Organization ID in Organization Settings. The IAM role's trust policy must require the same value in an `sts:ExternalId` condition. Infisical rejects any other value, including a project ID, when you create a configuration or change its credential (`role_arn` or `role_external_id`). Configurations saved earlier with a different external ID keep working until their credential changes. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-assume-role-external-id",
 						Sensitive:   true,
 					},
 					"role_arn": schema.StringAttribute{
