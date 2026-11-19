@@ -238,9 +238,13 @@ func pamApproversFromAPI(ctx context.Context, approvers []infisical.ApprovalPoli
 	return types.SetValueFrom(ctx, pamApproverType, models)
 }
 
-// isPamSingleApprovalStep reports whether steps is the one step needing one approval that this resource writes.
+// isPamSingleApprovalStep reports whether steps is the one step this resource writes, which needs one
+// approval and notifies its approvers.
 func isPamSingleApprovalStep(steps []infisical.ApprovalPolicyStep) bool {
-	return len(steps) == 1 && steps[0].RequiredApprovals == 1
+	return len(steps) == 1 &&
+		steps[0].RequiredApprovals == 1 &&
+		steps[0].NotifyApprovers != nil &&
+		*steps[0].NotifyApprovers
 }
 
 func pamApprovalPolicyToAPI(ctx context.Context, plan pamFolderApprovalPolicyModel) ([]infisical.ApprovalPolicyStep, []infisical.ApprovalPolicyApprover, infisical.PamAccessApprovalPolicyConstraints, diag.Diagnostics) {
@@ -360,7 +364,7 @@ func (r *pamFolderApprovalPolicyResource) Read(ctx context.Context, req resource
 	if !isPamSingleApprovalStep(policy.Steps) {
 		resp.Diagnostics.AddWarning(
 			"PAM folder approval policy changed outside of Terraform",
-			fmt.Sprintf("Policy %s doesn't have the single step this resource manages, where one approval from any approver grants access, so the next apply rewrites it that way.", policy.ID),
+			fmt.Sprintf("Policy %s doesn't have the single step this resource manages, where one approval from any approver grants access and every approver is notified, so the next apply rewrites it that way.", policy.ID),
 		)
 	}
 
