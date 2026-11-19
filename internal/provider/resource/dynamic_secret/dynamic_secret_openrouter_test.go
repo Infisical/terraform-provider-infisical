@@ -280,6 +280,12 @@ func TestDynamicSecretOpenRouterLifecycle(t *testing.T) {
 		t.Error("expected the dynamic secret to be deleted")
 	}
 
+	deleteAgainResp := resource.DeleteResponse{State: updateResp.State}
+	r.Delete(ctx, resource.DeleteRequest{State: updateResp.State}, &deleteAgainResp)
+	if deleteAgainResp.Diagnostics.HasError() {
+		t.Errorf("expected a 404 on delete to count as deleted, got %v", deleteAgainResp.Diagnostics)
+	}
+
 	readResp := resource.ReadResponse{State: updateResp.State}
 	r.Read(ctx, resource.ReadRequest{State: updateResp.State}, &readResp)
 	if readResp.Diagnostics.HasError() {
@@ -287,6 +293,32 @@ func TestDynamicSecretOpenRouterLifecycle(t *testing.T) {
 	}
 	if !readResp.State.Raw.IsNull() {
 		t.Error("expected a 404 on read to remove the resource from state")
+	}
+}
+
+func TestDynamicSecretOpenRouterReadWithoutID(t *testing.T) {
+	ctx := context.Background()
+	r, backend, s := newOpenRouterTestResource(t)
+	backend.secrets["openrouter"] = map[string]any{"managementKey": "sk-or-v1-management"}
+
+	plan, _ := openRouterPlanAndConfig(t, s, types.StringValue(""), DynamicSecretOpenRouterConfigurationModel{
+		ManagementKey:          types.StringValue("sk-or-v1-management"),
+		ManagementKeyWO:        types.StringNull(),
+		ManagementKeyWOVersion: types.Int64Null(),
+		WorkspaceId:            types.StringNull(),
+		Limit:                  types.StringNull(),
+		LimitReset:             types.StringNull(),
+		IncludeByokInLimit:     types.BoolValue(false),
+	})
+	state := tfsdk.State{Schema: s, Raw: plan.Raw}
+
+	readResp := resource.ReadResponse{State: state}
+	r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
+	if readResp.Diagnostics.HasError() {
+		t.Fatal(readResp.Diagnostics)
+	}
+	if !readResp.State.Raw.IsNull() {
+		t.Error("expected a read without an ID to remove the resource from state")
 	}
 }
 

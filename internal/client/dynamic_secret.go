@@ -103,6 +103,10 @@ func (client Client) DeleteDynamicSecret(request DeleteDynamicSecretRequest) (Dy
 		return DynamicSecret{}, errors.NewGenericRequestError(operationDeleteDynamicSecret, err)
 	}
 
+	if response.StatusCode() == http.StatusNotFound {
+		return DynamicSecret{}, ErrNotFound
+	}
+
 	if response.IsError() {
 		return DynamicSecret{}, errors.NewAPIErrorWithResponse(operationDeleteDynamicSecret, response, nil)
 	}
