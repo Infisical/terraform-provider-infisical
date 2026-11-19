@@ -64,7 +64,7 @@ func NewPamAccountMongoDBResource() resource.Resource {
 				},
 			},
 			"database": schema.StringAttribute{
-				Description: "The database to connect to. Defaults to `admin`.",
+				Description: "The database to connect to, which is also where the user authenticates unless the connection string sets `authSource`. Defaults to `admin`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("admin"),
@@ -74,7 +74,7 @@ func NewPamAccountMongoDBResource() resource.Resource {
 				},
 			},
 			"ssl_enabled": schema.BoolAttribute{
-				Description: "Whether to connect over TLS. Defaults to true.",
+				Description: "Whether to connect over TLS, which `mongodb+srv://` deployments such as Atlas need. Defaults to true. Set it to false for a server without TLS, since a mismatch makes the connection test time out.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),

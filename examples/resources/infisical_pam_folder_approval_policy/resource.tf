@@ -21,21 +21,36 @@ resource "infisical_pam_folder" "prod" {
   name = "prod"
 }
 
+resource "infisical_pam_user" "lead" {
+  email = "lead@example.com"
+  role  = "member"
+}
+
+resource "infisical_pam_user" "oncall" {
+  email = "oncall@example.com"
+  role  = "member"
+}
+
+resource "infisical_pam_group" "dbas" {
+  group_id = "<group-id>"
+  role     = "member"
+}
+
 resource "infisical_pam_folder_user" "lead" {
   folder_id = infisical_pam_folder.prod.id
-  email     = "lead@example.com"
+  email     = infisical_pam_user.lead.email # also makes Terraform add the user to PAM first
   role      = "admin"
 }
 
 resource "infisical_pam_folder_user" "oncall" {
   folder_id = infisical_pam_folder.prod.id
-  email     = "oncall@example.com"
+  email     = infisical_pam_user.oncall.email
   role      = "operator"
 }
 
 resource "infisical_pam_folder_group" "dbas" {
   folder_id = infisical_pam_folder.prod.id
-  group_id  = "<your-group-id>"
+  group_id  = infisical_pam_group.dbas.group_id
   role      = "operator"
 }
 

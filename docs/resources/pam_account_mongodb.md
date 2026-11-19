@@ -99,9 +99,9 @@ Required:
 
 Optional:
 
-- `database` (String) The database to connect to. Defaults to `admin`.
+- `database` (String) The database to connect to, which is also where the user authenticates unless the connection string sets `authSource`. Defaults to `admin`.
 - `ssl_certificate` (String) The PEM-encoded CA certificate to verify the server with.
-- `ssl_enabled` (Boolean) Whether to connect over TLS. Defaults to true.
+- `ssl_enabled` (Boolean) Whether to connect over TLS, which `mongodb+srv://` deployments such as Atlas need. Defaults to true. Set it to false for a server without TLS, since a mismatch makes the connection test time out.
 - `ssl_reject_unauthorized` (Boolean) Whether to reject a server certificate that isn't trusted. Defaults to true.
 
 

@@ -3,7 +3,6 @@ package customtypes
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -114,13 +113,13 @@ func (v MongoDBConnectionStringValue) StringSemanticEquals(_ context.Context, ne
 }
 
 // splitMongoDBConnectionString splits a connection string into its scheme, its hosts, which run
-// until the first "/", "?" or "#", and the rest.
+// until the first "/" or "?" as in the API's parser, and the rest.
 func splitMongoDBConnectionString(raw string) (scheme, hosts, rest string, ok bool) {
 	scheme, afterScheme, found := strings.Cut(raw, "://")
 	if !found || (scheme != "mongodb" && scheme != "mongodb+srv") {
 		return "", "", "", false
 	}
-	end := strings.IndexAny(afterScheme, "/?#")
+	end := strings.IndexAny(afterScheme, "/?")
 	if end == -1 {
 		return scheme, afterScheme, "", true
 	}
@@ -130,7 +129,12 @@ func splitMongoDBConnectionString(raw string) (scheme, hosts, rest string, ok bo
 // ValidateMongoDBConnectionString reports what the API would reject about a connection string, so
 // the refusal lands at plan time.
 func ValidateMongoDBConnectionString(raw string) error {
-	scheme, hosts, rest, ok := splitMongoDBConnectionString(strings.TrimSpace(raw))
+	trimmed := strings.TrimSpace(raw)
+	// The API's parser drops everything after a line break and strips tabs.
+	if strings.ContainsAny(trimmed, "\t\n\r") {
+		return fmt.Errorf("must be on one line, with no tabs")
+	}
+	scheme, hosts, rest, ok := splitMongoDBConnectionString(trimmed)
 	if !ok {
 		return fmt.Errorf("must start with mongodb:// or mongodb+srv://")
 	}
@@ -154,9 +158,23 @@ func ValidateMongoDBConnectionString(raw string) error {
 	return nil
 }
 
+// encodeMongoDBOptions percent-encodes the characters the API's URL serializer encodes in the
+// options: controls, spaces, quotes, angle brackets and non-ASCII bytes. Existing escapes are kept.
+func encodeMongoDBOptions(options string) string {
+	var encoded strings.Builder
+	for i := 0; i < len(options); i++ {
+		c := options[i]
+		if c <= ' ' || c > '~' || c == '"' || c == '<' || c == '>' {
+			fmt.Fprintf(&encoded, "%%%02X", c)
+			continue
+		}
+		encoded.WriteByte(c)
+	}
+	return encoded.String()
+}
+
 // NormalizeMongoDBConnectionString mirrors how the API stores a connection string: trimmed, with a
-// "/" between the hosts and the options. The options are compared percent-decoded, since the API
-// percent-encodes characters such as spaces in them.
+// "/" between the hosts and the options, and the options percent-encoded.
 func NormalizeMongoDBConnectionString(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	scheme, hosts, rest, ok := splitMongoDBConnectionString(trimmed)
@@ -172,8 +190,5 @@ func NormalizeMongoDBConnectionString(raw string) string {
 	if !hasQuery {
 		return normalized
 	}
-	if decoded, err := url.PathUnescape(query); err == nil {
-		query = decoded
-	}
-	return normalized + "?" + query
+	return normalized + "?" + encodeMongoDBOptions(query)
 }

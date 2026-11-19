@@ -3,12 +3,12 @@
 page_title: "infisical_pam_folder_approval_policy Resource - terraform-provider-infisical"
 subcategory: "PAM"
 description: |-
-  Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets requires_approval need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource, so rules added in Infisical are kept. Only Machine Identity authentication is supported for this resource.
+  Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets requires_approval need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource: updates keep the rules added in Infisical, and destroying the policy deletes them. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_pam_folder_approval_policy (Resource)
 
-Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets `requires_approval` need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource, so rules added in Infisical are kept. Only Machine Identity authentication is supported for this resource.
+Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets `requires_approval` need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource: updates keep the rules added in Infisical, and destroying the policy deletes them. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -36,21 +36,36 @@ resource "infisical_pam_folder" "prod" {
   name = "prod"
 }
 
+resource "infisical_pam_user" "lead" {
+  email = "lead@example.com"
+  role  = "member"
+}
+
+resource "infisical_pam_user" "oncall" {
+  email = "oncall@example.com"
+  role  = "member"
+}
+
+resource "infisical_pam_group" "dbas" {
+  group_id = "<group-id>"
+  role     = "member"
+}
+
 resource "infisical_pam_folder_user" "lead" {
   folder_id = infisical_pam_folder.prod.id
-  email     = "lead@example.com"
+  email     = infisical_pam_user.lead.email # also makes Terraform add the user to PAM first
   role      = "admin"
 }
 
 resource "infisical_pam_folder_user" "oncall" {
   folder_id = infisical_pam_folder.prod.id
-  email     = "oncall@example.com"
+  email     = infisical_pam_user.oncall.email
   role      = "operator"
 }
 
 resource "infisical_pam_folder_group" "dbas" {
   folder_id = infisical_pam_folder.prod.id
-  group_id  = "<your-group-id>"
+  group_id  = infisical_pam_group.dbas.group_id
   role      = "operator"
 }
 
@@ -88,7 +103,7 @@ resource "infisical_pam_folder_approval_policy" "prod" {
 
 ### Optional
 
-- `bypassers` (Attributes Set) The users and groups that can break glass: grant themselves access without an approver, on accounts whose template sets `allow_break_glass`. Each must be a member of the folder. Defaults to none. (see [below for nested schema](#nestedatt--bypassers))
+- `bypassers` (Attributes Set) The users and groups that can break glass: grant themselves access without an approver, on accounts whose template sets `allow_break_glass`. Each must be a member of the folder, and there can be at most 20. Defaults to none. (see [below for nested schema](#nestedatt--bypassers))
 - `constraints` (Attributes) Limits on the requests the policy approves. (see [below for nested schema](#nestedatt--constraints))
 
 ### Read-Only

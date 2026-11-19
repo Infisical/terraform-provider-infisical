@@ -38,9 +38,10 @@ const (
 )
 
 var (
-	_ resource.Resource                = &pamFolderApprovalPolicyResource{}
-	_ resource.ResourceWithConfigure   = &pamFolderApprovalPolicyResource{}
-	_ resource.ResourceWithImportState = &pamFolderApprovalPolicyResource{}
+	_ resource.Resource                   = &pamFolderApprovalPolicyResource{}
+	_ resource.ResourceWithConfigure      = &pamFolderApprovalPolicyResource{}
+	_ resource.ResourceWithImportState    = &pamFolderApprovalPolicyResource{}
+	_ resource.ResourceWithValidateConfig = &pamFolderApprovalPolicyResource{}
 )
 
 var pamApproverType = types.ObjectType{AttrTypes: map[string]attr.Type{
@@ -126,7 +127,7 @@ func (r *pamFolderApprovalPolicyResource) Schema(_ context.Context, _ resource.S
 	})
 
 	resp.Schema = schema.Schema{
-		Description: "Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets `requires_approval` need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource, so rules added in Infisical are kept. Only Machine Identity authentication is supported for this resource.",
+		Description: "Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets `requires_approval` need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource: updates keep the rules added in Infisical, and destroying the policy deletes them. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description:   "The ID of the approval policy.",
@@ -151,11 +152,11 @@ func (r *pamFolderApprovalPolicyResource) Schema(_ context.Context, _ resource.S
 				NestedObject: pamApproverObject("approver"),
 			},
 			"bypassers": schema.SetNestedAttribute{
-				Description:  "The users and groups that can break glass: grant themselves access without an approver, on accounts whose template sets `allow_break_glass`. Each must be a member of the folder. Defaults to none.",
+				Description:  "The users and groups that can break glass: grant themselves access without an approver, on accounts whose template sets `allow_break_glass`. Each must be a member of the folder, and there can be at most 20. Defaults to none.",
 				Optional:     true,
 				Computed:     true,
 				Default:      setdefault.StaticValue(types.SetValueMust(pamApproverType, []attr.Value{})),
-				Validators:   []validator.Set{setvalidator.SizeAtMost(100)},
+				Validators:   []validator.Set{setvalidator.SizeAtMost(20)},
 				NestedObject: pamApproverObject("bypasser"),
 			},
 			"constraints": schema.SingleNestedAttribute{
@@ -182,6 +183,31 @@ func (r *pamFolderApprovalPolicyResource) Schema(_ context.Context, _ resource.S
 	}
 }
 
+func (r *pamFolderApprovalPolicyResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	accessDuration := path.Root("constraints").AtName("access_duration")
+	var minimum, maximum types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, accessDuration.AtName("min"), &minimum)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, accessDuration.AtName("max"), &maximum)...)
+	if resp.Diagnostics.HasError() || minimum.IsUnknown() || maximum.IsUnknown() {
+		return
+	}
+
+	minimumValue, maximumValue := pamDefaultMinAccessDuration, pamDefaultMaxAccessDuration
+	if !minimum.IsNull() {
+		minimumValue = minimum.ValueString()
+	}
+	if !maximum.IsNull() {
+		maximumValue = maximum.ValueString()
+	}
+	parsedMinimum, minimumOK := validators.ParseMsDuration(minimumValue)
+	parsedMaximum, maximumOK := validators.ParseMsDuration(maximumValue)
+	// The API checks each bound alone, and an inverted range rejects every access request in the folder.
+	if minimumOK && maximumOK && parsedMinimum > parsedMaximum {
+		resp.Diagnostics.AddAttributeError(accessDuration.AtName("min"), "Invalid access duration",
+			fmt.Sprintf("The minimum access duration %q is longer than the maximum %q, so no request could ever be approved.", minimumValue, maximumValue))
+	}
+}
+
 func (r *pamFolderApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if client := configurePamClient(req, resp); client != nil {
 		r.client = client
@@ -198,12 +224,23 @@ func pamApproversToAPI(ctx context.Context, set types.Set) ([]infisical.Approval
 	return result, diags
 }
 
+// pamApproversFromAPI drops duplicates, which the API stores and a Terraform set can't hold.
 func pamApproversFromAPI(ctx context.Context, approvers []infisical.ApprovalPolicyApprover) (types.Set, diag.Diagnostics) {
 	models := make([]pamApproverModel, 0, len(approvers))
+	seen := map[infisical.ApprovalPolicyApprover]bool{}
 	for _, approver := range approvers {
+		if seen[approver] {
+			continue
+		}
+		seen[approver] = true
 		models = append(models, pamApproverModel{Type: types.StringValue(approver.Type), ID: types.StringValue(approver.ID)})
 	}
 	return types.SetValueFrom(ctx, pamApproverType, models)
+}
+
+// isPamSingleApprovalStep reports whether steps is the one step needing one approval that this resource writes.
+func isPamSingleApprovalStep(steps []infisical.ApprovalPolicyStep) bool {
+	return len(steps) == 1 && steps[0].RequiredApprovals == 1
 }
 
 func pamApprovalPolicyToAPI(ctx context.Context, plan pamFolderApprovalPolicyModel) ([]infisical.ApprovalPolicyStep, []infisical.ApprovalPolicyApprover, infisical.PamAccessApprovalPolicyConstraints, diag.Diagnostics) {
@@ -238,13 +275,13 @@ func pamApprovalPolicyFromAPI(ctx context.Context, policy infisical.PamAccessApp
 		Name:     types.StringValue(policy.Name),
 	}
 
-	// Read like Infisical's folder approval settings, which show the first step's approvers.
-	var firstStepApprovers []infisical.ApprovalPolicyApprover
-	if len(policy.Steps) > 0 {
-		firstStepApprovers = policy.Steps[0].Approvers
+	// A policy of any other shape reads as having no approvers, so the plan shows the next apply rewriting it.
+	var approvers []infisical.ApprovalPolicyApprover
+	if isPamSingleApprovalStep(policy.Steps) {
+		approvers = policy.Steps[0].Approvers
 	}
 	var approverDiags, bypasserDiags diag.Diagnostics
-	model.Approvers, approverDiags = pamApproversFromAPI(ctx, firstStepApprovers)
+	model.Approvers, approverDiags = pamApproversFromAPI(ctx, approvers)
 	diags.Append(approverDiags...)
 	model.Bypassers, bypasserDiags = pamApproversFromAPI(ctx, policy.Bypassers)
 	diags.Append(bypasserDiags...)
@@ -318,6 +355,13 @@ func (r *pamFolderApprovalPolicyResource) Read(ctx context.Context, req resource
 		}
 		resp.Diagnostics.AddError("Error reading PAM folder approval policy", "Couldn't read PAM folder approval policy, unexpected error: "+err.Error())
 		return
+	}
+
+	if !isPamSingleApprovalStep(policy.Steps) {
+		resp.Diagnostics.AddWarning(
+			"PAM folder approval policy changed outside of Terraform",
+			fmt.Sprintf("Policy %s doesn't have the single step this resource manages, where one approval from any approver grants access, so the next apply rewrites it that way.", policy.ID),
+		)
 	}
 
 	refreshed, diags := pamApprovalPolicyFromAPI(ctx, policy)
