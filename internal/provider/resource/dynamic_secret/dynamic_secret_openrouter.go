@@ -55,7 +55,7 @@ func NewDynamicSecretOpenRouterResource() resource.Resource {
 			"management_key": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The OpenRouter management API key used to create and delete the API keys issued for each lease. This value is stored in the Terraform state; use management_key_wo to keep it out of state. Exactly one of management_key or management_key_wo must be set. Infisical never returns this value, so changes made outside of Terraform are not detected. The key can't be changed while the dynamic secret has active leases, and a new key must belong to the same OpenRouter organization. Self-hosted instances need an Infisical release newer than v0.167.10.",
+				Description: "The OpenRouter management API key that creates and deletes the API key of each lease. Infisical never returns it, so changes made outside Terraform aren't detected. It can't be changed while the dynamic secret has active leases, and a new key must belong to the same OpenRouter organization. To keep it out of the Terraform state, use management_key_wo instead.",
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
 						path.MatchRelative().AtParent().AtName("management_key_wo"),
@@ -66,7 +66,7 @@ func NewDynamicSecretOpenRouterResource() resource.Resource {
 				Optional:    true,
 				WriteOnly:   true,
 				Sensitive:   true,
-				Description: "The OpenRouter management API key (write-only). This value is never stored in the Terraform state and can accept ephemeral values. Because it is not stored, changes to it are not detected; increment management_key_wo_version to push a new value. Requires Terraform 1.11+.",
+				Description: "The OpenRouter management API key (write-only). This value is never stored in the Terraform state and can accept ephemeral values. Because it isn't stored, changes to it aren't detected. Increment management_key_wo_version to push a new value.",
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(
 						path.MatchRelative().AtParent().AtName("management_key_wo_version"),
