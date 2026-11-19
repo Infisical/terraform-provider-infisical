@@ -229,6 +229,11 @@ func (r *DynamicSecretBaseResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	dynamicSecret, err := r.client.GetDynamicSecretByName(infisical.GetDynamicSecretByNameRequest{
 		ProjectSlug:     state.ProjectSlug.ValueString(),
 		EnvironmentSlug: state.EnvironmentSlug.ValueString(),
@@ -400,7 +405,7 @@ func (r *DynamicSecretBaseResource) Delete(ctx context.Context, req resource.Del
 		Path:            state.Path.ValueString(),
 	})
 
-	if err != nil {
+	if err != nil && err != infisical.ErrNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting dynamic secret",
 			"Couldn't delete dynamic secret from Infisical, unexpected error: "+err.Error(),

@@ -14,6 +14,7 @@ const (
 	DynamicSecretProviderKubernetes  DynamicSecretProvider = "kubernetes"
 	DynamicSecretProviderMongoAtlas  DynamicSecretProvider = "mongo-db-atlas"
 	DynamicSecretProviderMongoDb     DynamicSecretProvider = "mongo-db"
+	DynamicSecretProviderOpenRouter  DynamicSecretProvider = "openrouter"
 )
 
 const (
@@ -100,6 +101,10 @@ func (client Client) DeleteDynamicSecret(request DeleteDynamicSecretRequest) (Dy
 
 	if err != nil {
 		return DynamicSecret{}, errors.NewGenericRequestError(operationDeleteDynamicSecret, err)
+	}
+
+	if response.StatusCode() == http.StatusNotFound {
+		return DynamicSecret{}, ErrNotFound
 	}
 
 	if response.IsError() {
