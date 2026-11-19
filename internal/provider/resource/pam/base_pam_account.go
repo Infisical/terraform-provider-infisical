@@ -36,7 +36,7 @@ type PamAccountBaseResource struct {
 	client           *infisical.Client
 
 	ConnectionDetailsAttributes map[string]schema.Attribute
-	CredentialsAttributes       map[string]schema.Attribute
+	CredentialsAttributes       map[string]schema.Attribute // nil for types that store no credentials
 
 	ConnectionDetailsToAPI func(ctx context.Context, connectionDetails types.Object) (map[string]any, diag.Diagnostics)
 	// Returns the type's connection details model.
@@ -70,33 +70,48 @@ type pamAccountRotationModel struct {
 	RotationAccountID types.String `tfsdk:"rotation_account_id"`
 }
 
-// The model of account types that support credential rotation.
-type pamRotatableAccountResourceModel struct {
-	PamAccountBaseResourceModel
-	pamAccountRotationModel
+func (r *PamAccountBaseResource) hasCredentials() bool {
+	return r.CredentialsAttributes != nil
 }
 
-type pamModelGetter interface {
-	Get(ctx context.Context, target any) diag.Diagnostics
-}
-
-func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamModelGetter) (PamAccountBaseResourceModel, pamAccountRotationModel, diag.Diagnostics) {
-	if !r.SupportsRotation {
-		var model PamAccountBaseResourceModel
-		diags := source.Get(ctx, &model)
-		return model, pamAccountRotationModel{RotationAccountID: types.StringNull()}, diags
+// modelFields maps the type's attributes to model fields. The model is read and written per attribute,
+// since whether the schema has credentials and a rotation account depends on the type.
+func (r *PamAccountBaseResource) modelFields(model *PamAccountBaseResourceModel, rotation *pamAccountRotationModel) map[string]any {
+	fields := map[string]any{
+		"id":                 &model.ID,
+		"name":               &model.Name,
+		"description":        &model.Description,
+		"folder_id":          &model.FolderID,
+		"template_id":        &model.TemplateID,
+		"gateway_id":         &model.GatewayID,
+		"gateway_pool_id":    &model.GatewayPoolID,
+		"connection_details": &model.ConnectionDetails,
 	}
+	if r.hasCredentials() {
+		fields["credentials"] = &model.Credentials
+	}
+	if r.SupportsRotation {
+		fields["rotation_account_id"] = &rotation.RotationAccountID
+	}
+	return fields
+}
 
-	var model pamRotatableAccountResourceModel
-	diags := source.Get(ctx, &model)
-	return model.PamAccountBaseResourceModel, model.pamAccountRotationModel, diags
+func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamAttributeGetter) (PamAccountBaseResourceModel, pamAccountRotationModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	model := PamAccountBaseResourceModel{Credentials: types.ObjectNull(nil)}
+	rotation := pamAccountRotationModel{RotationAccountID: types.StringNull()}
+	for name, field := range r.modelFields(&model, &rotation) {
+		diags.Append(source.GetAttribute(ctx, path.Root(name), field)...)
+	}
+	return model, rotation, diags
 }
 
 func (r *PamAccountBaseResource) setModel(ctx context.Context, state *tfsdk.State, model PamAccountBaseResourceModel, rotation pamAccountRotationModel) diag.Diagnostics {
-	if !r.SupportsRotation {
-		return state.Set(ctx, model)
+	var diags diag.Diagnostics
+	for name, field := range r.modelFields(&model, &rotation) {
+		diags.Append(state.SetAttribute(ctx, path.Root(name), field)...)
 	}
-	return state.Set(ctx, pamRotatableAccountResourceModel{PamAccountBaseResourceModel: model, pamAccountRotationModel: rotation})
+	return diags
 }
 
 func (r *PamAccountBaseResource) attrTypes(attributes map[string]schema.Attribute) map[string]attr.Type {
@@ -159,11 +174,14 @@ func (r *PamAccountBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 			Required:    true,
 			Attributes:  r.ConnectionDetailsAttributes,
 		},
-		"credentials": schema.SingleNestedAttribute{
+	}
+
+	if r.hasCredentials() {
+		attributes["credentials"] = schema.SingleNestedAttribute{
 			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected.",
 			Required:    true,
 			Attributes:  r.CredentialsAttributes,
-		},
+		}
 	}
 
 	if r.SupportsRotation {
@@ -242,8 +260,12 @@ func (r *PamAccountBaseResource) Create(ctx context.Context, req resource.Create
 
 	connectionDetails, diags := r.ConnectionDetailsToAPI(ctx, plan.ConnectionDetails)
 	resp.Diagnostics.Append(diags...)
-	credentials, diags := r.CredentialsToAPI(ctx, plan.Credentials)
-	resp.Diagnostics.Append(diags...)
+	// The API requires the object even for types that store no credentials.
+	credentials := map[string]any{}
+	if r.hasCredentials() {
+		credentials, diags = r.CredentialsToAPI(ctx, plan.Credentials)
+		resp.Diagnostics.Append(diags...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -287,6 +309,11 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	account, err := r.client.GetPamAccount(infisical.GetPamAccountRequest{ID: state.ID.ValueString()})
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -314,20 +341,15 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 
 	connectionDetails, diags := types.ObjectValueFrom(ctx, r.attrTypes(r.ConnectionDetailsAttributes), r.ConnectionDetailsFromAPI(account.ConnectionDetails))
 	resp.Diagnostics.Append(diags...)
-	credentialsModel, diags := r.CredentialsFromAPI(ctx, account.Credentials, state.Credentials)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	credentials, diags := types.ObjectValueFrom(ctx, r.attrTypes(r.CredentialsAttributes), credentialsModel)
-	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	state.ConnectionDetails, diags = keepTrimmedStrings(ctx, state.ConnectionDetails, connectionDetails)
 	resp.Diagnostics.Append(diags...)
-	state.Credentials, diags = keepTrimmedStrings(ctx, state.Credentials, credentials)
-	resp.Diagnostics.Append(diags...)
+	if r.hasCredentials() {
+		state.Credentials, diags = r.readCredentials(ctx, account.Credentials, state.Credentials)
+		resp.Diagnostics.Append(diags...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -346,6 +368,21 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	resp.Diagnostics.Append(r.setModel(ctx, &resp.State, state, rotation)...)
+}
+
+func (r *PamAccountBaseResource) readCredentials(ctx context.Context, apiCredentials map[string]any, prior types.Object) (types.Object, diag.Diagnostics) {
+	model, diags := r.CredentialsFromAPI(ctx, apiCredentials, prior)
+	if diags.HasError() {
+		return prior, diags
+	}
+	credentials, objectDiags := types.ObjectValueFrom(ctx, r.attrTypes(r.CredentialsAttributes), model)
+	diags.Append(objectDiags...)
+	if diags.HasError() {
+		return prior, diags
+	}
+	kept, keptDiags := keepTrimmedStrings(ctx, prior, credentials)
+	diags.Append(keptDiags...)
+	return kept, diags
 }
 
 func (r *PamAccountBaseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {

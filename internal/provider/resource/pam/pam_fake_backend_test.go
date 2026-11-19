@@ -61,6 +61,8 @@ type fakePamBackend struct {
 	members map[string]map[string]map[string]*fakePamMembership
 	// the organization's users, by email
 	orgUsers map[string]string
+	// keyed by ID, in the API's response shape
+	approvalPolicies map[string]map[string]any
 
 	failRotationUpdates bool
 }
@@ -76,6 +78,7 @@ func newFakePamBackend(t *testing.T) *fakePamBackend {
 			"alice@acme.com": "11111111-1111-1111-1111-111111111111",
 			"bob@acme.com":   "22222222-2222-2222-2222-222222222222",
 		},
+		approvalPolicies: map[string]map[string]any{},
 	}
 }
 
@@ -162,6 +165,25 @@ func (a *fakePamAccount) response() map[string]any {
 		"connectionDetails": a.ConnectionDetails,
 		"credentials":       credentials,
 	}
+}
+
+// storedConnectionDetails mimics how the API stores MongoDB connection strings: it reserializes them
+// with mongodb-connection-string-url (pam-account-schemas.ts), which adds the "/" before the
+// options and percent-encodes spaces.
+func storedConnectionDetails(accountType string, connectionDetails map[string]any) map[string]any {
+	connectionString, ok := connectionDetails["connectionString"].(string)
+	if accountType != "mongodb" || !ok {
+		return connectionDetails
+	}
+	stored := maps.Clone(connectionDetails)
+	scheme, rest, _ := strings.Cut(connectionString, "://")
+	if end := strings.IndexAny(rest, "/?"); end == -1 {
+		rest += "/"
+	} else if rest[end] == '?' {
+		rest = rest[:end] + "/" + rest[end:]
+	}
+	stored["connectionString"] = scheme + "://" + strings.ReplaceAll(rest, " ", "%20")
+	return stored
 }
 
 func optionalBodyString(body map[string]any, key string) *string {
@@ -271,7 +293,7 @@ func (b *fakePamBackend) handler() http.Handler {
 			TemplateID:        templateID,
 			GatewayID:         optionalBodyString(body, "gatewayId"),
 			GatewayPoolID:     optionalBodyString(body, "gatewayPoolId"),
-			ConnectionDetails: connectionDetails,
+			ConnectionDetails: storedConnectionDetails(r.PathValue("type"), connectionDetails),
 			Credentials:       credentials,
 		}
 		b.accounts[account.ID] = account
@@ -315,7 +337,7 @@ func (b *fakePamBackend) handler() http.Handler {
 		}
 		if connectionDetails, ok := body["connectionDetails"].(map[string]any); ok {
 			routingChanged = routingChanged || connectionDetails["host"] != account.ConnectionDetails["host"] || connectionDetails["port"] != account.ConnectionDetails["port"]
-			account.ConnectionDetails = connectionDetails
+			account.ConnectionDetails = storedConnectionDetails(account.Type, connectionDetails)
 		}
 		if credentials, ok := body["credentials"].(map[string]any); ok {
 			routingChanged = routingChanged || credentials["username"] != account.Credentials["username"]
@@ -380,6 +402,61 @@ func (b *fakePamBackend) handler() http.Handler {
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"memberships": memberships, "skipped": skipped})
 	})
+	// Mirrors approval-policy-service.ts: PAM allows one policy per folder, a missing policy is a 403
+	// "Policy not found", and a PATCH keeps every field it leaves out.
+	mux.HandleFunc("POST /api/v1/approval-policies/pam-access", func(w http.ResponseWriter, r *http.Request) {
+		body := b.body(r)
+		for _, policy := range b.approvalPolicies {
+			if policy["scopeId"] == body["scopeId"] {
+				b.apiError(w, http.StatusBadRequest, "An approval policy already governs this scope. Update it instead of creating another.")
+				return
+			}
+		}
+		id := b.newID()
+		policy := map[string]any{
+			"id": id, "name": body["name"], "scopeType": body["scope"], "scopeId": body["scopeId"],
+			"steps": body["steps"], "bypassers": body["bypassers"], "enforcementLevel": "hard",
+			"conditions":   map[string]any{"version": 1, "conditions": body["conditions"]},
+			"constraints":  map[string]any{"version": 1, "constraints": body["constraints"]},
+			"autoApproval": map[string]any{"inputs": []any{}, "rules": []any{}},
+		}
+		b.approvalPolicies[id] = policy
+		b.writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
+	})
+	mux.HandleFunc("GET /api/v1/approval-policies/pam-access/{id}", func(w http.ResponseWriter, r *http.Request) {
+		policy, ok := b.approvalPolicies[r.PathValue("id")]
+		if !ok {
+			b.apiError(w, http.StatusForbidden, "Policy not found")
+			return
+		}
+		b.writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
+	})
+	mux.HandleFunc("PATCH /api/v1/approval-policies/pam-access/{id}", func(w http.ResponseWriter, r *http.Request) {
+		policy, ok := b.approvalPolicies[r.PathValue("id")]
+		if !ok {
+			b.apiError(w, http.StatusForbidden, "Policy not found")
+			return
+		}
+		body := b.body(r)
+		for _, key := range []string{"name", "steps", "bypassers", "autoApproval"} {
+			if value, sent := body[key]; sent {
+				policy[key] = value
+			}
+		}
+		if constraints, sent := body["constraints"]; sent {
+			policy["constraints"] = map[string]any{"version": 1, "constraints": constraints}
+		}
+		b.writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
+	})
+	mux.HandleFunc("DELETE /api/v1/approval-policies/pam-access/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := b.approvalPolicies[r.PathValue("id")]; !ok {
+			b.apiError(w, http.StatusForbidden, "Policy not found")
+			return
+		}
+		delete(b.approvalPolicies, r.PathValue("id"))
+		b.writeJSON(w, http.StatusOK, map[string]any{"policyId": r.PathValue("id")})
+	})
+
 	b.handleMembers(mux, "/api/v1/pam/memberships/{kind}", func(*http.Request) string { return "product" })
 	b.handleMembers(mux, "/api/v1/pam/folders/{folderId}/{kind}", func(r *http.Request) string { return "folders/" + r.PathValue("folderId") })
 	b.handleMembers(mux, "/api/v1/pam/accounts/{accountId}/{kind}", func(r *http.Request) string { return "accounts/" + r.PathValue("accountId") })

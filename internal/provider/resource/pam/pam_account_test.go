@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"strings"
+	"terraform-provider-infisical/internal/pkg/customtypes"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -44,12 +45,13 @@ func pamAccountBaseModel(connectionDetails, credentials types.Object) PamAccount
 
 func pamAccountPlan(t *testing.T, r *PamAccountBaseResource, model PamAccountBaseResourceModel, rotation *pamAccountRotationModel) tfsdk.Plan {
 	t.Helper()
-	plan := tfsdk.Plan{Schema: pamResourceSchema(t, r)}
+	plan := emptyPamPlan(pamResourceSchema(t, r))
+	if rotation == nil {
+		rotation = &pamAccountRotationModel{RotationAccountID: types.StringNull()}
+	}
 	var diags diag.Diagnostics
-	if rotation != nil {
-		diags = plan.Set(context.Background(), &pamRotatableAccountResourceModel{PamAccountBaseResourceModel: model, pamAccountRotationModel: *rotation})
-	} else {
-		diags = plan.Set(context.Background(), &model)
+	for name, field := range r.modelFields(&model, rotation) {
+		diags.Append(plan.SetAttribute(context.Background(), path.Root(name), field)...)
 	}
 	if diags.HasError() {
 		t.Fatal(diags)
@@ -447,5 +449,100 @@ func TestPamAccountValidateConfig(t *testing.T) {
 				t.Errorf("expected an error containing %q, got %q", test.wantError, detail)
 			}
 		})
+	}
+}
+
+func TestPamAccountMongoDBKeepsTheConfiguredConnectionString(t *testing.T) {
+	backend := newFakePamBackend(t)
+	r := asPamAccountResource(t, NewPamAccountMongoDBResource())
+	configurePamResource(t, r, newPamTestClient(t, backend))
+
+	configured := "mongodb://db1:27017,db2:27017?replicaSet=rs0&appName=orders app"
+	connection := pamAccountObject(t, r.ConnectionDetailsAttributes, PamAccountMongoDBConnectionDetailsModel{
+		ConnectionString:      customtypes.NewMongoDBConnectionStringValue(configured),
+		Database:              types.StringValue("admin"),
+		SslEnabled:            types.BoolValue(true),
+		SslRejectUnauthorized: types.BoolValue(true),
+		SslCertificate:        types.StringNull(),
+	})
+	credentials := pamAccountObject(t, r.CredentialsAttributes, PamAccountMongoDBCredentialsModel{
+		Username: types.StringValue("orders"),
+		Password: types.StringValue("hunter2"),
+	})
+	state := createPamResource(t, r, pamAccountPlan(t, r, pamAccountBaseModel(connection, credentials), nil))
+
+	body := backend.requestsTo("POST", "/api/v1/pam/accounts/mongodb")[0]
+	sent := jsonObject(t, body["connectionDetails"])
+	if sent["connectionString"] != configured || sent["database"] != "admin" || sent["sslEnabled"] != true || sent["sslRejectUnauthorized"] != true {
+		t.Errorf("unexpected connection details sent: %v", sent)
+	}
+	if sentCredentials := jsonObject(t, body["credentials"]); sentCredentials["username"] != "orders" || sentCredentials["password"] != "hunter2" {
+		t.Errorf("unexpected credentials sent: %v", sentCredentials)
+	}
+
+	refreshed, _ := pamAccountModel(t, r, readPamResource(t, r, state))
+	stored, ok := refreshed.ConnectionDetails.Attributes()["connection_string"].(customtypes.MongoDBConnectionStringValue)
+	if !ok || stored.ValueString() != "mongodb://db1:27017,db2:27017/?replicaSet=rs0&appName=orders%20app" {
+		t.Fatalf("expected the API's stored connection string, got %v", refreshed.ConnectionDetails.Attributes()["connection_string"])
+	}
+	// The framework keeps the configured value when the stored one is semantically equal.
+	if equal, diags := customtypes.NewMongoDBConnectionStringValue(configured).StringSemanticEquals(context.Background(), stored); diags.HasError() || !equal {
+		t.Errorf("expected %q to equal the stored %q", configured, stored.ValueString())
+	}
+	if password := stringAttribute(t, refreshed.Credentials.Attributes(), "password"); password != "hunter2" {
+		t.Errorf("expected the password to be kept from state, got %q", password)
+	}
+}
+
+func TestPamAccountAwsIamHasNoCredentials(t *testing.T) {
+	backend := newFakePamBackend(t)
+	r := asPamAccountResource(t, NewPamAccountAwsIamResource())
+	configurePamResource(t, r, newPamTestClient(t, backend))
+
+	if _, ok := pamResourceSchema(t, r).Attributes["credentials"]; ok {
+		t.Fatal("expected no credentials attribute")
+	}
+
+	roleArn := "arn:aws:iam::123456789012:role/infisical-pam"
+	connection := pamAccountObject(t, r.ConnectionDetailsAttributes, PamAccountAwsIamConnectionDetailsModel{RoleArn: types.StringValue(roleArn)})
+	state := createPamResource(t, r, pamAccountPlan(t, r, pamAccountBaseModel(connection, types.ObjectNull(nil)), nil))
+
+	body := backend.requestsTo("POST", "/api/v1/pam/accounts/aws-iam")[0]
+	// The API requires the credentials object on create, empty for this type.
+	if sentCredentials := jsonObject(t, body["credentials"]); len(sentCredentials) != 0 {
+		t.Errorf("expected empty credentials, got %v", sentCredentials)
+	}
+	if roleSent := jsonObject(t, body["connectionDetails"])["roleArn"]; roleSent != roleArn {
+		t.Errorf("expected the role ARN to be sent, got %v", roleSent)
+	}
+
+	if refreshed := readPamResource(t, r, state); !refreshed.Raw.Equal(state.Raw) {
+		t.Errorf("expected no drift after a refresh.\ngot:  %v\nwant: %v", refreshed.Raw, state.Raw)
+	}
+
+	created, _ := pamAccountModel(t, r, state)
+	described := created
+	described.Description = types.StringValue("Read-only")
+	updatePamResource(t, r, pamAccountPlan(t, r, described, nil), state)
+	patch := backend.requestsTo("PATCH", "/api/v1/pam/accounts/aws-iam/"+created.ID.ValueString())[0]
+	if len(patch) != 1 || patch["description"] != "Read-only" {
+		t.Errorf("expected only the description to be sent, got %v", patch)
+	}
+
+	imported, _ := pamAccountModel(t, r, importPamResource(t, r, pamResourceSchema(t, r), created.ID.ValueString()))
+	if got := stringAttribute(t, imported.ConnectionDetails.Attributes(), "role_arn"); got != roleArn {
+		t.Errorf("expected the imported role ARN %q, got %q", roleArn, got)
+	}
+}
+
+func TestPamAccountReadDropsAnEmptyID(t *testing.T) {
+	r := newPamSshTestResource(t, newFakePamBackend(t))
+	s := pamResourceSchema(t, r)
+	state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(s.Type().TerraformType(context.Background()), nil)}
+	if diags := state.SetAttribute(context.Background(), path.Root("id"), ""); diags.HasError() {
+		t.Fatal(diags)
+	}
+	if !readPamResource(t, r, state).Raw.IsNull() {
+		t.Error("expected an account without an ID to be dropped from state")
 	}
 }
