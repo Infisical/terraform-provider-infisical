@@ -82,7 +82,7 @@ resource "infisical_pam_account_aws_iam" "billing" {
 
 Required:
 
-- `role_arn` (String) The ARN of the IAM role Infisical assumes to give access to the account. Its trust policy must allow Infisical, with your organization ID as the external ID.
+- `role_arn` (String) The ARN of the IAM role Infisical assumes to give access to the account. Its trust policy must allow Infisical, with your organization ID as the external ID. See [AWS IAM accounts](https://infisical.com/docs/documentation/platform/pam/accounts/aws-iam) for the trust policy to use.
 
 ## Import
 

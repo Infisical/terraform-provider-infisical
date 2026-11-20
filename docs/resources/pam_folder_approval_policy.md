@@ -36,6 +36,17 @@ resource "infisical_pam_folder" "prod" {
   name = "prod"
 }
 
+# Accounts using this template need an approved request, and the bypassers can break glass on them.
+resource "infisical_pam_account_template" "prod_ssh" {
+  name         = "prod-ssh"
+  account_type = "ssh"
+
+  policies = {
+    requires_approval = true
+    allow_break_glass = true
+  }
+}
+
 resource "infisical_pam_user" "lead" {
   email = "lead@example.com"
   role  = "member"

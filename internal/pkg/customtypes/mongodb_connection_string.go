@@ -158,8 +158,8 @@ func ValidateMongoDBConnectionString(raw string) error {
 	return nil
 }
 
-// encodeMongoDBOptions percent-encodes the characters the API's URL serializer encodes in the
-// options: controls, spaces, quotes, angle brackets and non-ASCII bytes. Existing escapes are kept.
+// encodeMongoDBOptions percent-encodes the characters the API's URL serializer encodes after the
+// hosts: controls, spaces, quotes, angle brackets and non-ASCII bytes. Existing escapes are kept.
 func encodeMongoDBOptions(options string) string {
 	var encoded strings.Builder
 	for i := 0; i < len(options); i++ {
@@ -174,7 +174,7 @@ func encodeMongoDBOptions(options string) string {
 }
 
 // NormalizeMongoDBConnectionString mirrors how the API stores a connection string: trimmed, with a
-// "/" between the hosts and the options, and the options percent-encoded.
+// "/" after the hosts, and the options and fragment percent-encoded.
 func NormalizeMongoDBConnectionString(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	scheme, hosts, rest, ok := splitMongoDBConnectionString(trimmed)
@@ -182,13 +182,8 @@ func NormalizeMongoDBConnectionString(raw string) string {
 		return trimmed
 	}
 
-	path, query, hasQuery := strings.Cut(rest, "?")
-	if path == "" {
-		path = "/"
+	if !strings.HasPrefix(rest, "/") {
+		rest = "/" + rest
 	}
-	normalized := scheme + "://" + hosts + path
-	if !hasQuery {
-		return normalized
-	}
-	return normalized + "?" + encodeMongoDBOptions(query)
+	return scheme + "://" + hosts + encodeMongoDBOptions(rest)
 }

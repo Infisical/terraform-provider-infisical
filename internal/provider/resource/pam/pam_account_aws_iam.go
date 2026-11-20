@@ -26,7 +26,7 @@ func NewPamAccountAwsIamResource() resource.Resource {
 		Prerequisite:     "The test assumes `role_arn`, so the role must trust Infisical before the account is created.",
 		ConnectionDetailsAttributes: map[string]schema.Attribute{
 			"role_arn": schema.StringAttribute{
-				Description: "The ARN of the IAM role Infisical assumes to give access to the account. Its trust policy must allow Infisical, with your organization ID as the external ID.",
+				Description: "The ARN of the IAM role Infisical assumes to give access to the account. Its trust policy must allow Infisical, with your organization ID as the external ID. See [AWS IAM accounts](https://infisical.com/docs/documentation/platform/pam/accounts/aws-iam) for the trust policy to use.",
 				Required:    true,
 				Validators:  []validator.String{stringvalidator.LengthBetween(1, 2048)},
 			},

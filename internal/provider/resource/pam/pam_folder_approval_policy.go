@@ -199,13 +199,20 @@ func (r *pamFolderApprovalPolicyResource) ValidateConfig(ctx context.Context, re
 	if !maximum.IsNull() {
 		maximumValue = maximum.ValueString()
 	}
-	parsedMinimum, minimumOK := validators.ParseMsDuration(minimumValue)
-	parsedMaximum, maximumOK := validators.ParseMsDuration(maximumValue)
-	// The API checks each bound alone, and an inverted range rejects every access request in the folder.
+	resp.Diagnostics.Append(checkPamAccessDurationOrder(minimumValue, maximumValue)...)
+}
+
+// checkPamAccessDurationOrder rejects a minimum longer than the maximum. The API checks each bound
+// alone, and an inverted range rejects every access request in the folder.
+func checkPamAccessDurationOrder(minimum, maximum string) diag.Diagnostics {
+	var diags diag.Diagnostics
+	parsedMinimum, minimumOK := validators.ParseMsDuration(minimum)
+	parsedMaximum, maximumOK := validators.ParseMsDuration(maximum)
 	if minimumOK && maximumOK && parsedMinimum > parsedMaximum {
-		resp.Diagnostics.AddAttributeError(accessDuration.AtName("min"), "Invalid access duration",
-			fmt.Sprintf("The minimum access duration %q is longer than the maximum %q, so no request could ever be approved.", minimumValue, maximumValue))
+		diags.AddAttributeError(path.Root("constraints").AtName("access_duration").AtName("min"), "Invalid access duration",
+			fmt.Sprintf("The minimum access duration %q is longer than the maximum %q, so no request could ever be approved.", minimum, maximum))
 	}
+	return diags
 }
 
 func (r *pamFolderApprovalPolicyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -261,6 +268,8 @@ func pamApprovalPolicyToAPI(ctx context.Context, plan pamFolderApprovalPolicyMod
 
 	var constraints pamApprovalConstraintsModel
 	diags.Append(plan.Constraints.As(ctx, &constraints, basetypes.ObjectAsOptions{})...)
+	// Checked again here, since ignore_changes can pair a configured bound with a stored one.
+	diags.Append(checkPamAccessDurationOrder(constraints.AccessDuration.Min.ValueString(), constraints.AccessDuration.Max.ValueString())...)
 
 	return steps, bypassers, infisical.PamAccessApprovalPolicyConstraints{
 		AccessDuration: infisical.PamAccessApprovalPolicyAccessDuration{
@@ -321,7 +330,6 @@ func (r *pamFolderApprovalPolicyResource) Create(ctx context.Context, req resour
 		Scope:       pamApprovalPolicyScopeFolder,
 		ScopeID:     plan.FolderID.ValueString(),
 		Name:        plan.Name.ValueString(),
-		Conditions:  []map[string]any{},
 		Constraints: constraints,
 		Steps:       steps,
 		Bypassers:   bypassers,

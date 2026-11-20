@@ -15,12 +15,18 @@ const (
 const pamAccessApprovalPoliciesPath = "api/v1/approval-policies/pam-access"
 
 func (client Client) CreatePamAccessApprovalPolicy(request CreatePamAccessApprovalPolicyRequest) (PamAccessApprovalPolicy, error) {
+	// PAM policies take no conditions, but the API requires the list.
+	payload := struct {
+		CreatePamAccessApprovalPolicyRequest
+		Conditions []any `json:"conditions"`
+	}{request, []any{}}
+
 	var body PamAccessApprovalPolicyResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
-		SetBody(request).
+		SetBody(payload).
 		Post(pamAccessApprovalPoliciesPath)
 
 	if err != nil {

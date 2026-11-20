@@ -5330,11 +5330,9 @@ type PamAccessApprovalPolicy struct {
 }
 
 type CreatePamAccessApprovalPolicyRequest struct {
-	Scope   string `json:"scope"`
-	ScopeID string `json:"scopeId"`
-	Name    string `json:"name"`
-	// PAM policies take no conditions, but the API requires the list.
-	Conditions  []map[string]any                   `json:"conditions"`
+	Scope       string                             `json:"scope"`
+	ScopeID     string                             `json:"scopeId"`
+	Name        string                             `json:"name"`
 	Constraints PamAccessApprovalPolicyConstraints `json:"constraints"`
 	Steps       []ApprovalPolicyStep               `json:"steps"`
 	Bypassers   []ApprovalPolicyApprover           `json:"bypassers"`
