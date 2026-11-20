@@ -40,8 +40,10 @@ resource "infisical_external_kms_aws" "external-kms-aws-assume-role" {
     aws_kms_key_id = "<aws-kms-key-id>"
     type           = "assume-role"
     credential = {
-      role_arn         = "<assume-role-arn>"
-      role_external_id = "<role-external-id>"
+      role_arn = "<assume-role-arn>"
+      # Must be your Infisical organization ID. The role's trust policy must
+      # require the same value as sts:ExternalId.
+      role_external_id = "<your-infisical-organization-id>"
     }
   }
 }
@@ -95,5 +97,5 @@ Optional:
 
 - `access_key_id` (String, Sensitive) The AWS Access Key ID used to authenticate requests to AWS services. Required for access-key type. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-access-key-id
 - `role_arn` (String, Sensitive) The Amazon Resource Name (ARN) of the IAM role to assume for performing operations. Infisical will assume this role using AWS Security Token Service (STS). Required for assume-role type. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-iam-role-arn-for-role-assumption
-- `role_external_id` (String, Sensitive) The external ID of the role to assume for performing operations. Required for assume-role type. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-assume-role-external-id
+- `role_external_id` (String, Sensitive) The external ID that Infisical sends when it assumes the IAM role. Required for assume-role type. Must be your Infisical organization ID, shown under Organization ID in Organization Settings. The IAM role's trust policy must require the same value in an `sts:ExternalId` condition. Infisical rejects any other value, including a project ID, when you create a configuration or change its credential (`role_arn` or `role_external_id`). Configurations saved earlier with a different external ID keep working until their credential changes. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-assume-role-external-id
 - `secret_access_key` (String, Sensitive) The AWS Secret Access Key associated with the Access Key ID to authenticate requests to AWS services. Required for access-key type. For more details, refer to the documentation here https://infisical.com/docs/documentation/platform/kms-configuration/aws-kms#param-secret-access-key

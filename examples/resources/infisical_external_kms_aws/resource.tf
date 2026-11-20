@@ -25,8 +25,10 @@ resource "infisical_external_kms_aws" "external-kms-aws-assume-role" {
     aws_kms_key_id = "<aws-kms-key-id>"
     type           = "assume-role"
     credential = {
-      role_arn         = "<assume-role-arn>"
-      role_external_id = "<role-external-id>"
+      role_arn = "<assume-role-arn>"
+      # Must be your Infisical organization ID. The role's trust policy must
+      # require the same value as sts:ExternalId.
+      role_external_id = "<your-infisical-organization-id>"
     }
   }
 }

@@ -23,6 +23,9 @@ type ExternalKmsBaseResource struct {
 	ReadConfigurationForCreateFromPlan func(ctx context.Context, plan ExternalKmsBaseResourceModel) (map[string]any, diag.Diagnostics)
 	ReadConfigurationForUpdateFromPlan func(ctx context.Context, plan ExternalKmsBaseResourceModel, state ExternalKmsBaseResourceModel) (map[string]any, diag.Diagnostics)
 	OverwriteConfigurationFields       func(state *ExternalKmsBaseResourceModel) diag.Diagnostics
+	// LegacyExternalIdWarning is the warning detail that Read shows when the API reports
+	// hasLegacyExternalId. Leave it empty for providers that have no external ID.
+	LegacyExternalIdWarning string
 }
 
 type ExternalKmsBaseResourceModel struct {
@@ -155,6 +158,11 @@ func (r *ExternalKmsBaseResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	kms, err := r.client.GetExternalKmsById(infisical.GetExternalKmsByIdRequest{
 		Provider: r.Provider,
 		ID:       state.ID.ValueString(),
@@ -171,6 +179,10 @@ func (r *ExternalKmsBaseResource) Read(ctx context.Context, req resource.ReadReq
 			)
 			return
 		}
+	}
+
+	if kms.ExternalKms.HasLegacyExternalId {
+		resp.Diagnostics.AddWarning("External KMS uses a legacy external ID", r.LegacyExternalIdWarning)
 	}
 
 	if state.CredentialsHash.ValueString() != kms.ExternalKms.CredentialsHash {
