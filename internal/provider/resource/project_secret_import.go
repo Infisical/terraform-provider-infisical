@@ -4,14 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicalerrors "terraform-provider-infisical/internal/errors"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -35,6 +39,7 @@ type projectSecretImportResourceModel struct {
 	SecretPath      types.String `tfsdk:"folder_path"`
 	ImportPath      types.String `tfsdk:"import_folder_path"`
 	ImportEnvSlug   types.String `tfsdk:"import_environment_slug"`
+	ImportProjectID types.String `tfsdk:"import_project_id"`
 	IsReplication   types.Bool   `tfsdk:"is_replication"`
 }
 
@@ -76,6 +81,12 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 			"import_environment_slug": schema.StringAttribute{
 				Description:   "The environment slug of the secret import to modify/create",
 				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"import_project_id": schema.StringAttribute{
+				Description:   "The ID of the project to import secrets from, for a cross-project import. Omit it to import from `project_id`. The organization must have cross-project secret sharing turned on, and the source project needs a project grant that shares `import_environment_slug` and `import_folder_path` with `project_id`. Cross-project imports can't use replication. Requires Infisical v0.161.12 or later.",
+				Optional:      true,
+				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"is_replication": schema.BoolAttribute{
@@ -130,16 +141,22 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 		Environment:   plan.EnvironmentSlug.ValueString(),
 		SecretPath:    plan.SecretPath.ValueString(),
 		IsReplication: plan.IsReplication.ValueBool(),
-		ImportFrom: struct {
-			Environment string `json:"environment"`
-			SecretPath  string `json:"path"`
-		}{
-			Environment: plan.ImportEnvSlug.ValueString(),
-			SecretPath:  plan.ImportPath.ValueString(),
+		ImportFrom: infisical.SecretImportSource{
+			SourceProjectID: plan.ImportProjectID.ValueString(),
+			Environment:     plan.ImportEnvSlug.ValueString(),
+			SecretPath:      plan.ImportPath.ValueString(),
 		},
 	})
 
 	if err != nil {
+		if !plan.ImportProjectID.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("import_project_id"),
+				"Error creating cross-project secret import",
+				crossProjectImportErrorDetail(plan, err),
+			)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error creating project secret import",
 			"Couldn't save import to Infisical, unexpected error: "+err.Error(),
@@ -174,13 +191,26 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Get the latest data from the API
-	_, err := r.client.GetSecretImport(infisical.GetSecretImportRequest{
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	request := infisical.GetSecretImportRequest{
 		ID:          state.ID.ValueString(),
 		ProjectID:   state.ProjectID.ValueString(),
 		Environment: state.EnvironmentSlug.ValueString(),
 		SecretPath:  state.SecretPath.ValueString(),
-	})
+	}
+
+	// Same-project imports keep the v1 route, which older self-hosted servers also have.
+	var secretImport infisical.GetSecretImportResponse
+	var err error
+	if state.ImportProjectID.IsNull() {
+		secretImport, err = r.client.GetSecretImport(request)
+	} else {
+		secretImport, err = r.client.GetSecretImportWithSourceProject(request)
+	}
 
 	if err != nil {
 		if errors.As(err, &notFoundErr) {
@@ -193,6 +223,8 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		}
 		return
 	}
+
+	state.ImportProjectID = importProjectIDFromAPI(state.ImportProjectID, state.ProjectID.ValueString(), secretImport.SecretImport.ImportEnvironment.ProjectID)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -312,4 +344,62 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_folder_path"), secretImport.SecretImport.ImportPath)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_environment_slug"), secretImport.SecretImport.ImportEnvironment.Slug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("is_replication"), secretImport.SecretImport.IsReplication)...)
+
+	// The get by ID route leaves out the source project, so look the import up in the v2 list.
+	importProjectID := types.StringNull()
+	withSource, err := r.client.GetSecretImportWithSourceProject(infisical.GetSecretImportRequest{
+		ID:          secretImport.SecretImport.ID,
+		ProjectID:   secretImport.SecretImport.ProjectID,
+		Environment: secretImport.SecretImport.Environment.Slug,
+		SecretPath:  secretImport.SecretImport.SecretPath,
+	})
+	var apiErr *infisicalerrors.APIError
+	switch {
+	case err == nil:
+		importProjectID = importProjectIDFromAPI(importProjectID, secretImport.SecretImport.ProjectID, withSource.SecretImport.ImportEnvironment.ProjectID)
+	case errors.As(err, &notFoundErr), errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound:
+		// Servers without the v2 route predate cross-project imports. An import missing from the list is
+		// cross-project with sharing turned off, and the Read after import reports it as gone.
+	default:
+		resp.Diagnostics.AddError(
+			"Error fetching secret import",
+			"Couldn't fetch the source project of the secret import from Infisical, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_project_id"), importProjectID)...)
+}
+
+// importProjectIDFromAPI maps importEnv.projectId to import_project_id. The API returns a source project
+// for every import, so a same-project import keeps a null attribute null. Routes and servers that leave
+// importEnv.projectId out keep the current value.
+func importProjectIDFromAPI(current types.String, projectID, apiSourceProjectID string) types.String {
+	if apiSourceProjectID == "" || (current.IsNull() && apiSourceProjectID == projectID) {
+		return current
+	}
+	return types.StringValue(apiSourceProjectID)
+}
+
+func crossProjectImportErrorDetail(plan projectSecretImportResourceModel, err error) string {
+	sourceProjectID := plan.ImportProjectID.ValueString()
+	projectID := plan.ProjectID.ValueString()
+
+	hint := ""
+	switch {
+	case errors.Is(err, infisical.ErrCrossProjectSharingDisabled):
+		hint = "Cross-project secret sharing is turned off for this organization, or its plan does not include it. " +
+			"An organization admin can turn on \"Cross-project secret sharing\" under Secrets Management > Product Settings.\n\n"
+	case errors.Is(err, infisical.ErrCrossProjectGrantMissing):
+		hint = fmt.Sprintf("Project %q has no project grant that shares this environment and folder with project %q. "+
+			"In project %q, add one under Project Settings > Policies > Cross-Project Secret Sharing.\n\n", sourceProjectID, projectID, sourceProjectID)
+	}
+
+	return fmt.Sprintf(
+		"Couldn't import secrets from project %q (environment %q, folder %q) into project %q (environment %q, folder %q).\n\n"+
+			"%sSee https://infisical.com/docs/documentation/platform/secret-reference#cross-project-secret-sharing\n\n"+
+			"Infisical returned: %s",
+		sourceProjectID, plan.ImportEnvSlug.ValueString(), plan.ImportPath.ValueString(),
+		projectID, plan.EnvironmentSlug.ValueString(), plan.SecretPath.ValueString(),
+		hint, err.Error(),
+	)
 }
