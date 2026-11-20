@@ -31,27 +31,31 @@ func pamAccountObject(t *testing.T, attributes map[string]schema.Attribute, mode
 
 func pamAccountBaseModel(connectionDetails, credentials types.Object) PamAccountBaseResourceModel {
 	return PamAccountBaseResourceModel{
-		ID:                types.StringUnknown(),
-		Name:              types.StringValue("web01-root"),
-		Description:       types.StringNull(),
-		FolderID:          types.StringValue(testPamFolderID),
-		TemplateID:        types.StringValue(testPamTemplateID),
-		GatewayID:         types.StringNull(),
-		GatewayPoolID:     types.StringNull(),
-		ConnectionDetails: connectionDetails,
-		Credentials:       credentials,
+		pamAccountCommonModel: pamAccountCommonModel{
+			ID:                types.StringUnknown(),
+			Name:              types.StringValue("web01-root"),
+			Description:       types.StringNull(),
+			FolderID:          types.StringValue(testPamFolderID),
+			TemplateID:        types.StringValue(testPamTemplateID),
+			GatewayID:         types.StringNull(),
+			GatewayPoolID:     types.StringNull(),
+			ConnectionDetails: connectionDetails,
+		},
+		Credentials: credentials,
 	}
 }
 
 func pamAccountPlan(t *testing.T, r *PamAccountBaseResource, model PamAccountBaseResourceModel, rotation *pamAccountRotationModel) tfsdk.Plan {
 	t.Helper()
-	plan := emptyPamPlan(pamResourceSchema(t, r))
-	if rotation == nil {
-		rotation = &pamAccountRotationModel{RotationAccountID: types.StringNull()}
-	}
+	plan := tfsdk.Plan{Schema: pamResourceSchema(t, r)}
 	var diags diag.Diagnostics
-	for name, field := range r.modelFields(&model, rotation) {
-		diags.Append(plan.SetAttribute(context.Background(), path.Root(name), field)...)
+	switch {
+	case r.CredentialsAttributes == nil:
+		diags = plan.Set(context.Background(), &model.pamAccountCommonModel)
+	case rotation != nil:
+		diags = plan.Set(context.Background(), &pamRotatableAccountResourceModel{PamAccountBaseResourceModel: model, pamAccountRotationModel: *rotation})
+	default:
+		diags = plan.Set(context.Background(), &model)
 	}
 	if diags.HasError() {
 		t.Fatal(diags)

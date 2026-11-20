@@ -54,7 +54,8 @@ var pamSecretCredentialKeys = []string{"password", "privateKey", "serviceAccount
 
 const pamSelfRotation = "self"
 
-type PamAccountBaseResourceModel struct {
+// The attributes every account type has, which make up the whole model of types that store no credentials.
+type pamAccountCommonModel struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	Description       types.String `tfsdk:"description"`
@@ -63,55 +64,57 @@ type PamAccountBaseResourceModel struct {
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	GatewayPoolID     types.String `tfsdk:"gateway_pool_id"`
 	ConnectionDetails types.Object `tfsdk:"connection_details"`
-	Credentials       types.Object `tfsdk:"credentials"`
+}
+
+type PamAccountBaseResourceModel struct {
+	pamAccountCommonModel
+	Credentials types.Object `tfsdk:"credentials"`
 }
 
 type pamAccountRotationModel struct {
 	RotationAccountID types.String `tfsdk:"rotation_account_id"`
 }
 
+// The model of account types that support credential rotation.
+type pamRotatableAccountResourceModel struct {
+	PamAccountBaseResourceModel
+	pamAccountRotationModel
+}
+
+type pamModelGetter interface {
+	Get(ctx context.Context, target any) diag.Diagnostics
+}
+
 func (r *PamAccountBaseResource) hasCredentials() bool {
 	return r.CredentialsAttributes != nil
 }
 
-// modelFields maps the type's attributes to model fields. The model is read and written per attribute,
-// since whether the schema has credentials and a rotation account depends on the type.
-func (r *PamAccountBaseResource) modelFields(model *PamAccountBaseResourceModel, rotation *pamAccountRotationModel) map[string]any {
-	fields := map[string]any{
-		"id":                 &model.ID,
-		"name":               &model.Name,
-		"description":        &model.Description,
-		"folder_id":          &model.FolderID,
-		"template_id":        &model.TemplateID,
-		"gateway_id":         &model.GatewayID,
-		"gateway_pool_id":    &model.GatewayPoolID,
-		"connection_details": &model.ConnectionDetails,
+func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamModelGetter) (PamAccountBaseResourceModel, pamAccountRotationModel, diag.Diagnostics) {
+	noRotation := pamAccountRotationModel{RotationAccountID: types.StringNull()}
+	switch {
+	case !r.hasCredentials():
+		var model pamAccountCommonModel
+		diags := source.Get(ctx, &model)
+		return PamAccountBaseResourceModel{pamAccountCommonModel: model, Credentials: types.ObjectNull(nil)}, noRotation, diags
+	case !r.SupportsRotation:
+		var model PamAccountBaseResourceModel
+		diags := source.Get(ctx, &model)
+		return model, noRotation, diags
 	}
-	if r.hasCredentials() {
-		fields["credentials"] = &model.Credentials
-	}
-	if r.SupportsRotation {
-		fields["rotation_account_id"] = &rotation.RotationAccountID
-	}
-	return fields
-}
 
-func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamAttributeGetter) (PamAccountBaseResourceModel, pamAccountRotationModel, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	model := PamAccountBaseResourceModel{Credentials: types.ObjectNull(nil)}
-	rotation := pamAccountRotationModel{RotationAccountID: types.StringNull()}
-	for name, field := range r.modelFields(&model, &rotation) {
-		diags.Append(source.GetAttribute(ctx, path.Root(name), field)...)
-	}
-	return model, rotation, diags
+	var model pamRotatableAccountResourceModel
+	diags := source.Get(ctx, &model)
+	return model.PamAccountBaseResourceModel, model.pamAccountRotationModel, diags
 }
 
 func (r *PamAccountBaseResource) setModel(ctx context.Context, state *tfsdk.State, model PamAccountBaseResourceModel, rotation pamAccountRotationModel) diag.Diagnostics {
-	var diags diag.Diagnostics
-	for name, field := range r.modelFields(&model, &rotation) {
-		diags.Append(state.SetAttribute(ctx, path.Root(name), field)...)
+	switch {
+	case !r.hasCredentials():
+		return state.Set(ctx, model.pamAccountCommonModel)
+	case !r.SupportsRotation:
+		return state.Set(ctx, model)
 	}
-	return diags
+	return state.Set(ctx, pamRotatableAccountResourceModel{PamAccountBaseResourceModel: model, pamAccountRotationModel: rotation})
 }
 
 func (r *PamAccountBaseResource) attrTypes(attributes map[string]schema.Attribute) map[string]attr.Type {
