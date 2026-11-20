@@ -80,7 +80,7 @@ for file in "$DOCS_DIR/resources/"*.md; do
             update_subcategory "$file" "Approval";;
         
         # Groups
-        group|sub_organization_group)
+        group|group_user|sub_organization_group)
             update_subcategory "$file" "Groups";;
         
         # KMS
