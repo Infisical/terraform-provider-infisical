@@ -24,4 +24,9 @@ const AWS_MAPPING_BEHAVIOR_ONE_TO_ONE = "one-to-one"
 
 var (
 	ErrNotFound = errors.New("resource not found")
+
+	// The organization has cross-project secret sharing turned off, or its plan does not include it.
+	ErrCrossProjectSharingDisabled = errors.New("cross-project secret sharing is not enabled for this organization")
+	// The source project has no project grant that shares the source folder with the destination project.
+	ErrCrossProjectGrantMissing = errors.New("no project grant shares the source folder with the destination project")
 )

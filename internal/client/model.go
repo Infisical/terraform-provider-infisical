@@ -380,6 +380,11 @@ type SecretImport struct {
 	ID         string `json:"id"`
 	SecretPath string `json:"secretPath"`
 	ImportPath string `json:"importPath"`
+
+	ImportEnvironment struct {
+		// The source project. Only the v2 list route returns it.
+		ProjectID string `json:"projectId"`
+	} `json:"importEnv"`
 }
 
 type SecretImportByID struct {
@@ -2475,14 +2480,18 @@ type DeleteAccessApprovalPolicyResponse struct {
 }
 
 type CreateSecretImportRequest struct {
-	ProjectID     string `json:"workspaceId"`
-	Environment   string `json:"environment"`
-	SecretPath    string `json:"path"`
-	IsReplication bool   `json:"isReplication"`
-	ImportFrom    struct {
-		Environment string `json:"environment"`
-		SecretPath  string `json:"path"`
-	} `json:"import"`
+	ProjectID     string             `json:"workspaceId"`
+	Environment   string             `json:"environment"`
+	SecretPath    string             `json:"path"`
+	IsReplication bool               `json:"isReplication"`
+	ImportFrom    SecretImportSource `json:"import"`
+}
+
+type SecretImportSource struct {
+	// Empty for an import from the same project. Only the v2 create route accepts it.
+	SourceProjectID string `json:"sourceProjectId,omitempty"`
+	Environment     string `json:"environment"`
+	SecretPath      string `json:"path"`
 }
 
 type CreateSecretImportResponse struct {
