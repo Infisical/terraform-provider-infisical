@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -48,6 +49,28 @@ func (mongoDBConnectionStringValidator) ValidateString(_ context.Context, req va
 	}
 }
 
+// mongoDBConnectionStringPlanModifier keeps the stored connection string when the configured one
+// normalizes to it. After an import, state holds the API's form, and plan compares it with the
+// configured one without semantic equality.
+type mongoDBConnectionStringPlanModifier struct{}
+
+func (mongoDBConnectionStringPlanModifier) Description(_ context.Context) string {
+	return "keeps the stored connection string when it only differs from the configured one in how the API stores it"
+}
+
+func (m mongoDBConnectionStringPlanModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (mongoDBConnectionStringPlanModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || req.StateValue.IsNull() || req.StateValue.IsUnknown() {
+		return
+	}
+	if customtypes.NormalizeMongoDBConnectionString(req.ConfigValue.ValueString()) == customtypes.NormalizeMongoDBConnectionString(req.StateValue.ValueString()) {
+		resp.PlanValue = req.StateValue
+	}
+}
+
 func NewPamAccountMongoDBResource() resource.Resource {
 	return &PamAccountBaseResource{
 		AccountType:      "mongodb",
@@ -62,6 +85,7 @@ func NewPamAccountMongoDBResource() resource.Resource {
 					stringvalidator.LengthBetween(1, 1024),
 					mongoDBConnectionStringValidator{},
 				},
+				PlanModifiers: []planmodifier.String{mongoDBConnectionStringPlanModifier{}},
 			},
 			"database": schema.StringAttribute{
 				Description: "The database to connect to, which is also where the user authenticates unless the connection string sets `authSource`. Defaults to `admin`.",
