@@ -2,12 +2,13 @@ package infisicalclient
 
 import (
 	"fmt"
+	"net/http"
 	"terraform-provider-infisical/internal/errors"
 )
 
 const (
 	operationCreatePamAccessApprovalPolicy = "CallCreatePamAccessApprovalPolicy"
-	operationGetPamAccessApprovalPolicy    = "CallGetPamAccessApprovalPolicy"
+	operationListPamAccessApprovalPolicies = "CallListPamAccessApprovalPolicies"
 	operationUpdatePamAccessApprovalPolicy = "CallUpdatePamAccessApprovalPolicy"
 	operationDeletePamAccessApprovalPolicy = "CallDeletePamAccessApprovalPolicy"
 )
@@ -40,26 +41,28 @@ func (client Client) CreatePamAccessApprovalPolicy(request CreatePamAccessApprov
 	return body.Policy, nil
 }
 
-func (client Client) GetPamAccessApprovalPolicy(request GetPamAccessApprovalPolicyRequest) (PamAccessApprovalPolicy, error) {
-	var body PamAccessApprovalPolicyResponse
+// ListPamAccessApprovalPolicies returns the folder's approval policies, at most one since PAM allows one per folder.
+func (client Client) ListPamAccessApprovalPolicies(request ListPamAccessApprovalPoliciesRequest) ([]PamAccessApprovalPolicy, error) {
+	var body ListPamAccessApprovalPoliciesResponse
 	response, err := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
-		Get(fmt.Sprintf("%s/%s", pamAccessApprovalPoliciesPath, request.ID))
+		SetQueryParams(map[string]string{"scope": "pam-folder", "id": request.FolderID}).
+		Get(pamAccessApprovalPoliciesPath)
 
 	if err != nil {
-		return PamAccessApprovalPolicy{}, errors.NewGenericRequestError(operationGetPamAccessApprovalPolicy, err)
+		return nil, errors.NewGenericRequestError(operationListPamAccessApprovalPolicies, err)
 	}
 
 	if response.IsError() {
-		if isApprovalPolicyNotFound(response) {
-			return PamAccessApprovalPolicy{}, ErrNotFound
+		if response.StatusCode() == http.StatusNotFound {
+			return nil, ErrNotFound
 		}
-		return PamAccessApprovalPolicy{}, errors.NewAPIErrorWithResponse(operationGetPamAccessApprovalPolicy, response, nil)
+		return nil, errors.NewAPIErrorWithResponse(operationListPamAccessApprovalPolicies, response, nil)
 	}
 
-	return body.Policy, nil
+	return body.Policies, nil
 }
 
 func (client Client) UpdatePamAccessApprovalPolicy(request UpdatePamAccessApprovalPolicyRequest) (PamAccessApprovalPolicy, error) {

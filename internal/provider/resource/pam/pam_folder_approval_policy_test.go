@@ -58,6 +58,7 @@ func pamApprovalPolicyState(t *testing.T, state tfsdk.State) pamFolderApprovalPo
 
 func newPamApprovalPolicyTestResource(t *testing.T, backend *fakePamBackend) *pamFolderApprovalPolicyResource {
 	t.Helper()
+	backend.folders[testPamFolderID] = map[string]any{"id": testPamFolderID, "name": "prod"}
 	r := &pamFolderApprovalPolicyResource{}
 	configurePamResource(t, r, newPamTestClient(t, backend))
 	return r
@@ -107,13 +108,20 @@ func TestPamFolderApprovalPolicyLifecycle(t *testing.T) {
 		t.Errorf("expected no drift after a refresh.\ngot:  %v\nwant: %v", refreshed.Raw, state.Raw)
 	}
 
+	if id := pamApprovalPolicyState(t, state).ID.ValueString(); id != testPamFolderID {
+		t.Errorf("expected the folder ID as the resource ID, got %q", id)
+	}
+
 	// Rules added in Infisical survive an update, since the resource never sends them.
-	policyID := pamApprovalPolicyState(t, state).ID.ValueString()
+	var policyID string
+	for id := range backend.approvalPolicies {
+		policyID = id
+	}
 	rules := map[string]any{"inputs": []any{}, "rules": []any{map[string]any{"name": "jira-approved"}}}
 	backend.approvalPolicies[policyID]["autoApproval"] = rules
 
 	updated := model
-	updated.ID = types.StringValue(policyID)
+	updated.ID = types.StringValue(testPamFolderID)
 	updated.Bypassers = pamApprovers(t, user)
 	updated.Constraints = pamApprovalConstraints(t, pamDefaultMinAccessDuration, "1d")
 	state = updatePamResource(t, r, pamApprovalPolicyPlan(t, r, updated), state)
@@ -165,8 +173,8 @@ func TestPamFolderApprovalPolicyImport(t *testing.T) {
 	}
 	r := newPamApprovalPolicyTestResource(t, backend)
 
-	imported := pamApprovalPolicyState(t, importPamResource(t, r, pamResourceSchema(t, r), testPamPolicyID))
-	if imported.FolderID.ValueString() != folderID || imported.Name.ValueString() != "PAM Folder Approval - dbas" || len(imported.Approvers.Elements()) != 1 {
+	imported := pamApprovalPolicyState(t, importPamResource(t, r, pamResourceSchema(t, r), folderID))
+	if imported.ID.ValueString() != folderID || imported.FolderID.ValueString() != folderID || imported.Name.ValueString() != "PAM Folder Approval - dbas" || len(imported.Approvers.Elements()) != 1 {
 		t.Errorf("unexpected imported policy: %+v", imported)
 	}
 	if len(imported.Bypassers.Elements()) != 1 {

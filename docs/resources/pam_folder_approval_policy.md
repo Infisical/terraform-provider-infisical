@@ -119,7 +119,7 @@ resource "infisical_pam_folder_approval_policy" "prod" {
 
 ### Read-Only
 
-- `id` (String) The ID of the approval policy.
+- `id` (String) The ID of the folder, which identifies the policy since a folder has at most one.
 
 <a id="nestedatt--approvers"></a>
 ### Nested Schema for `approvers`
@@ -159,7 +159,6 @@ Optional:
 Import is supported using the following syntax:
 
 ```shell
-# This will import the PAM folder approval policy by its ID.
-# GET /api/v1/approval-policies/pam-access?scope=pam-folder&id=<folder_id> returns the ID of a folder's policy.
-terraform import infisical_pam_folder_approval_policy.example <policy_id>
+# This will import the PAM folder's approval policy by the folder's ID
+terraform import infisical_pam_folder_approval_policy.example <folder_id>
 ```

@@ -402,8 +402,8 @@ func (b *fakePamBackend) handler() http.Handler {
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"memberships": memberships, "skipped": skipped})
 	})
-	// Mirrors approval-policy-service.ts: PAM allows one policy per folder, a missing policy is a 403
-	// "Policy not found", and a PATCH keeps every field it leaves out.
+	// Mirrors approval-policy-service.ts: PAM allows one policy per folder, listing an unknown folder is a
+	// 404, a missing policy is a 403 "Policy not found", and a PATCH keeps every field it leaves out.
 	mux.HandleFunc("POST /api/v1/approval-policies/pam-access", func(w http.ResponseWriter, r *http.Request) {
 		body := b.body(r)
 		for _, policy := range b.approvalPolicies {
@@ -423,13 +423,19 @@ func (b *fakePamBackend) handler() http.Handler {
 		b.approvalPolicies[id] = policy
 		b.writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
 	})
-	mux.HandleFunc("GET /api/v1/approval-policies/pam-access/{id}", func(w http.ResponseWriter, r *http.Request) {
-		policy, ok := b.approvalPolicies[r.PathValue("id")]
-		if !ok {
-			b.apiError(w, http.StatusForbidden, "Policy not found")
+	mux.HandleFunc("GET /api/v1/approval-policies/pam-access", func(w http.ResponseWriter, r *http.Request) {
+		folderID := r.URL.Query().Get("id")
+		if _, ok := b.folders[folderID]; !ok || r.URL.Query().Get("scope") != "pam-folder" {
+			b.apiError(w, http.StatusNotFound, "Folder not found")
 			return
 		}
-		b.writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
+		policies := []map[string]any{}
+		for _, policy := range b.approvalPolicies {
+			if policy["scopeId"] == folderID {
+				policies = append(policies, policy)
+			}
+		}
+		b.writeJSON(w, http.StatusOK, map[string]any{"policies": policies})
 	})
 	mux.HandleFunc("PATCH /api/v1/approval-policies/pam-access/{id}", func(w http.ResponseWriter, r *http.Request) {
 		policy, ok := b.approvalPolicies[r.PathValue("id")]

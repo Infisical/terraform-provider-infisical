@@ -5338,8 +5338,12 @@ type CreatePamAccessApprovalPolicyRequest struct {
 	Bypassers   []ApprovalPolicyApprover           `json:"bypassers"`
 }
 
-type GetPamAccessApprovalPolicyRequest struct {
-	ID string
+type ListPamAccessApprovalPoliciesRequest struct {
+	FolderID string
+}
+
+type ListPamAccessApprovalPoliciesResponse struct {
+	Policies []PamAccessApprovalPolicy `json:"policies"`
 }
 
 // UpdatePamAccessApprovalPolicyRequest leaves out autoApproval, so the API keeps the stored rules.

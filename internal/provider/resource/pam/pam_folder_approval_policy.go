@@ -130,7 +130,7 @@ func (r *pamFolderApprovalPolicyResource) Schema(_ context.Context, _ resource.S
 		Description: "Create and manage the approval policy of a PAM folder. Accounts in the folder whose template sets `requires_approval` need an approved request before a session launches or credentials are revealed. A folder has at most one policy. Auto-approval rules aren't managed by this resource: updates keep the rules added in Infisical, and destroying the policy deletes them. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description:   "The ID of the approval policy.",
+				Description:   "The ID of the folder, which identifies the policy since a folder has at most one.",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -283,7 +283,7 @@ func pamApprovalPolicyFromAPI(ctx context.Context, policy infisical.PamAccessApp
 	var diags diag.Diagnostics
 
 	model := pamFolderApprovalPolicyModel{
-		ID:       types.StringValue(policy.ID),
+		ID:       stringOrNull(policy.ScopeID),
 		FolderID: stringOrNull(policy.ScopeID),
 		Name:     types.StringValue(policy.Name),
 	}
@@ -309,6 +309,16 @@ func pamApprovalPolicyFromAPI(ctx context.Context, policy infisical.PamAccessApp
 	return model, diags
 }
 
+// findFolderPolicy returns the folder's approval policy, or nil when it has none. It returns ErrNotFound
+// when the folder is gone.
+func (r *pamFolderApprovalPolicyResource) findFolderPolicy(folderID string) (*infisical.PamAccessApprovalPolicy, error) {
+	policies, err := r.client.ListPamAccessApprovalPolicies(infisical.ListPamAccessApprovalPoliciesRequest{FolderID: folderID})
+	if err != nil || len(policies) == 0 {
+		return nil, err
+	}
+	return &policies[0], nil
+}
+
 func (r *pamFolderApprovalPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !requirePamMachineIdentity(r.client, &resp.Diagnostics, "Unable to create PAM folder approval policy") {
 		return
@@ -326,7 +336,18 @@ func (r *pamFolderApprovalPolicyResource) Create(ctx context.Context, req resour
 		return
 	}
 
-	policy, err := r.client.CreatePamAccessApprovalPolicy(infisical.CreatePamAccessApprovalPolicyRequest{
+	existing, err := r.findFolderPolicy(plan.FolderID.ValueString())
+	if err != nil && err != infisical.ErrNotFound {
+		resp.Diagnostics.AddError("Error creating PAM folder approval policy", "Couldn't check the folder for an approval policy, unexpected error: "+err.Error())
+		return
+	}
+	if existing != nil {
+		resp.Diagnostics.AddError("Error creating PAM folder approval policy",
+			fmt.Sprintf("Folder %s already has an approval policy, and a folder can only have one. Import it with its folder ID to manage it with Terraform.", plan.FolderID.ValueString()))
+		return
+	}
+
+	_, err = r.client.CreatePamAccessApprovalPolicy(infisical.CreatePamAccessApprovalPolicyRequest{
 		Scope:       pamApprovalPolicyScopeFolder,
 		ScopeID:     plan.FolderID.ValueString(),
 		Name:        plan.Name.ValueString(),
@@ -339,7 +360,7 @@ func (r *pamFolderApprovalPolicyResource) Create(ctx context.Context, req resour
 		return
 	}
 
-	plan.ID = types.StringValue(policy.ID)
+	plan.ID = plan.FolderID
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -359,24 +380,24 @@ func (r *pamFolderApprovalPolicyResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	policy, err := r.client.GetPamAccessApprovalPolicy(infisical.GetPamAccessApprovalPolicyRequest{ID: state.ID.ValueString()})
-	if err != nil {
-		if err == infisical.ErrNotFound {
-			resp.State.RemoveResource(ctx)
-			return
-		}
+	policy, err := r.findFolderPolicy(state.ID.ValueString())
+	if err != nil && err != infisical.ErrNotFound {
 		resp.Diagnostics.AddError("Error reading PAM folder approval policy", "Couldn't read PAM folder approval policy, unexpected error: "+err.Error())
+		return
+	}
+	if policy == nil {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	if !isPamSingleApprovalStep(policy.Steps) {
 		resp.Diagnostics.AddWarning(
 			"PAM folder approval policy changed outside of Terraform",
-			fmt.Sprintf("Policy %s doesn't have the single step this resource manages, where one approval from any approver grants access and every approver is notified, so the next apply rewrites it that way.", policy.ID),
+			fmt.Sprintf("The approval policy of folder %s doesn't have the single step this resource manages, where one approval from any approver grants access and every approver is notified, so the next apply rewrites it that way.", state.ID.ValueString()),
 		)
 	}
 
-	refreshed, diags := pamApprovalPolicyFromAPI(ctx, policy)
+	refreshed, diags := pamApprovalPolicyFromAPI(ctx, *policy)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -402,8 +423,19 @@ func (r *pamFolderApprovalPolicyResource) Update(ctx context.Context, req resour
 		return
 	}
 
-	_, err := r.client.UpdatePamAccessApprovalPolicy(infisical.UpdatePamAccessApprovalPolicyRequest{
-		ID:          state.ID.ValueString(),
+	policy, err := r.findFolderPolicy(state.ID.ValueString())
+	if err != nil && err != infisical.ErrNotFound {
+		resp.Diagnostics.AddError("Error updating PAM folder approval policy", "Couldn't read PAM folder approval policy, unexpected error: "+err.Error())
+		return
+	}
+	if policy == nil {
+		resp.Diagnostics.AddError("Error updating PAM folder approval policy",
+			fmt.Sprintf("Folder %s no longer has an approval policy, so there is nothing to update. Apply again with refresh enabled and Terraform will create it.", state.ID.ValueString()))
+		return
+	}
+
+	_, err = r.client.UpdatePamAccessApprovalPolicy(infisical.UpdatePamAccessApprovalPolicyRequest{
+		ID:          policy.ID,
 		Name:        plan.Name.ValueString(),
 		Constraints: constraints,
 		Steps:       steps,
@@ -429,7 +461,10 @@ func (r *pamFolderApprovalPolicyResource) Delete(ctx context.Context, req resour
 		return
 	}
 
-	err := r.client.DeletePamAccessApprovalPolicy(infisical.DeletePamAccessApprovalPolicyRequest{ID: state.ID.ValueString()})
+	policy, err := r.findFolderPolicy(state.ID.ValueString())
+	if err == nil && policy != nil {
+		err = r.client.DeletePamAccessApprovalPolicy(infisical.DeletePamAccessApprovalPolicyRequest{ID: policy.ID})
+	}
 	if err != nil && err != infisical.ErrNotFound {
 		resp.Diagnostics.AddError("Error deleting PAM folder approval policy", "Couldn't delete PAM folder approval policy, unexpected error: "+err.Error())
 	}
@@ -439,7 +474,7 @@ func (r *pamFolderApprovalPolicyResource) ImportState(ctx context.Context, req r
 	if _, err := uuid.ParseUUID(req.ID); err != nil {
 		resp.Diagnostics.AddError(
 			"Unexpected Import Identifier",
-			fmt.Sprintf("Expected the ID of a PAM folder approval policy, such as 3f091b42-1661-41a1-b647-98c6a45af047, got: %q", req.ID),
+			fmt.Sprintf("Expected the ID of the PAM folder whose approval policy to import, such as 3f091b42-1661-41a1-b647-98c6a45af047, got: %q", req.ID),
 		)
 		return
 	}
