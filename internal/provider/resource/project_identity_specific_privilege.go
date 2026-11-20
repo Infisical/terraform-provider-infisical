@@ -487,6 +487,10 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 		})
 
 		if err != nil {
+			if err == infisical.ErrNotFound {
+				resp.State.RemoveResource(ctx)
+				return
+			}
 			resp.Diagnostics.AddError(
 				"Error reading project identity specific privilege",
 				"Couldn't read project identity specific privilege from Infisical, unexpected error: "+err.Error(),
@@ -589,6 +593,10 @@ func (r *projectIdentitySpecificPrivilegeResourceResource) Read(ctx context.Cont
 		})
 
 		if err != nil {
+			if err == infisical.ErrNotFound {
+				resp.State.RemoveResource(ctx)
+				return
+			}
 			resp.Diagnostics.AddError(
 				"Error reading project identity specific privilege",
 				"Couldn't read project identity specific privilege from Infisical, unexpected error: "+err.Error(),
