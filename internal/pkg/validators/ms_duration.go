@@ -24,7 +24,7 @@ type msDurationValidator struct {
 // No unit means milliseconds.
 var msDurationPattern = regexp.MustCompile(`(?i)^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$`)
 
-func parseMsDuration(value string) (time.Duration, bool) {
+func ParseMsDuration(value string) (time.Duration, bool) {
 	if len(value) > 100 {
 		return 0, false
 	}
@@ -69,8 +69,10 @@ func describeDuration(d time.Duration) string {
 		return plural(int64(d/(24*time.Hour)), "day")
 	case d%time.Hour == 0:
 		return plural(int64(d/time.Hour), "hour")
-	default:
+	case d%time.Minute == 0:
 		return plural(int64(d/time.Minute), "minute")
+	default:
+		return plural(int64(d/time.Second), "second")
 	}
 }
 
@@ -87,7 +89,7 @@ func (v msDurationValidator) ValidateString(ctx context.Context, req validator.S
 		return
 	}
 
-	duration, ok := parseMsDuration(req.ConfigValue.ValueString())
+	duration, ok := ParseMsDuration(req.ConfigValue.ValueString())
 	if !ok || duration < v.minimum || duration > v.maximum {
 		resp.Diagnostics.AddAttributeError(
 			req.Path,
