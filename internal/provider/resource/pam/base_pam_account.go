@@ -24,6 +24,7 @@ var (
 	_ resource.ResourceWithConfigure      = &PamAccountBaseResource{}
 	_ resource.ResourceWithImportState    = &PamAccountBaseResource{}
 	_ resource.ResourceWithValidateConfig = &PamAccountBaseResource{}
+	_ resource.ResourceWithModifyPlan     = &PamAccountBaseResource{}
 )
 
 // PamAccountBaseResource is the resource implementation shared by every PAM account type.
@@ -181,7 +182,7 @@ func (r *PamAccountBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 
 	if r.hasCredentials() {
 		attributes["credentials"] = schema.SingleNestedAttribute{
-			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected.",
+			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected. To stop managing a secret, add it to `lifecycle.ignore_changes` instead of removing it.",
 			Required:    true,
 			Attributes:  r.CredentialsAttributes,
 		}
@@ -222,6 +223,35 @@ func (r *PamAccountBaseResource) ValidateConfig(ctx context.Context, req resourc
 
 	if r.ValidateTypeConfig != nil && !model.ConnectionDetails.IsUnknown() && !model.Credentials.IsNull() && !model.Credentials.IsUnknown() {
 		resp.Diagnostics.Append(r.ValidateTypeConfig(ctx, model.ConnectionDetails, model.Credentials)...)
+	}
+}
+
+// ModifyPlan rejects removing a stored secret while the auth method stays the same. The API keeps a secret an
+// update leaves out, and every secret an auth method uses is one its sessions need, so ignore_changes is the
+// way to stop managing it.
+func (r *PamAccountBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() || !r.hasCredentials() {
+		return
+	}
+
+	var planned, prior types.Object
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("credentials"), &planned)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("credentials"), &prior)...)
+	if resp.Diagnostics.HasError() || planned.IsNull() || planned.IsUnknown() || prior.IsNull() {
+		return
+	}
+
+	plannedValues, priorValues := planned.Attributes(), prior.Attributes()
+	// When the auth method changes, the API stores only the chosen method's fields, which clears the dropped secret.
+	if method, ok := plannedValues["auth_method"]; ok && !method.Equal(priorValues["auth_method"]) {
+		return
+	}
+	for name, attribute := range r.CredentialsAttributes {
+		if attribute.IsSensitive() && !priorValues[name].IsNull() && plannedValues[name].IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("credentials").AtName(name), "Stored secret can't be removed",
+				fmt.Sprintf("Removing `%s` would leave the account without the secret its sessions need, and Infisical would keep the stored one. "+
+					"To stop managing it with Terraform, keep it in the configuration and add `lifecycle { ignore_changes = [credentials.%s] }`.", name, name))
+		}
 	}
 }
 

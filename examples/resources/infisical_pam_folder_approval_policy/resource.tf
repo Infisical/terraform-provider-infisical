@@ -67,7 +67,6 @@ resource "infisical_pam_folder_group" "dbas" {
 
 resource "infisical_pam_folder_approval_policy" "prod" {
   folder_id = infisical_pam_folder.prod.id
-  name      = "prod-access"
 
   # Approvers must be folder members, and referencing the memberships adds them first.
   approvers = [

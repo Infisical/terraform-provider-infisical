@@ -82,7 +82,6 @@ resource "infisical_pam_folder_group" "dbas" {
 
 resource "infisical_pam_folder_approval_policy" "prod" {
   folder_id = infisical_pam_folder.prod.id
-  name      = "prod-access"
 
   # Approvers must be folder members, and referencing the memberships adds them first.
   approvers = [
@@ -110,7 +109,6 @@ resource "infisical_pam_folder_approval_policy" "prod" {
 
 - `approvers` (Attributes Set) The users and groups that can approve a request. One approval from any of them grants it, and each is notified of new requests. Each must be a member of the folder. (see [below for nested schema](#nestedatt--approvers))
 - `folder_id` (String) The ID of the folder the policy covers. Changing it creates a new policy.
-- `name` (String) The name of the approval policy.
 
 ### Optional
 

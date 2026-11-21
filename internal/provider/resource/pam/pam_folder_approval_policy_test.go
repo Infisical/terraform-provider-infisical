@@ -73,7 +73,6 @@ func TestPamFolderApprovalPolicyLifecycle(t *testing.T) {
 	model := pamFolderApprovalPolicyModel{
 		ID:          types.StringUnknown(),
 		FolderID:    types.StringValue(testPamFolderID),
-		Name:        types.StringValue("prod-approvals"),
 		Approvers:   pamApprovers(t, user, group),
 		Bypassers:   pamApprovers(t),
 		Constraints: pamApprovalConstraints(t, pamDefaultMinAccessDuration, pamDefaultMaxAccessDuration),
@@ -81,7 +80,7 @@ func TestPamFolderApprovalPolicyLifecycle(t *testing.T) {
 	state := createPamResource(t, r, pamApprovalPolicyPlan(t, r, model))
 
 	created := backend.requestsTo("POST", "/api/v1/approval-policies/pam-access")[0]
-	if created["scope"] != pamApprovalPolicyScopeFolder || created["scopeId"] != testPamFolderID || created["name"] != "prod-approvals" {
+	if created["scope"] != pamApprovalPolicyScopeFolder || created["scopeId"] != testPamFolderID || created["name"] != "PAM Folder Approval - prod" {
 		t.Errorf("unexpected policy sent: %v", created)
 	}
 	// The API rejects null for these lists.
@@ -174,7 +173,7 @@ func TestPamFolderApprovalPolicyImport(t *testing.T) {
 	r := newPamApprovalPolicyTestResource(t, backend)
 
 	imported := pamApprovalPolicyState(t, importPamResource(t, r, pamResourceSchema(t, r), folderID))
-	if imported.ID.ValueString() != folderID || imported.FolderID.ValueString() != folderID || imported.Name.ValueString() != "PAM Folder Approval - dbas" || len(imported.Approvers.Elements()) != 1 {
+	if imported.ID.ValueString() != folderID || imported.FolderID.ValueString() != folderID || len(imported.Approvers.Elements()) != 1 {
 		t.Errorf("unexpected imported policy: %+v", imported)
 	}
 	if len(imported.Bypassers.Elements()) != 1 {

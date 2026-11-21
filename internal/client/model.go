@@ -5346,10 +5346,9 @@ type ListPamAccessApprovalPoliciesResponse struct {
 	Policies []PamAccessApprovalPolicy `json:"policies"`
 }
 
-// UpdatePamAccessApprovalPolicyRequest leaves out autoApproval, so the API keeps the stored rules.
+// UpdatePamAccessApprovalPolicyRequest leaves out the name and autoApproval, so the API keeps the stored ones.
 type UpdatePamAccessApprovalPolicyRequest struct {
 	ID          string                             `json:"-"`
-	Name        string                             `json:"name"`
 	Constraints PamAccessApprovalPolicyConstraints `json:"constraints"`
 	Steps       []ApprovalPolicyStep               `json:"steps"`
 	// Sent as an empty list to clear the stored bypassers.

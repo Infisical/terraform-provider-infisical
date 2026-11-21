@@ -69,7 +69,6 @@ type pamFolderApprovalPolicyResource struct {
 type pamFolderApprovalPolicyModel struct {
 	ID          types.String `tfsdk:"id"`
 	FolderID    types.String `tfsdk:"folder_id"`
-	Name        types.String `tfsdk:"name"`
 	Approvers   types.Set    `tfsdk:"approvers"`
 	Bypassers   types.Set    `tfsdk:"bypassers"`
 	Constraints types.Object `tfsdk:"constraints"`
@@ -139,11 +138,6 @@ func (r *pamFolderApprovalPolicyResource) Schema(_ context.Context, _ resource.S
 				Required:      true,
 				Validators:    []validator.String{infisicaltf.UuidValidator},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"name": schema.StringAttribute{
-				Description: "The name of the approval policy.",
-				Required:    true,
-				Validators:  []validator.String{stringvalidator.LengthBetween(1, 128)},
 			},
 			"approvers": schema.SetNestedAttribute{
 				Description:  "The users and groups that can approve a request. One approval from any of them grants it, and each is notified of new requests. Each must be a member of the folder.",
@@ -285,7 +279,6 @@ func pamApprovalPolicyFromAPI(ctx context.Context, policy infisical.PamAccessApp
 	model := pamFolderApprovalPolicyModel{
 		ID:       stringOrNull(policy.ScopeID),
 		FolderID: stringOrNull(policy.ScopeID),
-		Name:     types.StringValue(policy.Name),
 	}
 
 	// A policy of any other shape reads as having no approvers, so the plan shows the next apply rewriting it.
@@ -347,10 +340,17 @@ func (r *pamFolderApprovalPolicyResource) Create(ctx context.Context, req resour
 		return
 	}
 
+	folder, err := r.client.GetPamFolder(infisical.GetPamFolderRequest{ID: plan.FolderID.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating PAM folder approval policy", "Couldn't read the PAM folder, unexpected error: "+err.Error())
+		return
+	}
+
 	_, err = r.client.CreatePamAccessApprovalPolicy(infisical.CreatePamAccessApprovalPolicyRequest{
-		Scope:       pamApprovalPolicyScopeFolder,
-		ScopeID:     plan.FolderID.ValueString(),
-		Name:        plan.Name.ValueString(),
+		Scope:   pamApprovalPolicyScopeFolder,
+		ScopeID: plan.FolderID.ValueString(),
+		// The name Infisical's own folder approval settings give a folder's policy, shown in audit logs.
+		Name:        "PAM Folder Approval - " + folder.Name,
 		Constraints: constraints,
 		Steps:       steps,
 		Bypassers:   bypassers,
@@ -436,7 +436,6 @@ func (r *pamFolderApprovalPolicyResource) Update(ctx context.Context, req resour
 
 	_, err = r.client.UpdatePamAccessApprovalPolicy(infisical.UpdatePamAccessApprovalPolicyRequest{
 		ID:          policy.ID,
-		Name:        plan.Name.ValueString(),
 		Constraints: constraints,
 		Steps:       steps,
 		Bypassers:   bypassers,
