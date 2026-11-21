@@ -154,6 +154,10 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
         # Gateways
         gateway)
             update_subcategory "$file" "Gateways";;
+
+        # Instance
+        instance_details)
+            update_subcategory "$file" "Instance";;
     esac
 done
 
