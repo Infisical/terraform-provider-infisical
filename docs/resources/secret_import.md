@@ -70,7 +70,7 @@ resource "infisical_secret_import" "cross-project" {
 
 ### Optional
 
-- `import_project_id` (String) The ID of the project to import secrets from, for a cross-project import. Omit it to import from `project_id`. The organization must have cross-project secret sharing turned on, and the source project needs a project grant that shares `import_environment_slug` and `import_folder_path` with `project_id`. Cross-project imports can't use replication. Requires Infisical v0.161.12 or later.
+- `import_project_id` (String) The ID of the project to import secrets from, for a cross-project import. Omit it to import from `project_id`. The organization must have cross-project secret sharing turned on, and the source project needs a project grant that shares `import_environment_slug` and `import_folder_path` with `project_id`. A cross-project import can't use replication, so `is_replication` must be `false`. Requires Infisical v0.161.12 or later.
 
 ### Read-Only
 

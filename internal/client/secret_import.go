@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	operationGetSecretImport                  = "CallGetSecretImport"
 	operationGetSecretImportWithSourceProject = "CallGetSecretImportWithSourceProject"
 	operationGetSecretImportByID              = "CallGetSecretImportByID"
 	operationGetSecretImportList              = "CallGetSecretImportList"
@@ -45,35 +44,11 @@ func findSecretImportByID(secretImports []SecretImport, id string) (GetSecretImp
 	return GetSecretImportResponse{}, NewNotFoundError("SecretImport", id)
 }
 
-func (client Client) GetSecretImport(request GetSecretImportRequest) (GetSecretImportResponse, error) {
-	var body ListSecretImportResponse
-
-	httpRequest := client.Config.HttpClient.
-		R().
-		SetResult(&body).
-		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("workspaceId", request.ProjectID).
-		SetQueryParam("environment", request.Environment).
-		SetQueryParam("path", request.SecretPath)
-
-	response, err := httpRequest.Get("api/v1/secret-imports")
-
-	if err != nil {
-		return GetSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImport, err)
-	}
-
-	if response.IsError() {
-		return GetSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImport, response, nil)
-	}
-
-	return findSecretImportByID(body.SecretImports, request.ID)
-
-}
-
 // GetSecretImportWithSourceProject reads an import through the v2 list route, the only route that
 // returns its source project (importEnv.projectId). The v1 routes, and the v2 create and get by ID
-// routes, leave it out. When the organization turns cross-project secret sharing off, the list leaves
-// out cross-project imports, so they read as not found.
+// routes, leave it out. While the organization has cross-project secret sharing turned off, the list
+// leaves out cross-project imports (getImports in secret-import-service.ts), so a NotFoundError from
+// this function does not mean the import is gone. Use GetSecretImportByID for that.
 func (client Client) GetSecretImportWithSourceProject(request GetSecretImportRequest) (GetSecretImportResponse, error) {
 	var body ListSecretImportResponse
 
@@ -205,6 +180,9 @@ func (client Client) UpdateSecretImport(request UpdateSecretImportRequest) (Upda
 	return body, nil
 }
 
+// DeleteSecretImport also deletes cross-project imports. The v1 and v2 routes both call deleteImport in
+// Infisical core (secret-import-service.ts), which finds the import in the destination folder and checks
+// neither the source project nor the organization's cross-project setting.
 func (client Client) DeleteSecretImport(request DeleteSecretImportRequest) (DeleteSecretImportResponse, error) {
 	var body DeleteSecretImportResponse
 	response, err := client.Config.HttpClient.
