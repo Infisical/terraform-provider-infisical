@@ -24,6 +24,7 @@ var (
 	_ resource.ResourceWithConfigure      = &PamAccountBaseResource{}
 	_ resource.ResourceWithImportState    = &PamAccountBaseResource{}
 	_ resource.ResourceWithValidateConfig = &PamAccountBaseResource{}
+	_ resource.ResourceWithModifyPlan     = &PamAccountBaseResource{}
 )
 
 // PamAccountBaseResource is the resource implementation shared by every PAM account type.
@@ -36,7 +37,7 @@ type PamAccountBaseResource struct {
 	client           *infisical.Client
 
 	ConnectionDetailsAttributes map[string]schema.Attribute
-	CredentialsAttributes       map[string]schema.Attribute
+	CredentialsAttributes       map[string]schema.Attribute // nil for types that store no credentials
 
 	ConnectionDetailsToAPI func(ctx context.Context, connectionDetails types.Object) (map[string]any, diag.Diagnostics)
 	// Returns the type's connection details model.
@@ -54,7 +55,8 @@ var pamSecretCredentialKeys = []string{"password", "privateKey", "serviceAccount
 
 const pamSelfRotation = "self"
 
-type PamAccountBaseResourceModel struct {
+// The attributes every account type has, which make up the whole model of types that store no credentials.
+type pamAccountCommonModel struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	Description       types.String `tfsdk:"description"`
@@ -63,7 +65,11 @@ type PamAccountBaseResourceModel struct {
 	GatewayID         types.String `tfsdk:"gateway_id"`
 	GatewayPoolID     types.String `tfsdk:"gateway_pool_id"`
 	ConnectionDetails types.Object `tfsdk:"connection_details"`
-	Credentials       types.Object `tfsdk:"credentials"`
+}
+
+type PamAccountBaseResourceModel struct {
+	pamAccountCommonModel
+	Credentials types.Object `tfsdk:"credentials"`
 }
 
 type pamAccountRotationModel struct {
@@ -80,11 +86,21 @@ type pamModelGetter interface {
 	Get(ctx context.Context, target any) diag.Diagnostics
 }
 
+func (r *PamAccountBaseResource) hasCredentials() bool {
+	return r.CredentialsAttributes != nil
+}
+
 func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamModelGetter) (PamAccountBaseResourceModel, pamAccountRotationModel, diag.Diagnostics) {
-	if !r.SupportsRotation {
+	noRotation := pamAccountRotationModel{RotationAccountID: types.StringNull()}
+	switch {
+	case !r.hasCredentials():
+		var model pamAccountCommonModel
+		diags := source.Get(ctx, &model)
+		return PamAccountBaseResourceModel{pamAccountCommonModel: model, Credentials: types.ObjectNull(nil)}, noRotation, diags
+	case !r.SupportsRotation:
 		var model PamAccountBaseResourceModel
 		diags := source.Get(ctx, &model)
-		return model, pamAccountRotationModel{RotationAccountID: types.StringNull()}, diags
+		return model, noRotation, diags
 	}
 
 	var model pamRotatableAccountResourceModel
@@ -93,7 +109,10 @@ func (r *PamAccountBaseResource) getModel(ctx context.Context, source pamModelGe
 }
 
 func (r *PamAccountBaseResource) setModel(ctx context.Context, state *tfsdk.State, model PamAccountBaseResourceModel, rotation pamAccountRotationModel) diag.Diagnostics {
-	if !r.SupportsRotation {
+	switch {
+	case !r.hasCredentials():
+		return state.Set(ctx, model.pamAccountCommonModel)
+	case !r.SupportsRotation:
 		return state.Set(ctx, model)
 	}
 	return state.Set(ctx, pamRotatableAccountResourceModel{PamAccountBaseResourceModel: model, pamAccountRotationModel: rotation})
@@ -159,11 +178,14 @@ func (r *PamAccountBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 			Required:    true,
 			Attributes:  r.ConnectionDetailsAttributes,
 		},
-		"credentials": schema.SingleNestedAttribute{
-			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected.",
+	}
+
+	if r.hasCredentials() {
+		attributes["credentials"] = schema.SingleNestedAttribute{
+			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected. To stop managing a secret, add it to `lifecycle.ignore_changes`.",
 			Required:    true,
 			Attributes:  r.CredentialsAttributes,
-		},
+		}
 	}
 
 	if r.SupportsRotation {
@@ -201,6 +223,35 @@ func (r *PamAccountBaseResource) ValidateConfig(ctx context.Context, req resourc
 
 	if r.ValidateTypeConfig != nil && !model.ConnectionDetails.IsUnknown() && !model.Credentials.IsNull() && !model.Credentials.IsUnknown() {
 		resp.Diagnostics.Append(r.ValidateTypeConfig(ctx, model.ConnectionDetails, model.Credentials)...)
+	}
+}
+
+// ModifyPlan rejects removing a stored secret while the auth method stays the same. The API keeps a secret an
+// update leaves out, and every secret an auth method uses is one its sessions need, so ignore_changes is the
+// way to stop managing it.
+func (r *PamAccountBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() || !r.hasCredentials() {
+		return
+	}
+
+	var planned, prior types.Object
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("credentials"), &planned)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("credentials"), &prior)...)
+	if resp.Diagnostics.HasError() || planned.IsNull() || planned.IsUnknown() || prior.IsNull() {
+		return
+	}
+
+	plannedValues, priorValues := planned.Attributes(), prior.Attributes()
+	// When the auth method changes, the API stores only the chosen method's fields, which clears the dropped secret.
+	if method, ok := plannedValues["auth_method"]; ok && !method.Equal(priorValues["auth_method"]) {
+		return
+	}
+	for name, attribute := range r.CredentialsAttributes {
+		if attribute.IsSensitive() && !priorValues[name].IsNull() && plannedValues[name].IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("credentials").AtName(name), "Stored secret can't be removed",
+				fmt.Sprintf("Infisical keeps the stored `%s` when you remove it from the configuration. "+
+					"To stop managing it with Terraform, add `lifecycle { ignore_changes = [credentials.%s] }`.", name, name))
+		}
 	}
 }
 
@@ -242,8 +293,12 @@ func (r *PamAccountBaseResource) Create(ctx context.Context, req resource.Create
 
 	connectionDetails, diags := r.ConnectionDetailsToAPI(ctx, plan.ConnectionDetails)
 	resp.Diagnostics.Append(diags...)
-	credentials, diags := r.CredentialsToAPI(ctx, plan.Credentials)
-	resp.Diagnostics.Append(diags...)
+	// The API requires the object even for types that store no credentials.
+	credentials := map[string]any{}
+	if r.hasCredentials() {
+		credentials, diags = r.CredentialsToAPI(ctx, plan.Credentials)
+		resp.Diagnostics.Append(diags...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -287,6 +342,11 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	account, err := r.client.GetPamAccount(infisical.GetPamAccountRequest{ID: state.ID.ValueString()})
 	if err != nil {
 		if err == infisical.ErrNotFound {
@@ -314,20 +374,15 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 
 	connectionDetails, diags := types.ObjectValueFrom(ctx, r.attrTypes(r.ConnectionDetailsAttributes), r.ConnectionDetailsFromAPI(account.ConnectionDetails))
 	resp.Diagnostics.Append(diags...)
-	credentialsModel, diags := r.CredentialsFromAPI(ctx, account.Credentials, state.Credentials)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	credentials, diags := types.ObjectValueFrom(ctx, r.attrTypes(r.CredentialsAttributes), credentialsModel)
-	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	state.ConnectionDetails, diags = keepTrimmedStrings(ctx, state.ConnectionDetails, connectionDetails)
 	resp.Diagnostics.Append(diags...)
-	state.Credentials, diags = keepTrimmedStrings(ctx, state.Credentials, credentials)
-	resp.Diagnostics.Append(diags...)
+	if r.hasCredentials() {
+		state.Credentials, diags = r.readCredentials(ctx, account.Credentials, state.Credentials)
+		resp.Diagnostics.Append(diags...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -346,6 +401,36 @@ func (r *PamAccountBaseResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	resp.Diagnostics.Append(r.setModel(ctx, &resp.State, state, rotation)...)
+}
+
+func (r *PamAccountBaseResource) readCredentials(ctx context.Context, apiCredentials map[string]any, prior types.Object) (types.Object, diag.Diagnostics) {
+	model, diags := r.CredentialsFromAPI(ctx, apiCredentials, prior)
+	if diags.HasError() {
+		return prior, diags
+	}
+	credentials, objectDiags := types.ObjectValueFrom(ctx, r.attrTypes(r.CredentialsAttributes), model)
+	diags.Append(objectDiags...)
+	if diags.HasError() {
+		return prior, diags
+	}
+	// Secrets kept from state belong to the auth method in state, so they're dropped when the account uses another.
+	method, hasMethod := credentials.Attributes()["auth_method"]
+	if hasMethod && !prior.IsNull() && !prior.IsUnknown() && !method.Equal(prior.Attributes()["auth_method"]) {
+		values := credentials.Attributes()
+		for name, attribute := range r.CredentialsAttributes {
+			if attribute.IsSensitive() {
+				values[name] = types.StringNull()
+			}
+		}
+		credentials, objectDiags = types.ObjectValue(credentials.AttributeTypes(ctx), values)
+		diags.Append(objectDiags...)
+		if diags.HasError() {
+			return prior, diags
+		}
+	}
+	kept, keptDiags := keepTrimmedStrings(ctx, prior, credentials)
+	diags.Append(keptDiags...)
+	return kept, diags
 }
 
 func (r *PamAccountBaseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {

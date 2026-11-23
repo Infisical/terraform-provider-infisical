@@ -5309,3 +5309,57 @@ type RemovePamMemberRequest struct {
 	Kind     PamMemberKind
 	MemberID string
 }
+
+type PamAccessApprovalPolicyAccessDuration struct {
+	Min string `json:"min"`
+	Max string `json:"max"`
+}
+
+type PamAccessApprovalPolicyConstraints struct {
+	AccessDuration PamAccessApprovalPolicyAccessDuration `json:"accessDuration"`
+}
+
+type PamAccessApprovalPolicy struct {
+	ID          string                   `json:"id"`
+	Name        string                   `json:"name"`
+	ScopeID     *string                  `json:"scopeId"`
+	Steps       []ApprovalPolicyStep     `json:"steps"`
+	Bypassers   []ApprovalPolicyApprover `json:"bypassers"`
+	Constraints struct {
+		Constraints PamAccessApprovalPolicyConstraints `json:"constraints"`
+	} `json:"constraints"`
+}
+
+type CreatePamAccessApprovalPolicyRequest struct {
+	Scope       string                             `json:"scope"`
+	ScopeID     string                             `json:"scopeId"`
+	Name        string                             `json:"name"`
+	Constraints PamAccessApprovalPolicyConstraints `json:"constraints"`
+	Steps       []ApprovalPolicyStep               `json:"steps"`
+	Bypassers   []ApprovalPolicyApprover           `json:"bypassers"`
+}
+
+type ListPamAccessApprovalPoliciesRequest struct {
+	FolderID string
+}
+
+type ListPamAccessApprovalPoliciesResponse struct {
+	Policies []PamAccessApprovalPolicy `json:"policies"`
+}
+
+// UpdatePamAccessApprovalPolicyRequest leaves out the name and autoApproval, so the API keeps the stored ones.
+type UpdatePamAccessApprovalPolicyRequest struct {
+	ID          string                             `json:"-"`
+	Constraints PamAccessApprovalPolicyConstraints `json:"constraints"`
+	Steps       []ApprovalPolicyStep               `json:"steps"`
+	// Sent as an empty list to clear the stored bypassers.
+	Bypassers []ApprovalPolicyApprover `json:"bypassers"`
+}
+
+type DeletePamAccessApprovalPolicyRequest struct {
+	ID string
+}
+
+type PamAccessApprovalPolicyResponse struct {
+	Policy PamAccessApprovalPolicy `json:"policy"`
+}
