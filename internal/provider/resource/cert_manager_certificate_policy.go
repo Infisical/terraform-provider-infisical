@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -33,14 +34,14 @@ var (
 		"client_auth", "server_auth", "code_signing",
 		"email_protection", "ocsp_signing", "time_stamping",
 	}
-	SUPPORTED_SIGNATURE_ALGORITHMS = []string{
+	SUPPORTED_SIGNATURE_ALGORITHMS = slices.Concat([]string{
 		"SHA256-RSA", "SHA512-RSA", "SHA384-ECDSA",
 		"SHA384-RSA", "SHA256-ECDSA", "SHA512-ECDSA",
-	}
-	SUPPORTED_KEY_ALGORITHMS = []string{
+	}, PQC_ALGORITHMS)
+	SUPPORTED_KEY_ALGORITHMS = slices.Concat([]string{
 		"RSA-2048", "RSA-3072", "RSA-4096",
 		"ECDSA-P256", "ECDSA-P521", "ECDSA-P384",
-	}
+	}, PQC_ALGORITHMS)
 	POLICY_NAME_SLUG_REGEX = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 )
 
@@ -403,7 +404,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 				Description: "Algorithm constraints for the certificate policy. Omit the block to accept any algorithm; each list restricts its own kind independently and needs at least one value when set.",
 				Attributes: map[string]schema.Attribute{
 					"signature": schema.ListAttribute{
-						Description: "List of allowed signature algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", "),
+						Description: "List of allowed signature algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE,
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -412,7 +413,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						},
 					},
 					"key_algorithm": schema.ListAttribute{
-						Description: "List of allowed key algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_KEY_ALGORITHMS, ", "),
+						Description: "List of allowed key algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_KEY_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE,
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -660,6 +661,11 @@ func (r *certManagerCertificatePolicyResource) Read(ctx context.Context, req res
 	var currentState certManagerCertificatePolicyResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if currentState.Id.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 

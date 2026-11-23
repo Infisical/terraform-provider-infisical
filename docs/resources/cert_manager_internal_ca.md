@@ -64,7 +64,7 @@ resource "infisical_cert_manager_internal_ca" "issuing" {
 
 - `common_name` (String) The common name (CN) of the CA certificate
 - `country` (String) The country (C) of the CA certificate
-- `key_algorithm` (String) The key algorithm for the CA. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1. Defaults to 'RSA_2048'.
+- `key_algorithm` (String) The key algorithm for the CA. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1, ML-DSA-44, ML-DSA-65, ML-DSA-87. Defaults to 'RSA_2048'. The ML-DSA values are post-quantum algorithms and need an Infisical Enterprise license. A CA with an ML-DSA key signs certificates only with that same ML-DSA variant.
 - `locality` (String) The locality (L) of the CA certificate
 - `organization` (String) The organization (O) of the CA certificate
 - `ou` (String) The organizational unit (OU) of the CA certificate

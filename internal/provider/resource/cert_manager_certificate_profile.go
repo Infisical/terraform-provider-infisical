@@ -120,14 +120,14 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 						Optional:    true,
 					},
 					"key_algorithm": schema.StringAttribute{
-						Description: "Default key algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", "),
+						Description: "Default key algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE,
 						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS...),
 						},
 					},
 					"signature_algorithm": schema.StringAttribute{
-						Description: "Default signature algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", "),
+						Description: "Default signature algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE + " The value must be one the profile's CA can sign with.",
 						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS...),
@@ -380,6 +380,11 @@ func (r *certManagerCertificateProfileResource) Read(ctx context.Context, req re
 	var currentState certManagerCertificateProfileResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if currentState.Id.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 

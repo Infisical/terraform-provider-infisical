@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -26,8 +27,9 @@ const (
 )
 
 var (
-	SUPPORTED_CA_TYPES               = []string{CA_TYPE_ROOT, CA_TYPE_INTERMEDIATE}
-	SUPPORTED_ROOT_CA_KEY_ALGORITHMS = []string{"RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"}
+	SUPPORTED_CA_TYPES = []string{CA_TYPE_ROOT, CA_TYPE_INTERMEDIATE}
+	// Infisical core refuses SLH-DSA keys when it creates an internal CA, so only ML-DSA is offered here.
+	SUPPORTED_ROOT_CA_KEY_ALGORITHMS = slices.Concat([]string{"RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"}, ML_DSA_ALGORITHMS)
 	SUPPORTED_CA_STATUSES            = []string{"active", "disabled"}
 )
 
@@ -125,7 +127,7 @@ func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.Sch
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
-				Description: "The key algorithm for the CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", ") + ". Defaults to '" + DEFAULT_CA_KEY_ALGORITHM + "'.",
+				Description: "The key algorithm for the CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", ") + ". Defaults to '" + DEFAULT_CA_KEY_ALGORITHM + "'. The ML-DSA values are post-quantum algorithms and need an Infisical Enterprise license. A CA with an ML-DSA key signs certificates only with that same ML-DSA variant.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(DEFAULT_CA_KEY_ALGORITHM),
@@ -258,6 +260,11 @@ func (r *certManagerInternalCAResource) Read(ctx context.Context, req resource.R
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.Id.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 

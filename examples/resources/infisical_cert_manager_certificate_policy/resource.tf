@@ -162,3 +162,13 @@ resource "infisical_cert_manager_certificate_policy" "code_signing" {
     key_algorithm = ["RSA-2048", "RSA-3072", "ECDSA-P256"]
   }
 }
+
+resource "infisical_cert_manager_certificate_policy" "post_quantum" {
+  name        = "post-quantum-policy"
+  description = "Only ML-DSA keys and signatures"
+
+  algorithms {
+    signature     = ["ML-DSA-65", "ML-DSA-87"]
+    key_algorithm = ["ML-DSA-65", "ML-DSA-87"]
+  }
+}
