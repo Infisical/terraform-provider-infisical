@@ -413,6 +413,21 @@ func (r *PamAccountBaseResource) readCredentials(ctx context.Context, apiCredent
 	if diags.HasError() {
 		return prior, diags
 	}
+	// Secrets kept from state belong to the auth method in state, so they're dropped when the account uses another.
+	method, hasMethod := credentials.Attributes()["auth_method"]
+	if hasMethod && !prior.IsNull() && !prior.IsUnknown() && !method.Equal(prior.Attributes()["auth_method"]) {
+		values := credentials.Attributes()
+		for name, attribute := range r.CredentialsAttributes {
+			if attribute.IsSensitive() {
+				values[name] = types.StringNull()
+			}
+		}
+		credentials, objectDiags = types.ObjectValue(credentials.AttributeTypes(ctx), values)
+		diags.Append(objectDiags...)
+		if diags.HasError() {
+			return prior, diags
+		}
+	}
 	kept, keptDiags := keepTrimmedStrings(ctx, prior, credentials)
 	diags.Append(keptDiags...)
 	return kept, diags
