@@ -9,8 +9,10 @@ import (
 	infisical "terraform-provider-infisical/internal/client"
 	"time"
 
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -18,6 +20,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+var _ resource.ResourceWithImportState = &AppConnectionBaseResource{}
 
 // AppConnectionBaseResource is the resource implementation.
 type AppConnectionBaseResource struct {
@@ -358,6 +362,11 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	appConnection, err := r.client.GetAppConnectionById(infisical.GetAppConnectionByIdRequest{
 		App: r.App,
 		ID:  state.ID.ValueString(),
@@ -380,21 +389,23 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
 
 	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
-		resp.Diagnostics.AddWarning(
-			"App connection credentials conflict",
-			fmt.Sprintf("The credentials for the %s App Connection with ID %s have been updated outside of Terraform.", r.AppConnectionName, state.ID.ValueString()),
-		)
+		// An import starts with no hash. The API never returns secret credentials, so there is
+		// nothing to compare against and no conflict to warn about.
+		if !state.CredentialsHash.IsNull() {
+			resp.Diagnostics.AddWarning(
+				"App connection credentials conflict",
+				fmt.Sprintf("The credentials for the %s App Connection with ID %s have been updated outside of Terraform.", r.AppConnectionName, state.ID.ValueString()),
+			)
+		}
 
-		// force TF update
+		// Nulling the credentials makes the next plan send the configured credentials again.
 		diags = r.OverwriteCredentialsFields(&state)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 
-		diags = resp.State.Set(ctx, r.stateValue(state, gatewayId))
-		resp.Diagnostics.Append(diags...)
-		return
+		state.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
 	}
 
 	if !(state.Description.IsNull() && appConnection.Description == "") {
@@ -520,10 +531,30 @@ func (r *AppConnectionBaseResource) Delete(ctx context.Context, req resource.Del
 		ID:  state.ID.ValueString(),
 	})
 
+	// Already gone, which is what the delete wanted.
+	if err == infisical.ErrNotFound {
+		return
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting app connection",
 			"Couldn't delete app connection from Infisical, unexpected error: "+err.Error(),
 		)
 	}
+}
+
+// ImportState accepts the app connection ID. Read then fills in everything the API returns. The
+// API never returns secret credentials, so the first plan after an import sends the configured
+// credentials again.
+func (r *AppConnectionBaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.ParseUUID(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected the ID of an app connection, such as 3f091b42-1661-41a1-b647-98c6a45af047, got: %q", req.ID),
+		)
+		return
+	}
+
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
