@@ -36,6 +36,8 @@ type IdentityOidcAuthResource struct {
 	client *infisical.Client
 }
 
+var _ resource.ResourceWithImportState = &IdentityOidcAuthResource{}
+
 // IdentityOidcAuthResourceSourceModel describes the data source data model.
 type IdentityOidcAuthResourceModel struct {
 	ID                      types.String                   `tfsdk:"id"`
@@ -614,6 +616,39 @@ func (r *IdentityOidcAuthResource) unlinkTemplateOnly(state IdentityOidcAuthReso
 	}
 
 	return r.client.GetIdentityOidcAuth(infisical.GetIdentityOidcAuthRequest{IdentityID: identityID})
+}
+
+// ImportState imports an existing auth configuration by its identity ID.
+func (r *IdentityOidcAuthResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !r.client.Config.IsMachineIdentityAuth {
+		resp.Diagnostics.AddError(
+			"Unable to import identity oidc auth",
+			"Only Machine Identity authentication is supported for this operation",
+		)
+		return
+	}
+
+	identityAuth, err := r.client.GetIdentityOidcAuth(infisical.GetIdentityOidcAuthRequest{IdentityID: req.ID})
+	if err != nil {
+		if err == infisical.ErrNotFound {
+			resp.Diagnostics.AddError(
+				"Identity oidc auth not found",
+				"The identity with the given ID does not have oidc auth configured",
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error importing identity oidc auth",
+				"Couldn't read identity oidc auth from Infisical, unexpected error: "+err.Error(),
+			)
+		}
+		return
+	}
+
+	var state IdentityOidcAuthResourceModel
+	state.ID = types.StringValue(identityAuth.ID)
+	state.IdentityID = types.StringValue(req.ID)
+	updateOidcAuthStateByApi(ctx, resp.Diagnostics, &state, &identityAuth)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
