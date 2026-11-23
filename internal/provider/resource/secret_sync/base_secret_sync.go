@@ -288,6 +288,14 @@ func (r *SecretSyncBaseResource) ModifyPlan(ctx context.Context, req resource.Mo
 		}
 	}
 
+	if plan.ProjectID.IsUnknown() {
+		return
+	}
+	destinationConfig, err := plan.DestinationConfig.ToTerraformValue(ctx)
+	if err != nil || !destinationConfig.IsFullyKnown() {
+		return
+	}
+
 	var destinationConfigMap map[string]interface{}
 	var configDiags diag.Diagnostics
 	var excludeSyncId string
