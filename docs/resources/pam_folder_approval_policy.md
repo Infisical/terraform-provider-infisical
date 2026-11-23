@@ -36,7 +36,7 @@ resource "infisical_pam_folder" "prod" {
   name = "prod"
 }
 
-# Accounts using this template need an approved request, and the bypassers can break glass on them.
+# Accounts in the prod folder that use this template need an approved request, and the bypassers can break glass on them.
 resource "infisical_pam_account_template" "prod_ssh" {
   name         = "prod-ssh"
   account_type = "ssh"
