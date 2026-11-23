@@ -70,7 +70,7 @@ resource "infisical_pam_account_kubernetes" "prod" {
 ### Required
 
 - `connection_details` (Attributes) How to reach the Kubernetes target. (see [below for nested schema](#nestedatt--connection_details))
-- `credentials` (Attributes) The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected. To stop managing a secret, add it to `lifecycle.ignore_changes` instead of removing it. (see [below for nested schema](#nestedatt--credentials))
+- `credentials` (Attributes) The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected. To stop managing a secret, add it to `lifecycle.ignore_changes`. (see [below for nested schema](#nestedatt--credentials))
 - `folder_id` (String) The ID of the folder the account is in. Changing it moves the account.
 - `name` (String) The name of the account, unique in its folder. Must be lowercase letters, numbers and hyphens, at most 64 characters.
 - `template_id` (String) The ID of the account template the account uses, which must be a `kubernetes` template.

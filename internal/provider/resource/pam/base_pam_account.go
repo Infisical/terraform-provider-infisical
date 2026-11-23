@@ -182,7 +182,7 @@ func (r *PamAccountBaseResource) Schema(_ context.Context, _ resource.SchemaRequ
 
 	if r.hasCredentials() {
 		attributes["credentials"] = schema.SingleNestedAttribute{
-			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected. To stop managing a secret, add it to `lifecycle.ignore_changes` instead of removing it.",
+			Description: "The credentials of the account. Secrets are never read back, so changes made outside of Terraform, such as rotation, aren't detected. To stop managing a secret, add it to `lifecycle.ignore_changes`.",
 			Required:    true,
 			Attributes:  r.CredentialsAttributes,
 		}
@@ -249,8 +249,8 @@ func (r *PamAccountBaseResource) ModifyPlan(ctx context.Context, req resource.Mo
 	for name, attribute := range r.CredentialsAttributes {
 		if attribute.IsSensitive() && !priorValues[name].IsNull() && plannedValues[name].IsNull() {
 			resp.Diagnostics.AddAttributeError(path.Root("credentials").AtName(name), "Stored secret can't be removed",
-				fmt.Sprintf("Removing `%s` would leave the account without the secret its sessions need, and Infisical would keep the stored one. "+
-					"To stop managing it with Terraform, keep it in the configuration and add `lifecycle { ignore_changes = [credentials.%s] }`.", name, name))
+				fmt.Sprintf("Infisical keeps the stored `%s` when you remove it from the configuration. "+
+					"To stop managing it with Terraform, add `lifecycle { ignore_changes = [credentials.%s] }`.", name, name))
 		}
 	}
 }
