@@ -76,10 +76,13 @@ func TestApprovalPolicyReadKeepsEmptyBypassers(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		bypassers bool
+		populated bool
 		wantNull  bool
 	}{
 		{name: "configured as empty list", bypassers: true, wantNull: false},
 		{name: "not configured", bypassers: false, wantNull: true},
+		// Last bypasser removed in Infisical: a config without bypassers must not plan an update.
+		{name: "removed outside Terraform", bypassers: true, populated: true, wantNull: true},
 	} {
 		t.Run("secret/"+tc.name, func(t *testing.T) {
 			model := secretApprovalPolicyResourceModel{
@@ -88,6 +91,9 @@ func TestApprovalPolicyReadKeepsEmptyBypassers(t *testing.T) {
 			}
 			if tc.bypassers {
 				model.Bypassers = []SecretBypasser{}
+			}
+			if tc.populated {
+				model.Bypassers = []SecretBypasser{{Type: types.StringValue("group"), ID: types.StringValue("g1"), Name: types.StringNull()}}
 			}
 			r := &secretApprovalPolicyResource{client: approvalPolicyClient(t, "/api/v1/secret-approvals/"+testApprovalPolicyID)}
 			got := readBypassers(t, r, model)
@@ -102,6 +108,9 @@ func TestApprovalPolicyReadKeepsEmptyBypassers(t *testing.T) {
 			}
 			if tc.bypassers {
 				model.Bypassers = []AccessBypasser{}
+			}
+			if tc.populated {
+				model.Bypassers = []AccessBypasser{{Type: types.StringValue("group"), ID: types.StringValue("g1"), Name: types.StringNull()}}
 			}
 			r := &accessApprovalPolicyResource{client: approvalPolicyClient(t, "/api/v1/access-approvals/policies/"+testApprovalPolicyID)}
 			got := readBypassers(t, r, model)

@@ -573,10 +573,10 @@ func (r *secretApprovalPolicyResource) Delete(ctx context.Context, req resource.
 	}
 }
 
-// An empty API list keeps the prior form (`[]` or null), otherwise `bypassers = []` drifts on every plan.
+// An empty API list stays `[]` only when state already holds `[]`, otherwise `bypassers = []` drifts on every plan.
 func mapSecretBypassersFromAPI(apiBypassers []infisical.SecretApprovalPolicyBypasser, prior []SecretBypasser) []SecretBypasser {
 	if len(apiBypassers) == 0 {
-		if prior != nil {
+		if prior != nil && len(prior) == 0 {
 			return []SecretBypasser{}
 		}
 		return nil

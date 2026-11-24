@@ -573,10 +573,10 @@ func mapApproversFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) 
 	return approvers
 }
 
-// An empty API list keeps the prior form (`[]` or null), otherwise `bypassers = []` drifts on every plan.
+// An empty API list stays `[]` only when state already holds `[]`, otherwise `bypassers = []` drifts on every plan.
 func mapBypassersFromAPI(apiBypassers []infisical.AccessApprovalPolicyBypasser, prior []AccessBypasser) []AccessBypasser {
 	if len(apiBypassers) == 0 {
-		if prior != nil {
+		if prior != nil && len(prior) == 0 {
 			return []AccessBypasser{}
 		}
 		return nil
