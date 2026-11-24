@@ -2953,6 +2953,32 @@ type DeleteGroupRequest struct {
 	ID string
 }
 
+type GroupUser struct {
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	IsPartOfGroup bool   `json:"isPartOfGroup"`
+}
+
+type AddGroupUserRequest struct {
+	GroupID  string
+	Username string
+}
+
+type RemoveGroupUserRequest struct {
+	GroupID  string
+	Username string
+}
+
+type ListGroupUsersRequest struct {
+	GroupID  string
+	Username string
+}
+
+type ListGroupUsersResponse struct {
+	GroupUsers []GroupUser `json:"users"`
+	TotalCount int         `json:"totalCount"`
+}
+
 type GroupMachineIdentity struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
