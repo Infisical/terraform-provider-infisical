@@ -204,6 +204,13 @@ func TestSecretImportCrossProjectLifecycle(t *testing.T) {
 		t.Errorf("state after refresh = %+v, want %+v", got, created)
 	}
 
+	want.SecretPath = "/renamed"
+	backend.imports[id] = want
+	state = readSecretImport(t, r, state)
+	if got := secretImportTestModel(t, state).SecretPath.ValueString(); got != "/renamed" {
+		t.Errorf("folder_path after the destination folder was renamed = %q, want /renamed", got)
+	}
+
 	deleteResp := resource.DeleteResponse{State: state}
 	r.Delete(context.Background(), resource.DeleteRequest{State: state}, &deleteResp)
 	if deleteResp.Diagnostics.HasError() {
@@ -246,6 +253,7 @@ func TestSecretImportValidateConfigRejectsCrossProjectReplication(t *testing.T) 
 		"same project":                    {types.StringValue("destination"), types.StringNull(), false},
 		"import_project_id is project_id": {types.StringValue("destination"), types.StringValue("destination"), false},
 		"import_project_id not known yet": {types.StringValue("destination"), types.StringUnknown(), false},
+		"project_id not known yet":        {types.StringUnknown(), types.StringValue("destination"), false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := tfsdk.Config{Schema: s, Raw: secretImportTestPlan(t, s, tc.projectID, tc.importProjectID, true).Raw}

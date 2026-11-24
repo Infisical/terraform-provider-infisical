@@ -104,11 +104,11 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 func (r *projectSecretImportResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config projectSecretImportResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-	if resp.Diagnostics.HasError() || !config.IsReplication.ValueBool() || config.ImportProjectID.IsNull() || config.ImportProjectID.IsUnknown() {
+	if resp.Diagnostics.HasError() || !config.IsReplication.ValueBool() || config.ImportProjectID.IsNull() {
 		return
 	}
 
-	if !config.ProjectID.IsUnknown() && config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
+	if config.ProjectID.IsUnknown() || config.ImportProjectID.IsUnknown() || config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
 		return
 	}
 
@@ -224,6 +224,9 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		)
 		return
 	}
+
+	state.EnvironmentSlug = types.StringValue(secretImport.SecretImport.Environment.Slug)
+	state.SecretPath = types.StringValue(secretImport.SecretImport.SecretPath)
 
 	// The by-ID route leaves out the source project. If the list hides the import, keep the value in state.
 	if !state.ImportProjectID.IsNull() {
