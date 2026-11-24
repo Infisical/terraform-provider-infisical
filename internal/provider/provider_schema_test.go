@@ -39,7 +39,7 @@ func TestProviderSchemaIsValid(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"infisical_instance_details"} {
+	for _, name := range []string{"infisical_instance_deployment_aws_metadata"} {
 		if _, ok := resp.DataSourceSchemas[name]; !ok {
 			t.Errorf("expected data source %s to be registered on the provider", name)
 		}

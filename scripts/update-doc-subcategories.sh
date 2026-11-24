@@ -156,7 +156,7 @@ for file in "$DOCS_DIR/data-sources/"*.md; do
             update_subcategory "$file" "Gateways";;
 
         # Instance
-        instance_details)
+        instance_deployment_aws_metadata)
             update_subcategory "$file" "Instance";;
     esac
 done

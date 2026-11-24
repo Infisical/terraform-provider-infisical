@@ -20,7 +20,7 @@ provider "infisical" {
   }
 }
 
-data "infisical_instance_details" "this" {}
+data "infisical_instance_deployment_aws_metadata" "this" {}
 
 # Trust policy for an IAM role that an Infisical AWS App Connection assumes.
 data "aws_iam_policy_document" "infisical_trust" {
@@ -29,7 +29,7 @@ data "aws_iam_policy_document" "infisical_trust" {
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.infisical_instance_details.this.aws_account_id}:root"]
+      identifiers = ["arn:aws:iam::${data.infisical_instance_deployment_aws_metadata.this.account_id}:root"]
     }
 
     condition {
@@ -41,5 +41,5 @@ data "aws_iam_policy_document" "infisical_trust" {
 }
 
 output "infisical_aws_account_id" {
-  value = data.infisical_instance_details.this.aws_account_id
+  value = data.infisical_instance_deployment_aws_metadata.this.account_id
 }
