@@ -177,10 +177,23 @@ Optional:
 
 Optional:
 
-- `connection_id` (String) The ID of the AWS or S3-Compatible Storage app connection used to store recordings.
+- `azure_blob` (Attributes) The container recordings are stored in when `storage_backend` is `azure-blob`. Sessions need a gateway version that supports Azure Blob Storage, and the storage account needs a CORS rule allowing GET from your Infisical URL for playback. (see [below for nested schema](#nestedatt--settings--recording--azure_blob))
+- `connection_id` (String) The ID of the app connection used to store recordings: an AWS or S3-Compatible Storage connection for `aws-s3`, or an Azure Blob Storage connection for `azure-blob`.
 - `enabled` (Boolean) Whether sessions are recorded. Defaults to true.
 - `s3` (Attributes) The bucket recordings are stored in when `storage_backend` is `aws-s3`. (see [below for nested schema](#nestedatt--settings--recording--s3))
-- `storage_backend` (String) Where recordings are stored: `postgres` (Infisical's database) or `aws-s3`, which needs `connection_id` and `s3`. Defaults to `postgres`.
+- `storage_backend` (String) Where recordings are stored: `postgres` (Infisical's database), `aws-s3`, which needs `connection_id` and `s3`, or `azure-blob`, which needs `connection_id` and `azure_blob`. Defaults to `postgres`.
+
+<a id="nestedatt--settings--recording--azure_blob"></a>
+### Nested Schema for `settings.recording.azure_blob`
+
+Required:
+
+- `container` (String) The name of the container. It must already exist in the connection's storage account.
+
+Optional:
+
+- `key_prefix` (String) An optional prefix for the recording blob names.
+
 
 <a id="nestedatt--settings--recording--s3"></a>
 ### Nested Schema for `settings.recording.s3`

@@ -27,6 +27,7 @@ const (
 	AppConnectionAppRender                AppConnectionApp = "render"
 	AppConnectionAppAzureClientSecrets    AppConnectionApp = "azure-client-secrets"
 	AppConnectionAppAzureAppConfiguration AppConnectionApp = "azure-app-configuration"
+	AppConnectionAppAzureBlobStorage      AppConnectionApp = "azure-blob-storage"
 	AppConnectionAppAzureDevOps           AppConnectionApp = "azure-devops"
 	AppConnectionAppAzureKeyVault         AppConnectionApp = "azure-key-vault"
 	AppConnectionAppBitbucket             AppConnectionApp = "bitbucket"

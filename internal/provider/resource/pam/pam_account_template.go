@@ -57,8 +57,9 @@ const (
 )
 
 const (
-	pamRecordingBackendPostgres = "postgres"
-	pamRecordingBackendS3       = "aws-s3"
+	pamRecordingBackendPostgres  = "postgres"
+	pamRecordingBackendS3        = "aws-s3"
+	pamRecordingBackendAzureBlob = "azure-blob"
 )
 
 const pamDefaultHeartbeatIntervalSeconds = 86400
@@ -117,6 +118,12 @@ type pamTemplateRecordingModel struct {
 	StorageBackend types.String `tfsdk:"storage_backend"`
 	ConnectionID   types.String `tfsdk:"connection_id"`
 	S3             types.Object `tfsdk:"s3"`
+	AzureBlob      types.Object `tfsdk:"azure_blob"`
+}
+
+type pamTemplateRecordingAzureBlobModel struct {
+	Container types.String `tfsdk:"container"`
+	KeyPrefix types.String `tfsdk:"key_prefix"`
 }
 
 type pamTemplateRecordingS3Model struct {
@@ -165,11 +172,17 @@ var pamTemplateRecordingS3AttrTypes = map[string]attr.Type{
 	"key_prefix": types.StringType,
 }
 
+var pamTemplateRecordingAzureBlobAttrTypes = map[string]attr.Type{
+	"container":  types.StringType,
+	"key_prefix": types.StringType,
+}
+
 var pamTemplateRecordingAttrTypes = map[string]attr.Type{
 	"enabled":         types.BoolType,
 	"storage_backend": types.StringType,
 	"connection_id":   types.StringType,
 	"s3":              types.ObjectType{AttrTypes: pamTemplateRecordingS3AttrTypes},
+	"azure_blob":      types.ObjectType{AttrTypes: pamTemplateRecordingAzureBlobAttrTypes},
 }
 
 var pamTemplateSessionLogMaskingAttrTypes = map[string]attr.Type{
@@ -324,13 +337,13 @@ func (r *pamAccountTemplateResource) Schema(_ context.Context, _ resource.Schema
 								Computed:    true,
 							},
 							"storage_backend": schema.StringAttribute{
-								Description: "Where recordings are stored: `postgres` (Infisical's database) or `aws-s3`, which needs `connection_id` and `s3`. Defaults to `postgres`.",
+								Description: "Where recordings are stored: `postgres` (Infisical's database), `aws-s3`, which needs `connection_id` and `s3`, or `azure-blob`, which needs `connection_id` and `azure_blob`. Defaults to `postgres`.",
 								Optional:    true,
 								Computed:    true,
-								Validators:  []validator.String{stringvalidator.OneOf(pamRecordingBackendPostgres, pamRecordingBackendS3)},
+								Validators:  []validator.String{stringvalidator.OneOf(pamRecordingBackendPostgres, pamRecordingBackendS3, pamRecordingBackendAzureBlob)},
 							},
 							"connection_id": schema.StringAttribute{
-								Description: "The ID of the AWS or S3-Compatible Storage app connection used to store recordings.",
+								Description: "The ID of the app connection used to store recordings: an AWS or S3-Compatible Storage connection for `aws-s3`, or an Azure Blob Storage connection for `azure-blob`.",
 								Optional:    true,
 								Validators:  []validator.String{infisicaltf.UuidValidator},
 							},
@@ -350,6 +363,25 @@ func (r *pamAccountTemplateResource) Schema(_ context.Context, _ resource.Schema
 									},
 									"key_prefix": schema.StringAttribute{
 										Description: "An optional prefix for the recording object keys.",
+										Optional:    true,
+										Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
+									},
+								},
+							},
+							"azure_blob": schema.SingleNestedAttribute{
+								Description: "The container recordings are stored in when `storage_backend` is `azure-blob`. Sessions need a gateway version that supports Azure Blob Storage, and the storage account needs a CORS rule allowing GET from your Infisical URL for playback.",
+								Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"container": schema.StringAttribute{
+										Description: "The name of the container. It must already exist in the connection's storage account.",
+										Required:    true,
+										Validators: []validator.String{
+											stringvalidator.LengthBetween(3, 63),
+											stringvalidator.RegexMatches(regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`), "may only contain lowercase letters, numbers and single hyphens between them"),
+										},
+									},
+									"key_prefix": schema.StringAttribute{
+										Description: "An optional prefix for the recording blob names.",
 										Optional:    true,
 										Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 									},
@@ -485,6 +517,18 @@ func (r *pamAccountTemplateResource) ValidateConfig(ctx context.Context, req res
 			resp.Diagnostics.AddAttributeError(path.Root("settings").AtName("recording"), "Incomplete recording storage",
 				"Storing recordings in S3 needs both `connection_id` and `s3`.")
 		}
+		if recording.StorageBackend.ValueString() == pamRecordingBackendAzureBlob && (recording.ConnectionID.IsNull() || recording.AzureBlob.IsNull()) {
+			resp.Diagnostics.AddAttributeError(path.Root("settings").AtName("recording"), "Incomplete recording storage",
+				"Storing recordings in Azure Blob Storage needs both `connection_id` and `azure_blob`.")
+		}
+		if recording.StorageBackend.ValueString() == pamRecordingBackendAzureBlob && !recording.S3.IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("settings").AtName("recording").AtName("s3"), "Unused recording storage block",
+				"`storage_backend = \"azure-blob\"` only reads `azure_blob`. Remove the `s3` block.")
+		}
+		if recording.StorageBackend.ValueString() == pamRecordingBackendS3 && !recording.AzureBlob.IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("settings").AtName("recording").AtName("azure_blob"), "Unused recording storage block",
+				"`storage_backend = \"aws-s3\"` only reads `s3`. Remove the `azure_blob` block.")
+		}
 	}
 
 	if !settings.PasswordRequirements.IsNull() && !settings.PasswordRequirements.IsUnknown() {
@@ -566,6 +610,7 @@ func resolvePamTemplateSettings(ctx context.Context, config types.Object, accoun
 			StorageBackend: types.StringNull(),
 			ConnectionID:   types.StringNull(),
 			S3:             types.ObjectNull(pamTemplateRecordingS3AttrTypes),
+			AzureBlob:      types.ObjectNull(pamTemplateRecordingAzureBlobAttrTypes),
 		}
 		if !settings.Recording.IsNull() {
 			diags.Append(settings.Recording.As(ctx, &recording, basetypes.ObjectAsOptions{})...)
@@ -776,6 +821,15 @@ func pamSettingsToAPI(ctx context.Context, settingsObject types.Object) (map[str
 		}
 		result["recordingS3Config"] = s3Config
 	}
+	if !recording.AzureBlob.IsNull() {
+		var azureBlob pamTemplateRecordingAzureBlobModel
+		diags.Append(recording.AzureBlob.As(ctx, &azureBlob, basetypes.ObjectAsOptions{})...)
+		azureBlobConfig := map[string]any{"container": azureBlob.Container.ValueString()}
+		if prefix := optionalString(azureBlob.KeyPrefix); prefix != nil {
+			azureBlobConfig["keyPrefix"] = *prefix
+		}
+		result["recordingAzureBlobConfig"] = azureBlobConfig
+	}
 
 	var masking pamTemplateSessionLogMaskingModel
 	diags.Append(settings.SessionLogMasking.As(ctx, &masking, basetypes.ObjectAsOptions{})...)
@@ -835,11 +889,21 @@ func pamSettingsFromAPI(template infisical.PamAccountTemplate) types.Object {
 			"key_prefix": stringOrNull(&keyPrefix),
 		})
 	}
+	azureBlob := types.ObjectNull(pamTemplateRecordingAzureBlobAttrTypes)
+	if azureBlobConfig, ok := settings["recordingAzureBlobConfig"].(map[string]any); ok {
+		container, _ := azureBlobConfig["container"].(string)
+		keyPrefix, _ := azureBlobConfig["keyPrefix"].(string)
+		azureBlob = types.ObjectValueMust(pamTemplateRecordingAzureBlobAttrTypes, map[string]attr.Value{
+			"container":  types.StringValue(container),
+			"key_prefix": stringOrNull(&keyPrefix),
+		})
+	}
 	recording := types.ObjectValueMust(pamTemplateRecordingAttrTypes, map[string]attr.Value{
 		"enabled":         types.BoolValue(enabled),
 		"storage_backend": types.StringValue(backend),
 		"connection_id":   stringOrNull(template.RecordingConnectionID),
 		"s3":              s3,
+		"azure_blob":      azureBlob,
 	})
 
 	builtInDetection, _ := settings["sessionLogMaskingBuiltInDetection"].(bool)
