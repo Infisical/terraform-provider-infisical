@@ -39,6 +39,7 @@ type fakeInternalCABackend struct {
 	cas                  map[string]infisical.CertificateAuthority
 	lastCreated          map[string]any
 	deletes              int
+	patches              int
 	requests             int
 }
 
@@ -111,6 +112,25 @@ func (b *fakeInternalCABackend) handler() http.Handler {
 			b.writeJSON(w, http.StatusNotFound, map[string]any{"message": "CA not found"})
 			return
 		}
+		b.writeJSON(w, http.StatusOK, ca)
+	})
+
+	mux.HandleFunc("PATCH /api/v1/cert-manager/ca/internal/{id}", func(w http.ResponseWriter, r *http.Request) {
+		b.patches++
+		ca, ok := b.cas[r.PathValue("id")]
+		if !ok {
+			b.writeJSON(w, http.StatusNotFound, map[string]any{"message": "CA not found"})
+			return
+		}
+		var body struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			b.t.Fatal(err)
+		}
+		ca.Name, ca.Status = body.Name, body.Status
+		b.cas[ca.Id] = ca
 		b.writeJSON(w, http.StatusOK, ca)
 	})
 
@@ -544,6 +564,123 @@ func TestInternalCAValidateConfig(t *testing.T) {
 				t.Errorf("expected the error on %s, got %v", tc.errorPath, resp.Diagnostics)
 			}
 		})
+	}
+}
+
+// Builds the planned key source values the way the framework does: an omitted Computed attribute starts
+// unknown, then the schema's plan modifiers run against the prior state (null when Terraform plans a create,
+// including the create half of a replacement).
+func planInternalCAKeySource(t *testing.T, s schema.Schema, prior *certManagerInternalCAResourceModel, planned *certManagerInternalCAResourceModel) bool {
+	t.Helper()
+	ctx := context.Background()
+	state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(s.Type().TerraformType(ctx), nil)}
+	priorValues := certManagerInternalCAResourceModel{}
+	if prior != nil {
+		state = tfsdk.State{Schema: s, Raw: internalCAPlan(t, s, *prior).Raw}
+		priorValues = *prior
+	}
+	plan := internalCAPlan(t, s, *planned)
+
+	replace := false
+	for _, field := range []struct {
+		attribute string
+		prior     types.String
+		planned   *types.String
+	}{
+		{"key_source", priorValues.KeySource, &planned.KeySource},
+		{"hsm_connector_id", priorValues.HsmConnectorId, &planned.HsmConnectorId},
+		{"app_connection_id", priorValues.AppConnectionId, &planned.AppConnectionId},
+		{"region", priorValues.Region, &planned.Region},
+	} {
+		stringAttribute, ok := s.Attributes[field.attribute].(schema.StringAttribute)
+		if !ok {
+			t.Fatalf("%s is not a string attribute", field.attribute)
+		}
+		config := *field.planned
+		resp := planmodifier.StringResponse{PlanValue: config}
+		if config.IsNull() {
+			resp.PlanValue = types.StringUnknown()
+		}
+		for _, modifier := range stringAttribute.PlanModifiers {
+			modifier.PlanModifyString(ctx, planmodifier.StringRequest{
+				Path: path.Root(field.attribute), State: state, Plan: plan,
+				StateValue: field.prior, ConfigValue: config, PlanValue: resp.PlanValue,
+			}, &resp)
+		}
+		*field.planned = resp.PlanValue
+		replace = replace || resp.RequiresReplace
+	}
+	return replace
+}
+
+func TestInternalCAImportedHSMCAWithKeySourceOmitted(t *testing.T) {
+	ctx := context.Background()
+	s := internalCATestSchema(t)
+	backend := newFakeInternalCABackend(t)
+	r := newInternalCATestResource(t, backend)
+	backend.cas[testInternalCAID] = infisical.CertificateAuthority{
+		Id: testInternalCAID, Name: "root-ca", Status: "active", Type: "internal",
+		Configuration: infisical.CertificateAuthorityConfiguration{
+			Type: CA_TYPE_ROOT, CommonName: "Root CA", KeyAlgorithm: "EC_prime256v1",
+			KeySource: CA_KEY_SOURCE_HSM, HsmConnectorId: testHsmConnectorID,
+		},
+	}
+
+	emptyState := tfsdk.State{Schema: s, Raw: tftypes.NewValue(s.Type().TerraformType(ctx), nil)}
+	imported := resource.ImportStateResponse{State: emptyState}
+	r.ImportState(ctx, resource.ImportStateRequest{ID: testInternalCAID}, &imported)
+	if imported.Diagnostics.HasError() {
+		t.Fatal(imported.Diagnostics)
+	}
+	state := readInternalCA(t, r, imported.State).State
+	prior := internalCAStateModel(t, state)
+
+	omitted := func(name, keyAlgorithm string) certManagerInternalCAResourceModel {
+		return internalCAModel("", func(m *certManagerInternalCAResourceModel) {
+			m.Id = types.StringValue(testInternalCAID)
+			m.Name = types.StringValue(name)
+			m.KeyAlgorithm = types.StringValue(keyAlgorithm)
+			m.KeySource = types.StringNull()
+		})
+	}
+
+	renamed := omitted("renamed", "EC_prime256v1")
+	if planInternalCAKeySource(t, s, &prior, &renamed) {
+		t.Fatal("expected an ordinary update to keep the CA when key_source is omitted")
+	}
+	if renamed.KeySource.ValueString() != CA_KEY_SOURCE_HSM || renamed.HsmConnectorId.ValueString() != testHsmConnectorID {
+		t.Fatalf("expected the plan to keep the CA's key source, got %+v", renamed)
+	}
+	updated := resource.UpdateResponse{State: state}
+	r.Update(ctx, resource.UpdateRequest{Plan: internalCAPlan(t, s, renamed), State: state}, &updated)
+	if updated.Diagnostics.HasError() {
+		t.Fatal(updated.Diagnostics)
+	}
+	if backend.patches != 1 || backend.cas[testInternalCAID].Configuration.KeySource != CA_KEY_SOURCE_HSM {
+		t.Fatalf("expected an in-place update of the HSM CA, got %d patches and %+v", backend.patches, backend.cas[testInternalCAID])
+	}
+	if model := internalCAStateModel(t, updated.State); model.KeySource.ValueString() != CA_KEY_SOURCE_HSM || model.HsmConnectorId.ValueString() != testHsmConnectorID {
+		t.Errorf("expected state to keep the CA's key source, got %+v", model)
+	}
+
+	replacement := omitted("renamed", "RSA_2048")
+	planInternalCAKeySource(t, s, nil, &replacement)
+	if !replacement.KeySource.IsUnknown() || !replacement.HsmConnectorId.IsUnknown() {
+		t.Fatalf("expected the create half of the replacement to leave the key source to Infisical, got %+v", replacement)
+	}
+	delete(backend.cas, testInternalCAID)
+	created := createInternalCA(t, r, internalCAPlan(t, s, replacement))
+	if created.Diagnostics.HasError() {
+		t.Fatal(created.Diagnostics)
+	}
+	configuration := createdConfiguration(t, backend)
+	for _, key := range []string{"keySource", "hsmConnectorId"} {
+		if _, sent := configuration[key]; sent {
+			t.Errorf("expected %s to be left out of the replacement request, got %v", key, configuration[key])
+		}
+	}
+	if model := internalCAStateModel(t, created.State); model.KeySource.ValueString() != CA_KEY_SOURCE_INFISICAL || !model.HsmConnectorId.IsNull() {
+		t.Errorf("expected the replacement CA to use Infisical's default key source, got %+v", model)
 	}
 }
 
