@@ -3,8 +3,11 @@ package resource
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+
+	"github.com/hashicorp/go-uuid"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -32,7 +35,9 @@ var (
 )
 
 var (
-	_ resource.Resource = &certManagerInternalCAResource{}
+	_ resource.Resource                   = &certManagerInternalCAResource{}
+	_ resource.ResourceWithImportState    = &certManagerInternalCAResource{}
+	_ resource.ResourceWithValidateConfig = &certManagerInternalCAResource{}
 )
 
 func NewCertManagerInternalCAResource() resource.Resource {
@@ -55,6 +60,11 @@ type certManagerInternalCAResourceModel struct {
 	Locality     types.String `tfsdk:"locality"`
 	KeyAlgorithm types.String `tfsdk:"key_algorithm"`
 	Status       types.String `tfsdk:"status"`
+
+	KeySource       types.String `tfsdk:"key_source"`
+	HsmConnectorId  types.String `tfsdk:"hsm_connector_id"`
+	AppConnectionId types.String `tfsdk:"app_connection_id"`
+	Region          types.String `tfsdk:"region"`
 }
 
 func (r *certManagerInternalCAResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -152,6 +162,7 @@ func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.Sch
 			},
 		},
 	}
+	maps.Copy(resp.Schema.Attributes, certManagerInternalCAKeySourceAttributes())
 }
 
 func (r *certManagerInternalCAResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -208,19 +219,22 @@ func (r *certManagerInternalCAResource) Create(ctx context.Context, req resource
 		return
 	}
 
+	configuration := infisical.CertificateAuthorityConfiguration{
+		Type:         plan.Type.ValueString(),
+		CommonName:   plan.CommonName.ValueString(),
+		Organization: plan.Organization.ValueString(),
+		OU:           plan.OU.ValueString(),
+		Country:      plan.Country.ValueString(),
+		Province:     plan.Province.ValueString(),
+		Locality:     plan.Locality.ValueString(),
+		KeyAlgorithm: plan.KeyAlgorithm.ValueString(),
+	}
+	certManagerInternalCAKeySourceConfiguration(plan, &configuration)
+
 	newCA, err := r.client.CreateInternalCA(infisical.CreateInternalCARequest{
-		Name:   plan.Name.ValueString(),
-		Status: plan.Status.ValueString(),
-		Configuration: infisical.CertificateAuthorityConfiguration{
-			Type:         plan.Type.ValueString(),
-			CommonName:   plan.CommonName.ValueString(),
-			Organization: plan.Organization.ValueString(),
-			OU:           plan.OU.ValueString(),
-			Country:      plan.Country.ValueString(),
-			Province:     plan.Province.ValueString(),
-			Locality:     plan.Locality.ValueString(),
-			KeyAlgorithm: plan.KeyAlgorithm.ValueString(),
-		},
+		Name:          plan.Name.ValueString(),
+		Status:        plan.Status.ValueString(),
+		Configuration: configuration,
 	})
 
 	if err != nil {
@@ -228,6 +242,10 @@ func (r *certManagerInternalCAResource) Create(ctx context.Context, req resource
 			"Error creating CA",
 			"Couldn't create CA in Infisical, unexpected error: "+err.Error(),
 		)
+		return
+	}
+
+	if !r.confirmCreatedKeySource(ctx, &plan, newCA, resp) {
 		return
 	}
 
@@ -258,6 +276,11 @@ func (r *certManagerInternalCAResource) Read(ctx context.Context, req resource.R
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.Id.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -309,6 +332,7 @@ func (r *certManagerInternalCAResource) Read(ctx context.Context, req resource.R
 	if ca.Configuration.KeyAlgorithm != "" {
 		state.KeyAlgorithm = types.StringValue(ca.Configuration.KeyAlgorithm)
 	}
+	certManagerInternalCAKeySourceFromAPI(ca.Configuration, &state)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -410,7 +434,7 @@ func (r *certManagerInternalCAResource) Delete(ctx context.Context, req resource
 		CAId: state.Id.ValueString(),
 	})
 
-	if err != nil {
+	if err != nil && err != infisical.ErrNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting CA",
 			"Couldn't delete CA from Infisical, unexpected error: "+err.Error(),
@@ -420,5 +444,12 @@ func (r *certManagerInternalCAResource) Delete(ctx context.Context, req resource
 }
 
 func (r *certManagerInternalCAResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.ParseUUID(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected the ID of an internal certificate authority, such as 3f091b42-1661-41a1-b647-98c6a45af047, got: %q", req.ID),
+		)
+		return
+	}
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
