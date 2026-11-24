@@ -17,7 +17,6 @@ provider "infisical" {
   }
 }
 
-# Import the secrets of /shared in dev into /app in prod of the same project.
 resource "infisical_secret_import" "same-project" {
   project_id              = "<your-infisical-project-id>"
   environment_slug        = "prod"
@@ -27,9 +26,7 @@ resource "infisical_secret_import" "same-project" {
   is_replication          = false
 }
 
-# Import the secrets of /database in prod of another project.
-# The organization must have cross-project secret sharing turned on, and the
-# source project needs a project grant that shares prod:/database with this project.
+# Needs cross-project secret sharing and a project grant in the source project.
 resource "infisical_secret_import" "cross-project" {
   project_id              = "<your-infisical-project-id>"
   environment_slug        = "prod"

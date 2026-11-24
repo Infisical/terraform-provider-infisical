@@ -86,7 +86,7 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"import_project_id": schema.StringAttribute{
-				Description:   "The ID of the project to import secrets from, for a cross-project import. Omit it to import from `project_id`. The organization must have cross-project secret sharing turned on, and the source project needs a project grant that shares `import_environment_slug` and `import_folder_path` with `project_id`. A cross-project import can't use replication, so `is_replication` must be `false`. Requires Infisical v0.161.12 or later.",
+				Description:   "The ID of the project to import secrets from. Omit it to import from `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.161.12 or later.",
 				Optional:      true,
 				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -100,9 +100,7 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 	}
 }
 
-// ValidateConfig rejects replication for a cross-project import, which createImport in Infisical core
-// (secret-import-service.ts) refuses with a 400. Without this check the error comes only at apply, and a
-// change that forces replacement would delete the working import before the create fails.
+// ValidateConfig catches cross-project replication at plan time, before a replacement deletes the existing import.
 func (r *projectSecretImportResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config projectSecretImportResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
@@ -110,7 +108,6 @@ func (r *projectSecretImportResource) ValidateConfig(ctx context.Context, req re
 		return
 	}
 
-	// Core treats an import whose source project is the destination project as a same-project import.
 	if !config.ProjectID.IsUnknown() && config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
 		return
 	}
@@ -118,7 +115,7 @@ func (r *projectSecretImportResource) ValidateConfig(ctx context.Context, req re
 	resp.Diagnostics.AddAttributeError(
 		path.Root("is_replication"),
 		"Invalid is_replication",
-		"Infisical doesn't support replication for cross-project imports. Set is_replication to false, or remove import_project_id to import from project_id.",
+		"Infisical doesn't support replication for cross-project imports. Set is_replication to false, or remove import_project_id.",
 	)
 }
 
@@ -173,14 +170,6 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 	})
 
 	if err != nil {
-		if !plan.ImportProjectID.IsNull() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("import_project_id"),
-				"Error creating cross-project secret import",
-				crossProjectImportErrorDetail(plan, err),
-			)
-			return
-		}
 		resp.Diagnostics.AddError(
 			"Error creating project secret import",
 			"Couldn't save import to Infisical, unexpected error: "+err.Error(),
@@ -220,8 +209,7 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Unlike the list routes, the get by ID route returns a cross-project import whatever the organization's
-	// cross-project setting, so a 404 means the import is gone. The v1 route is also on older self-hosted servers.
+	// The list routes hide cross-project imports while cross-project sharing is turned off, so read by ID.
 	secretImport, err := r.client.GetSecretImportByID(infisical.GetSecretImportByIDRequest{
 		ID: state.ID.ValueString(),
 	})
@@ -237,11 +225,9 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// The get by ID routes leave out the source project, so a cross-project import also needs the v2 list.
-	// While the organization has cross-project secret sharing turned off, the list leaves out cross-project
-	// imports. The import still exists then, so keep the source project from state.
+	// The by-ID route leaves out the source project. If the list hides the import, keep the value in state.
 	if !state.ImportProjectID.IsNull() {
-		withSource, err := r.client.GetSecretImportWithSourceProject(infisical.GetSecretImportRequest{
+		withSource, err := r.client.GetSecretImport(infisical.GetSecretImportRequest{
 			ID:          secretImport.SecretImport.ID,
 			ProjectID:   secretImport.SecretImport.ProjectID,
 			Environment: secretImport.SecretImport.Environment.Slug,
@@ -250,9 +236,7 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		switch {
 		case err == nil:
 			state.ImportProjectID = importProjectIDFromAPI(state.ImportProjectID, secretImport.SecretImport.ProjectID, withSource.SecretImport.ImportEnvironment.ProjectID)
-		case errors.As(err, &notFoundErr):
-			// Hidden by the organization's setting, not gone.
-		default:
+		case !errors.As(err, &notFoundErr):
 			resp.Diagnostics.AddError(
 				"Error reading secret import",
 				"Couldn't read the source project of the secret import from Infisical, unexpected error: "+err.Error(),
@@ -380,9 +364,9 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_environment_slug"), secretImport.SecretImport.ImportEnvironment.Slug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("is_replication"), secretImport.SecretImport.IsReplication)...)
 
-	// The get by ID route leaves out the source project, so look the import up in the v2 list.
+	// The by-ID route leaves out the source project.
 	importProjectID := types.StringNull()
-	withSource, err := r.client.GetSecretImportWithSourceProject(infisical.GetSecretImportRequest{
+	withSource, err := r.client.GetSecretImport(infisical.GetSecretImportRequest{
 		ID:          secretImport.SecretImport.ID,
 		ProjectID:   secretImport.SecretImport.ProjectID,
 		Environment: secretImport.SecretImport.Environment.Slug,
@@ -395,8 +379,6 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 	case errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound:
 		// Servers without the v2 list route predate cross-project imports.
 	case errors.As(err, &notFoundErr):
-		// The list leaves out cross-project imports while the organization has cross-project secret sharing
-		// turned off. Importing with a null import_project_id would make the next plan replace the import.
 		resp.Diagnostics.AddError(
 			"Error fetching secret import",
 			fmt.Sprintf("Couldn't read the source project of secret import %q. Infisical lists cross-project imports only while "+
@@ -414,36 +396,10 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_project_id"), importProjectID)...)
 }
 
-// importProjectIDFromAPI maps importEnv.projectId to import_project_id. The API returns a source project
-// for every import, so a same-project import keeps a null attribute null. Routes and servers that leave
-// importEnv.projectId out keep the current value.
+// importProjectIDFromAPI keeps import_project_id null for a same-project import, and keeps the current value when the API leaves it out.
 func importProjectIDFromAPI(current types.String, projectID, apiSourceProjectID string) types.String {
 	if apiSourceProjectID == "" || (current.IsNull() && apiSourceProjectID == projectID) {
 		return current
 	}
 	return types.StringValue(apiSourceProjectID)
-}
-
-func crossProjectImportErrorDetail(plan projectSecretImportResourceModel, err error) string {
-	sourceProjectID := plan.ImportProjectID.ValueString()
-	projectID := plan.ProjectID.ValueString()
-
-	hint := ""
-	switch {
-	case errors.Is(err, infisical.ErrCrossProjectSharingDisabled):
-		hint = "Cross-project secret sharing is turned off for this organization, or its plan does not include it. " +
-			"An organization admin can turn on \"Cross-project secret sharing\" under Secrets Management > Product Settings.\n\n"
-	case errors.Is(err, infisical.ErrCrossProjectGrantMissing):
-		hint = fmt.Sprintf("Project %q has no project grant that shares this environment and folder with project %q. "+
-			"In project %q, add one under Project Settings > Policies > Cross-Project Secret Sharing.\n\n", sourceProjectID, projectID, sourceProjectID)
-	}
-
-	return fmt.Sprintf(
-		"Couldn't import secrets from project %q (environment %q, folder %q) into project %q (environment %q, folder %q).\n\n"+
-			"%sSee https://infisical.com/docs/documentation/platform/secret-reference#cross-project-secret-sharing\n\n"+
-			"Infisical returned: %s",
-		sourceProjectID, plan.ImportEnvSlug.ValueString(), plan.ImportPath.ValueString(),
-		projectID, plan.EnvironmentSlug.ValueString(), plan.SecretPath.ValueString(),
-		hint, err.Error(),
-	)
 }

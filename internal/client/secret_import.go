@@ -1,30 +1,20 @@
 package infisicalclient
 
 import (
-	"fmt"
 	"net/http"
 	"terraform-provider-infisical/internal/errors"
 )
 
 const (
-	operationGetSecretImportWithSourceProject = "CallGetSecretImportWithSourceProject"
-	operationGetSecretImportByID              = "CallGetSecretImportByID"
-	operationGetSecretImportList              = "CallGetSecretImportList"
-	operationCreateSecretImport               = "CallCreateSecretImport"
-	operationUpdateSecretImport               = "CallUpdateSecretImport"
-	operationDeleteSecretImport               = "CallDeleteSecretImport"
+	operationGetSecretImport     = "CallGetSecretImport"
+	operationGetSecretImportByID = "CallGetSecretImportByID"
+	operationGetSecretImportList = "CallGetSecretImportList"
+	operationCreateSecretImport  = "CallCreateSecretImport"
+	operationUpdateSecretImport  = "CallUpdateSecretImport"
+	operationDeleteSecretImport  = "CallDeleteSecretImport"
 )
 
-// The 403 messages that createImport in Infisical core (secret-import-service.ts) returns for a
-// cross-project import. Both are 403 ForbiddenError, like a missing permission, so only the message
-// tells them apart.
-const (
-	crossProjectSharingDisabledMessage = "Cross-project secret sharing is not enabled for this organization"
-	crossProjectGrantMissingMessage    = "No project grant found allowing this cross-project import"
-)
-
-// CreateSecretImportRequest with the v2 field names: v2 names the destination project projectId,
-// where v1 names it workspaceId.
+// v2 names the destination project projectId instead of workspaceId.
 type createSecretImportV2Request struct {
 	ProjectID     string             `json:"projectId"`
 	Environment   string             `json:"environment"`
@@ -44,32 +34,30 @@ func findSecretImportByID(secretImports []SecretImport, id string) (GetSecretImp
 	return GetSecretImportResponse{}, NewNotFoundError("SecretImport", id)
 }
 
-// GetSecretImportWithSourceProject reads an import through the v2 list route, the only route that
-// returns its source project (importEnv.projectId). The v1 routes, and the v2 create and get by ID
-// routes, leave it out. While the organization has cross-project secret sharing turned off, the list
-// leaves out cross-project imports (getImports in secret-import-service.ts), so a NotFoundError from
-// this function does not mean the import is gone. Use GetSecretImportByID for that.
-func (client Client) GetSecretImportWithSourceProject(request GetSecretImportRequest) (GetSecretImportResponse, error) {
+// GetSecretImport uses the v2 list, the only route that returns the source project (importEnv.projectId).
+func (client Client) GetSecretImport(request GetSecretImportRequest) (GetSecretImportResponse, error) {
 	var body ListSecretImportResponse
 
-	response, err := client.Config.HttpClient.
+	httpRequest := client.Config.HttpClient.
 		R().
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetQueryParam("projectId", request.ProjectID).
 		SetQueryParam("environment", request.Environment).
-		SetQueryParam("path", request.SecretPath).
-		Get("api/v2/secret-imports")
+		SetQueryParam("path", request.SecretPath)
+
+	response, err := httpRequest.Get("api/v2/secret-imports")
 
 	if err != nil {
-		return GetSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImportWithSourceProject, err)
+		return GetSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImport, err)
 	}
 
 	if response.IsError() {
-		return GetSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImportWithSourceProject, response, nil)
+		return GetSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImport, response, nil)
 	}
 
 	return findSecretImportByID(body.SecretImports, request.ID)
+
 }
 
 func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (GetSecretImportByIDResponse, error) {
@@ -123,7 +111,7 @@ func (client Client) GetSecretImportList(request ListSecretImportRequest) (ListS
 func (client Client) CreateSecretImport(request CreateSecretImportRequest) (CreateSecretImportResponse, error) {
 	url, payload := "api/v1/secret-imports", any(request)
 	if request.ImportFrom.SourceProjectID != "" {
-		// v1 drops import.sourceProjectId without an error and would create a same-project import.
+		// v1 ignores sourceProjectId and would create a same-project import.
 		url = "api/v2/secret-imports"
 		payload = createSecretImportV2Request(request)
 	}
@@ -141,16 +129,7 @@ func (client Client) CreateSecretImport(request CreateSecretImportRequest) (Crea
 	}
 
 	if response.IsError() {
-		apiError := errors.NewAPIErrorWithResponse(operationCreateSecretImport, response, nil)
-		if apiErr, ok := apiError.(*errors.APIError); ok && apiErr.StatusCode == http.StatusForbidden {
-			switch apiErr.ErrorMessage {
-			case crossProjectSharingDisabledMessage:
-				return CreateSecretImportResponse{}, fmt.Errorf("%w: %w", ErrCrossProjectSharingDisabled, apiError)
-			case crossProjectGrantMissingMessage:
-				return CreateSecretImportResponse{}, fmt.Errorf("%w: %w", ErrCrossProjectGrantMissing, apiError)
-			}
-		}
-		return CreateSecretImportResponse{}, apiError
+		return CreateSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationCreateSecretImport, response, nil)
 	}
 
 	return body, nil
@@ -180,9 +159,6 @@ func (client Client) UpdateSecretImport(request UpdateSecretImportRequest) (Upda
 	return body, nil
 }
 
-// DeleteSecretImport also deletes cross-project imports. The v1 and v2 routes both call deleteImport in
-// Infisical core (secret-import-service.ts), which finds the import in the destination folder and checks
-// neither the source project nor the organization's cross-project setting.
 func (client Client) DeleteSecretImport(request DeleteSecretImportRequest) (DeleteSecretImportResponse, error) {
 	var body DeleteSecretImportResponse
 	response, err := client.Config.HttpClient.

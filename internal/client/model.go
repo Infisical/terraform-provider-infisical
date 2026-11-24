@@ -382,7 +382,6 @@ type SecretImport struct {
 	ImportPath string `json:"importPath"`
 
 	ImportEnvironment struct {
-		// The source project. Only the v2 list route returns it.
 		ProjectID string `json:"projectId"`
 	} `json:"importEnv"`
 }
@@ -2488,7 +2487,6 @@ type CreateSecretImportRequest struct {
 }
 
 type SecretImportSource struct {
-	// Empty for an import from the same project. Only the v2 create route accepts it.
 	SourceProjectID string `json:"sourceProjectId,omitempty"`
 	Environment     string `json:"environment"`
 	SecretPath      string `json:"path"`
