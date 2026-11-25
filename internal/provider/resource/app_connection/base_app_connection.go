@@ -324,6 +324,14 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 		return
 	}
 
+	// A replacement creates a new connection, which takes the configured credentials. A value
+	// known only at apply is checked by Update instead.
+	replacing, diags := planReplacesConnection(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() || replacing || hasUnknownAttribute(planned) {
+		return
+	}
+
 	// A failed read here is not worth failing the plan over: Update reads the connection again.
 	managed, err := r.credentialsManagedByInfisicalForID(id.ValueString())
 	if err != nil || !managed {
@@ -342,8 +350,43 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 	resp.Diagnostics.AddAttributeError(
 		path.Root("credentials"),
 		"Credentials managed by Infisical",
-		fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. Keep the configured credentials as they are. To change them, change them in Infisical or replace the connection.", r.AppConnectionName),
+		credentialsManagedErrorDetail(r.AppConnectionName),
 	)
+}
+
+func credentialsManagedErrorDetail(appConnectionName string) string {
+	return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. Keep the configured credentials as they are. To change them, change them in Infisical or replace the connection.", appConnectionName)
+}
+
+// planReplacesConnection reports whether the plan replaces the connection: method and project_id
+// use RequiresReplace, and an unknown value there replaces it too. The framework doesn't pass
+// attribute-level replacements to ModifyPlan, so they are compared here.
+func planReplacesConnection(ctx context.Context, req resource.ModifyPlanRequest) (bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	for _, attribute := range []string{"method", "project_id"} {
+		var planned, current types.String
+		diags.Append(req.Plan.GetAttribute(ctx, path.Root(attribute), &planned)...)
+		diags.Append(req.State.GetAttribute(ctx, path.Root(attribute), &current)...)
+		if diags.HasError() {
+			return false, diags
+		}
+		if planned.IsUnknown() || !planned.Equal(current) {
+			return true, diags
+		}
+	}
+	return false, diags
+}
+
+func hasUnknownAttribute(object types.Object) bool {
+	if object.IsUnknown() {
+		return true
+	}
+	for _, value := range object.Attributes() {
+		if value.IsUnknown() {
+			return true
+		}
+	}
+	return false
 }
 
 // credentialsUnset reports whether state holds no credentials: none after an import, or all
@@ -586,6 +629,16 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		resp.Diagnostics.AddError(
 			"Error updating app connection",
 			"Couldn't read app connection before updating it, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// ModifyPlan refuses this when it can; a credential known only at apply reaches here.
+	if managed && !credentialsUnset(state.Credentials) && !plan.Credentials.Equal(state.Credentials) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("credentials"),
+			"Credentials managed by Infisical",
+			credentialsManagedErrorDetail(r.AppConnectionName),
 		)
 		return
 	}

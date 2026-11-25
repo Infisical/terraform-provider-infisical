@@ -189,3 +189,87 @@ func TestManagedCredentialsChangeIsRefusedAtPlan(t *testing.T) {
 		t.Errorf("a host change on a connection whose credentials Infisical manages must fail at plan, got %v", resp.Diagnostics)
 	}
 }
+
+// managedStateWithCredentials returns the state of an imported platform-managed connection after
+// the first apply recorded its configured credentials.
+func managedStateWithCredentials(t *testing.T) (*AppConnectionBaseResource, *fakeADCSConnectionBackend, tfsdk.State) {
+	t.Helper()
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	backend := newFakeADCSConnectionBackend(t)
+	r := newADCSTestResource(t, backend)
+	seedManagedConnection(backend, map[string]any{"isPlatformManagedCredentials": true})
+	imported := importAndRead(t, r)
+
+	updateResp := resource.UpdateResponse{State: imported}
+	r.Update(ctx, resource.UpdateRequest{Plan: adcsPlan(t, s, types.StringValue(testADCSConnectionID), testADCSFirstPassword), State: imported}, &updateResp)
+	if updateResp.Diagnostics.HasError() {
+		t.Fatal(updateResp.Diagnostics)
+	}
+	return r, backend, updateResp.State
+}
+
+func modelWithCredentials(t *testing.T, state tfsdk.State, host string, password attr.Value) appConnectionGatewayResourceModel {
+	t.Helper()
+	model := adcsModel(t, state)
+	credentials, diags := types.ObjectValue(adcsCredentialsAttrTypes, map[string]attr.Value{
+		"host":     types.StringValue(host),
+		"username": types.StringValue(`CORP\svc-infisical`),
+		"password": password,
+	})
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	model.Credentials = credentials
+	return model
+}
+
+func modifyPlan(t *testing.T, r *AppConnectionBaseResource, state tfsdk.State, model appConnectionGatewayResourceModel) resource.ModifyPlanResponse {
+	t.Helper()
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	plan := tfsdk.Plan{Schema: s}
+	if diags := plan.Set(ctx, model); diags.HasError() {
+		t.Fatal(diags)
+	}
+	resp := resource.ModifyPlanResponse{Plan: plan}
+	r.ModifyPlan(ctx, resource.ModifyPlanRequest{Plan: plan, State: state, Config: tfsdk.Config{Schema: s, Raw: plan.Raw}}, &resp)
+	return resp
+}
+
+// A replacement creates a new connection with the configured credentials, so it is not refused.
+func TestManagedCredentialsReplacementIsNotRefused(t *testing.T) {
+	r, _, state := managedStateWithCredentials(t)
+	model := modelWithCredentials(t, state, "ca02.corp.example.com", types.StringValue(testADCSSecondPassword))
+	model.ProjectId = types.StringValue("project-2")
+	if resp := modifyPlan(t, r, state, model); resp.Diagnostics.HasError() {
+		t.Errorf("a plan that replaces the connection must not be refused, got %v", resp.Diagnostics)
+	}
+}
+
+// A credential known only at apply can't be compared at plan, so Update refuses the change.
+func TestManagedCredentialsUnknownAtPlanIsRefusedAtApply(t *testing.T) {
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	r, backend, state := managedStateWithCredentials(t)
+
+	unknown := modelWithCredentials(t, state, "ca01.corp.example.com", types.StringUnknown())
+	if resp := modifyPlan(t, r, state, unknown); resp.Diagnostics.HasError() {
+		t.Errorf("a credential unknown at plan must not fail the plan, got %v", resp.Diagnostics)
+	}
+
+	resolved := modelWithCredentials(t, state, "ca01.corp.example.com", types.StringValue(testADCSSecondPassword))
+	plan := tfsdk.Plan{Schema: s}
+	if diags := plan.Set(ctx, resolved); diags.HasError() {
+		t.Fatal(diags)
+	}
+	requestsBefore := backend.requests
+	updateResp := resource.UpdateResponse{State: state}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: state}, &updateResp)
+	if !updateResp.Diagnostics.HasError() {
+		t.Error("a credential change on a managed connection must fail at apply when the plan couldn't refuse it")
+	}
+	if backend.requests != requestsBefore+1 {
+		t.Errorf("only the read before the update may reach the API, got %d requests", backend.requests-requestsBefore)
+	}
+}
