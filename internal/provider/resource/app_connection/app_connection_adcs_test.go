@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -476,5 +477,20 @@ func TestAppConnectionImportOnVariantWithoutGateway(t *testing.T) {
 	if model.Name.ValueString() != "render-connection" || model.Method.ValueString() != "api-key" ||
 		model.Description.ValueString() != "Deploys" || model.ProjectId.ValueString() != "project-1" {
 		t.Errorf("import did not fill state from the API: %+v", model)
+	}
+}
+
+// The API trims each credential and then requires at least one character, so whitespace alone must
+// fail at plan.
+func TestADCSCredentialsRejectWhitespaceOnly(t *testing.T) {
+	ctx := context.Background()
+	for value, wantError := range map[string]bool{"   ": true, "": true, " ca01.corp.example.com ": false} {
+		resp := validator.StringResponse{}
+		for _, v := range adcsCredentialLengthValidators() {
+			v.ValidateString(ctx, validator.StringRequest{ConfigValue: types.StringValue(value)}, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantError {
+			t.Errorf("credential %q: error = %v, want %v", value, resp.Diagnostics.HasError(), wantError)
+		}
 	}
 }

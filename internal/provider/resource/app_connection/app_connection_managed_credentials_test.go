@@ -402,9 +402,10 @@ func TestCredentialValueMatchesInt32(t *testing.T) {
 	}
 }
 
-// With rotation on, a change to a non-secret field alone would send the configured password,
-// which Infisical may have rotated, so it is refused at plan and at apply.
-func TestRotatingConnectionRefusesChangeWithoutPassword(t *testing.T) {
+// With rotation on, a change to a non-secret field alone sends the configured password with it.
+// The plan can't tell whether Infisical rotated it since, so it warns and the change is sent for
+// the API to decide.
+func TestRotatingConnectionWarnsWhenChangeSendsUnchangedPassword(t *testing.T) {
 	ctx := context.Background()
 	s := adcsTestSchema(t)
 	backend := newFakeADCSConnectionBackend(t)
@@ -418,22 +419,22 @@ func TestRotatingConnectionRefusesChangeWithoutPassword(t *testing.T) {
 	}
 
 	hostOnly := modelWithCredentials(t, first.State, "ca02.corp.example.com", types.StringValue(testADCSFirstPassword))
-	if resp := modifyPlan(t, r, first.State, hostOnly); !resp.Diagnostics.HasError() {
-		t.Errorf("a host change without a new password must fail the plan, got %v", resp.Diagnostics)
+	if resp := modifyPlan(t, r, first.State, hostOnly); resp.Diagnostics.HasError() || resp.Diagnostics.WarningsCount() != 1 {
+		t.Errorf("a host change without a new password must plan with one warning, got %v", resp.Diagnostics)
 	}
 
 	plan := tfsdk.Plan{Schema: s}
 	if diags := plan.Set(ctx, hostOnly); diags.HasError() {
 		t.Fatal(diags)
 	}
-	requestsBefore := backend.requests
 	updateResp := resource.UpdateResponse{State: first.State}
 	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: first.State}, &updateResp)
-	if !updateResp.Diagnostics.HasError() {
-		t.Error("a host change without a new password must fail at apply too")
+	if updateResp.Diagnostics.HasError() {
+		t.Fatalf("the change must be sent for the API to decide, got %v", updateResp.Diagnostics)
 	}
-	if backend.requests != requestsBefore+1 {
-		t.Errorf("only the read before the update may reach the API, got %d requests", backend.requests-requestsBefore)
+	credentials, _ := backend.lastBody["credentials"].(map[string]any)
+	if credentials["host"] != "ca02.corp.example.com" || credentials["password"] != testADCSFirstPassword {
+		t.Errorf("the host change must be sent with the configured password, got body %v", backend.lastBody)
 	}
 }
 
@@ -558,13 +559,13 @@ func TestRotatingAzureClientIDIsNotASecret(t *testing.T) {
 	clientIDOnly := credentialsObject(t, r, map[string]attr.Value{
 		"client_id": types.StringValue("client-b"), "tenant_id": types.StringValue("tenant"), "client_secret": types.StringValue("secret-a"),
 	})
-	if !r.needsCurrentPassword(connection, clientIDOnly, current) {
-		t.Error("changing client_id alone must need the current client secret")
+	if !r.sendsUnchangedPassword(connection, clientIDOnly, current) {
+		t.Error("changing client_id alone must count as sending the unchanged client secret")
 	}
 	withSecret := credentialsObject(t, r, map[string]attr.Value{
 		"client_id": types.StringValue("client-b"), "tenant_id": types.StringValue("tenant"), "client_secret": types.StringValue("secret-b"),
 	})
-	if r.needsCurrentPassword(connection, withSecret, current) {
+	if r.sendsUnchangedPassword(connection, withSecret, current) {
 		t.Error("a change that sets the client secret is the user's own and must be sent")
 	}
 }

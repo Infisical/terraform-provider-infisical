@@ -420,8 +420,8 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 	if err != nil {
 		return
 	}
-	if r.needsCurrentPassword(appConnection, planned, current) {
-		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", rotationNeedsPasswordDetail(r.AppConnectionName))
+	if r.sendsUnchangedPassword(appConnection, planned, current) {
+		resp.Diagnostics.AddAttributeWarning(path.Root("credentials"), "Credentials managed by Infisical", rotationSendsPasswordDetail(r.AppConnectionName))
 		return
 	}
 	if !recordsCredentialsWithoutSending(appConnection, current) {
@@ -451,13 +451,13 @@ func recordsCredentialsWithoutSending(appConnection infisical.AppConnection, sta
 	return appConnection.IsAutoRotationEnabled && credentialsUnset(stateCredentials)
 }
 
-// needsCurrentPassword reports whether a credentials change on a connection with rotation on would
-// send a password Terraform can't vouch for. The API takes the credentials as one object, so a
-// change to a setting such as a certificate sends the configured password too, and Infisical may
-// have rotated it since. A change that sets a secret field is the user's own, and is sent. A secret
-// field is one marked sensitive that Infisical doesn't return: Azure marks client_id sensitive, but
-// GET returns it, and Infisical rotates only the client secret.
-func (r *AppConnectionBaseResource) needsCurrentPassword(appConnection infisical.AppConnection, planned, current types.Object) bool {
+// sendsUnchangedPassword reports whether a credentials change on a connection with rotation on sends
+// a password the change doesn't set. The API takes the credentials as one object, so a change to a
+// setting such as a certificate sends the configured password too. Infisical may have rotated it
+// since, and only the API can tell, since GET never returns it, so the plan warns and the API
+// decides. A secret field is one marked sensitive that Infisical doesn't return: Azure marks
+// client_id sensitive, but GET returns it, and Infisical rotates only the client secret.
+func (r *AppConnectionBaseResource) sendsUnchangedPassword(appConnection infisical.AppConnection, planned, current types.Object) bool {
 	if !appConnection.IsAutoRotationEnabled || credentialsUnset(current) || planned.Equal(current) {
 		return false
 	}
@@ -480,8 +480,8 @@ func (r *AppConnectionBaseResource) credentialsAPIKey(name string) string {
 	return snakeToCamel(name)
 }
 
-func rotationNeedsPasswordDetail(appConnectionName string) string {
-	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection. Changing them sends the password too, and the configured one may no longer be current. Set the current password in the configuration along with this change.", appConnectionName)
+func rotationSendsPasswordDetail(appConnectionName string) string {
+	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection. This change sends the configured password with it, and if Infisical has rotated the password since it was set, Infisical rejects the change at apply. In that case, set the current password in the configuration along with this change.", appConnectionName)
 }
 
 func credentialsManager(appConnection infisical.AppConnection) string {
@@ -771,10 +771,6 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		(current.IsAutoRotationEnabled && plan.Credentials.Equal(state.Credentials))
 
 	// ModifyPlan refuses these when it can; a credential known only at apply reaches here.
-	if r.needsCurrentPassword(current, plan.Credentials, state.Credentials) {
-		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", rotationNeedsPasswordDetail(r.AppConnectionName))
-		return
-	}
 	if recordsCredentialsWithoutSending(current, state.Credentials) {
 		if differing := r.credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
 			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, current, differing))

@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"regexp"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -22,9 +23,13 @@ type AppConnectionADCSCredentialsModel struct {
 
 const ADCSAppConnectionUsernamePasswordMethod = "username-password"
 
-// Mirrors the 1 to 255 character limit that the API puts on each credential field.
+// Mirrors the API, which trims each credential field and then requires 1 to 255 characters, so a
+// value of only whitespace fails at plan instead of at apply.
 func adcsCredentialLengthValidators() []validator.String {
-	return []validator.String{stringvalidator.LengthBetween(1, 255)}
+	return []validator.String{
+		stringvalidator.LengthBetween(1, 255),
+		stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must contain a character other than whitespace"),
+	}
 }
 
 func buildADCSCredentials(credentials AppConnectionADCSCredentialsModel, method string, errorSummary string) (map[string]any, diag.Diagnostics) {
