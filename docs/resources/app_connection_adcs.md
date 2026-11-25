@@ -32,22 +32,17 @@ provider "infisical" {
   }
 }
 
-variable "adcs_password" {
-  type      = string
-  sensitive = true
-}
-
-resource "infisical_app_connection_adcs" "adcs" {
+resource "infisical_app_connection_adcs" "app-connection-adcs" {
   name   = "adcs-app-connection"
   method = "username-password"
   credentials = {
     host     = "ca01.corp.example.com"
     username = "CORP\\svc-infisical"
-    password = var.adcs_password
+    password = "<password>"
   }
-  # project_id = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
+  # project_id   = "<project-id>" # Optional, only required if you want to scope the app connection to a specific project
   gateway_id  = "<gateway-id>" # Required, Microsoft ADCS connections reach the AD CS server through a gateway
-  description = "Enrolls certificates from the corporate AD CS server"
+  description = "I am a test app connection"
 }
 ```
 
@@ -85,7 +80,7 @@ Required:
 Import is supported using the following syntax:
 
 ```shell
-# Import a Microsoft ADCS app connection by its ID.
-# The API never returns the password, so the first apply after an import sends the configured credentials again.
-terraform import infisical_app_connection_adcs.adcs <app-connection-id>
+# This will import the Microsoft ADCS app connection by its ID.
+# Secrets are never read back, so the first apply after importing sends the credentials in the configuration.
+terraform import infisical_app_connection_adcs.example <app_connection_id>
 ```

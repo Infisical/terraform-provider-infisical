@@ -16,29 +16,19 @@ Create and manage external Microsoft ADCS (Active Directory Certificate Services
 terraform {
   required_providers {
     infisical = {
-      # version = <latest version>
       source = "infisical/infisical"
     }
   }
 }
 
 provider "infisical" {
-  host = "https://app.infisical.com" # Only required if using self hosted instance of Infisical, default is https://app.infisical.com
-  auth = {
-    universal = {
-      client_id     = "<machine-identity-client-id>"
-      client_secret = "<machine-identity-client-secret>"
-    }
-  }
-}
-
-variable "adcs_password" {
-  type      = string
-  sensitive = true
+  host          = "https://app.infisical.com"
+  client_id     = var.client_id
+  client_secret = var.client_secret
 }
 
 resource "infisical_app_connection_adcs" "adcs" {
-  name   = "adcs-app-connection"
+  name   = "adcs-connection"
   method = "username-password"
   credentials = {
     host     = "ca01.corp.example.com"
@@ -79,6 +69,6 @@ resource "infisical_cert_manager_external_ca_microsoft_adcs" "adcs" {
 Import is supported using the following syntax:
 
 ```shell
-# Import a Microsoft ADCS CA by its ID
-terraform import infisical_cert_manager_external_ca_microsoft_adcs.adcs <ca-id>
+# This will import the external Microsoft ADCS CA by its ID
+terraform import infisical_cert_manager_external_ca_microsoft_adcs.example <ca_id>
 ```
