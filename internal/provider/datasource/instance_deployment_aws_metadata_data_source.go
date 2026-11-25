@@ -38,7 +38,7 @@ func (d *InstanceDeploymentAwsMetadataDataSource) Schema(ctx context.Context, re
 		Description: "Read details about the AWS account the Infisical instance runs as, such as the account ID to trust in an IAM role's trust policy. Only Machine Identity authentication is supported for this data source.",
 		Attributes: map[string]schema.Attribute{
 			"account_id": schema.StringAttribute{
-				Description: "The AWS account ID Infisical acts as when it assumes an IAM role in your AWS account, for example for an AWS App Connection. Name this account as the trusted principal in the role's trust policy. Null when the instance has no AWS identity.",
+				Description: "The AWS account ID Infisical acts as when it assumes an IAM role in your AWS account, for example for an AWS App Connection. Name this account as the trusted principal in the role's trust policy. Null when the instance has no AWS identity. If Infisical can't reach AWS to find out, the read fails instead of returning null.",
 				Computed:    true,
 			},
 		},

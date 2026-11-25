@@ -126,6 +126,23 @@ func TestInstanceDeploymentAwsMetadataDataSourceLeavesStateUnsetOnAPIError(t *te
 	}
 }
 
+// Infisical answers 504 when it can't reach AWS STS. The read must fail rather than store a null
+// account ID, which a config could act on (for example by dropping a trust policy).
+func TestInstanceDeploymentAwsMetadataDataSourceFailsWhenInfisicalCannotReachAws(t *testing.T) {
+	client := awsMetadataClient(t, http.StatusGatewayTimeout, `{"statusCode":504,"error":"GatewayTimeoutError","message":"Infisical couldn't read its AWS account ID from AWS STS. Try again shortly."}`)
+
+	resp := readAwsMetadata(t, client)
+	if !resp.Diagnostics.HasError() {
+		t.Fatal("expected an error diagnostic when Infisical can't reach AWS")
+	}
+	if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, "couldn't read its AWS account ID") {
+		t.Errorf("expected Infisical's message in the diagnostic, got %q", detail)
+	}
+	if !resp.State.Raw.IsNull() {
+		t.Error("expected state to stay unset after a failed read")
+	}
+}
+
 func TestInstanceDeploymentAwsMetadataDataSourceRequiresMachineIdentity(t *testing.T) {
 	client := awsMetadataClient(t, http.StatusOK, `{"metadata":{"accountId":"123456789012"}}`)
 	client.Config.IsMachineIdentityAuth = false

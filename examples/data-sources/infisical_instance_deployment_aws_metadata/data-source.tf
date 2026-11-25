@@ -20,7 +20,16 @@ provider "infisical" {
   }
 }
 
-data "infisical_instance_deployment_aws_metadata" "this" {}
+data "infisical_instance_deployment_aws_metadata" "this" {
+  # account_id is null when the instance has no AWS identity. Stop with a clear message
+  # instead of building a trust policy from it (postconditions need Terraform 1.2 or later).
+  lifecycle {
+    postcondition {
+      condition     = self.account_id != null
+      error_message = "This Infisical instance has no AWS identity. Run it on AWS with an instance role, or set the AWS App Connection keys (INF_APP_CONNECTION_AWS_ACCESS_KEY_ID and INF_APP_CONNECTION_AWS_SECRET_ACCESS_KEY)."
+    }
+  }
+}
 
 # Trust policy for an IAM role that an Infisical AWS App Connection assumes.
 data "aws_iam_policy_document" "infisical_trust" {
