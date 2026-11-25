@@ -74,7 +74,8 @@ resource "infisical_app_connection_ssh" "app-connection-ssh-key" {
 ### Optional
 
 - `description` (String) An optional description for the SSH App Connection.
-- `gateway_id` (String) The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used.
+- `gateway_id` (String) The Gateway ID to use for the app connection. Conflicts with `gateway_pool_id`. If neither is specified, the Internet Gateway will be used.
+- `gateway_pool_id` (String) The ID of the gateway pool to use for the app connection, instead of a single gateway. Conflicts with `gateway_id`. Gateway pools require an Infisical Enterprise plan. Requires Infisical v0.159.29 or later.
 - `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only

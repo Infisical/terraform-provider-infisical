@@ -40,12 +40,14 @@ type fakeADCSConnectionBackend struct {
 	app         string
 	connections map[string]map[string]any
 	credentials map[string]map[string]any
-	requests    int
-	lastBody    map[string]any
+	// Connections with a credential rotation. Like the real GET by ID, responses don't include it.
+	rotations map[string]bool
+	requests  int
+	lastBody  map[string]any
 }
 
 func newFakeADCSConnectionBackend(t *testing.T) *fakeADCSConnectionBackend {
-	return &fakeADCSConnectionBackend{t: t, app: "adcs", connections: map[string]map[string]any{}, credentials: map[string]map[string]any{}}
+	return &fakeADCSConnectionBackend{t: t, app: "adcs", connections: map[string]map[string]any{}, credentials: map[string]map[string]any{}, rotations: map[string]bool{}}
 }
 
 func (b *fakeADCSConnectionBackend) writeJSON(w http.ResponseWriter, status int, body any) {
@@ -86,9 +88,18 @@ func (b *fakeADCSConnectionBackend) handler() http.Handler {
 				b.writeJSON(w, http.StatusNotFound, map[string]any{"message": "not found"})
 				return
 			}
-			if credentials, ok := body["credentials"].(map[string]any); ok {
+			existing := b.connections[id]
+			credentials, credentialsSent := body["credentials"].(map[string]any)
+			// updateAppConnection rejects credentials for a platform-managed connection, and
+			// credentials sent to a connection with a rotation turn the rotation back on.
+			if credentialsSent && existing["isPlatformManagedCredentials"] == true {
+				b.writeJSON(w, http.StatusBadRequest, map[string]any{"message": "Cannot update credentials or management status for platform managed connections"})
+				return
+			}
+			if credentialsSent {
 				b.credentials[id] = credentials
 			}
+			gatewayId, gatewayPoolId := resolveGatewayFields(existing, body)
 			b.connections[id] = map[string]any{
 				"id":              id,
 				"name":            body["name"],
@@ -96,8 +107,17 @@ func (b *fakeADCSConnectionBackend) handler() http.Handler {
 				"app":             b.app,
 				"method":          body["method"],
 				"projectId":       nil,
-				"gatewayId":       body["gatewayId"],
+				"gatewayId":       gatewayId,
+				"gatewayPoolId":   gatewayPoolId,
 				"credentialsHash": credentialsHash(b.credentials[id]),
+			}
+			for _, key := range []string{"isPlatformManagedCredentials", "isAutoRotationEnabled"} {
+				if value, ok := existing[key]; ok {
+					b.connections[id][key] = value
+				}
+			}
+			if credentialsSent && b.rotations[id] {
+				b.connections[id]["isAutoRotationEnabled"] = true
 			}
 			b.writeJSON(w, http.StatusOK, map[string]any{"appConnection": b.connections[id]})
 			return
@@ -113,6 +133,34 @@ func (b *fakeADCSConnectionBackend) handler() http.Handler {
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"appConnection": connection})
 	})
+}
+
+// Mirrors the gateway mutual exclusion in updateAppConnection (Infisical core,
+// backend/src/services/app-connection/app-connection-service.ts): an omitted field keeps its
+// value, and setting one of gatewayId or gatewayPoolId clears the other only when the other was
+// omitted.
+func resolveGatewayFields(existing map[string]any, body map[string]any) (any, any) {
+	var gatewayId, gatewayPoolId any
+	if existing != nil {
+		gatewayId, gatewayPoolId = existing["gatewayId"], existing["gatewayPoolId"]
+	}
+	sentGatewayId, gatewayIdSent := body["gatewayId"]
+	sentPoolId, poolIdSent := body["gatewayPoolId"]
+	switch {
+	case gatewayIdSent && poolIdSent:
+		gatewayId, gatewayPoolId = sentGatewayId, sentPoolId
+	case gatewayIdSent:
+		gatewayId = sentGatewayId
+		if sentGatewayId != nil {
+			gatewayPoolId = nil
+		}
+	case poolIdSent:
+		gatewayPoolId = sentPoolId
+		if sentPoolId != nil {
+			gatewayId = nil
+		}
+	}
+	return gatewayId, gatewayPoolId
 }
 
 func newADCSTestResource(t *testing.T, backend *fakeADCSConnectionBackend) *AppConnectionBaseResource {
@@ -349,9 +397,10 @@ func TestADCSAppConnectionReadWithEmptyIDRemovesResource(t *testing.T) {
 func TestADCSAppConnectionSchema(t *testing.T) {
 	s := adcsTestSchema(t)
 
-	gateway, ok := s.Attributes["gateway_id"].(schema.StringAttribute)
-	if !ok || !gateway.Required {
-		t.Error("gateway_id must be required, the API cannot reach AD CS without a gateway")
+	for _, name := range []string{"gateway_id", "gateway_pool_id"} {
+		if attribute, ok := s.Attributes[name].(schema.StringAttribute); !ok || !attribute.Optional {
+			t.Errorf("%s must be optional, the config validator requires exactly one of them", name)
+		}
 	}
 
 	credentials, ok := s.Attributes["credentials"].(schema.SingleNestedAttribute)

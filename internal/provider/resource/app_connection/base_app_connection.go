@@ -7,9 +7,11 @@ import (
 	"math/rand/v2"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 	"time"
 
 	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -21,7 +23,32 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var _ resource.ResourceWithImportState = &AppConnectionBaseResource{}
+var (
+	_ resource.ResourceWithImportState      = &AppConnectionBaseResource{}
+	_ resource.ResourceWithConfigValidators = &AppConnectionBaseResource{}
+	_ resource.ResourceWithModifyPlan       = &AppConnectionBaseResource{}
+)
+
+// credentialsManagedByInfisical reports whether Infisical owns the connection's credentials:
+// platform-managed credentials or a credential rotation that is turned on. Infisical rejects an
+// update that sends credentials to a platform-managed connection, and replaces credentials it
+// rotates (backend/src/services/app-connection/app-connection-service.ts in Infisical core), so
+// the provider never sends them for these connections. A paused rotation can't be detected:
+// GET by ID doesn't return the rotation, only the list endpoint does.
+func credentialsManagedByInfisical(appConnection infisical.AppConnection) bool {
+	return appConnection.IsPlatformManagedCredentials || appConnection.IsAutoRotationEnabled
+}
+
+// credentialsManagedByInfisicalForID reads the connection to find out whether Infisical manages
+// its credentials. The API never returns credentials, so this is the only way to know before an
+// update.
+func (r *AppConnectionBaseResource) credentialsManagedByInfisicalForID(id string) (bool, error) {
+	appConnection, err := r.client.GetAppConnectionById(infisical.GetAppConnectionByIdRequest{App: r.App, ID: id})
+	if err != nil {
+		return false, err
+	}
+	return credentialsManagedByInfisical(appConnection), nil
+}
 
 // AppConnectionBaseResource is the resource implementation.
 type AppConnectionBaseResource struct {
@@ -29,8 +56,8 @@ type AppConnectionBaseResource struct {
 	ResourceTypeName                 string                     // terraform resource name suffix
 	AppConnectionName                string                     // complete descriptive name of the app connection
 	DocsURL                          string                     // optional Infisical guide linked from the resource description
-	SupportsGateway                  bool                       // when true, exposes gateway_id and sends it to the API
-	RequiresGateway                  bool                       // when true, gateway_id is required
+	SupportsGateway                  bool                       // when true, exposes gateway_id and gateway_pool_id and sends them to the API
+	RequiresGateway                  bool                       // when true, one of gateway_id or gateway_pool_id is required
 	client                           *infisical.Client
 	AllowedMethods                   []string
 	CredentialsAttributes            map[string]schema.Attribute
@@ -109,11 +136,19 @@ type AppConnectionBaseResourceModel struct {
 
 // appConnectionGatewayResourceModel is used for plan/state I/O on connections that support
 // gateways. The embedded base model's tfsdk fields are promoted, so this matches the schema
-// that includes gateway_id. Connections without gateway support keep using the base model
-// directly, leaving their schema untouched.
+// that includes gateway_id and gateway_pool_id. Connections without gateway support keep using
+// the base model directly, leaving their schema untouched.
 type appConnectionGatewayResourceModel struct {
 	AppConnectionBaseResourceModel
-	GatewayId types.String `tfsdk:"gateway_id"`
+	GatewayId     types.String `tfsdk:"gateway_id"`
+	GatewayPoolId types.String `tfsdk:"gateway_pool_id"`
+}
+
+// appConnectionGateway is how a connection reaches its host: one gateway, a gateway pool, or
+// neither (the Internet Gateway). The API allows at most one of the two.
+type appConnectionGateway struct {
+	Id     types.String
+	PoolId types.String
 }
 
 // planStateGetter is satisfied by both tfsdk.Plan and tfsdk.State (value receivers), letting
@@ -123,57 +158,63 @@ type planStateGetter interface {
 }
 
 // readModel reads plan/state into the base model. For gateway-enabled connections it also
-// returns the configured gateway_id; otherwise that value is null.
-func (r *AppConnectionBaseResource) readModel(ctx context.Context, src planStateGetter) (AppConnectionBaseResourceModel, types.String, diag.Diagnostics) {
+// returns the configured gateway_id and gateway_pool_id; otherwise both are null.
+func (r *AppConnectionBaseResource) readModel(ctx context.Context, src planStateGetter) (AppConnectionBaseResourceModel, appConnectionGateway, diag.Diagnostics) {
 	if r.SupportsGateway {
 		var m appConnectionGatewayResourceModel
 		diags := src.Get(ctx, &m)
-		return m.AppConnectionBaseResourceModel, m.GatewayId, diags
+		return m.AppConnectionBaseResourceModel, appConnectionGateway{Id: m.GatewayId, PoolId: m.GatewayPoolId}, diags
 	}
 
 	var m AppConnectionBaseResourceModel
 	diags := src.Get(ctx, &m)
-	return m, types.StringNull(), diags
+	return m, appConnectionGateway{Id: types.StringNull(), PoolId: types.StringNull()}, diags
 }
 
 // stateValue returns the value to write to state, gateway-aware when the connection supports
-// gateways so the struct matches the schema (which then includes gateway_id).
-func (r *AppConnectionBaseResource) stateValue(model AppConnectionBaseResourceModel, gatewayId types.String) interface{} {
+// gateways so the struct matches the schema (which then includes gateway_id and gateway_pool_id).
+func (r *AppConnectionBaseResource) stateValue(model AppConnectionBaseResourceModel, gateway appConnectionGateway) interface{} {
 	if r.SupportsGateway {
 		return appConnectionGatewayResourceModel{
 			AppConnectionBaseResourceModel: model,
-			GatewayId:                      gatewayId,
+			GatewayId:                      gateway.Id,
+			GatewayPoolId:                  gateway.PoolId,
 		}
 	}
 	return model
 }
 
-// reconcileGatewayId returns the gateway_id to persist from the API response. For connections
-// that don't support gateways it leaves the current value untouched.
-func (r *AppConnectionBaseResource) reconcileGatewayId(current types.String, appConnection infisical.AppConnection) types.String {
+// reconcileGateway returns the gateway_id and gateway_pool_id to persist from the API response,
+// so a gateway or pool chosen in the dashboard shows up as drift. For connections that don't
+// support gateways it leaves the current value untouched.
+func (r *AppConnectionBaseResource) reconcileGateway(current appConnectionGateway, appConnection infisical.AppConnection) appConnectionGateway {
 	if !r.SupportsGateway {
 		return current
 	}
-	if appConnection.GatewayId != nil {
-		return types.StringValue(*appConnection.GatewayId)
+	return appConnectionGateway{
+		Id:     stringValueOrNull(appConnection.GatewayId),
+		PoolId: stringValueOrNull(appConnection.GatewayPoolId),
 	}
-	return types.StringNull()
 }
 
-// gatewayIdForRequest returns the gateway_id value to send to the API. It returns a non-nil
-// pointer only when the resource supports gateways and a value is set. When the gateway has
-// been removed from the configuration it returns nil, which serializes to an explicit `null`
-// so the API resets the connection back to the Internet Gateway (omitting the field would
-// leave the existing gateway untouched).
-func (r *AppConnectionBaseResource) gatewayIdForRequest(gatewayId types.String) *string {
-	if !r.SupportsGateway {
+func stringValueOrNull(value *string) types.String {
+	if value == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(*value)
+}
+
+// gatewayFieldForRequest returns a gateway_id or gateway_pool_id value to send to the API. Both
+// are always sent, and an unset one goes as an explicit `null`. The API clears a field it
+// receives as null and leaves an omitted one as it is, and setting a gateway clears the pool
+// (and the reverse) only for the field that was left out, so sending both is the only way the
+// result matches the configuration.
+func gatewayFieldForRequest(value types.String) *string {
+	if value.IsNull() || value.IsUnknown() || value.ValueString() == "" {
 		return nil
 	}
-	if gatewayId.IsNull() || gatewayId.IsUnknown() || gatewayId.ValueString() == "" {
-		return nil
-	}
-	value := gatewayId.ValueString()
-	return &value
+	v := value.ValueString()
+	return &v
 }
 
 // Metadata returns the resource type name.
@@ -219,17 +260,23 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 	}
 
 	if r.SupportsGateway {
-		description := "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used."
+		gatewayDescription := "The Gateway ID to use for the app connection. Conflicts with `gateway_pool_id`. If neither is specified, the Internet Gateway will be used."
+		poolDescription := "The ID of the gateway pool to use for the app connection, instead of a single gateway. Conflicts with `gateway_id`. Gateway pools require an Infisical Enterprise plan. Requires Infisical v0.159.29 or later."
 		if r.RequiresGateway {
-			description = fmt.Sprintf("The Gateway ID to use for the app connection. %s connections can only reach the host through a gateway.", r.AppConnectionName)
+			gatewayDescription = fmt.Sprintf("The Gateway ID to use for the app connection. %s connections can only reach the host through a gateway, so set either `gateway_id` or `gateway_pool_id`.", r.AppConnectionName)
+			poolDescription = fmt.Sprintf("The ID of the gateway pool to use for the app connection, instead of a single gateway. %s connections can only reach the host through a gateway, so set either `gateway_id` or `gateway_pool_id`. Gateway pools require an Infisical Enterprise plan. Requires Infisical v0.159.29 or later.", r.AppConnectionName)
 		}
 		attributes["gateway_id"] = schema.StringAttribute{
-			Optional:    !r.RequiresGateway,
-			Required:    r.RequiresGateway,
-			Description: description,
+			Optional:    true,
+			Description: gatewayDescription,
 			Validators: []validator.String{
 				stringvalidator.LengthAtLeast(1),
 			},
+		}
+		attributes["gateway_pool_id"] = schema.StringAttribute{
+			Optional:    true,
+			Description: poolDescription,
+			Validators:  []validator.String{infisicaltf.UuidValidator},
 		}
 	}
 
@@ -242,6 +289,49 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 		Description: description,
 		Attributes:  attributes,
 	}
+}
+
+// ConfigValidators makes gateway_id and gateway_pool_id mutually exclusive, as the API does, and
+// requires one of them when the connection can only reach its host through a gateway.
+func (r *AppConnectionBaseResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	if !r.SupportsGateway {
+		return nil
+	}
+
+	gatewayPaths := []path.Expression{path.MatchRoot("gateway_id"), path.MatchRoot("gateway_pool_id")}
+	if r.RequiresGateway {
+		return []resource.ConfigValidator{resourcevalidator.ExactlyOneOf(gatewayPaths...)}
+	}
+	return []resource.ConfigValidator{resourcevalidator.Conflicting(gatewayPaths...)}
+}
+
+// ModifyPlan warns when the configured credentials differ from state on a connection whose
+// credentials Infisical manages, because Update won't send them.
+func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var id types.String
+	var planned, current types.Object
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("id"), &id)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("credentials"), &planned)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("credentials"), &current)...)
+	if resp.Diagnostics.HasError() || planned.Equal(current) || r.client == nil {
+		return
+	}
+
+	// A failed read here is not worth failing the plan over: Update reads the connection again.
+	managed, err := r.credentialsManagedByInfisicalForID(id.ValueString())
+	if err != nil || !managed {
+		return
+	}
+
+	resp.Diagnostics.AddAttributeWarning(
+		path.Root("credentials"),
+		"Credentials managed by Infisical",
+		fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform won't send the configured credentials. Change them in Infisical instead.", r.AppConnectionName),
+	)
 }
 
 // Configure adds the provider configured client to the resource.
@@ -275,7 +365,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Retrieve values from plan
-	plan, gatewayId, diags := r.readModel(ctx, req.Plan)
+	plan, gateway, diags := r.readModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -318,7 +408,8 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 		if r.SupportsGateway {
 			appConnection, apiErr = r.client.CreateAppConnectionWithGateway(infisical.CreateAppConnectionWithGateway{
 				CreateAppConnectionRequest: baseRequest,
-				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+				GatewayId:                  gatewayFieldForRequest(gateway.Id),
+				GatewayPoolId:              gatewayFieldForRequest(gateway.PoolId),
 			})
 		} else {
 			appConnection, apiErr = r.client.CreateAppConnection(baseRequest)
@@ -336,9 +427,9 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 
 	plan.ID = types.StringValue(appConnection.Id)
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
-	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+	gateway = r.reconcileGateway(gateway, appConnection)
 
-	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
+	diags = resp.State.Set(ctx, r.stateValue(plan, gateway))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -356,7 +447,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	// Get current state
-	state, gatewayId, diags := r.readModel(ctx, req.State)
+	state, gateway, diags := r.readModel(ctx, req.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -385,10 +476,13 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		}
 	}
 
-	// Reconcile gateway_id from the API so out-of-band changes are detected as drift.
-	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+	gateway = r.reconcileGateway(gateway, appConnection)
 
-	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
+	// When Infisical manages the credentials, it changes them itself, so a new hash is not a
+	// conflict and the configured credentials stay in state. An import has none to keep.
+	if credentialsManagedByInfisical(appConnection) && !state.CredentialsHash.IsNull() {
+		state.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
+	} else if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
 		// An import starts with no hash. The API never returns secret credentials, so there is
 		// nothing to compare against and no conflict to warn about.
 		if !state.CredentialsHash.IsNull() {
@@ -421,7 +515,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
-	diags = resp.State.Set(ctx, r.stateValue(state, gatewayId))
+	diags = resp.State.Set(ctx, r.stateValue(state, gateway))
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -435,7 +529,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	// Retrieve values from plan
-	plan, gatewayId, diags := r.readModel(ctx, req.Plan)
+	plan, gateway, diags := r.readModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -463,14 +557,27 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	credentialsMap, diags := r.ReadCredentialsForUpdateFromPlan(ctx, plan, state)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
+	managed, err := r.credentialsManagedByInfisicalForID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating app connection",
+			"Couldn't read app connection before updating it, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
+	// A nil map leaves credentials out of the request, so Infisical keeps the ones it manages.
+	var credentialsMap map[string]any
+	if !managed {
+		credentialsMap, diags = r.ReadCredentialsForUpdateFromPlan(ctx, plan, state)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+	}
+
 	var appConnection infisical.AppConnection
-	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
+	err = retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
 		var apiErr error
 		baseRequest := infisical.UpdateAppConnectionRequest{
 			ID:          state.ID.ValueString(),
@@ -485,7 +592,8 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		if r.SupportsGateway {
 			appConnection, apiErr = r.client.UpdateAppConnectionWithGateway(infisical.UpdateAppConnectionWithGateway{
 				UpdateAppConnectionRequest: baseRequest,
-				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+				GatewayId:                  gatewayFieldForRequest(gateway.Id),
+				GatewayPoolId:              gatewayFieldForRequest(gateway.PoolId),
 			})
 		} else {
 			appConnection, apiErr = r.client.UpdateAppConnection(baseRequest)
@@ -502,9 +610,9 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
-	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+	gateway = r.reconcileGateway(gateway, appConnection)
 
-	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
+	diags = resp.State.Set(ctx, r.stateValue(plan, gateway))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

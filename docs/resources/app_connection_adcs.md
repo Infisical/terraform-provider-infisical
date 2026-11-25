@@ -52,13 +52,14 @@ resource "infisical_app_connection_adcs" "app-connection-adcs" {
 ### Required
 
 - `credentials` (Attributes) The credentials for the Microsoft ADCS App Connection (see [below for nested schema](#nestedatt--credentials))
-- `gateway_id` (String) The Gateway ID to use for the app connection. Microsoft ADCS connections can only reach the host through a gateway.
 - `method` (String) The method used to authenticate with Microsoft ADCS. Possible values are: username-password
 - `name` (String) The name of the Microsoft ADCS App Connection to create. Must be slug-friendly
 
 ### Optional
 
 - `description` (String) An optional description for the Microsoft ADCS App Connection.
+- `gateway_id` (String) The Gateway ID to use for the app connection. Microsoft ADCS connections can only reach the host through a gateway, so set either `gateway_id` or `gateway_pool_id`.
+- `gateway_pool_id` (String) The ID of the gateway pool to use for the app connection, instead of a single gateway. Microsoft ADCS connections can only reach the host through a gateway, so set either `gateway_id` or `gateway_pool_id`. Gateway pools require an Infisical Enterprise plan. Requires Infisical v0.159.29 or later.
 - `project_id` (String) The ID of the project to scope the app connection to. If not provided, the app connection will be scoped to the organization.
 
 ### Read-Only
