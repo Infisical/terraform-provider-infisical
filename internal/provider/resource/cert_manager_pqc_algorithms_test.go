@@ -26,8 +26,10 @@ import (
 
 // Copied from CertKeyAlgorithm and CertSignatureAlgorithm in Infisical core
 // (backend/src/services/certificate-common/certificate-constants.ts).
-var infisicalCorePqcAlgorithms = []string{
-	"ML-DSA-44", "ML-DSA-65", "ML-DSA-87",
+var infisicalCoreMlDsaAlgorithms = []string{"ML-DSA-44", "ML-DSA-65", "ML-DSA-87"}
+
+// The API accepts these too, but product chose to offer only ML-DSA, as the Infisical UI does.
+var infisicalCoreSlhDsaAlgorithms = []string{
 	"SLH-DSA-SHA2-128f", "SLH-DSA-SHA2-128s", "SLH-DSA-SHA2-192f", "SLH-DSA-SHA2-192s",
 	"SLH-DSA-SHA2-256f", "SLH-DSA-SHA2-256s", "SLH-DSA-SHAKE-128f", "SLH-DSA-SHAKE-128s",
 	"SLH-DSA-SHAKE-192f", "SLH-DSA-SHAKE-192s", "SLH-DSA-SHAKE-256f", "SLH-DSA-SHAKE-256s",
@@ -94,8 +96,8 @@ func nestedBlockAttributes(t *testing.T, s schema.Schema, name string) map[strin
 }
 
 func TestPqcAlgorithmListsMatchInfisicalCore(t *testing.T) {
-	if !slices.Equal(PQC_ALGORITHMS, infisicalCorePqcAlgorithms) {
-		t.Errorf("PQC_ALGORITHMS = %v, want %v", PQC_ALGORITHMS, infisicalCorePqcAlgorithms)
+	if !slices.Equal(ML_DSA_ALGORITHMS, infisicalCoreMlDsaAlgorithms) {
+		t.Errorf("ML_DSA_ALGORITHMS = %v, want %v", ML_DSA_ALGORITHMS, infisicalCoreMlDsaAlgorithms)
 	}
 }
 
@@ -110,11 +112,17 @@ func TestPqcAlgorithmsAcceptedPerResource(t *testing.T) {
 		"infisical_cert_manager_certificate.signature_algorithm":                  stringAttributeValidators(t, certSchema.Attributes, "signature_algorithm"),
 		"infisical_cert_manager_certificate_profile.defaults.key_algorithm":       stringAttributeValidators(t, profileDefaults, "key_algorithm"),
 		"infisical_cert_manager_certificate_profile.defaults.signature_algorithm": stringAttributeValidators(t, profileDefaults, "signature_algorithm"),
+		"infisical_cert_manager_internal_ca.key_algorithm":                        stringAttributeValidators(t, caSchema.Attributes, "key_algorithm"),
 	}
 	for name, validators := range stringChecks {
-		for _, alg := range infisicalCorePqcAlgorithms {
+		for _, alg := range infisicalCoreMlDsaAlgorithms {
 			if !stringValidatorsAccept(validators, alg) {
 				t.Errorf("%s rejects %s", name, alg)
+			}
+		}
+		for _, alg := range infisicalCoreSlhDsaAlgorithms {
+			if stringValidatorsAccept(validators, alg) {
+				t.Errorf("%s accepts %s", name, alg)
 			}
 		}
 		if stringValidatorsAccept(validators, "ML-DSA-128") {
@@ -127,27 +135,19 @@ func TestPqcAlgorithmsAcceptedPerResource(t *testing.T) {
 		"infisical_cert_manager_certificate_policy.algorithms.key_algorithm": listAttributeValidators(t, policyAlgorithms, "key_algorithm"),
 	}
 	for name, validators := range listChecks {
-		for _, alg := range infisicalCorePqcAlgorithms {
+		for _, alg := range infisicalCoreMlDsaAlgorithms {
 			if !listValidatorsAccept(validators, alg) {
 				t.Errorf("%s rejects %s", name, alg)
+			}
+		}
+		for _, alg := range infisicalCoreSlhDsaAlgorithms {
+			if listValidatorsAccept(validators, alg) {
+				t.Errorf("%s accepts %s", name, alg)
 			}
 		}
 		// Policies use their own names for classical algorithms, so the certificate names must not pass.
 		if listValidatorsAccept(validators, "RSA_2048") || listValidatorsAccept(validators, "RSA-SHA256") {
 			t.Errorf("%s accepts a certificate-style classical algorithm name", name)
-		}
-	}
-
-	caValidators := stringAttributeValidators(t, caSchema.Attributes, "key_algorithm")
-	for _, alg := range ML_DSA_ALGORITHMS {
-		if !stringValidatorsAccept(caValidators, alg) {
-			t.Errorf("infisical_cert_manager_internal_ca.key_algorithm rejects %s", alg)
-		}
-	}
-	// Infisical core refuses SLH-DSA keys for internal CAs ("SLH-DSA algorithms are not currently supported for CA creation").
-	for _, alg := range SLH_DSA_ALGORITHMS {
-		if stringValidatorsAccept(caValidators, alg) {
-			t.Errorf("infisical_cert_manager_internal_ca.key_algorithm accepts %s, which the API refuses", alg)
 		}
 	}
 }
@@ -404,7 +404,7 @@ func TestCertValidateConfigRefusesEnciphermentUsagesForPqcKeys(t *testing.T) {
 		wantError    bool
 	}{
 		{"ML-DSA-65", []string{"digital_signature", "key_encipherment"}, true},
-		{"SLH-DSA-SHA2-128f", []string{"key_agreement"}, true},
+		{"ML-DSA-87", []string{"key_agreement"}, true},
 		{"ML-DSA-44", []string{"data_encipherment"}, true},
 		{"ML-DSA-65", []string{"digital_signature", "non_repudiation"}, false},
 		{"RSA_2048", []string{"digital_signature", "key_encipherment"}, false},

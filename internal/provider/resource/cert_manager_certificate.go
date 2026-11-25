@@ -34,21 +34,13 @@ import (
 var (
 	// Post-quantum algorithms, as CertKeyAlgorithm and CertSignatureAlgorithm in Infisical core name them.
 	// The same names serve as key and signature algorithm, and certificate policies store them unchanged.
+	// The API also accepts SLH-DSA, but the Infisical UI offers only ML-DSA, and product chose to match the UI.
 	ML_DSA_ALGORITHMS = []string{
 		"ML-DSA-44", "ML-DSA-65", "ML-DSA-87",
 	}
-	SLH_DSA_ALGORITHMS = []string{
-		"SLH-DSA-SHA2-128f", "SLH-DSA-SHA2-128s",
-		"SLH-DSA-SHA2-192f", "SLH-DSA-SHA2-192s",
-		"SLH-DSA-SHA2-256f", "SLH-DSA-SHA2-256s",
-		"SLH-DSA-SHAKE-128f", "SLH-DSA-SHAKE-128s",
-		"SLH-DSA-SHAKE-192f", "SLH-DSA-SHAKE-192s",
-		"SLH-DSA-SHAKE-256f", "SLH-DSA-SHAKE-256s",
-	}
-	PQC_ALGORITHMS = slices.Concat(ML_DSA_ALGORITHMS, SLH_DSA_ALGORITHMS)
 
 	// Infisical core checks the pkiPqc license only when a certificate is issued, not when a profile or policy is saved.
-	PQC_ISSUE_LICENSE_NOTE = "Issuing a certificate with a post-quantum value (ML-DSA or SLH-DSA) needs an Infisical Enterprise license."
+	PQC_ISSUE_LICENSE_NOTE = "Issuing a certificate with a post-quantum value (ML-DSA) needs an Infisical Enterprise license."
 
 	// Core added CertKeyAlgorithm and CertSignatureAlgorithm PQC values in v0.159.12. Older servers reject them, except
 	// on policies, where they are stored as plain strings that no request can match.
@@ -57,11 +49,11 @@ var (
 	SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS = slices.Concat([]string{
 		"RSA_2048", "RSA_3072", "RSA_4096",
 		"EC_prime256v1", "EC_secp384r1", "EC_secp521r1",
-	}, PQC_ALGORITHMS)
+	}, ML_DSA_ALGORITHMS)
 	SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS = slices.Concat([]string{
 		"RSA-SHA256", "RSA-SHA384", "RSA-SHA512",
 		"ECDSA-SHA256", "ECDSA-SHA384", "ECDSA-SHA512",
-	}, PQC_ALGORITHMS)
+	}, ML_DSA_ALGORITHMS)
 	SUPPORTED_CERT_ISSUE_KEY_USAGES = []string{
 		"digital_signature", "key_encipherment", "non_repudiation",
 		"data_encipherment", "key_agreement", "key_cert_sign",
@@ -269,7 +261,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
-				Description: "The key algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". The ML-DSA and SLH-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. " + PQC_MIN_VERSION_NOTE,
+				Description: "The key algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". The ML-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. " + PQC_MIN_VERSION_NOTE,
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -281,7 +273,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"signature_algorithm": schema.StringAttribute{
-				Description: "The signature algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". The ML-DSA and SLH-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. An internal CA with an ML-DSA key signs only with that same ML-DSA variant. " + PQC_MIN_VERSION_NOTE,
+				Description: "The signature algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". The ML-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. An internal CA with an ML-DSA key signs only with that same ML-DSA variant. " + PQC_MIN_VERSION_NOTE,
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -459,12 +451,12 @@ func (r *certManagerCertificateResource) ValidateConfig(ctx context.Context, req
 	)
 }
 
-// Infisical core refuses these usages for an ML-DSA or SLH-DSA key, because those keys only sign. It checks this at
+// Infisical core refuses these usages for an ML-DSA key, because those keys only sign. It checks this at
 // issuance, so without this check plan succeeds and apply fails.
 var pqcInvalidKeyUsages = []string{"key_encipherment", "key_agreement", "data_encipherment"}
 
 func validatePqcKeyUsages(ctx context.Context, config certManagerCertificateResourceModel, resp *resource.ValidateConfigResponse) {
-	if config.KeyAlgorithm.IsNull() || config.KeyAlgorithm.IsUnknown() || !slices.Contains(PQC_ALGORITHMS, config.KeyAlgorithm.ValueString()) ||
+	if config.KeyAlgorithm.IsNull() || config.KeyAlgorithm.IsUnknown() || !slices.Contains(ML_DSA_ALGORITHMS, config.KeyAlgorithm.ValueString()) ||
 		config.KeyUsages.IsNull() || config.KeyUsages.IsUnknown() {
 		return
 	}
