@@ -380,6 +380,11 @@ type SecretImport struct {
 	ID         string `json:"id"`
 	SecretPath string `json:"secretPath"`
 	ImportPath string `json:"importPath"`
+
+	// The create response returns projectId from Infisical v0.167.16.
+	ImportEnvironment struct {
+		ProjectID string `json:"projectId"`
+	} `json:"importEnv"`
 }
 
 type SecretImportByID struct {

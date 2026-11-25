@@ -38,7 +38,7 @@ type fakeSecretImportBackend struct {
 
 	// ignoresSourceProject is Infisical before v0.161.12: the create body schema strips sourceProjectId.
 	ignoresSourceProject bool
-	// omitsImportProjectID is Infisical before v0.167.16: get by ID strips importEnv.projectId.
+	// omitsImportProjectID is Infisical before v0.167.16: create and get by ID strip importEnv.projectId.
 	omitsImportProjectID bool
 	failDelete           bool
 	// sharingDisabled and missingGrant are the cross-project checks in createImport, which return 403.
@@ -105,7 +105,11 @@ func (b *fakeSecretImportBackend) handler() http.Handler {
 			SourceProjectID: sourceProjectID, ImportEnv: body.Import.Environment, ImportPath: fakeCanonicalPath(body.Import.Path),
 			IsReplication: body.IsReplication,
 		}
-		b.writeJSON(w, http.StatusOK, map[string]any{"secretImport": map[string]any{"id": id}})
+		importEnv := map[string]string{"slug": body.Import.Environment, "projectId": sourceProjectID}
+		if b.omitsImportProjectID {
+			delete(importEnv, "projectId")
+		}
+		b.writeJSON(w, http.StatusOK, map[string]any{"secretImport": map[string]any{"id": id, "importEnv": importEnv}})
 	})
 
 	// getImportById only checks Read on the destination folder, so it ignores the cross-project sharing setting.
@@ -259,6 +263,9 @@ func TestSecretImportCrossProjectLifecycle(t *testing.T) {
 	s := secretImportTestSchema(t)
 
 	state := createSecretImport(t, r, s, secretImportTestModel(types.StringValue("destination"), types.StringValue("source"), false))
+	if backend.gets != 0 {
+		t.Errorf("cross-project create made %d get by ID calls, want 0: the create response has the source project", backend.gets)
+	}
 	created := secretImportStateModel(t, state)
 	id := created.ID.ValueString()
 	want := fakeSecretImport{

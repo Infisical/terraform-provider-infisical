@@ -200,7 +200,7 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 	plan.ID = types.StringValue(newProjectSecretImport.SecretImport.ID)
 
 	if !plan.ImportProjectID.IsNull() {
-		r.verifyCrossProjectImport(ctx, &plan, resp)
+		r.verifyCrossProjectImport(ctx, &plan, newProjectSecretImport.SecretImport.ImportEnvironment.ProjectID, resp)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -214,25 +214,14 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 }
 
 // verifyCrossProjectImport checks that the server created the import from import_project_id. Infisical before v0.167.16
-// leaves importEnv.projectId out of the get by ID response, and before v0.161.12 it ignores sourceProjectId and creates
+// leaves importEnv.projectId out of the create response, and before v0.161.12 it ignores sourceProjectId and creates
 // a same-project import instead. In both cases the import is deleted again, so no wrong import is left behind.
-func (r *projectSecretImportResource) verifyCrossProjectImport(ctx context.Context, plan *projectSecretImportResourceModel, resp *resource.CreateResponse) {
-	created, err := r.client.GetSecretImportByID(infisical.GetSecretImportByIDRequest{ID: plan.ID.ValueString()})
-	if err != nil {
-		// The import exists, so it has to be tracked in state instead of leaking.
-		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-		resp.Diagnostics.AddError(
-			"Error creating project secret import",
-			"The secret import was created, but reading it back failed: "+err.Error(),
-		)
+func (r *projectSecretImportResource) verifyCrossProjectImport(ctx context.Context, plan *projectSecretImportResourceModel, createdSourceProjectID string, resp *resource.CreateResponse) {
+	if createdSourceProjectID == plan.ImportProjectID.ValueString() {
 		return
 	}
 
-	if created.SecretImport.ImportEnvironment.ProjectID == plan.ImportProjectID.ValueString() {
-		return
-	}
-
-	_, err = r.client.DeleteSecretImport(infisical.DeleteSecretImportRequest{
+	_, err := r.client.DeleteSecretImport(infisical.DeleteSecretImportRequest{
 		ID:          plan.ID.ValueString(),
 		ProjectID:   plan.ProjectID.ValueString(),
 		Environment: plan.EnvironmentSlug.ValueString(),
