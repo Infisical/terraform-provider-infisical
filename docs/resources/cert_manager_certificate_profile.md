@@ -142,12 +142,12 @@ Optional:
 - `country` (String) Default country (C)
 - `domain_components` (List of String) Default domain components (DC). Multi-valued; each entry becomes a DC attribute in the certificate subject.
 - `extended_key_usages` (List of String) Default extended key usages. Supported values: client_auth, server_auth, code_signing, email_protection, ocsp_signing, time_stamping
-- `key_algorithm` (String) Default key algorithm. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1
+- `key_algorithm` (String) Default key algorithm. Supported values: RSA_2048, RSA_3072, RSA_4096, EC_prime256v1, EC_secp384r1, EC_secp521r1, ML-DSA-44, ML-DSA-65, ML-DSA-87. Issuing a certificate with a post-quantum value (ML-DSA) needs an Infisical Enterprise license. Post-quantum values need Infisical v0.159.12 or later.
 - `key_usages` (List of String) Default key usages. Supported values: digital_signature, key_encipherment, non_repudiation, data_encipherment, key_agreement, key_cert_sign, crl_sign, encipher_only, decipher_only
 - `locality` (String) Default locality (L)
 - `organization` (String) Default organization (O)
 - `organizational_unit` (String) Default organizational unit (OU)
-- `signature_algorithm` (String) Default signature algorithm. Supported values: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512
+- `signature_algorithm` (String) Default signature algorithm. Supported values: RSA-SHA256, RSA-SHA384, RSA-SHA512, ECDSA-SHA256, ECDSA-SHA384, ECDSA-SHA512, ML-DSA-44, ML-DSA-65, ML-DSA-87. Issuing a certificate with a post-quantum value (ML-DSA) needs an Infisical Enterprise license. The value must be one the profile's CA can sign with. Post-quantum values need Infisical v0.159.12 or later.
 - `state` (String) Default state/province (ST)
 - `ttl_days` (Number) Default certificate validity in days
 
