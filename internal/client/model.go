@@ -380,10 +380,6 @@ type SecretImport struct {
 	ID         string `json:"id"`
 	SecretPath string `json:"secretPath"`
 	ImportPath string `json:"importPath"`
-
-	ImportEnvironment struct {
-		ProjectID string `json:"projectId"`
-	} `json:"importEnv"`
 }
 
 type SecretImportByID struct {
@@ -393,11 +389,12 @@ type SecretImportByID struct {
 	ProjectID     string `json:"projectId"`
 	IsReplication bool   `json:"isReplication"`
 
-	// Imported from
+	// Imported from. Infisical v0.167.16 and later return projectId.
 	ImportEnvironment struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-		Slug string `json:"slug"`
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		Slug      string `json:"slug"`
+		ProjectID string `json:"projectId"`
 	} `json:"importEnv"`
 
 	// Imported into
@@ -2479,7 +2476,7 @@ type DeleteAccessApprovalPolicyResponse struct {
 }
 
 type CreateSecretImportRequest struct {
-	ProjectID     string             `json:"workspaceId"`
+	ProjectID     string             `json:"projectId"`
 	Environment   string             `json:"environment"`
 	SecretPath    string             `json:"path"`
 	IsReplication bool               `json:"isReplication"`
@@ -2498,7 +2495,7 @@ type CreateSecretImportResponse struct {
 
 type UpdateSecretImportRequest struct {
 	ID            string `json:"id"`
-	ProjectID     string `json:"workspaceId"`
+	ProjectID     string `json:"projectId"`
 	Environment   string `json:"environment"`
 	SecretPath    string `json:"path"`
 	IsReplication bool   `json:"isReplication"`
@@ -2515,22 +2512,11 @@ type UpdateSecretImportResponse struct {
 type DeleteSecretImportRequest struct {
 	ID          string `json:"id"`
 	Environment string `json:"environment"`
-	ProjectID   string `json:"workspaceId"`
+	ProjectID   string `json:"projectId"`
 	SecretPath  string `json:"path"`
 }
 
 type DeleteSecretImportResponse struct {
-	SecretImport SecretImport `json:"secretImport"`
-}
-
-type GetSecretImportRequest struct {
-	ID          string `json:"id"`
-	Environment string `json:"environment"`
-	ProjectID   string `json:"workspaceId"`
-	SecretPath  string `json:"path"`
-}
-
-type GetSecretImportResponse struct {
 	SecretImport SecretImport `json:"secretImport"`
 }
 
@@ -2540,16 +2526,6 @@ type GetSecretImportByIDRequest struct {
 
 type GetSecretImportByIDResponse struct {
 	SecretImport SecretImportByID `json:"secretImport"`
-}
-
-type ListSecretImportRequest struct {
-	Environment string `json:"environment"`
-	ProjectID   string `json:"workspaceId"`
-	SecretPath  string `json:"path"`
-}
-
-type ListSecretImportResponse struct {
-	SecretImports []SecretImport `json:"secretImports"`
 }
 
 type AppConnection struct {

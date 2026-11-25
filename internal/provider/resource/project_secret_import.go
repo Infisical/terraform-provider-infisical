@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	infisical "terraform-provider-infisical/internal/client"
-	infisicalerrors "terraform-provider-infisical/internal/errors"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -86,7 +84,7 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"import_project_id": schema.StringAttribute{
-				Description:   "The ID of the project to import secrets from. Omit it to import from `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.161.12 or later.",
+				Description:   "The ID of the project to import secrets from. Omit it to import from `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.16 or later.",
 				Optional:      true,
 				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -179,11 +177,62 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 
 	plan.ID = types.StringValue(newProjectSecretImport.SecretImport.ID)
 
+	if !plan.ImportProjectID.IsNull() {
+		r.verifyCrossProjectImport(ctx, &plan, resp)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// verifyCrossProjectImport checks that the server created the import from import_project_id. Infisical before v0.167.16
+// leaves importEnv.projectId out of the get by ID response, and before v0.161.12 it ignores sourceProjectId and creates
+// a same-project import instead. In both cases the import is deleted again, so no wrong import is left behind.
+func (r *projectSecretImportResource) verifyCrossProjectImport(ctx context.Context, plan *projectSecretImportResourceModel, resp *resource.CreateResponse) {
+	created, err := r.client.GetSecretImportByID(infisical.GetSecretImportByIDRequest{ID: plan.ID.ValueString()})
+	if err != nil {
+		// The import exists, so it has to be tracked in state instead of leaking.
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+		resp.Diagnostics.AddError(
+			"Error creating project secret import",
+			"The secret import was created, but reading it back failed: "+err.Error(),
+		)
+		return
+	}
+
+	if created.SecretImport.ImportEnvironment.ProjectID == plan.ImportProjectID.ValueString() {
+		return
+	}
+
+	_, err = r.client.DeleteSecretImport(infisical.DeleteSecretImportRequest{
+		ID:          plan.ID.ValueString(),
+		ProjectID:   plan.ProjectID.ValueString(),
+		Environment: plan.EnvironmentSlug.ValueString(),
+		SecretPath:  plan.SecretPath.ValueString(),
+	})
+	if err != nil && !errors.As(err, &notFoundErr) {
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+		resp.Diagnostics.AddError(
+			"Error creating project secret import",
+			"This Infisical instance does not support import_project_id, so the secret import was not created from "+
+				"the source project, and deleting it again failed: "+err.Error()+". Destroy the secret import, then "+
+				"either upgrade to Infisical v0.167.16 or later or remove import_project_id from the configuration.",
+		)
+		return
+	}
+
+	resp.Diagnostics.AddError(
+		"Error creating project secret import",
+		"This Infisical instance does not support import_project_id, so the secret import was not created from the "+
+			"source project. The secret import was deleted again. Upgrade to Infisical v0.167.16 or later, or remove "+
+			"import_project_id from the configuration.",
+	)
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -209,44 +258,25 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// The list routes hide cross-project imports while cross-project sharing is turned off, so read by ID.
+	// Read by ID: the list route hides cross-project imports while cross-project secret sharing is turned off, and
+	// only get by ID returns the source project.
 	secretImport, err := r.client.GetSecretImportByID(infisical.GetSecretImportByIDRequest{
 		ID: state.ID.ValueString(),
 	})
+
 	if err != nil {
 		if errors.Is(err, infisical.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
-			return
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching secret imports from your project",
+				"Couldn't read project secret import from Infisical, unexpected error: "+err.Error(),
+			)
 		}
-		resp.Diagnostics.AddError(
-			"Error reading secret import",
-			"Couldn't read secret import from Infisical, unexpected error: "+err.Error(),
-		)
 		return
 	}
 
-	state.EnvironmentSlug = types.StringValue(secretImport.SecretImport.Environment.Slug)
-	state.SecretPath = types.StringValue(secretImport.SecretImport.SecretPath)
-
-	// The by-ID route leaves out the source project. If the list hides the import, keep the value in state.
-	if !state.ImportProjectID.IsNull() {
-		withSource, err := r.client.GetSecretImport(infisical.GetSecretImportRequest{
-			ID:          secretImport.SecretImport.ID,
-			ProjectID:   secretImport.SecretImport.ProjectID,
-			Environment: secretImport.SecretImport.Environment.Slug,
-			SecretPath:  secretImport.SecretImport.SecretPath,
-		})
-		switch {
-		case err == nil:
-			state.ImportProjectID = importProjectIDFromAPI(state.ImportProjectID, secretImport.SecretImport.ProjectID, withSource.SecretImport.ImportEnvironment.ProjectID)
-		case !errors.As(err, &notFoundErr):
-			resp.Diagnostics.AddError(
-				"Error reading secret import",
-				"Couldn't read the source project of the secret import from Infisical, unexpected error: "+err.Error(),
-			)
-			return
-		}
-	}
+	state.ImportProjectID = importProjectIDFromAPI(state.ImportProjectID, secretImport.SecretImport.ProjectID, secretImport.SecretImport.ImportEnvironment.ProjectID)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -366,40 +396,10 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_folder_path"), secretImport.SecretImport.ImportPath)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_environment_slug"), secretImport.SecretImport.ImportEnvironment.Slug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("is_replication"), secretImport.SecretImport.IsReplication)...)
-
-	// The by-ID route leaves out the source project.
-	importProjectID := types.StringNull()
-	withSource, err := r.client.GetSecretImport(infisical.GetSecretImportRequest{
-		ID:          secretImport.SecretImport.ID,
-		ProjectID:   secretImport.SecretImport.ProjectID,
-		Environment: secretImport.SecretImport.Environment.Slug,
-		SecretPath:  secretImport.SecretImport.SecretPath,
-	})
-	var apiErr *infisicalerrors.APIError
-	switch {
-	case err == nil:
-		importProjectID = importProjectIDFromAPI(importProjectID, secretImport.SecretImport.ProjectID, withSource.SecretImport.ImportEnvironment.ProjectID)
-	case errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound:
-		// Servers without the v2 list route predate cross-project imports.
-	case errors.As(err, &notFoundErr):
-		resp.Diagnostics.AddError(
-			"Error fetching secret import",
-			fmt.Sprintf("Couldn't read the source project of secret import %q. Infisical lists cross-project imports only while "+
-				"cross-project secret sharing is turned on for the organization. Turn it on under Secrets Management > Product Settings and import again.",
-				secretImport.SecretImport.ID),
-		)
-		return
-	default:
-		resp.Diagnostics.AddError(
-			"Error fetching secret import",
-			"Couldn't fetch the source project of the secret import from Infisical, unexpected error: "+err.Error(),
-		)
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_project_id"), importProjectID)...)
 }
 
-// importProjectIDFromAPI keeps import_project_id null for a same-project import, and keeps the current value when the API leaves it out.
+// importProjectIDFromAPI keeps import_project_id null for a same-project import, and keeps the current value when the
+// API leaves it out (Infisical before v0.167.16).
 func importProjectIDFromAPI(current types.String, projectID, apiSourceProjectID string) types.String {
 	if apiSourceProjectID == "" || (current.IsNull() && apiSourceProjectID == projectID) {
 		return current
