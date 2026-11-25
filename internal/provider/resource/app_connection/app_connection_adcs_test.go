@@ -25,6 +25,12 @@ import (
 
 const testADCSConnectionID = "3f091b42-1661-41a1-b647-98c6a45af047"
 
+// Placeholder credentials for the fake backend.
+const (
+	testADCSFirstPassword  = "first-password"
+	testADCSSecondPassword = "second-password"
+)
+
 // Fake of the routes that registerAppConnectionEndpoints in Infisical core registers for
 // AppConnection.ADCS (backend/src/server/routes/v1/app-connection-routers/adcs-connection-router.ts).
 // Like the real API, responses never contain credentials, only a hash that changes with them, and a
@@ -187,12 +193,12 @@ func TestADCSAppConnectionLifecycle(t *testing.T) {
 	r := newADCSTestResource(t, backend)
 
 	createResp := resource.CreateResponse{State: tfsdk.State{Schema: s}}
-	r.Create(ctx, resource.CreateRequest{Plan: adcsPlan(t, s, types.StringUnknown(), "first-password")}, &createResp)
+	r.Create(ctx, resource.CreateRequest{Plan: adcsPlan(t, s, types.StringUnknown(), testADCSFirstPassword)}, &createResp)
 	if createResp.Diagnostics.HasError() {
 		t.Fatal(createResp.Diagnostics)
 	}
 
-	wantCredentials := map[string]any{"host": "ca01.corp.example.com", "username": `CORP\svc-infisical`, "password": "first-password"}
+	wantCredentials := map[string]any{"host": "ca01.corp.example.com", "username": `CORP\svc-infisical`, "password": testADCSFirstPassword}
 	if fmt.Sprint(backend.lastBody["credentials"]) != fmt.Sprint(wantCredentials) {
 		t.Errorf("credentials sent = %v, want %v", backend.lastBody["credentials"], wantCredentials)
 	}
@@ -215,7 +221,7 @@ func TestADCSAppConnectionLifecycle(t *testing.T) {
 	}
 
 	updateResp := resource.UpdateResponse{State: createResp.State}
-	r.Update(ctx, resource.UpdateRequest{Plan: adcsPlan(t, s, types.StringValue(testADCSConnectionID), "second-password"), State: createResp.State}, &updateResp)
+	r.Update(ctx, resource.UpdateRequest{Plan: adcsPlan(t, s, types.StringValue(testADCSConnectionID), testADCSSecondPassword), State: createResp.State}, &updateResp)
 	if updateResp.Diagnostics.HasError() {
 		t.Fatal(updateResp.Diagnostics)
 	}
@@ -250,7 +256,7 @@ func TestADCSAppConnectionReadDetectsOutOfBandCredentialChange(t *testing.T) {
 	r := newADCSTestResource(t, backend)
 
 	createResp := resource.CreateResponse{State: tfsdk.State{Schema: s}}
-	r.Create(ctx, resource.CreateRequest{Plan: adcsPlan(t, s, types.StringUnknown(), "first-password")}, &createResp)
+	r.Create(ctx, resource.CreateRequest{Plan: adcsPlan(t, s, types.StringUnknown(), testADCSFirstPassword)}, &createResp)
 	if createResp.Diagnostics.HasError() {
 		t.Fatal(createResp.Diagnostics)
 	}
