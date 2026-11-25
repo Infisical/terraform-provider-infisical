@@ -44,3 +44,12 @@ resource "infisical_project" "certificate-project" {
   description = "This is a certificates project for certificate management"
   type        = "cert-manager"
 }
+
+# Keep the description out of the plan output and state (requires Terraform 1.11.0 or higher).
+# Increment description_wo_version to apply a new description_wo.
+resource "infisical_project" "private-project" {
+  name                   = "Private Project"
+  slug                   = "private-project"
+  description_wo         = "Owner: platform-team@example.com"
+  description_wo_version = 1
+}

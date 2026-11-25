@@ -9,13 +9,16 @@ import (
 
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -49,6 +52,8 @@ type projectResourceModel struct {
 	KmsSecretManagerKeyId   types.String `tfsdk:"kms_secret_manager_key_id"`
 	Name                    types.String `tfsdk:"name"`
 	Description             types.String `tfsdk:"description"`
+	DescriptionWO           types.String `tfsdk:"description_wo"`
+	DescriptionWOVersion    types.Int64  `tfsdk:"description_wo_version"`
 	LastUpdated             types.String `tfsdk:"last_updated"`
 	TemplateName            types.String `tfsdk:"template_name"`
 	ShouldCreateDefaultEnvs types.Bool   `tfsdk:"should_create_default_envs"`
@@ -89,8 +94,31 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"description": schema.StringAttribute{
-				Description: "The description of the project",
+				Description: "The description of the project. To keep it out of the plan output and state, use `description_wo` instead.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(
+						path.MatchRoot("description_wo"),
+						path.MatchRoot("description_wo_version"),
+					),
+				},
+			},
+			"description_wo": schema.StringAttribute{
+				Description: "The description of the project as a write-only value: it is sent to Infisical but never stored in the plan or state. It is sent on every update, so it must stay set for as long as the description should be kept. Changing it alone is not detected, so increment `description_wo_version` to update it. Requires Terraform 1.11.0 or higher.",
+				Optional:    true,
+				Sensitive:   true,
+				WriteOnly:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("description_wo_version")),
+				},
+			},
+			"description_wo_version": schema.Int64Attribute{
+				Description: "Used with `description_wo` to update the description. Increment it whenever `description_wo` changes, and the next apply sends the new description.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AlsoRequires(path.MatchRoot("description_wo")),
+				},
 			},
 			"template_name": schema.StringAttribute{
 				Description: "The name of the template to use for the project",
@@ -151,6 +179,32 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.client = client
 }
 
+// configuredDescription returns description, or description_wo from the config
+// since write-only values never make it into the plan.
+func configuredDescription(ctx context.Context, diagnostics *diag.Diagnostics, config tfsdk.Config, plan projectResourceModel) string {
+	if !plan.Description.IsNull() {
+		return plan.Description.ValueString()
+	}
+
+	var writeOnlyDescription types.String
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("description_wo"), &writeOnlyDescription)...)
+	return writeOnlyDescription.ValueString()
+}
+
+// setDescription stores the description returned by Infisical, unless description_wo
+// manages it, in which case the description stays out of state.
+func (m *projectResourceModel) setDescription(description string) {
+	if !m.DescriptionWOVersion.IsNull() {
+		return
+	}
+
+	if description == "" {
+		m.Description = types.StringNull()
+	} else {
+		m.Description = types.StringValue(description)
+	}
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
@@ -179,9 +233,14 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		projectType = plan.Type.ValueString()
 	}
 
+	description := configuredDescription(ctx, &resp.Diagnostics, req.Config, plan)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	newProject, err := r.client.CreateProject(infisical.CreateProjectRequest{
 		ProjectName:             plan.Name.ValueString(),
-		ProjectDescription:      plan.Description.ValueString(),
+		ProjectDescription:      description,
 		Slug:                    plan.Slug.ValueString(),
 		Type:                    projectType,
 		Template:                plan.TemplateName.ValueString(),
@@ -255,7 +314,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	if state.Slug.ValueString() == "" {
+	if state.ID.ValueString() == "" {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -278,12 +337,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	if project.Description == "" {
-		state.Description = types.StringNull()
-	} else {
-		state.Description = types.StringValue(project.Description)
-	}
-
+	state.setDescription(project.Description)
 	state.ID = types.StringValue(project.ID)
 	state.Name = types.StringValue(project.Name)
 	state.Type = types.StringValue(project.Type)
@@ -357,18 +411,18 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	updateRequest := infisical.UpdateProjectRequest{
+	description := configuredDescription(ctx, &resp.Diagnostics, req.Config, plan)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.client.UpdateProject(infisical.UpdateProjectRequest{
 		ProjectName:         plan.Name.ValueString(),
+		ProjectDescription:  description,
 		ProjectId:           plan.ID.ValueString(),
 		ProjectSlug:         plan.Slug.ValueString(),
 		HasDeleteProtection: plan.HasDeleteProtection.ValueBool(),
-	}
-
-	if !plan.Description.IsNull() {
-		updateRequest.ProjectDescription = plan.Description.ValueString()
-	}
-
-	_, err := r.client.UpdateProject(updateRequest)
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -404,12 +458,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if project.Description == "" {
-		plan.Description = types.StringNull()
-	} else {
-		plan.Description = types.StringValue(project.Description)
-	}
-
+	plan.setDescription(project.Description)
 	plan.LastUpdated = types.StringValue(project.UpdatedAt.Format(time.RFC850))
 	plan.Name = types.StringValue(project.Name)
 	plan.HasDeleteProtection = types.BoolValue(project.HasDeleteProtection)
