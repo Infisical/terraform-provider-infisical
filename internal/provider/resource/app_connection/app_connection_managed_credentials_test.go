@@ -259,7 +259,8 @@ func TestManagedCredentialsUnknownAtPlanIsRefusedAtApply(t *testing.T) {
 		t.Errorf("a credential unknown at plan must not fail the plan, got %v", resp.Diagnostics)
 	}
 
-	resolved := modelWithCredentials(t, state, "ca01.corp.example.com", types.StringValue(testADCSSecondPassword))
+	// The value resolves at apply to a host Infisical doesn't have.
+	resolved := modelWithCredentials(t, state, "ca02.corp.example.com", types.StringValue(testADCSSecondPassword))
 	plan := tfsdk.Plan{Schema: s}
 	if diags := plan.Set(ctx, resolved); diags.HasError() {
 		t.Fatal(diags)
@@ -268,7 +269,7 @@ func TestManagedCredentialsUnknownAtPlanIsRefusedAtApply(t *testing.T) {
 	updateResp := resource.UpdateResponse{State: state}
 	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: state}, &updateResp)
 	if !updateResp.Diagnostics.HasError() {
-		t.Error("a credential change on a managed connection must fail at apply when the plan couldn't refuse it")
+		t.Error("a host that differs from Infisical's must fail at apply when the plan couldn't refuse it")
 	}
 	if backend.requests != requestsBefore+1 {
 		t.Errorf("only the read before the update may reach the API, got %d requests", backend.requests-requestsBefore)
@@ -312,5 +313,89 @@ func TestSnakeToCamel(t *testing.T) {
 		if got := snakeToCamel(in); got != want {
 			t.Errorf("snakeToCamel(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Infisical owns a platform-managed connection's password, so a password change in the config is
+// recorded without being sent, not refused.
+func TestManagedCredentialsPasswordChangeIsRecorded(t *testing.T) {
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	r, backend, state := managedStateWithCredentials(t)
+
+	changed := modelWithCredentials(t, state, "ca01.corp.example.com", types.StringValue(testADCSSecondPassword))
+	if resp := modifyPlan(t, r, state, changed); resp.Diagnostics.HasError() || resp.Diagnostics.WarningsCount() != 1 {
+		t.Errorf("a password change must only warn, got %v", resp.Diagnostics)
+	}
+	plan := tfsdk.Plan{Schema: s}
+	if diags := plan.Set(ctx, changed); diags.HasError() {
+		t.Fatal(diags)
+	}
+	updateResp := resource.UpdateResponse{State: state}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: state}, &updateResp)
+	if updateResp.Diagnostics.HasError() {
+		t.Fatal(updateResp.Diagnostics)
+	}
+	if _, sent := backend.lastBody["credentials"]; sent {
+		t.Errorf("credentials must not be sent to a platform-managed connection, got body %v", backend.lastBody)
+	}
+}
+
+// With rotation on, the API accepts a credentials change, so once state holds the credentials a
+// change the user makes is sent, and an update that leaves them unchanged doesn't resend them.
+func TestRotatingConnectionSendsOnlyChangedCredentials(t *testing.T) {
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	backend := newFakeADCSConnectionBackend(t)
+	r := newADCSTestResource(t, backend)
+	seedManagedConnection(backend, map[string]any{"isAutoRotationEnabled": true, "hasRotation": true})
+	imported := importAndRead(t, r)
+
+	// After the import the credentials are recorded, not sent.
+	first := resource.UpdateResponse{State: imported}
+	r.Update(ctx, resource.UpdateRequest{Plan: adcsPlan(t, s, types.StringValue(testADCSConnectionID), testADCSFirstPassword), State: imported}, &first)
+	if first.Diagnostics.HasError() {
+		t.Fatal(first.Diagnostics)
+	}
+	if _, sent := backend.lastBody["credentials"]; sent {
+		t.Errorf("credentials must not be sent after an import, got body %v", backend.lastBody)
+	}
+
+	// A rename leaves them out too.
+	rename := resource.UpdateResponse{State: first.State}
+	r.Update(ctx, resource.UpdateRequest{Plan: renamedPlan(t, "renamed"), State: first.State}, &rename)
+	if rename.Diagnostics.HasError() {
+		t.Fatal(rename.Diagnostics)
+	}
+	if _, sent := backend.lastBody["credentials"]; sent {
+		t.Errorf("unchanged credentials must not be resent, got body %v", backend.lastBody)
+	}
+
+	// A change the user makes is sent, and the API accepts it.
+	changed := modelWithCredentials(t, rename.State, "ca02.corp.example.com", types.StringValue(testADCSSecondPassword))
+	if resp := modifyPlan(t, r, rename.State, changed); resp.Diagnostics.HasError() || resp.Diagnostics.WarningsCount() != 0 {
+		t.Errorf("a credentials change on a rotating connection must plan cleanly, got %v", resp.Diagnostics)
+	}
+	plan := tfsdk.Plan{Schema: s}
+	if diags := plan.Set(ctx, changed); diags.HasError() {
+		t.Fatal(diags)
+	}
+	changeResp := resource.UpdateResponse{State: rename.State}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: rename.State}, &changeResp)
+	if changeResp.Diagnostics.HasError() {
+		t.Fatal(changeResp.Diagnostics)
+	}
+	credentials, _ := backend.lastBody["credentials"].(map[string]any)
+	if credentials["host"] != "ca02.corp.example.com" {
+		t.Errorf("a changed host must be sent, got body %v", backend.lastBody)
+	}
+}
+
+func TestCredentialValueMatchesInt32(t *testing.T) {
+	if credentialValueMatches(types.Int32Value(5432), float64(15432)) {
+		t.Error("an Int32 port that differs from Infisical's must not match")
+	}
+	if !credentialValueMatches(types.Int32Value(15432), float64(15432)) {
+		t.Error("an Int32 port equal to Infisical's must match")
 	}
 }

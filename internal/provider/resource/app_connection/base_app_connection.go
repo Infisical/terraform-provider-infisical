@@ -74,6 +74,9 @@ func credentialValueMatches(value attr.Value, apiValue any) bool {
 	case basetypes.BoolValue:
 		b, ok := apiValue.(bool)
 		return ok && b == v.ValueBool()
+	case basetypes.Int32Value:
+		n, ok := apiValue.(float64)
+		return ok && int32(n) == v.ValueInt32()
 	case basetypes.Int64Value:
 		n, ok := apiValue.(float64)
 		return ok && int64(n) == v.ValueInt64()
@@ -95,12 +98,15 @@ func snakeToCamel(name string) string {
 	return strings.Join(parts, "")
 }
 
-func credentialsMismatchDetail(appConnectionName string, differing []string) string {
+func credentialsMismatchDetail(appConnectionName string, appConnection infisical.AppConnection, differing []string) string {
 	mismatch := fmt.Sprintf("The configured %s doesn't match what Infisical has. Set it to the value in Infisical.", differing[0])
 	if len(differing) > 1 {
 		mismatch = fmt.Sprintf("These configured fields don't match what Infisical has: %s. Set them to the values in Infisical.", strings.Join(differing, ", "))
 	}
-	return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. %s", appConnectionName, mismatch)
+	if appConnection.IsPlatformManagedCredentials {
+		return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials) and rejects any change to them, so Terraform doesn't send them. %s To use different credentials, create a new connection: run `terraform taint` on this resource, then apply. `terraform apply -replace` stops at this check too.", appConnectionName, mismatch)
+	}
+	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection, so after an import or a rotation Terraform records the configured credentials without sending them. %s After that apply, Terraform sends changes to the credentials again.", appConnectionName, mismatch)
 }
 
 // AppConnectionBaseResource is the resource implementation.
@@ -387,32 +393,38 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 
 	// A failed read here is not worth failing the plan over: Update reads the connection again.
 	appConnection, err := r.readConnection(id.ValueString())
-	if err != nil || !credentialsManagedByInfisical(appConnection) {
+	if err != nil || !recordsCredentialsWithoutSending(appConnection, current) {
 		return
 	}
 
-	if credentialsUnset(current) {
-		if differing := credentialsDifferingFromInfisical(planned, appConnection.Credentials); len(differing) > 0 {
-			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, differing))
-			return
-		}
-		resp.Diagnostics.AddAttributeWarning(
-			path.Root("credentials"),
-			"Credentials managed by Infisical",
-			fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform records the configured credentials without sending them.", r.AppConnectionName),
-		)
+	if differing := credentialsDifferingFromInfisical(planned, appConnection.Credentials); len(differing) > 0 {
+		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, appConnection, differing))
 		return
 	}
-
-	resp.Diagnostics.AddAttributeError(
+	resp.Diagnostics.AddAttributeWarning(
 		path.Root("credentials"),
 		"Credentials managed by Infisical",
-		credentialsManagedErrorDetail(r.AppConnectionName),
+		fmt.Sprintf("Infisical manages the credentials of this %s App Connection (%s), so Terraform records the configured credentials without sending them.", r.AppConnectionName, credentialsManager(appConnection)),
 	)
 }
 
-func credentialsManagedErrorDetail(appConnectionName string) string {
-	return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. Set the configured credentials back to their current values, or remove this resource and create a new connection.", appConnectionName)
+// recordsCredentialsWithoutSending reports whether an update records the configured credentials
+// in state without sending them. Infisical rejects any credentials sent to a platform-managed
+// connection. With rotation on, it accepts them, but after an import or a rotation, when state
+// holds no credentials, the configured ones are likely stale and would replace the ones Infisical
+// rotated; once state holds them, a change the user makes is sent.
+func recordsCredentialsWithoutSending(appConnection infisical.AppConnection, stateCredentials types.Object) bool {
+	if appConnection.IsPlatformManagedCredentials {
+		return true
+	}
+	return appConnection.IsAutoRotationEnabled && credentialsUnset(stateCredentials)
+}
+
+func credentialsManager(appConnection infisical.AppConnection) string {
+	if appConnection.IsPlatformManagedCredentials {
+		return "platform-managed credentials"
+	}
+	return "credential rotation"
 }
 
 // planReplacesConnection reports whether the plan replaces the connection: method and project_id
@@ -689,27 +701,22 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		)
 		return
 	}
-	managed := credentialsManagedByInfisical(current)
+	// With rotation on and credentials in state, only a change the user made is sent: resending
+	// unchanged credentials would replace the ones Infisical rotated.
+	skipCredentials := recordsCredentialsWithoutSending(current, state.Credentials) ||
+		(current.IsAutoRotationEnabled && plan.Credentials.Equal(state.Credentials))
 
-	// ModifyPlan refuses these when it can; a credential known only at apply reaches here.
-	if managed && !credentialsUnset(state.Credentials) && !plan.Credentials.Equal(state.Credentials) {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("credentials"),
-			"Credentials managed by Infisical",
-			credentialsManagedErrorDetail(r.AppConnectionName),
-		)
-		return
-	}
-	if managed && credentialsUnset(state.Credentials) {
+	// ModifyPlan refuses this when it can; a credential known only at apply reaches here.
+	if recordsCredentialsWithoutSending(current, state.Credentials) {
 		if differing := credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
-			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, differing))
+			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, current, differing))
 			return
 		}
 	}
 
-	// A nil map leaves credentials out of the request, so Infisical keeps the ones it manages.
+	// A nil map leaves credentials out of the request, so Infisical keeps the ones it has.
 	var credentialsMap map[string]any
-	if !managed {
+	if !skipCredentials {
 		credentialsMap, diags = r.ReadCredentialsForUpdateFromPlan(ctx, plan, state)
 		if diags.HasError() {
 			resp.Diagnostics.Append(diags...)

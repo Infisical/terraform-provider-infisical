@@ -112,6 +112,11 @@ func (b *fakeADCSConnectionBackend) handler() http.Handler {
 				"credentialsHash": credentialsHash(b.credentials[id]),
 				"credentials":     sanitizedCredentials(b.credentials[id]),
 			}
+			// An update without credentials keeps the ones Infisical has, and their hash.
+			if !credentialsSent && existing != nil {
+				b.connections[id]["credentials"] = existing["credentials"]
+				b.connections[id]["credentialsHash"] = existing["credentialsHash"]
+			}
 			for _, key := range []string{"isPlatformManagedCredentials", "isAutoRotationEnabled"} {
 				if value, ok := existing[key]; ok {
 					b.connections[id][key] = value
