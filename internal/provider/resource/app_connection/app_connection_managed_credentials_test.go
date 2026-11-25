@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -94,8 +95,9 @@ func TestManagedCredentialsAreNotSentAfterImport(t *testing.T) {
 	}
 }
 
-// Infisical changes credentials it manages on its own, so a new hash is not a conflict, and the
-// configured credentials stay in state so the next plan is clean.
+// Infisical changes credentials it manages on its own, so a new hash is not a conflict. The
+// credentials are cleared from state, so the next apply records the configured ones without
+// sending them.
 func TestManagedCredentialsHashChangeIsNotAConflict(t *testing.T) {
 	ctx := context.Background()
 	s := adcsTestSchema(t)
@@ -120,8 +122,8 @@ func TestManagedCredentialsHashChangeIsNotAConflict(t *testing.T) {
 		t.Fatalf("a rotation is not a conflict, got %v", readResp.Diagnostics)
 	}
 	model := adcsModel(t, readResp.State)
-	if !model.Credentials.Equal(adcsModel(t, createResp.State).Credentials) {
-		t.Error("the configured credentials must stay in state, or the next plan would try to send them")
+	if !credentialsUnset(model.Credentials) {
+		t.Error("the credentials must be cleared, so the next apply records the configured ones")
 	}
 	if model.CredentialsHash.ValueString() != "hash-after-rotation" {
 		t.Errorf("expected the new hash in state, got %s", model.CredentialsHash)
@@ -146,5 +148,44 @@ func TestManagedCredentialsPlanWarning(t *testing.T) {
 		if got := resp.Diagnostics.WarningsCount() == 1; got != managed {
 			t.Errorf("managed %v: warning = %v, got %v", managed, got, resp.Diagnostics)
 		}
+	}
+}
+
+// A change to credentials already in state would never reach Infisical, so the plan refuses it.
+func TestManagedCredentialsChangeIsRefusedAtPlan(t *testing.T) {
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	backend := newFakeADCSConnectionBackend(t)
+	r := newADCSTestResource(t, backend)
+	seedManagedConnection(backend, map[string]any{"isPlatformManagedCredentials": true})
+	imported := importAndRead(t, r)
+
+	// The first apply after the import records the configured credentials.
+	plan := adcsPlan(t, s, types.StringValue(testADCSConnectionID), testADCSFirstPassword)
+	updateResp := resource.UpdateResponse{State: imported}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: imported}, &updateResp)
+	if updateResp.Diagnostics.HasError() {
+		t.Fatal(updateResp.Diagnostics)
+	}
+
+	changed := adcsModel(t, updateResp.State)
+	credentials, diags := types.ObjectValue(adcsCredentialsAttrTypes, map[string]attr.Value{
+		"host":     types.StringValue("ca02.corp.example.com"),
+		"username": types.StringValue(`CORP\svc-infisical`),
+		"password": types.StringValue(testADCSFirstPassword),
+	})
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	changed.Credentials = credentials
+	changedPlan := tfsdk.Plan{Schema: s}
+	if diags := changedPlan.Set(ctx, changed); diags.HasError() {
+		t.Fatal(diags)
+	}
+
+	resp := resource.ModifyPlanResponse{Plan: changedPlan}
+	r.ModifyPlan(ctx, resource.ModifyPlanRequest{Plan: changedPlan, State: updateResp.State, Config: tfsdk.Config{Schema: s, Raw: changedPlan.Raw}}, &resp)
+	if !resp.Diagnostics.HasError() {
+		t.Errorf("a host change on a connection whose credentials Infisical manages must fail at plan, got %v", resp.Diagnostics)
 	}
 }

@@ -305,8 +305,11 @@ func (r *AppConnectionBaseResource) ConfigValidators(_ context.Context) []resour
 	return []resource.ConfigValidator{resourcevalidator.Conflicting(gatewayPaths...)}
 }
 
-// ModifyPlan warns when the configured credentials differ from state on a connection whose
-// credentials Infisical manages, because Update won't send them.
+// ModifyPlan handles configured credentials that differ from state on a connection whose
+// credentials Infisical manages. Update never sends them, so when state has none (after an
+// import, or after Infisical changed them) the plan warns and the apply records the configured
+// ones; a change to credentials already in state is refused, because it would never reach
+// Infisical.
 func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
@@ -327,11 +330,34 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 		return
 	}
 
-	resp.Diagnostics.AddAttributeWarning(
+	if credentialsUnset(current) {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("credentials"),
+			"Credentials managed by Infisical",
+			fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform won't send the configured credentials. Change them in Infisical instead.", r.AppConnectionName),
+		)
+		return
+	}
+
+	resp.Diagnostics.AddAttributeError(
 		path.Root("credentials"),
 		"Credentials managed by Infisical",
-		fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform won't send the configured credentials. Change them in Infisical instead.", r.AppConnectionName),
+		fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. Keep the configured credentials as they are. To change them, change them in Infisical or replace the connection.", r.AppConnectionName),
 	)
+}
+
+// credentialsUnset reports whether state holds no credentials: none after an import, or all
+// fields nulled by OverwriteCredentialsFields after the hash changed.
+func credentialsUnset(credentials types.Object) bool {
+	if credentials.IsNull() || credentials.IsUnknown() {
+		return true
+	}
+	for _, value := range credentials.Attributes() {
+		if !value.IsNull() {
+			return false
+		}
+	}
+	return true
 }
 
 // Configure adds the provider configured client to the resource.
@@ -478,21 +504,19 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 
 	gateway = r.reconcileGateway(gateway, appConnection)
 
-	// When Infisical manages the credentials, it changes them itself, so a new hash is not a
-	// conflict and the configured credentials stay in state. An import has none to keep.
-	if credentialsManagedByInfisical(appConnection) && !state.CredentialsHash.IsNull() {
-		state.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
-	} else if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
+	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
 		// An import starts with no hash. The API never returns secret credentials, so there is
-		// nothing to compare against and no conflict to warn about.
-		if !state.CredentialsHash.IsNull() {
+		// nothing to compare against and no conflict to warn about. When Infisical manages the
+		// credentials, it changes them itself, so a new hash is not a conflict either.
+		if !state.CredentialsHash.IsNull() && !credentialsManagedByInfisical(appConnection) {
 			resp.Diagnostics.AddWarning(
 				"App connection credentials conflict",
 				fmt.Sprintf("The credentials for the %s App Connection with ID %s have been updated outside of Terraform.", r.AppConnectionName, state.ID.ValueString()),
 			)
 		}
 
-		// Nulling the credentials makes the next plan send the configured credentials again.
+		// Nulling the credentials makes the next apply take the configured credentials again:
+		// Update sends them, or records them without sending when Infisical manages them.
 		diags = r.OverwriteCredentialsFields(&state)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
