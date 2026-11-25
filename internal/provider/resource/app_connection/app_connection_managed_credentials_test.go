@@ -523,3 +523,20 @@ func TestCredentialValueMatchesFailsClosed(t *testing.T) {
 		t.Error("a type the comparison doesn't handle must never match")
 	}
 }
+
+// An empty configured string matches a field Infisical leaves out or returns as null.
+func TestManagedCredentialsEmptyStringMatchesAbsent(t *testing.T) {
+	r, ok := NewAppConnectionPostgresResource().(*AppConnectionBaseResource)
+	if !ok {
+		t.Fatal("expected the base resource")
+	}
+	planned := credentialsObject(t, r, map[string]attr.Value{
+		"host":            types.StringValue("db.internal"),
+		"ssl_certificate": types.StringValue(""),
+	})
+	for _, api := range []map[string]any{{"host": "db.internal"}, {"host": "db.internal", "sslCertificate": nil}} {
+		if differing := r.credentialsDifferingFromInfisical(planned, api); len(differing) != 0 {
+			t.Errorf("an empty ssl_certificate must match %v, got %v", api, differing)
+		}
+	}
+}

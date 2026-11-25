@@ -90,6 +90,10 @@ func (r *AppConnectionBaseResource) credentialsDifferingFromInfisical(planned ty
 func credentialValueMatches(value attr.Value, apiValue any) bool {
 	switch v := value.(type) {
 	case basetypes.StringValue:
+		// Infisical leaves out or nulls a string that has no value, which an empty one matches.
+		if apiValue == nil {
+			apiValue = ""
+		}
 		s, ok := apiValue.(string)
 		return ok && strings.TrimSpace(s) == strings.TrimSpace(v.ValueString())
 	case basetypes.BoolValue:
