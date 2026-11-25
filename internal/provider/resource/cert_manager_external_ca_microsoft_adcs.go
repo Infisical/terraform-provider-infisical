@@ -83,8 +83,9 @@ func (r *certManagerExternalCAMicrosoftADCSResource) Schema(_ context.Context, _
 			},
 			"ca_name": schema.StringAttribute{
 				Description: "The AD CS certification authority name, for example `corp-ca01-CA`. Run `certutil -getreg CA\\CommonName` on the AD CS server to find it. " +
-					"If omitted, Infisical discovers it from the CA host, which works only if the Gateway can reach the host over SMB (TCP 445). " +
-					"Infisical checks the name through the Gateway on create and on every change, and rejects a name the CA host does not publish.",
+					"If omitted, Infisical reads it from the CA host's registry over SMB (TCP 445) when the CA is created and whenever `app_connection_id` changes. " +
+					"Removing a `ca_name` you set keeps the current name. " +
+					"On create, and whenever `ca_name` or `app_connection_id` changes, Infisical checks through the Gateway that it can list certificate templates on the CA, and rejects the change if it cannot.",
 				Optional: true,
 				Computed: true,
 				Validators: []validator.String{
@@ -102,7 +103,7 @@ func (r *certManagerExternalCAMicrosoftADCSResource) Schema(_ context.Context, _
 type caNameUseStateUnlessConnectionChanges struct{}
 
 func (m caNameUseStateUnlessConnectionChanges) Description(_ context.Context) string {
-	return "Uses the prior ca_name while app_connection_id does not change."
+	return "Keeps the prior ca_name when ca_name is not configured and app_connection_id does not change."
 }
 
 func (m caNameUseStateUnlessConnectionChanges) MarkdownDescription(ctx context.Context) string {
