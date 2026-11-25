@@ -314,26 +314,27 @@ func TestInternalCAAwsKmsCreateAndRead(t *testing.T) {
 	}
 }
 
-func TestInternalCAOmittedKeySourceComesFromTheCA(t *testing.T) {
+func TestInternalCACreateWithoutKeySourceAsksForInfisical(t *testing.T) {
 	s := internalCATestSchema(t)
 	backend := newFakeInternalCABackend(t)
 	r := newInternalCATestResource(t, backend)
 
-	created := createInternalCA(t, r, internalCAPlan(t, s, internalCAModel("", func(m *certManagerInternalCAResourceModel) {
-		m.KeySource = types.StringUnknown()
-		m.HsmConnectorId = types.StringUnknown()
-		m.AppConnectionId = types.StringUnknown()
-		m.Region = types.StringUnknown()
-	})))
+	config := internalCAModel("", func(m *certManagerInternalCAResourceModel) { m.KeySource = types.StringNull() })
+	unknown := config
+	unknown.KeySource, unknown.HsmConnectorId, unknown.AppConnectionId, unknown.Region =
+		types.StringUnknown(), types.StringUnknown(), types.StringUnknown(), types.StringUnknown()
+	plan := modifyInternalCAPlan(t, s, nil, config, unknown)
+
+	created := createInternalCA(t, r, internalCAPlan(t, s, plan))
 	if created.Diagnostics.HasError() {
 		t.Fatal(created.Diagnostics)
 	}
-	if _, sent := createdConfiguration(t, backend)["keySource"]; sent {
-		t.Error("expected keySource to be left out of the create request so Infisical applies its default")
+	if got := createdConfiguration(t, backend)["keySource"]; got != CA_KEY_SOURCE_INFISICAL {
+		t.Errorf("expected the create request to ask for keySource infisical, got %v", got)
 	}
 	model := internalCAStateModel(t, created.State)
 	if model.KeySource.ValueString() != CA_KEY_SOURCE_INFISICAL || !model.HsmConnectorId.IsNull() || !model.AppConnectionId.IsNull() || !model.Region.IsNull() {
-		t.Errorf("expected the key source attributes to be filled from the CA, got %+v", model)
+		t.Errorf("expected state to match the planned key source values, got %+v", model)
 	}
 }
 
@@ -368,11 +369,12 @@ func TestInternalCAKeepsCAWhenKeySourceCannotBeConfirmed(t *testing.T) {
 	created := createInternalCA(t, r, internalCAPlan(t, s, internalCAModel(CA_KEY_SOURCE_HSM, func(m *certManagerInternalCAResourceModel) {
 		m.HsmConnectorId = types.StringValue(testHsmConnectorID)
 	})))
-	if !created.Diagnostics.HasError() || backend.deletes != 0 {
-		t.Fatalf("expected an error and no delete, got %d deletes and %v", backend.deletes, created.Diagnostics)
+	if created.Diagnostics.HasError() || created.Diagnostics.WarningsCount() != 1 || backend.deletes != 0 {
+		t.Fatalf("expected a warning, no error and no delete, got %d deletes and %v", backend.deletes, created.Diagnostics)
 	}
-	if model := internalCAStateModel(t, created.State); model.Id.ValueString() != testInternalCAID {
-		t.Errorf("expected the CA to be tracked in state, got %+v", model)
+	model := internalCAStateModel(t, created.State)
+	if model.Id.ValueString() != testInternalCAID || model.KeySource.ValueString() != CA_KEY_SOURCE_HSM || model.HsmConnectorId.ValueString() != testHsmConnectorID {
+		t.Errorf("expected the CA to be saved with the configured key source, got %+v", model)
 	}
 }
 

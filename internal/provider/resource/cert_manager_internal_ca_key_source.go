@@ -204,13 +204,11 @@ func (r *certManagerInternalCAResource) confirmCreatedKeySource(ctx context.Cont
 	if configuration.KeySource == "" && plannedKeySource(plan.KeySource) != CA_KEY_SOURCE_INFISICAL {
 		ca, err := r.client.GetInternalCA(infisical.GetCARequest{CAId: created.Id})
 		if err != nil {
-			plan.Id = types.StringValue(created.Id)
-			plan.Status = types.StringValue(created.Status)
 			fillUnknownKeySourceFromAPI(created.Configuration, plan)
-			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-			resp.Diagnostics.AddError("Error creating CA",
-				"The CA was created, but reading it back to confirm where its signing key is kept failed: "+err.Error())
-			return false
+			resp.Diagnostics.AddWarning("Couldn't confirm the CA's key source",
+				"The CA was created, but reading it back to confirm where its signing key is kept failed: "+err.Error()+
+					". Terraform saved the CA with the configured key source, and the next plan shows a difference if Infisical reports another one.")
+			return true
 		}
 		configuration = ca.Configuration
 	}
