@@ -60,7 +60,7 @@ func certManagerInternalCAKeySourceAttributes() map[string]schema.Attribute {
 			Description: "Where the CA's signing key is generated and kept. Supported values: " + strings.Join(SUPPORTED_CA_KEY_SOURCES, ", ") + ". " +
 				"When omitted, an existing CA keeps the key source it has in Infisical, and a CA that Terraform creates, including one it creates again (replaced, tainted or deleted outside Terraform), uses '" + CA_KEY_SOURCE_INFISICAL + "'. Set it to keep the key of a re-created CA in the HSM or AWS KMS. " +
 				"'infisical' keeps the key in Infisical. " +
-				"'hsm' generates the key in the HSM reached through `hsm_connector_id`, and supports the key algorithms " + strings.Join(hsmCAKeyAlgorithms(), ", ") + ". Infisical does not remove the key from the HSM when the CA is deleted. Requires Infisical " + CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_HSM] + " or later. " +
+				"'hsm' generates the key in the HSM reached through `hsm_connector_id`, and supports the key algorithms " + strings.Join(hsmCAKeyAlgorithms(), ", ") + ". Infisical does not remove the key from the HSM when the CA is deleted. Requires an Enterprise license and Infisical " + CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_HSM] + " or later. " +
 				"'aws-kms' generates the key in AWS KMS through `app_connection_id` in `region`, and AWS KMS makes every signature. When the CA is deleted, Infisical asks AWS KMS to schedule the key for deletion. Requires an Enterprise license and Infisical " + CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_AWS_KMS] + " or later. " +
 				"Changing it replaces the CA.",
 			Optional:      true,
@@ -131,6 +131,34 @@ func (r *certManagerInternalCAResource) ValidateConfig(ctx context.Context, req 
 	}
 }
 
+func (r *certManagerInternalCAResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() {
+		return
+	}
+
+	var config, plan certManagerInternalCAResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if config.KeySource.IsNull() {
+		plan.KeySource = types.StringValue(CA_KEY_SOURCE_INFISICAL)
+	}
+	for _, field := range []struct{ config, planned *types.String }{
+		{&config.HsmConnectorId, &plan.HsmConnectorId},
+		{&config.AppConnectionId, &plan.AppConnectionId},
+		{&config.Region, &plan.Region},
+	} {
+		if field.config.IsNull() {
+			*field.planned = types.StringNull()
+		}
+	}
+
+	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+}
+
 func plannedKeySource(value types.String) string {
 	if value.IsNull() || value.IsUnknown() {
 		return CA_KEY_SOURCE_INFISICAL
@@ -173,7 +201,7 @@ func fillUnknownKeySourceFromAPI(configuration infisical.CertificateAuthorityCon
 
 func (r *certManagerInternalCAResource) confirmCreatedKeySource(ctx context.Context, plan *certManagerInternalCAResourceModel, created infisical.CreateInternalCAResponse, resp *resource.CreateResponse) bool {
 	configuration := created.Configuration
-	if configuration.KeySource == "" {
+	if configuration.KeySource == "" && plannedKeySource(plan.KeySource) != CA_KEY_SOURCE_INFISICAL {
 		ca, err := r.client.GetInternalCA(infisical.GetCARequest{CAId: created.Id})
 		if err != nil {
 			plan.Id = types.StringValue(created.Id)

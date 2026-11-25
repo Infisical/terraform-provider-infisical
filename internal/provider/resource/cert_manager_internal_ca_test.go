@@ -613,6 +613,79 @@ func planInternalCAKeySource(t *testing.T, s schema.Schema, prior *certManagerIn
 	return replace
 }
 
+func modifyInternalCAPlan(t *testing.T, s schema.Schema, prior *certManagerInternalCAResourceModel, config, planned certManagerInternalCAResourceModel) certManagerInternalCAResourceModel {
+	t.Helper()
+	ctx := context.Background()
+	state := tfsdk.State{Schema: s, Raw: tftypes.NewValue(s.Type().TerraformType(ctx), nil)}
+	if prior != nil {
+		state = tfsdk.State{Schema: s, Raw: internalCAPlan(t, s, *prior).Raw}
+	}
+	plan := internalCAPlan(t, s, planned)
+	resp := resource.ModifyPlanResponse{Plan: plan}
+	(&certManagerInternalCAResource{}).ModifyPlan(ctx, resource.ModifyPlanRequest{
+		State:  state,
+		Plan:   plan,
+		Config: tfsdk.Config{Schema: s, Raw: internalCAPlan(t, s, config).Raw},
+	}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	var model certManagerInternalCAResourceModel
+	if diags := resp.Plan.Get(ctx, &model); diags.HasError() {
+		t.Fatal(diags)
+	}
+	return model
+}
+
+func TestInternalCAPlanShowsDefaultKeySourceOnCreate(t *testing.T) {
+	s := internalCATestSchema(t)
+	omittedConfig := internalCAModel("", func(m *certManagerInternalCAResourceModel) { m.KeySource = types.StringNull() })
+	unknownPlan := omittedConfig
+	unknownPlan.KeySource, unknownPlan.HsmConnectorId, unknownPlan.AppConnectionId, unknownPlan.Region =
+		types.StringUnknown(), types.StringUnknown(), types.StringUnknown(), types.StringUnknown()
+
+	created := modifyInternalCAPlan(t, s, nil, omittedConfig, unknownPlan)
+	if created.KeySource.ValueString() != CA_KEY_SOURCE_INFISICAL || !created.HsmConnectorId.IsNull() || !created.AppConnectionId.IsNull() || !created.Region.IsNull() {
+		t.Errorf("expected a create without key_source to plan infisical and no companions, got %+v", created)
+	}
+
+	hsmConfig := internalCAModel(CA_KEY_SOURCE_HSM, func(m *certManagerInternalCAResourceModel) { m.HsmConnectorId = types.StringValue(testHsmConnectorID) })
+	hsmPlan := hsmConfig
+	hsmPlan.AppConnectionId, hsmPlan.Region = types.StringUnknown(), types.StringUnknown()
+	hsm := modifyInternalCAPlan(t, s, nil, hsmConfig, hsmPlan)
+	if hsm.KeySource.ValueString() != CA_KEY_SOURCE_HSM || hsm.HsmConnectorId.ValueString() != testHsmConnectorID || !hsm.AppConnectionId.IsNull() || !hsm.Region.IsNull() {
+		t.Errorf("expected a create with hsm to keep the configured values and plan no AWS fields, got %+v", hsm)
+	}
+
+	prior := internalCAModel(CA_KEY_SOURCE_HSM, func(m *certManagerInternalCAResourceModel) {
+		m.Id = types.StringValue(testInternalCAID)
+		m.HsmConnectorId = types.StringValue(testHsmConnectorID)
+	})
+	update := modifyInternalCAPlan(t, s, &prior, omittedConfig, prior)
+	if update.KeySource.ValueString() != CA_KEY_SOURCE_HSM || update.HsmConnectorId.ValueString() != testHsmConnectorID {
+		t.Errorf("expected an update to keep the CA's key source, got %+v", update)
+	}
+}
+
+func TestInternalCASkipsReadBackForInfisicalOnServersWithoutKeySourceInCreate(t *testing.T) {
+	s := internalCATestSchema(t)
+	backend := newFakeInternalCABackend(t)
+	backend.createOmitsKeySource = true
+	backend.failGet = true
+	r := newInternalCATestResource(t, backend)
+
+	created := createInternalCA(t, r, internalCAPlan(t, s, internalCAModel(CA_KEY_SOURCE_INFISICAL, nil)))
+	if created.Diagnostics.HasError() {
+		t.Fatalf("expected an infisical CA to be created without reading it back, got %v", created.Diagnostics)
+	}
+	if backend.requests != 1 {
+		t.Errorf("expected only the create request, got %d requests", backend.requests)
+	}
+	if model := internalCAStateModel(t, created.State); model.KeySource.ValueString() != CA_KEY_SOURCE_INFISICAL || model.Id.ValueString() != testInternalCAID {
+		t.Errorf("unexpected state after create: %+v", model)
+	}
+}
+
 func TestInternalCAImportedHSMCAWithKeySourceOmitted(t *testing.T) {
 	ctx := context.Background()
 	s := internalCATestSchema(t)
@@ -663,21 +736,25 @@ func TestInternalCAImportedHSMCAWithKeySourceOmitted(t *testing.T) {
 		t.Errorf("expected state to keep the CA's key source, got %+v", model)
 	}
 
-	replacement := omitted("renamed", "RSA_2048")
+	replacementConfig := omitted("renamed", "RSA_2048")
+	replacementConfig.Id = types.StringUnknown()
+	replacement := replacementConfig
 	planInternalCAKeySource(t, s, nil, &replacement)
-	if !replacement.KeySource.IsUnknown() || !replacement.HsmConnectorId.IsUnknown() {
-		t.Fatalf("expected the create half of the replacement to leave the key source to Infisical, got %+v", replacement)
+	replacementPlan := modifyInternalCAPlan(t, s, nil, replacementConfig, replacement)
+	if replacementPlan.KeySource.ValueString() != CA_KEY_SOURCE_INFISICAL || !replacementPlan.HsmConnectorId.IsNull() {
+		t.Fatalf("expected the replacement plan to show Infisical's default key source, got %+v", replacementPlan)
 	}
 	delete(backend.cas, testInternalCAID)
-	created := createInternalCA(t, r, internalCAPlan(t, s, replacement))
+	created := createInternalCA(t, r, internalCAPlan(t, s, replacementPlan))
 	if created.Diagnostics.HasError() {
 		t.Fatal(created.Diagnostics)
 	}
 	configuration := createdConfiguration(t, backend)
-	for _, key := range []string{"keySource", "hsmConnectorId"} {
-		if _, sent := configuration[key]; sent {
-			t.Errorf("expected %s to be left out of the replacement request, got %v", key, configuration[key])
-		}
+	if configuration["keySource"] != CA_KEY_SOURCE_INFISICAL {
+		t.Errorf("expected the replacement request to ask for keySource infisical, got %v", configuration["keySource"])
+	}
+	if _, sent := configuration["hsmConnectorId"]; sent {
+		t.Errorf("expected hsmConnectorId to be left out of the replacement request, got %v", configuration["hsmConnectorId"])
 	}
 	if model := internalCAStateModel(t, created.State); model.KeySource.ValueString() != CA_KEY_SOURCE_INFISICAL || !model.HsmConnectorId.IsNull() {
 		t.Errorf("expected the replacement CA to use Infisical's default key source, got %+v", model)

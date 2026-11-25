@@ -38,6 +38,7 @@ var (
 	_ resource.Resource                   = &certManagerInternalCAResource{}
 	_ resource.ResourceWithImportState    = &certManagerInternalCAResource{}
 	_ resource.ResourceWithValidateConfig = &certManagerInternalCAResource{}
+	_ resource.ResourceWithModifyPlan     = &certManagerInternalCAResource{}
 )
 
 func NewCertManagerInternalCAResource() resource.Resource {
