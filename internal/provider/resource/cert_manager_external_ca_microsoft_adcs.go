@@ -164,12 +164,18 @@ func microsoftADCSCAConfigurationFromPlan(plan certManagerExternalCAMicrosoftADC
 	return configuration
 }
 
-// The API trims ca_name before comparing, so a change in whitespace alone is not a change. An
-// unknown ca_name is one the API must discover again.
-func microsoftADCSCAConfigurationChanged(plan, state certManagerExternalCAMicrosoftADCSResourceModel) bool {
-	return !plan.AppConnectionId.Equal(state.AppConnectionId) ||
+// microsoftADCSCAConfigurationDiffers compares the planned configuration with the CA as Infisical
+// has it now, not with state, because the UI can change it between plan and apply (a saved plan,
+// or -refresh=false). The API trims ca_name before comparing, so a change in whitespace alone is
+// not a change. An unknown ca_name is one the API must discover again.
+func microsoftADCSCAConfigurationDiffers(plan certManagerExternalCAMicrosoftADCSResourceModel, current infisical.MicrosoftADCSCAConfiguration) bool {
+	currentCaName := ""
+	if current.CaName != nil {
+		currentCaName = *current.CaName
+	}
+	return plan.AppConnectionId.ValueString() != current.AppConnectionId ||
 		plan.CaName.IsUnknown() ||
-		strings.TrimSpace(plan.CaName.ValueString()) != strings.TrimSpace(state.CaName.ValueString())
+		strings.TrimSpace(plan.CaName.ValueString()) != strings.TrimSpace(currentCaName)
 }
 
 // The API trims ca_name. Keeping the configured spelling when only whitespace differs avoids a
@@ -285,10 +291,19 @@ func (r *certManagerExternalCAMicrosoftADCSResource) Update(ctx context.Context,
 		Status: plan.Status.ValueString(),
 	}
 
+	current, err := r.client.GetMicrosoftADCSCA(state.Id.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Microsoft ADCS CA",
+			"Couldn't read Microsoft ADCS CA before updating it, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	// When configuration is sent, the API requires permission to use the app connection and checks
 	// that the CA is reachable. Leaving it out lets an identity that can only edit CAs rename or
 	// disable this one.
-	if microsoftADCSCAConfigurationChanged(plan, state) {
+	if microsoftADCSCAConfigurationDiffers(plan, current.Configuration) {
 		configuration := microsoftADCSCAConfigurationFromPlan(plan)
 		request.Configuration = &configuration
 	}

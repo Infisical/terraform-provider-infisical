@@ -456,3 +456,59 @@ func TestMicrosoftADCSCARejectsWhitespaceOnlyCaName(t *testing.T) {
 		}
 	}
 }
+
+// The UI can change the connection or ca_name between plan and apply (a saved plan, or
+// -refresh=false). Update must then send configuration, or the API keeps the UI's value and
+// Terraform rejects the result as inconsistent with the plan.
+func TestMicrosoftADCSCAUpdateSendsConfigurationChangedSincePlan(t *testing.T) {
+	cases := map[string]infisical.MicrosoftADCSCAConfiguration{
+		"ca_name changed in the UI":    {AppConnectionId: testMicrosoftADCSConnectionID, CaName: stringPtr("CORP-CA01-CA")},
+		"connection changed in the UI": {AppConnectionId: testOtherADCSConnectionID, CaName: stringPtr(testDiscoveredCaName)},
+	}
+
+	for name, changedInUI := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			s := microsoftADCSCATestSchema(t)
+			backend := newFakeMicrosoftADCSCABackend(t)
+			r := newMicrosoftADCSCATestResource(t, backend)
+
+			createResp := resource.CreateResponse{State: tfsdk.State{Schema: s}}
+			r.Create(ctx, resource.CreateRequest{Plan: microsoftADCSCAPlan(t, s, certManagerExternalCAMicrosoftADCSResourceModel{
+				Id:              types.StringUnknown(),
+				Name:            types.StringValue("corporate-adcs"),
+				Status:          types.StringValue("active"),
+				AppConnectionId: types.StringValue(testMicrosoftADCSConnectionID),
+				CaName:          types.StringUnknown(),
+			})}, &createResp)
+			if createResp.Diagnostics.HasError() {
+				t.Fatal(createResp.Diagnostics)
+			}
+
+			// The plan renames the CA from the state it had; then the UI changes the configuration.
+			planModel := microsoftADCSCAModel(t, createResp.State)
+			planModel.Name = types.StringValue("corporate-adcs-renamed")
+			ca := backend.cas[testMicrosoftADCSCAID]
+			ca.Configuration = changedInUI
+			backend.cas[testMicrosoftADCSCAID] = ca
+
+			updateResp := resource.UpdateResponse{State: createResp.State}
+			r.Update(ctx, resource.UpdateRequest{Plan: microsoftADCSCAPlan(t, s, planModel), State: createResp.State}, &updateResp)
+			if updateResp.Diagnostics.HasError() {
+				t.Fatal(updateResp.Diagnostics)
+			}
+			if _, sent := backend.lastBody["configuration"]; !sent {
+				t.Errorf("a configuration changed since the plan must be sent, got body %v", backend.lastBody)
+			}
+			got := microsoftADCSCAModel(t, updateResp.State)
+			if !got.AppConnectionId.Equal(planModel.AppConnectionId) || !got.CaName.Equal(planModel.CaName) {
+				t.Errorf("state must match the plan, got connection %s and ca_name %s, planned %s and %s",
+					got.AppConnectionId, got.CaName, planModel.AppConnectionId, planModel.CaName)
+			}
+		})
+	}
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
