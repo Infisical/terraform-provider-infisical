@@ -22,9 +22,10 @@ const (
 	testProjectDescription = "Owner: platform-team@example.com"
 )
 
-// Fake of GET /api/v1/workspace/:workspaceId (backend/src/server/routes/v1/deprecated-project-router.ts)
-// and PATCH /api/v1/projects/:projectId (backend/src/server/routes/v1/project-router.ts): the PATCH
-// stores the trimmed description and the GET returns it.
+// Fake of POST /api/v2/workspace (backend/src/server/routes/v2/deprecated-project-router.ts),
+// GET /api/v1/workspace/:workspaceId (backend/src/server/routes/v1/deprecated-project-router.ts)
+// and PATCH /api/v1/projects/:projectId (backend/src/server/routes/v1/project-router.ts): the POST
+// and PATCH store the trimmed description and the GET returns it.
 type fakeProjectBackend struct {
 	t           *testing.T
 	exists      bool
@@ -60,6 +61,19 @@ func (b *fakeProjectBackend) get(w http.ResponseWriter, _ *http.Request) {
 	b.writeJSON(w, http.StatusOK, map[string]any{"workspace": b.project()})
 }
 
+func (b *fakeProjectBackend) create(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ProjectDescription string `json:"projectDescription"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		b.t.Error(err)
+		return
+	}
+	b.exists = true
+	b.description = strings.TrimSpace(body.ProjectDescription)
+	b.writeJSON(w, http.StatusOK, map[string]any{"project": b.project()})
+}
+
 func (b *fakeProjectBackend) update(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Description *string `json:"description"`
@@ -77,6 +91,7 @@ func (b *fakeProjectBackend) update(w http.ResponseWriter, r *http.Request) {
 func newTestProjectResource(t *testing.T, backend *fakeProjectBackend) *projectResource {
 	t.Helper()
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v2/workspace", backend.create)
 	mux.HandleFunc("GET /api/v1/workspace/{id}", backend.get)
 	mux.HandleFunc("PATCH /api/v1/projects/{id}", backend.update)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -191,6 +206,53 @@ func TestProjectReadRemovesMissingProject(t *testing.T) {
 				t.Error("expected the project to be removed from state")
 			}
 		})
+	}
+}
+
+// Creating a project with description_wo sends the write-only value to Infisical and keeps
+// the description out of state, even though Infisical returns it.
+func TestProjectCreateWithDescriptionWO(t *testing.T) {
+	s := projectTestSchema(t)
+	backend := &fakeProjectBackend{t: t}
+	r := newTestProjectResource(t, backend)
+
+	configured := projectResourceModel{
+		Name:                 types.StringValue("My Project"),
+		Slug:                 types.StringValue("my-project"),
+		DescriptionWO:        types.StringValue(testProjectDescription),
+		DescriptionWOVersion: types.Int64Value(1),
+	}
+
+	planned := configured
+	planned.DescriptionWO = types.StringNull()
+	planned.ID = types.StringUnknown()
+	planned.Type = types.StringUnknown()
+	planned.KmsSecretManagerKeyId = types.StringUnknown()
+	planned.HasDeleteProtection = types.BoolUnknown()
+	planned.AuditLogRetentionDays = types.Int64Unknown()
+	planned.LastUpdated = types.StringUnknown()
+
+	resp := resource.CreateResponse{State: tfsdk.State{Schema: s}}
+	r.Create(context.Background(), resource.CreateRequest{
+		Config: tfsdk.Config{Schema: s, Raw: projectTestState(t, s, configured).Raw},
+		Plan:   tfsdk.Plan{Schema: s, Raw: projectTestState(t, s, planned).Raw},
+	}, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	if backend.description != testProjectDescription {
+		t.Errorf("description sent to Infisical: got %q, want %q", backend.description, testProjectDescription)
+	}
+	model := projectStateModel(t, resp.State)
+	if model.ID.ValueString() != testProjectID {
+		t.Errorf("id: got %v, want %q", model.ID, testProjectID)
+	}
+	if !model.Description.IsNull() || !model.DescriptionWO.IsNull() {
+		t.Errorf("expected the description to stay out of state, got description=%v description_wo=%v", model.Description, model.DescriptionWO)
+	}
+	if model.DescriptionWOVersion.ValueInt64() != 1 {
+		t.Errorf("description_wo_version: got %v, want 1", model.DescriptionWOVersion)
 	}
 }
 
