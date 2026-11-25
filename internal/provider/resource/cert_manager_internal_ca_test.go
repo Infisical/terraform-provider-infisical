@@ -403,6 +403,25 @@ func TestInternalCAReadBackAfterCreate(t *testing.T) {
 	})
 }
 
+func TestInternalCAAwsKmsIgnoredByOldServerSkipsTheReadBack(t *testing.T) {
+	s := internalCATestSchema(t)
+	backend := newFakeInternalCABackend(t)
+	backend.oldServer = true
+	backend.failGet = true
+	r := newInternalCATestResource(t, backend)
+
+	created := createInternalCA(t, r, internalCAPlan(t, s, internalCAModel(CA_KEY_SOURCE_AWS_KMS, func(m *certManagerInternalCAResourceModel) {
+		m.AppConnectionId = types.StringValue(testAppConnectionID)
+		m.Region = types.StringValue("us-east-1")
+	})))
+	if !created.Diagnostics.HasError() || !strings.Contains(created.Diagnostics.Errors()[0].Detail(), CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_AWS_KMS]) {
+		t.Fatalf("expected an error naming the minimum version, got %v", created.Diagnostics)
+	}
+	if backend.gets != 0 || backend.deletes != 1 || len(backend.cas) != 0 || !created.State.Raw.IsNull() {
+		t.Errorf("expected no read, one delete and nothing in state, got %d reads, %d deletes, %d CAs", backend.gets, backend.deletes, len(backend.cas))
+	}
+}
+
 func TestInternalCADefaultKeySourceOnOldServer(t *testing.T) {
 	s := internalCATestSchema(t)
 	backend := newFakeInternalCABackend(t)

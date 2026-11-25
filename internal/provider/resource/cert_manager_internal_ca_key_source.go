@@ -220,7 +220,7 @@ func (r *certManagerInternalCAResource) readCreatedCA(ctx context.Context, id st
 
 func (r *certManagerInternalCAResource) confirmCreatedKeySource(ctx context.Context, plan *certManagerInternalCAResourceModel, created infisical.CreateInternalCAResponse, resp *resource.CreateResponse) bool {
 	configuration := created.Configuration
-	if configuration.KeySource == "" && plannedKeySource(plan.KeySource) != CA_KEY_SOURCE_INFISICAL {
+	if configuration.KeySource == "" && plannedKeySource(plan.KeySource) == CA_KEY_SOURCE_HSM {
 		ca, err := r.readCreatedCA(ctx, created.Id)
 		if err != nil {
 			plan.Id = types.StringValue(created.Id)
