@@ -243,8 +243,13 @@ func TestInternalCACreateAndReadKeepMlDsaKeyAlgorithm(t *testing.T) {
 		t.Errorf("create sent keyAlgorithm %q, want ML-DSA-65", sentKeyAlgorithm)
 	}
 
-	readResp := resource.ReadResponse{State: resp.State}
-	(&certManagerInternalCAResource{client: client}).Read(context.Background(), resource.ReadRequest{State: resp.State}, &readResp)
+	// Start Read from another key algorithm, so the assertion below only passes if Read copies it from the API.
+	priorState := resp.State
+	if diags := priorState.SetAttribute(context.Background(), path.Root("key_algorithm"), DEFAULT_CA_KEY_ALGORITHM); diags.HasError() {
+		t.Fatal(diags)
+	}
+	readResp := resource.ReadResponse{State: priorState}
+	(&certManagerInternalCAResource{client: client}).Read(context.Background(), resource.ReadRequest{State: priorState}, &readResp)
 	if readResp.Diagnostics.HasError() {
 		t.Fatal(readResp.Diagnostics)
 	}
@@ -276,7 +281,7 @@ func TestInternalCACreateSurfacesPqcLicenseError(t *testing.T) {
 	}
 }
 
-func TestCertReadKeepsPqcAlgorithms(t *testing.T) {
+func TestCertReadSetsPqcAlgorithmsFromApi(t *testing.T) {
 	cases := []struct{ key, signature string }{
 		{"ML-DSA-65", "ML-DSA-65"},
 		{"ML-DSA-44", "ML-DSA-65"},
@@ -298,16 +303,14 @@ func TestCertReadKeepsPqcAlgorithms(t *testing.T) {
 					http.NotFound(w, req)
 				}
 			})
-			state := fieldCertModel()
-			state.KeyAlgorithm = types.StringValue(c.key)
-			state.SignatureAlgorithm = types.StringValue(c.signature)
-			resp := runRead(t, r, state)
+			// fieldCertModel starts at RSA_2048 / RSA-SHA256, so the values below can only come from the API.
+			resp := runRead(t, r, fieldCertModel())
 			if resp.Diagnostics.HasError() {
 				t.Fatal(resp.Diagnostics)
 			}
 			got := stateModel(t, resp.State)
 			if got.KeyAlgorithm.ValueString() != c.key || got.SignatureAlgorithm.ValueString() != c.signature {
-				t.Errorf("read changed the algorithms to %s / %s", got.KeyAlgorithm, got.SignatureAlgorithm)
+				t.Errorf("read set the algorithms to %s / %s, want %s / %s", got.KeyAlgorithm, got.SignatureAlgorithm, c.key, c.signature)
 			}
 		})
 	}
@@ -389,5 +392,38 @@ func TestCsrMatchesCertificateKeyForPqcKeys(t *testing.T) {
 				t.Error("a certificate for another key must not match")
 			}
 		})
+	}
+}
+
+func TestCertValidateConfigRefusesEnciphermentUsagesForPqcKeys(t *testing.T) {
+	ctx := context.Background()
+	s := certTestSchema(t)
+	for _, tc := range []struct {
+		keyAlgorithm string
+		keyUsages    []string
+		wantError    bool
+	}{
+		{"ML-DSA-65", []string{"digital_signature", "key_encipherment"}, true},
+		{"SLH-DSA-SHA2-128f", []string{"key_agreement"}, true},
+		{"ML-DSA-44", []string{"data_encipherment"}, true},
+		{"ML-DSA-65", []string{"digital_signature", "non_repudiation"}, false},
+		{"RSA_2048", []string{"digital_signature", "key_encipherment"}, false},
+		{"", []string{"key_encipherment"}, false},
+	} {
+		model := configFromModel(fieldCertModel())
+		model.KeyAlgorithm = types.StringNull()
+		if tc.keyAlgorithm != "" {
+			model.KeyAlgorithm = types.StringValue(tc.keyAlgorithm)
+		}
+		usages, diags := types.ListValueFrom(ctx, types.StringType, tc.keyUsages)
+		if diags.HasError() {
+			t.Fatal(diags)
+		}
+		model.KeyUsages = usages
+		resp := resource.ValidateConfigResponse{}
+		(&certManagerCertificateResource{}).ValidateConfig(ctx, resource.ValidateConfigRequest{Config: certConfig(t, s, &model)}, &resp)
+		if resp.Diagnostics.HasError() != tc.wantError {
+			t.Errorf("key_algorithm=%q key_usages=%v: diagnostics %v, want error %t", tc.keyAlgorithm, tc.keyUsages, resp.Diagnostics, tc.wantError)
+		}
 	}
 }

@@ -442,7 +442,11 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 func (r *certManagerCertificateResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config certManagerCertificateResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-	if resp.Diagnostics.HasError() || config.RevocationReason.IsNull() || config.RevocationReason.IsUnknown() {
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	validatePqcKeyUsages(ctx, config, resp)
+	if config.RevocationReason.IsNull() || config.RevocationReason.IsUnknown() {
 		return
 	}
 	if config.RevokeOnDestroy.ValueBool() || config.RevokeOnDestroy.IsUnknown() {
@@ -453,6 +457,33 @@ func (r *certManagerCertificateResource) ValidateConfig(ctx context.Context, req
 		"Revocation reason has no effect",
 		"revocation_reason_on_destroy is only used when revoke_on_destroy is true.",
 	)
+}
+
+// Infisical core refuses these usages for an ML-DSA or SLH-DSA key, because those keys only sign. It checks this at
+// issuance, so without this check plan succeeds and apply fails.
+var pqcInvalidKeyUsages = []string{"key_encipherment", "key_agreement", "data_encipherment"}
+
+func validatePqcKeyUsages(ctx context.Context, config certManagerCertificateResourceModel, resp *resource.ValidateConfigResponse) {
+	if config.KeyAlgorithm.IsNull() || config.KeyAlgorithm.IsUnknown() || !slices.Contains(PQC_ALGORITHMS, config.KeyAlgorithm.ValueString()) ||
+		config.KeyUsages.IsNull() || config.KeyUsages.IsUnknown() {
+		return
+	}
+	var keyUsages []types.String
+	resp.Diagnostics.Append(config.KeyUsages.ElementsAs(ctx, &keyUsages, false)...)
+	var invalid []string
+	for _, usage := range keyUsages {
+		if !usage.IsUnknown() && slices.Contains(pqcInvalidKeyUsages, usage.ValueString()) {
+			invalid = append(invalid, usage.ValueString())
+		}
+	}
+	if len(invalid) > 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("key_usages"),
+			"Key usage not allowed with a post-quantum key",
+			fmt.Sprintf("key_algorithm %s is a post-quantum signature algorithm, so the certificate can't have the key usages %s. Remove them from key_usages.",
+				config.KeyAlgorithm.ValueString(), strings.Join(invalid, ", ")),
+		)
+	}
 }
 
 func (r *certManagerCertificateResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
