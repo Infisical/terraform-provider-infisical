@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	infisical "terraform-provider-infisical/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -538,5 +540,31 @@ func TestManagedCredentialsEmptyStringMatchesAbsent(t *testing.T) {
 		if differing := r.credentialsDifferingFromInfisical(planned, api); len(differing) != 0 {
 			t.Errorf("an empty ssl_certificate must match %v, got %v", api, differing)
 		}
+	}
+}
+
+// Azure marks client_id sensitive, but GET returns it and Infisical rotates only the client
+// secret: changing client_id alone would send the rotated-away secret, so it needs the current
+// one, while a change to client_secret is the user's own and is sent.
+func TestRotatingAzureClientIDIsNotASecret(t *testing.T) {
+	r, ok := NewAppConnectionAzureResource().(*AppConnectionBaseResource)
+	if !ok {
+		t.Fatal("expected the base resource")
+	}
+	connection := infisical.AppConnection{IsAutoRotationEnabled: true, Credentials: map[string]any{"clientId": "client-a", "tenantId": "tenant"}}
+	current := credentialsObject(t, r, map[string]attr.Value{
+		"client_id": types.StringValue("client-a"), "tenant_id": types.StringValue("tenant"), "client_secret": types.StringValue("secret-a"),
+	})
+	clientIDOnly := credentialsObject(t, r, map[string]attr.Value{
+		"client_id": types.StringValue("client-b"), "tenant_id": types.StringValue("tenant"), "client_secret": types.StringValue("secret-a"),
+	})
+	if !r.needsCurrentPassword(connection, clientIDOnly, current) {
+		t.Error("changing client_id alone must need the current client secret")
+	}
+	withSecret := credentialsObject(t, r, map[string]attr.Value{
+		"client_id": types.StringValue("client-b"), "tenant_id": types.StringValue("tenant"), "client_secret": types.StringValue("secret-b"),
+	})
+	if r.needsCurrentPassword(connection, withSecret, current) {
+		t.Error("a change that sets the client secret is the user's own and must be sent")
 	}
 }

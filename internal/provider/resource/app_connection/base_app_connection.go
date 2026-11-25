@@ -57,11 +57,7 @@ func (r *AppConnectionBaseResource) credentialsDifferingFromInfisical(planned ty
 		if value.IsUnknown() {
 			continue
 		}
-		key, mapped := r.CredentialsAPIKeys[name]
-		if !mapped {
-			key = snakeToCamel(name)
-		}
-		apiValue, returned := apiCredentials[key]
+		apiValue, returned := apiCredentials[r.credentialsAPIKey(name)]
 		if !returned {
 			attribute, known := r.CredentialsAttributes[name]
 			if known && attribute.IsSensitive() {
@@ -392,11 +388,11 @@ func (r *AppConnectionBaseResource) ConfigValidators(_ context.Context) []resour
 	return []resource.ConfigValidator{resourcevalidator.Conflicting(gatewayPaths...)}
 }
 
-// ModifyPlan handles configured credentials that differ from state on a connection whose
-// credentials Infisical manages. Update never sends them, so when state has none (after an
-// import, or after Infisical changed them) the plan warns and the apply records the configured
-// ones; a change to credentials already in state is refused, because it would never reach
-// Infisical.
+// ModifyPlan checks configured credentials that differ from state on a connection whose
+// credentials Infisical manages. With rotation on, a change that would send a password Infisical
+// may have rotated is refused. When the apply would record the credentials without sending them
+// (always for platform-managed credentials; with rotation on, after an import or a rotation), a
+// non-secret field that differs from Infisical's is refused, and otherwise the plan warns.
 func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
@@ -458,18 +454,30 @@ func recordsCredentialsWithoutSending(appConnection infisical.AppConnection, sta
 // needsCurrentPassword reports whether a credentials change on a connection with rotation on would
 // send a password Terraform can't vouch for. The API takes the credentials as one object, so a
 // change to a setting such as a certificate sends the configured password too, and Infisical may
-// have rotated it since. A change that sets a secret field is the user's own, and is sent.
+// have rotated it since. A change that sets a secret field is the user's own, and is sent. A secret
+// field is one marked sensitive that Infisical doesn't return: Azure marks client_id sensitive, but
+// GET returns it, and Infisical rotates only the client secret.
 func (r *AppConnectionBaseResource) needsCurrentPassword(appConnection infisical.AppConnection, planned, current types.Object) bool {
 	if !appConnection.IsAutoRotationEnabled || credentialsUnset(current) || planned.Equal(current) {
 		return false
 	}
 	plannedAttributes, currentAttributes := planned.Attributes(), current.Attributes()
 	for name, attribute := range r.CredentialsAttributes {
-		if attribute.IsSensitive() && !plannedAttributes[name].Equal(currentAttributes[name]) {
+		if _, returned := appConnection.Credentials[r.credentialsAPIKey(name)]; returned || !attribute.IsSensitive() {
+			continue
+		}
+		if !plannedAttributes[name].Equal(currentAttributes[name]) {
 			return false
 		}
 	}
 	return true
+}
+
+func (r *AppConnectionBaseResource) credentialsAPIKey(name string) string {
+	if key, mapped := r.CredentialsAPIKeys[name]; mapped {
+		return key
+	}
+	return snakeToCamel(name)
 }
 
 func rotationNeedsPasswordDetail(appConnectionName string) string {
