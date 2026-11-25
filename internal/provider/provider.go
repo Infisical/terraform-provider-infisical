@@ -438,6 +438,7 @@ func (p *infisicalProvider) Resources(_ context.Context) []func() resource.Resou
 		infisicalResource.NewGroupResource,
 		infisicalResource.NewGroupUserResource,
 		infisicalResource.NewEmailDomainResource,
+		infisicalResource.NewEmailDomainVerificationResource,
 		infisicalResource.NewGroupMachineIdentityResource,
 		infisicalResource.NewSubOrganizationGroupResource,
 		infisicalResource.NewProjectScopedIdentityResource,

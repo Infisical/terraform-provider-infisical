@@ -1,11 +1,14 @@
 package infisicalclient
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"testing"
+
+	infisicalerrors "terraform-provider-infisical/internal/errors"
 )
 
 const emailDomainsListJSON = `{"emailDomains":[
@@ -94,5 +97,42 @@ func TestDeleteEmailDomain(t *testing.T) {
 	blocked := testClient(t, jsonResponse(http.StatusBadRequest, `{"statusCode":400,"message":"Turn off SSO enforcement before deleting it."}`))
 	if err := blocked.DeleteEmailDomain(DeleteEmailDomainRequest{ID: "d1"}); err == nil || errors.Is(err, ErrNotFound) {
 		t.Errorf("expected a non-ErrNotFound error, got: %v", err)
+	}
+}
+
+func TestVerifyEmailDomain(t *testing.T) {
+	var gotMethod, gotPath string
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		jsonResponse(http.StatusOK, `{"emailDomain":{"id":"d1","domain":"example.com","status":"verified"}}`)(w, r)
+	})
+
+	emailDomain, err := client.VerifyEmailDomainWithContext(context.Background(), VerifyEmailDomainRequest{ID: "d1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/api/v1/email-domains/d1/verify" {
+		t.Errorf("unexpected request: %s %s", gotMethod, gotPath)
+	}
+	if emailDomain.Status != EmailDomainStatusVerified {
+		t.Errorf("unexpected email domain: %+v", emailDomain)
+	}
+
+	notFound := testClient(t, jsonResponse(http.StatusNotFound, `{"statusCode":404,"message":"Email domain not found."}`))
+	if _, err := notFound.VerifyEmailDomainWithContext(context.Background(), VerifyEmailDomainRequest{ID: "d1"}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got: %v", err)
+	}
+
+	conflict := testClient(t, jsonResponse(http.StatusConflict, `{"statusCode":409,"message":"Email domain 'example.com' is already verified."}`))
+	_, err = conflict.VerifyEmailDomainWithContext(context.Background(), VerifyEmailDomainRequest{ID: "d1"})
+	var apiErr *infisicalerrors.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusConflict || apiErr.ErrorMessage != "Email domain 'example.com' is already verified." {
+		t.Errorf("expected a 409 APIError with the message, got: %v", err)
+	}
+
+	dnsMiss := testClient(t, jsonResponse(http.StatusBadRequest, `{"statusCode":400,"error":"EMAIL_DOMAIN_DNS_RECORD_MISMATCH","message":"DNS TXT record not found or value does not match."}`))
+	_, err = dnsMiss.VerifyEmailDomainWithContext(context.Background(), VerifyEmailDomainRequest{ID: "d1"})
+	if !errors.As(err, &apiErr) || apiErr.ErrorCode != "EMAIL_DOMAIN_DNS_RECORD_MISMATCH" {
+		t.Errorf("expected a 400 APIError with the error code, got: %v", err)
 	}
 }

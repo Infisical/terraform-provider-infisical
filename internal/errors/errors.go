@@ -28,6 +28,7 @@ type APIError struct {
 	URL               string `json:"url"`
 	StatusCode        int    `json:"statusCode"`
 	ErrorMessage      string `json:"message,omitempty"`
+	ErrorCode         string `json:"error,omitempty"`
 	ReqId             string `json:"reqId,omitempty"`
 }
 
@@ -53,7 +54,7 @@ func (e *APIError) Error() string {
 }
 
 func NewAPIErrorWithResponse(operation string, res *resty.Response, additionalContext *string) error {
-	errorMessage := tryParseErrorBody(res)
+	errorMessage, errorCode := tryParseErrorBody(res)
 	reqId := tryExtractReqId(res)
 
 	if res == nil {
@@ -65,6 +66,7 @@ func NewAPIErrorWithResponse(operation string, res *resty.Response, additionalCo
 		Method:     res.Request.Method,
 		URL:        res.Request.URL,
 		StatusCode: res.StatusCode(),
+		ErrorCode:  errorCode,
 		ReqId:      reqId,
 	}
 
@@ -79,24 +81,26 @@ func NewAPIErrorWithResponse(operation string, res *resty.Response, additionalCo
 	return apiError
 }
 
-func tryParseErrorBody(res *resty.Response) string {
+// tryParseErrorBody returns the message and the error code of an error response.
+func tryParseErrorBody(res *resty.Response) (string, string) {
 	if res == nil || !res.IsError() {
-		return ""
+		return "", ""
 	}
 
 	body := res.String()
 	if body == "" {
-		return ""
+		return "", ""
 	}
 
 	type ErrorResponse struct {
 		Message string `json:"message"`
+		Error   string `json:"error"`
 		ReqId   string `json:"reqId"`
 	}
 
 	// stringify zod body entirely
 	if res.StatusCode() == 422 {
-		return body
+		return body, ""
 	}
 
 	// now we have a string, we need to try to parse it as json
@@ -104,10 +108,10 @@ func tryParseErrorBody(res *resty.Response) string {
 	err := json.Unmarshal([]byte(body), &errorResponse)
 
 	if err != nil {
-		return ""
+		return "", ""
 	}
 
-	return errorResponse.Message
+	return errorResponse.Message, errorResponse.Error
 }
 
 func tryExtractReqId(res *resty.Response) string {

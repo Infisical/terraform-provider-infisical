@@ -5398,6 +5398,7 @@ type EmailDomain struct {
 	Domain                 string `json:"domain"`
 	VerificationCode       string `json:"verificationCode"`
 	VerificationRecordName string `json:"verificationRecordName"`
+	Status                 string `json:"status"`
 }
 
 type CreateEmailDomainRequest struct {
@@ -5418,4 +5419,12 @@ type GetEmailDomainByIDRequest struct {
 
 type DeleteEmailDomainRequest struct {
 	ID string
+}
+
+type VerifyEmailDomainRequest struct {
+	ID string
+}
+
+type VerifyEmailDomainResponse struct {
+	EmailDomain EmailDomain `json:"emailDomain"`
 }
