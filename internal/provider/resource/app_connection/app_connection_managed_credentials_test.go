@@ -399,3 +399,52 @@ func TestCredentialValueMatchesInt32(t *testing.T) {
 		t.Error("an Int32 port equal to Infisical's must match")
 	}
 }
+
+// With rotation on, a change to a non-secret field alone would send the configured password,
+// which Infisical may have rotated, so it is refused at plan and at apply.
+func TestRotatingConnectionRefusesChangeWithoutPassword(t *testing.T) {
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	backend := newFakeADCSConnectionBackend(t)
+	r := newADCSTestResource(t, backend)
+	seedManagedConnection(backend, map[string]any{"isAutoRotationEnabled": true, "hasRotation": true})
+	imported := importAndRead(t, r)
+	first := resource.UpdateResponse{State: imported}
+	r.Update(ctx, resource.UpdateRequest{Plan: adcsPlan(t, s, types.StringValue(testADCSConnectionID), testADCSFirstPassword), State: imported}, &first)
+	if first.Diagnostics.HasError() {
+		t.Fatal(first.Diagnostics)
+	}
+
+	hostOnly := modelWithCredentials(t, first.State, "ca02.corp.example.com", types.StringValue(testADCSFirstPassword))
+	if resp := modifyPlan(t, r, first.State, hostOnly); !resp.Diagnostics.HasError() {
+		t.Errorf("a host change without a new password must fail the plan, got %v", resp.Diagnostics)
+	}
+
+	plan := tfsdk.Plan{Schema: s}
+	if diags := plan.Set(ctx, hostOnly); diags.HasError() {
+		t.Fatal(diags)
+	}
+	requestsBefore := backend.requests
+	updateResp := resource.UpdateResponse{State: first.State}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: first.State}, &updateResp)
+	if !updateResp.Diagnostics.HasError() {
+		t.Error("a host change without a new password must fail at apply too")
+	}
+	if backend.requests != requestsBefore+1 {
+		t.Errorf("only the read before the update may reach the API, got %d requests", backend.requests-requestsBefore)
+	}
+}
+
+// Removing a setting Infisical still has is a mismatch, or the removal would be recorded but
+// never reach Infisical.
+func TestManagedCredentialsRemovedFieldIsAMismatch(t *testing.T) {
+	differing := credentialsDifferingFromInfisical(
+		types.ObjectValueMust(adcsCredentialsAttrTypes, map[string]attr.Value{
+			"host": types.StringNull(), "username": types.StringNull(), "password": types.StringValue("secret"),
+		}),
+		map[string]any{"host": "ca01.corp.example.com", "username": ""},
+	)
+	if len(differing) != 1 || differing[0] != "credentials.host" {
+		t.Errorf("a removed host Infisical still has must differ, and an empty username must not, got %v", differing)
+	}
+}

@@ -32,12 +32,10 @@ var (
 	_ resource.ResourceWithModifyPlan       = &AppConnectionBaseResource{}
 )
 
-// credentialsManagedByInfisical reports whether Infisical owns the connection's credentials:
-// platform-managed credentials or a credential rotation that is turned on. Infisical rejects an
-// update that sends credentials to a platform-managed connection, and replaces credentials it
-// rotates (backend/src/services/app-connection/app-connection-service.ts in Infisical core), so
-// the provider never sends them for these connections. A paused rotation can't be detected:
-// GET by ID doesn't return the rotation, only the list endpoint does.
+// credentialsManagedByInfisical reports whether Infisical changes the connection's credentials
+// itself: platform-managed credentials or a credential rotation that is turned on
+// (backend/src/services/app-connection/app-connection-service.ts in Infisical core). A paused
+// rotation can't be detected: GET by ID doesn't return the rotation, only the list endpoint does.
 func credentialsManagedByInfisical(appConnection infisical.AppConnection) bool {
 	return appConnection.IsPlatformManagedCredentials || appConnection.IsAutoRotationEnabled
 }
@@ -55,7 +53,14 @@ func credentialsDifferingFromInfisical(planned types.Object, apiCredentials map[
 	var differing []string
 	for name, value := range planned.Attributes() {
 		apiValue, returned := apiCredentials[snakeToCamel(name)]
-		if !returned || value.IsNull() || value.IsUnknown() {
+		if !returned || value.IsUnknown() {
+			continue
+		}
+		// A removed setting matches only when Infisical has none either.
+		if value.IsNull() {
+			if apiValue != nil && apiValue != "" {
+				differing = append(differing, "credentials."+name)
+			}
 			continue
 		}
 		if !credentialValueMatches(value, apiValue) {
@@ -393,7 +398,14 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 
 	// A failed read here is not worth failing the plan over: Update reads the connection again.
 	appConnection, err := r.readConnection(id.ValueString())
-	if err != nil || !recordsCredentialsWithoutSending(appConnection, current) {
+	if err != nil {
+		return
+	}
+	if r.needsCurrentPassword(appConnection, planned, current) {
+		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", rotationNeedsPasswordDetail(r.AppConnectionName))
+		return
+	}
+	if !recordsCredentialsWithoutSending(appConnection, current) {
 		return
 	}
 
@@ -418,6 +430,27 @@ func recordsCredentialsWithoutSending(appConnection infisical.AppConnection, sta
 		return true
 	}
 	return appConnection.IsAutoRotationEnabled && credentialsUnset(stateCredentials)
+}
+
+// needsCurrentPassword reports whether a credentials change on a connection with rotation on would
+// send a password Terraform can't vouch for. The API takes the credentials as one object, so a
+// change to a setting such as a certificate sends the configured password too, and Infisical may
+// have rotated it since. A change that sets a secret field is the user's own, and is sent.
+func (r *AppConnectionBaseResource) needsCurrentPassword(appConnection infisical.AppConnection, planned, current types.Object) bool {
+	if !appConnection.IsAutoRotationEnabled || credentialsUnset(current) || planned.Equal(current) {
+		return false
+	}
+	plannedAttributes, currentAttributes := planned.Attributes(), current.Attributes()
+	for name, attribute := range r.CredentialsAttributes {
+		if attribute.IsSensitive() && !plannedAttributes[name].Equal(currentAttributes[name]) {
+			return false
+		}
+	}
+	return true
+}
+
+func rotationNeedsPasswordDetail(appConnectionName string) string {
+	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection. Changing them sends the password too, and the configured one may no longer be current. Set the current password in the configuration along with this change.", appConnectionName)
 }
 
 func credentialsManager(appConnection infisical.AppConnection) string {
@@ -706,7 +739,11 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	skipCredentials := recordsCredentialsWithoutSending(current, state.Credentials) ||
 		(current.IsAutoRotationEnabled && plan.Credentials.Equal(state.Credentials))
 
-	// ModifyPlan refuses this when it can; a credential known only at apply reaches here.
+	// ModifyPlan refuses these when it can; a credential known only at apply reaches here.
+	if r.needsCurrentPassword(current, plan.Credentials, state.Credentials) {
+		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", rotationNeedsPasswordDetail(r.AppConnectionName))
+		return
+	}
 	if recordsCredentialsWithoutSending(current, state.Credentials) {
 		if differing := credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
 			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, current, differing))
