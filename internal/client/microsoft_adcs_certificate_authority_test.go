@@ -40,13 +40,20 @@ func TestMicrosoftADCSCAUsesTheAdcsRoutes(t *testing.T) {
 	caName := "corp-ca01-CA"
 	if _, err := client.UpdateMicrosoftADCSCA(UpdateMicrosoftADCSCARequest{
 		CAId: "ca-1", Name: "corporate-adcs", Status: "disabled",
-		Configuration: MicrosoftADCSCAConfiguration{AppConnectionId: "conn-1", CaName: &caName},
+		Configuration: &MicrosoftADCSCAConfiguration{AppConnectionId: "conn-1", CaName: &caName},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	configuration, _ = gotBody["configuration"].(map[string]any)
 	if gotMethod != http.MethodPatch || gotPath != "/api/v1/cert-manager/ca/adcs/ca-1" || configuration["caName"] != caName {
 		t.Errorf("update went to %s %s with body %v", gotMethod, gotPath, gotBody)
+	}
+
+	if _, err := client.UpdateMicrosoftADCSCA(UpdateMicrosoftADCSCARequest{CAId: "ca-1", Name: "corporate-adcs", Status: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, sent := gotBody["configuration"]; sent {
+		t.Errorf("a nil configuration must be left out of the body, got %v", gotBody)
 	}
 
 	if _, err := client.GetMicrosoftADCSCA("ca-1"); err != nil {

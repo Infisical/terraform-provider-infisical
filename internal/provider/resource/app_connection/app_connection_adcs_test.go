@@ -40,6 +40,7 @@ type fakeADCSConnectionBackend struct {
 	app         string
 	connections map[string]map[string]any
 	credentials map[string]map[string]any
+	requests    int
 	lastBody    map[string]any
 }
 
@@ -63,6 +64,7 @@ func credentialsHash(credentials map[string]any) string {
 
 func (b *fakeADCSConnectionBackend) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b.requests++
 		prefix := "/api/v1/app-connections/" + b.app
 		if !strings.HasPrefix(r.URL.Path, prefix) {
 			b.t.Errorf("unexpected path %s", r.URL.Path)
@@ -263,6 +265,7 @@ func TestADCSAppConnectionReadDetectsOutOfBandCredentialChange(t *testing.T) {
 
 	backend.credentials[testADCSConnectionID] = map[string]any{"password": "changed-in-the-ui"}
 	backend.connections[testADCSConnectionID]["credentialsHash"] = credentialsHash(backend.credentials[testADCSConnectionID])
+	backend.connections[testADCSConnectionID]["name"] = "renamed-in-the-ui"
 
 	readResp := resource.ReadResponse{State: createResp.State}
 	r.Read(ctx, resource.ReadRequest{State: createResp.State}, &readResp)
@@ -277,7 +280,7 @@ func TestADCSAppConnectionReadDetectsOutOfBandCredentialChange(t *testing.T) {
 	if !credentials.Password.IsNull() {
 		t.Error("expected credentials to be nulled so the next plan sends them again")
 	}
-	if model.Name.ValueString() != "adcs-connection" {
+	if model.Name.ValueString() != "renamed-in-the-ui" {
 		t.Errorf("expected the other fields to still refresh, got %+v", model)
 	}
 }
@@ -328,14 +331,18 @@ func TestADCSAppConnectionImport(t *testing.T) {
 func TestADCSAppConnectionReadWithEmptyIDRemovesResource(t *testing.T) {
 	ctx := context.Background()
 	s := adcsTestSchema(t)
-	r := newADCSTestResource(t, newFakeADCSConnectionBackend(t))
+	backend := newFakeADCSConnectionBackend(t)
+	r := newADCSTestResource(t, backend)
 
 	plan := adcsPlan(t, s, types.StringValue(""), "password")
 	state := tfsdk.State{Schema: s, Raw: plan.Raw}
 	readResp := resource.ReadResponse{State: state}
 	r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
 	if readResp.Diagnostics.HasError() || !readResp.State.Raw.IsNull() {
-		t.Errorf("expected the resource to be removed without an API call, got %v", readResp.Diagnostics)
+		t.Errorf("expected the resource to be removed, got %v", readResp.Diagnostics)
+	}
+	if backend.requests != 0 {
+		t.Errorf("an empty ID must not reach the API, got %d requests", backend.requests)
 	}
 }
 

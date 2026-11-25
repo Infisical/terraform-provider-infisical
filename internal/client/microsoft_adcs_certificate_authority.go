@@ -37,10 +37,11 @@ type CreateMicrosoftADCSCARequest struct {
 }
 
 type UpdateMicrosoftADCSCARequest struct {
-	CAId          string                       `json:"-"`
-	Name          string                       `json:"name"`
-	Status        string                       `json:"status"`
-	Configuration MicrosoftADCSCAConfiguration `json:"configuration"`
+	CAId   string `json:"-"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	// Nil leaves the connection and CA name as they are.
+	Configuration *MicrosoftADCSCAConfiguration `json:"configuration,omitempty"`
 }
 
 func (client Client) CreateMicrosoftADCSCA(request CreateMicrosoftADCSCARequest) (MicrosoftADCSCA, error) {

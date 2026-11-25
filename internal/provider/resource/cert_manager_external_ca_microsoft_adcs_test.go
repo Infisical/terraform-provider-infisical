@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -36,6 +37,7 @@ type fakeMicrosoftADCSCABackend struct {
 	t           *testing.T
 	cas         map[string]infisical.MicrosoftADCSCA
 	discoveries int
+	requests    int
 	lastBody    map[string]any
 }
 
@@ -63,6 +65,7 @@ func (b *fakeMicrosoftADCSCABackend) resolveCaName(raw any) *string {
 
 func (b *fakeMicrosoftADCSCABackend) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b.requests++
 		const prefix = "/api/v1/cert-manager/ca/adcs"
 		if !strings.HasPrefix(r.URL.Path, prefix) {
 			b.t.Errorf("unexpected path %s", r.URL.Path)
@@ -198,8 +201,8 @@ func TestMicrosoftADCSCALifecycleWithDiscoveredCaName(t *testing.T) {
 		t.Error("read after create changed state, which would show drift on the next plan")
 	}
 
-	// A status change keeps ca_name from state (see caNameUseStateUnlessConnectionChanges), and the
-	// update must send it, or the API would run discovery again.
+	// A status change keeps ca_name from state (see caNameUseStateUnlessConnectionChanges). The
+	// update must leave configuration out, because sending it needs permission to use the connection.
 	updatePlan := created
 	updatePlan.Status = types.StringValue("disabled")
 	updateResp := resource.UpdateResponse{State: createResp.State}
@@ -207,16 +210,33 @@ func TestMicrosoftADCSCALifecycleWithDiscoveredCaName(t *testing.T) {
 	if updateResp.Diagnostics.HasError() {
 		t.Fatal(updateResp.Diagnostics)
 	}
-	configuration, _ = backend.lastBody["configuration"].(map[string]any)
-	if configuration["caName"] != testDiscoveredCaName {
-		t.Errorf("update must send the known ca_name, got body %v", backend.lastBody)
+	if _, sent := backend.lastBody["configuration"]; sent {
+		t.Errorf("a status change must not send configuration, got body %v", backend.lastBody)
 	}
 	if backend.discoveries != 1 {
 		t.Errorf("expected discovery only on create, got %d discoveries", backend.discoveries)
 	}
-	if got := microsoftADCSCAModel(t, updateResp.State); got.Status.ValueString() != "disabled" {
+	if got := microsoftADCSCAModel(t, updateResp.State); got.Status.ValueString() != "disabled" || got.CaName.ValueString() != testDiscoveredCaName {
 		t.Errorf("unexpected state after update: %+v", got)
 	}
+
+	// A new connection with ca_name unset plans ca_name as unknown, so the API discovers it again.
+	connectionPlan := microsoftADCSCAModel(t, updateResp.State)
+	connectionPlan.AppConnectionId = types.StringValue(testOtherADCSConnectionID)
+	connectionPlan.CaName = types.StringUnknown()
+	connectionResp := resource.UpdateResponse{State: updateResp.State}
+	r.Update(ctx, resource.UpdateRequest{Plan: microsoftADCSCAPlan(t, s, connectionPlan), State: updateResp.State}, &connectionResp)
+	if connectionResp.Diagnostics.HasError() {
+		t.Fatal(connectionResp.Diagnostics)
+	}
+	configuration, _ = backend.lastBody["configuration"].(map[string]any)
+	if configuration["appConnectionId"] != testOtherADCSConnectionID {
+		t.Errorf("a connection change must send configuration, got body %v", backend.lastBody)
+	}
+	if _, sent := configuration["caName"]; sent || backend.discoveries != 2 {
+		t.Errorf("a connection change with ca_name unset must leave caName out so the API discovers it, got body %v and %d discoveries", backend.lastBody, backend.discoveries)
+	}
+	updateResp = connectionResp
 
 	deleteResp := resource.DeleteResponse{State: updateResp.State}
 	r.Delete(ctx, resource.DeleteRequest{State: updateResp.State}, &deleteResp)
@@ -271,7 +291,8 @@ func TestMicrosoftADCSCAKeepsConfiguredCaNameWhenOnlyWhitespaceDiffers(t *testin
 func TestMicrosoftADCSCAReadWithEmptyIDRemovesResource(t *testing.T) {
 	ctx := context.Background()
 	s := microsoftADCSCATestSchema(t)
-	r := newMicrosoftADCSCATestResource(t, newFakeMicrosoftADCSCABackend(t))
+	backend := newFakeMicrosoftADCSCABackend(t)
+	r := newMicrosoftADCSCATestResource(t, backend)
 
 	plan := microsoftADCSCAPlan(t, s, certManagerExternalCAMicrosoftADCSResourceModel{
 		Id:              types.StringValue(""),
@@ -284,7 +305,10 @@ func TestMicrosoftADCSCAReadWithEmptyIDRemovesResource(t *testing.T) {
 	readResp := resource.ReadResponse{State: state}
 	r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
 	if readResp.Diagnostics.HasError() || !readResp.State.Raw.IsNull() {
-		t.Errorf("expected the resource to be removed without an API call, got %v", readResp.Diagnostics)
+		t.Errorf("expected the resource to be removed, got %v", readResp.Diagnostics)
+	}
+	if backend.requests != 0 {
+		t.Errorf("an empty ID must not reach the API, got %d requests", backend.requests)
 	}
 }
 
@@ -411,5 +435,24 @@ func TestMicrosoftADCSCAReadSurfacesServerErrors(t *testing.T) {
 	r.Read(ctx, resource.ReadRequest{State: state}, &readResp)
 	if !readResp.Diagnostics.HasError() {
 		t.Error("a 403 must be an error, not a silent removal from state")
+	}
+}
+
+// The API trims ca_name before its minimum length check, so whitespace alone must fail at plan.
+func TestMicrosoftADCSCARejectsWhitespaceOnlyCaName(t *testing.T) {
+	ctx := context.Background()
+	caName, ok := microsoftADCSCATestSchema(t).Attributes["ca_name"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("ca_name must be a string attribute")
+	}
+
+	for value, wantError := range map[string]bool{"": true, "   ": true, " corp-ca01-CA ": false} {
+		resp := validator.StringResponse{}
+		for _, v := range caName.Validators {
+			v.ValidateString(ctx, validator.StringRequest{Path: path.Root("ca_name"), ConfigValue: types.StringValue(value)}, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantError {
+			t.Errorf("ca_name %q: error = %v, want %v", value, resp.Diagnostics.HasError(), wantError)
+		}
 	}
 }

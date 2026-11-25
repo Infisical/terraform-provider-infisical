@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
@@ -88,8 +89,9 @@ func (r *certManagerExternalCAMicrosoftADCSResource) Schema(_ context.Context, _
 					"On create, and whenever `ca_name` or `app_connection_id` changes, Infisical checks through the Gateway that it can list certificate templates on the CA, and rejects the change if it cannot.",
 				Optional: true,
 				Computed: true,
+				// The API trims ca_name before its minimum length check, so whitespace alone fails at apply.
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must contain a character other than whitespace"),
 				},
 				PlanModifiers: []planmodifier.String{caNameUseStateUnlessConnectionChanges{}},
 			},
@@ -160,6 +162,14 @@ func microsoftADCSCAConfigurationFromPlan(plan certManagerExternalCAMicrosoftADC
 	}
 
 	return configuration
+}
+
+// The API trims ca_name before comparing, so a change in whitespace alone is not a change. An
+// unknown ca_name is one the API must discover again.
+func microsoftADCSCAConfigurationChanged(plan, state certManagerExternalCAMicrosoftADCSResourceModel) bool {
+	return !plan.AppConnectionId.Equal(state.AppConnectionId) ||
+		plan.CaName.IsUnknown() ||
+		strings.TrimSpace(plan.CaName.ValueString()) != strings.TrimSpace(state.CaName.ValueString())
 }
 
 // The API trims ca_name. Keeping the configured spelling when only whitespace differs avoids a
@@ -269,12 +279,21 @@ func (r *certManagerExternalCAMicrosoftADCSResource) Update(ctx context.Context,
 		return
 	}
 
-	updatedCA, err := r.client.UpdateMicrosoftADCSCA(infisical.UpdateMicrosoftADCSCARequest{
-		CAId:          state.Id.ValueString(),
-		Name:          plan.Name.ValueString(),
-		Status:        plan.Status.ValueString(),
-		Configuration: microsoftADCSCAConfigurationFromPlan(plan),
-	})
+	request := infisical.UpdateMicrosoftADCSCARequest{
+		CAId:   state.Id.ValueString(),
+		Name:   plan.Name.ValueString(),
+		Status: plan.Status.ValueString(),
+	}
+
+	// When configuration is sent, the API requires permission to use the app connection and checks
+	// that the CA is reachable. Leaving it out lets an identity that can only edit CAs rename or
+	// disable this one.
+	if microsoftADCSCAConfigurationChanged(plan, state) {
+		configuration := microsoftADCSCAConfigurationFromPlan(plan)
+		request.Configuration = &configuration
+	}
+
+	updatedCA, err := r.client.UpdateMicrosoftADCSCA(request)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
