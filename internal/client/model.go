@@ -2953,6 +2953,32 @@ type DeleteGroupRequest struct {
 	ID string
 }
 
+type GroupUser struct {
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	IsPartOfGroup bool   `json:"isPartOfGroup"`
+}
+
+type AddGroupUserRequest struct {
+	GroupID  string
+	Username string
+}
+
+type RemoveGroupUserRequest struct {
+	GroupID  string
+	Username string
+}
+
+type ListGroupUsersRequest struct {
+	GroupID  string
+	Username string
+}
+
+type ListGroupUsersResponse struct {
+	GroupUsers []GroupUser `json:"users"`
+	TotalCount int         `json:"totalCount"`
+}
+
 type GroupMachineIdentity struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
@@ -3301,6 +3327,9 @@ type CertificateAuthorityConfiguration struct {
 	DN             string `json:"dn,omitempty"`
 	SerialNumber   string `json:"serialNumber,omitempty"`
 	ActiveCaCertId string `json:"activeCaCertId,omitempty"`
+	KeySource      string `json:"keySource,omitempty"`
+	HsmConnectorId string `json:"hsmConnectorId,omitempty"`
+	Region         string `json:"region,omitempty"`
 
 	// ACME-specific fields
 	DNSAppConnectionId string                 `json:"dnsAppConnectionId,omitempty"`

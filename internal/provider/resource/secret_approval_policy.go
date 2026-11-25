@@ -319,6 +319,11 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	secretApprovalPolicy, err := r.client.GetSecretApprovalPolicyByID(infisical.GetSecretApprovalPolicyByIDRequest{
 		ID: state.ID.ValueString(),
 	})
@@ -385,7 +390,7 @@ func (r *secretApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	}
 
 	state.Approvers = approvers
-	state.Bypassers = mapSecretBypassersFromAPI(secretApprovalPolicy.SecretApprovalPolicy.Bypassers)
+	state.Bypassers = mapSecretBypassersFromAPI(secretApprovalPolicy.SecretApprovalPolicy.Bypassers, state.Bypassers)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -568,8 +573,12 @@ func (r *secretApprovalPolicyResource) Delete(ctx context.Context, req resource.
 	}
 }
 
-func mapSecretBypassersFromAPI(apiBypassers []infisical.SecretApprovalPolicyBypasser) []SecretBypasser {
+// An empty API list stays `[]` only when state already holds `[]`, otherwise `bypassers = []` drifts on every plan.
+func mapSecretBypassersFromAPI(apiBypassers []infisical.SecretApprovalPolicyBypasser, prior []SecretBypasser) []SecretBypasser {
 	if len(apiBypassers) == 0 {
+		if prior != nil && len(prior) == 0 {
+			return []SecretBypasser{}
+		}
 		return nil
 	}
 	bypassers := make([]SecretBypasser, len(apiBypassers))

@@ -140,6 +140,9 @@ func (client Client) DeleteInternalCA(request DeleteCARequest) (DeleteCAResponse
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == 404 {
+			return DeleteCAResponse{}, ErrNotFound
+		}
 		return DeleteCAResponse{}, errors.NewAPIErrorWithResponse(operationDeleteCA, response, nil)
 	}
 

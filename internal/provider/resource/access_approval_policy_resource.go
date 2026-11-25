@@ -332,6 +332,11 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	accessApprovalPolicy, err := r.client.GetAccessApprovalPolicyByID(infisical.GetAccessApprovalPolicyByIDRequest{
 		ID: state.ID.ValueString(),
 	})
@@ -371,7 +376,7 @@ func (r *accessApprovalPolicyResource) Read(ctx context.Context, req resource.Re
 	state.MaxTimePeriod = infisicaltf.StringPointerToTypesString(policy.MaxTimePeriod)
 	state.RequestExpirationTime = infisicaltf.StringPointerToTypesString(policy.RequestExpirationTime)
 	state.Approvers = mapApproversFromAPI(policy.Approvers)
-	state.Bypassers = mapBypassersFromAPI(policy.Bypassers)
+	state.Bypassers = mapBypassersFromAPI(policy.Bypassers, state.Bypassers)
 
 	if len(policy.Environments) > 0 && !state.EnvironmentSlugs.IsNull() {
 		var environmentSlugs []string
@@ -568,8 +573,12 @@ func mapApproversFromAPI(apiApprovers []infisical.AccessApprovalPolicyApprover) 
 	return approvers
 }
 
-func mapBypassersFromAPI(apiBypassers []infisical.AccessApprovalPolicyBypasser) []AccessBypasser {
+// An empty API list stays `[]` only when state already holds `[]`, otherwise `bypassers = []` drifts on every plan.
+func mapBypassersFromAPI(apiBypassers []infisical.AccessApprovalPolicyBypasser, prior []AccessBypasser) []AccessBypasser {
 	if len(apiBypassers) == 0 {
+		if prior != nil && len(prior) == 0 {
+			return []AccessBypasser{}
+		}
 		return nil
 	}
 	bypassers := make([]AccessBypasser, len(apiBypassers))
