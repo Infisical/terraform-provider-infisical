@@ -438,7 +438,11 @@ func TestRotatingConnectionRefusesChangeWithoutPassword(t *testing.T) {
 // Removing a setting Infisical still has is a mismatch, or the removal would be recorded but
 // never reach Infisical.
 func TestManagedCredentialsRemovedFieldIsAMismatch(t *testing.T) {
-	differing := credentialsDifferingFromInfisical(
+	r, ok := NewAppConnectionADCSResource().(*AppConnectionBaseResource)
+	if !ok {
+		t.Fatal("expected the base resource")
+	}
+	differing := r.credentialsDifferingFromInfisical(
 		types.ObjectValueMust(adcsCredentialsAttrTypes, map[string]attr.Value{
 			"host": types.StringNull(), "username": types.StringNull(), "password": types.StringValue("secret"),
 		}),
@@ -446,5 +450,76 @@ func TestManagedCredentialsRemovedFieldIsAMismatch(t *testing.T) {
 	)
 	if len(differing) != 1 || differing[0] != "credentials.host" {
 		t.Errorf("a removed host Infisical still has must differ, and an empty username must not, got %v", differing)
+	}
+}
+
+// credentialsObject builds a credentials value for a variant from its own schema, with the given
+// attributes set and the rest null.
+func credentialsObject(t *testing.T, r *AppConnectionBaseResource, values map[string]attr.Value) types.Object {
+	t.Helper()
+	var schemaResp resource.SchemaResponse
+	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
+	objectType, ok := schemaResp.Schema.Attributes["credentials"].GetType().(types.ObjectType)
+	if !ok {
+		t.Fatal("credentials must be an object")
+	}
+	attributes := map[string]attr.Value{}
+	for name, attrType := range objectType.AttrTypes {
+		if value, set := values[name]; set {
+			attributes[name] = value
+			continue
+		}
+		nullValue, err := attrType.ValueFromTerraform(context.Background(), tftypes.NewValue(attrType.TerraformType(context.Background()), nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		attributes[name] = nullValue
+	}
+	object, diags := types.ObjectValue(objectType.AttrTypes, attributes)
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	return object
+}
+
+// Infisical leaves out a non-secret field that has no value: an absent string counts as empty,
+// so setting it is a mismatch; an absent bool keeps Infisical's default and is skipped; an absent
+// secret is never compared.
+func TestManagedCredentialsAbsentFields(t *testing.T) {
+	r, ok := NewAppConnectionPostgresResource().(*AppConnectionBaseResource)
+	if !ok {
+		t.Fatal("expected the base resource")
+	}
+	planned := credentialsObject(t, r, map[string]attr.Value{
+		"host":                    types.StringValue("db.internal"),
+		"ssl_certificate":         types.StringValue("pr415-ca"),
+		"ssl_reject_unauthorized": types.BoolValue(true),
+		"password":                types.StringValue("secret"),
+	})
+	differing := r.credentialsDifferingFromInfisical(planned, map[string]any{"host": "db.internal"})
+	if len(differing) != 1 || differing[0] != "credentials.ssl_certificate" {
+		t.Errorf("only the certificate Infisical doesn't have must differ, got %v", differing)
+	}
+}
+
+// Azure DevOps names the field organization_name, and the API orgName.
+func TestManagedCredentialsMappedAPIKey(t *testing.T) {
+	r, ok := NewAppConnectionAzureDevOpsResource().(*AppConnectionBaseResource)
+	if !ok {
+		t.Fatal("expected the base resource")
+	}
+	planned := credentialsObject(t, r, map[string]attr.Value{"organization_name": types.StringValue("org-a")})
+	if differing := r.credentialsDifferingFromInfisical(planned, map[string]any{"orgName": "org-b"}); len(differing) != 1 {
+		t.Errorf("an organization_name that differs from orgName must differ, got %v", differing)
+	}
+	if differing := r.credentialsDifferingFromInfisical(planned, map[string]any{"orgName": "org-a"}); len(differing) != 0 {
+		t.Errorf("a matching orgName must not differ, got %v", differing)
+	}
+}
+
+func TestCredentialValueMatchesFailsClosed(t *testing.T) {
+	list := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("a")})
+	if credentialValueMatches(list, []any{"a"}) {
+		t.Error("a type the comparison doesn't handle must never match")
 	}
 }

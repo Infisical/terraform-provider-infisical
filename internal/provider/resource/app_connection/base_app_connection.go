@@ -47,14 +47,30 @@ func (r *AppConnectionBaseResource) readConnection(id string) (infisical.AppConn
 }
 
 // credentialsDifferingFromInfisical lists the configured credential fields that differ from the
-// non-secret credentials Infisical returns. Each attribute is matched to the API key with the
-// same name in camelCase; fields the API doesn't return, such as passwords, are skipped.
-func credentialsDifferingFromInfisical(planned types.Object, apiCredentials map[string]any) []string {
+// non-secret credentials Infisical returns. Each attribute is matched to its API key, the name in
+// camelCase unless CredentialsAPIKeys says otherwise. Secret fields aren't returned and are
+// skipped. Infisical leaves out a non-secret field that has no value, so an absent string counts
+// as empty; an absent bool or number is skipped, since Infisical applies its own default to it.
+func (r *AppConnectionBaseResource) credentialsDifferingFromInfisical(planned types.Object, apiCredentials map[string]any) []string {
 	var differing []string
 	for name, value := range planned.Attributes() {
-		apiValue, returned := apiCredentials[snakeToCamel(name)]
-		if !returned || value.IsUnknown() {
+		if value.IsUnknown() {
 			continue
+		}
+		key, mapped := r.CredentialsAPIKeys[name]
+		if !mapped {
+			key = snakeToCamel(name)
+		}
+		apiValue, returned := apiCredentials[key]
+		if !returned {
+			attribute, known := r.CredentialsAttributes[name]
+			if known && attribute.IsSensitive() {
+				continue
+			}
+			if _, isString := value.(basetypes.StringValue); !isString {
+				continue
+			}
+			apiValue = nil
 		}
 		// A removed setting matches only when Infisical has none either.
 		if value.IsNull() {
@@ -89,8 +105,8 @@ func credentialValueMatches(value attr.Value, apiValue any) bool {
 		n, ok := apiValue.(float64)
 		return ok && n == v.ValueFloat64()
 	}
-	// Lists and objects aren't compared.
-	return true
+	// A type this comparison doesn't handle never counts as a match.
+	return false
 }
 
 func snakeToCamel(name string) string {
@@ -116,15 +132,18 @@ func credentialsMismatchDetail(appConnectionName string, appConnection infisical
 
 // AppConnectionBaseResource is the resource implementation.
 type AppConnectionBaseResource struct {
-	App                              infisical.AppConnectionApp // used for identifying secret sync route
-	ResourceTypeName                 string                     // terraform resource name suffix
-	AppConnectionName                string                     // complete descriptive name of the app connection
-	DocsURL                          string                     // optional Infisical guide linked from the resource description
-	SupportsGateway                  bool                       // when true, exposes gateway_id and gateway_pool_id and sends them to the API
-	RequiresGateway                  bool                       // when true, one of gateway_id or gateway_pool_id is required
-	client                           *infisical.Client
-	AllowedMethods                   []string
-	CredentialsAttributes            map[string]schema.Attribute
+	App                   infisical.AppConnectionApp // used for identifying secret sync route
+	ResourceTypeName      string                     // terraform resource name suffix
+	AppConnectionName     string                     // complete descriptive name of the app connection
+	DocsURL               string                     // optional Infisical guide linked from the resource description
+	SupportsGateway       bool                       // when true, exposes gateway_id and gateway_pool_id and sends them to the API
+	RequiresGateway       bool                       // when true, one of gateway_id or gateway_pool_id is required
+	client                *infisical.Client
+	AllowedMethods        []string
+	CredentialsAttributes map[string]schema.Attribute
+	// API keys of credential attributes whose names don't follow snake_case to camelCase, for
+	// comparing the configuration with the credentials Infisical returns.
+	CredentialsAPIKeys               map[string]string
 	ReadCredentialsForCreateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	OverwriteCredentialsFields       func(state *AppConnectionBaseResourceModel) diag.Diagnostics
@@ -409,7 +428,7 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 		return
 	}
 
-	if differing := credentialsDifferingFromInfisical(planned, appConnection.Credentials); len(differing) > 0 {
+	if differing := r.credentialsDifferingFromInfisical(planned, appConnection.Credentials); len(differing) > 0 {
 		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, appConnection, differing))
 		return
 	}
@@ -745,7 +764,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 	if recordsCredentialsWithoutSending(current, state.Credentials) {
-		if differing := credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
+		if differing := r.credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
 			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, current, differing))
 			return
 		}

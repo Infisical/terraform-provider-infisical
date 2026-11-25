@@ -26,10 +26,11 @@ const AzureDevOpsAppConnectionClientSecretsMethod = "client-secret"
 
 func NewAppConnectionAzureDevOpsResource() resource.Resource {
 	return &AppConnectionBaseResource{
-		App:               infisical.AppConnectionAppAzureDevOps,
-		AppConnectionName: "Azure DevOps",
-		ResourceTypeName:  "_app_connection_azure_devops",
-		AllowedMethods:    []string{AzureDevOpsAppConnectionAccessTokenMethod, AzureDevOpsAppConnectionClientSecretsMethod},
+		App:                infisical.AppConnectionAppAzureDevOps,
+		AppConnectionName:  "Azure DevOps",
+		ResourceTypeName:   "_app_connection_azure_devops",
+		AllowedMethods:     []string{AzureDevOpsAppConnectionAccessTokenMethod, AzureDevOpsAppConnectionClientSecretsMethod},
+		CredentialsAPIKeys: map[string]string{"organization_name": "orgName"},
 		CredentialsAttributes: map[string]schema.Attribute{
 			"organization_name": schema.StringAttribute{
 				Required:    true,
