@@ -5392,3 +5392,30 @@ type DeletePamAccessApprovalPolicyRequest struct {
 type PamAccessApprovalPolicyResponse struct {
 	Policy PamAccessApprovalPolicy `json:"policy"`
 }
+
+type EmailDomain struct {
+	ID                     string `json:"id"`
+	Domain                 string `json:"domain"`
+	VerificationCode       string `json:"verificationCode"`
+	VerificationRecordName string `json:"verificationRecordName"`
+}
+
+type CreateEmailDomainRequest struct {
+	Domain string `json:"domain"`
+}
+
+type CreateEmailDomainResponse struct {
+	EmailDomain EmailDomain `json:"emailDomain"`
+}
+
+type ListEmailDomainsResponse struct {
+	EmailDomains []EmailDomain `json:"emailDomains"`
+}
+
+type GetEmailDomainByIDRequest struct {
+	ID string
+}
+
+type DeleteEmailDomainRequest struct {
+	ID string
+}
