@@ -2560,6 +2560,8 @@ type AppConnection struct {
 	// Set when Infisical manages the credentials, so the provider must not send them on update.
 	IsPlatformManagedCredentials bool `json:"isPlatformManagedCredentials"`
 	IsAutoRotationEnabled        bool `json:"isAutoRotationEnabled"`
+	// The non-secret credential fields; the API never returns passwords, keys or tokens.
+	Credentials map[string]any `json:"credentials"`
 }
 
 type CreateAppConnectionRequest struct {

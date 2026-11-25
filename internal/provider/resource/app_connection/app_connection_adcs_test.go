@@ -110,6 +110,7 @@ func (b *fakeADCSConnectionBackend) handler() http.Handler {
 				"gatewayId":       gatewayId,
 				"gatewayPoolId":   gatewayPoolId,
 				"credentialsHash": credentialsHash(b.credentials[id]),
+				"credentials":     sanitizedCredentials(b.credentials[id]),
 			}
 			for _, key := range []string{"isPlatformManagedCredentials", "isAutoRotationEnabled"} {
 				if value, ok := existing[key]; ok {
@@ -133,6 +134,17 @@ func (b *fakeADCSConnectionBackend) handler() http.Handler {
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"appConnection": connection})
 	})
+}
+
+// Like the real API, responses carry the non-secret credential fields and never the password.
+func sanitizedCredentials(credentials map[string]any) map[string]any {
+	sanitized := map[string]any{}
+	for key, value := range credentials {
+		if key != "password" {
+			sanitized[key] = value
+		}
+	}
+	return sanitized
 }
 
 // Mirrors the gateway mutual exclusion in updateAppConnection (Infisical core,

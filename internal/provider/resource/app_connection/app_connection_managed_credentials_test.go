@@ -22,6 +22,7 @@ func seedManagedConnection(backend *fakeADCSConnectionBackend, flags map[string]
 		"id": testADCSConnectionID, "name": "adcs-connection", "description": "", "app": "adcs",
 		"method": "username-password", "projectId": nil, "gatewayId": "gateway-1", "gatewayPoolId": nil,
 		"credentialsHash": "hash-managed",
+		"credentials":     map[string]any{"host": "ca01.corp.example.com", "username": `CORP\svc-infisical`},
 	}
 	for key, value := range flags {
 		if key == "hasRotation" {
@@ -271,5 +272,45 @@ func TestManagedCredentialsUnknownAtPlanIsRefusedAtApply(t *testing.T) {
 	}
 	if backend.requests != requestsBefore+1 {
 		t.Errorf("only the read before the update may reach the API, got %d requests", backend.requests-requestsBefore)
+	}
+}
+
+// After an import, the configured credentials are recorded without being sent, so a non-secret
+// field that differs from Infisical's must fail the plan, and the apply when the plan couldn't
+// tell, instead of being recorded.
+func TestManagedCredentialsMismatchAfterImportIsRefused(t *testing.T) {
+	ctx := context.Background()
+	s := adcsTestSchema(t)
+	backend := newFakeADCSConnectionBackend(t)
+	r := newADCSTestResource(t, backend)
+	seedManagedConnection(backend, map[string]any{"isPlatformManagedCredentials": true})
+	imported := importAndRead(t, r)
+
+	mismatched := modelWithCredentials(t, imported, "ca02.corp.example.com", types.StringValue(testADCSFirstPassword))
+	if resp := modifyPlan(t, r, imported, mismatched); !resp.Diagnostics.HasError() {
+		t.Errorf("a host that differs from Infisical's must fail the plan, got %v", resp.Diagnostics)
+	}
+
+	plan := tfsdk.Plan{Schema: s}
+	if diags := plan.Set(ctx, mismatched); diags.HasError() {
+		t.Fatal(diags)
+	}
+	updateResp := resource.UpdateResponse{State: imported}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: imported}, &updateResp)
+	if !updateResp.Diagnostics.HasError() {
+		t.Error("a host that differs from Infisical's must fail the apply too")
+	}
+
+	matching := modelWithCredentials(t, imported, "ca01.corp.example.com", types.StringValue(testADCSFirstPassword))
+	if resp := modifyPlan(t, r, imported, matching); resp.Diagnostics.HasError() || resp.Diagnostics.WarningsCount() != 1 {
+		t.Errorf("matching credentials must only warn, got %v", resp.Diagnostics)
+	}
+}
+
+func TestSnakeToCamel(t *testing.T) {
+	for in, want := range map[string]string{"host": "host", "ssl_reject_unauthorized": "sslRejectUnauthorized", "client_id": "clientId"} {
+		if got := snakeToCamel(in); got != want {
+			t.Errorf("snakeToCamel(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

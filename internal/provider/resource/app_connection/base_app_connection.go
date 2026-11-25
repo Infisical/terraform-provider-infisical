@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"sort"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -21,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var (
@@ -39,15 +42,65 @@ func credentialsManagedByInfisical(appConnection infisical.AppConnection) bool {
 	return appConnection.IsPlatformManagedCredentials || appConnection.IsAutoRotationEnabled
 }
 
-// credentialsManagedByInfisicalForID reads the connection to find out whether Infisical manages
-// its credentials. The API never returns credentials, so this is the only way to know before an
-// update.
-func (r *AppConnectionBaseResource) credentialsManagedByInfisicalForID(id string) (bool, error) {
-	appConnection, err := r.client.GetAppConnectionById(infisical.GetAppConnectionByIdRequest{App: r.App, ID: id})
-	if err != nil {
-		return false, err
+// readConnection reads the connection before an update, to find out whether Infisical manages
+// its credentials and which non-secret credential fields it holds.
+func (r *AppConnectionBaseResource) readConnection(id string) (infisical.AppConnection, error) {
+	return r.client.GetAppConnectionById(infisical.GetAppConnectionByIdRequest{App: r.App, ID: id})
+}
+
+// credentialsDifferingFromInfisical lists the configured credential fields that differ from the
+// non-secret credentials Infisical returns. Each attribute is matched to the API key with the
+// same name in camelCase; fields the API doesn't return, such as passwords, are skipped.
+func credentialsDifferingFromInfisical(planned types.Object, apiCredentials map[string]any) []string {
+	var differing []string
+	for name, value := range planned.Attributes() {
+		apiValue, returned := apiCredentials[snakeToCamel(name)]
+		if !returned || value.IsNull() || value.IsUnknown() {
+			continue
+		}
+		if !credentialValueMatches(value, apiValue) {
+			differing = append(differing, "credentials."+name)
+		}
 	}
-	return credentialsManagedByInfisical(appConnection), nil
+	sort.Strings(differing)
+	return differing
+}
+
+func credentialValueMatches(value attr.Value, apiValue any) bool {
+	switch v := value.(type) {
+	case basetypes.StringValue:
+		s, ok := apiValue.(string)
+		return ok && strings.TrimSpace(s) == strings.TrimSpace(v.ValueString())
+	case basetypes.BoolValue:
+		b, ok := apiValue.(bool)
+		return ok && b == v.ValueBool()
+	case basetypes.Int64Value:
+		n, ok := apiValue.(float64)
+		return ok && int64(n) == v.ValueInt64()
+	case basetypes.Float64Value:
+		n, ok := apiValue.(float64)
+		return ok && n == v.ValueFloat64()
+	}
+	// Lists and objects aren't compared.
+	return true
+}
+
+func snakeToCamel(name string) string {
+	parts := strings.Split(name, "_")
+	for i := 1; i < len(parts); i++ {
+		if parts[i] != "" {
+			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+func credentialsMismatchDetail(appConnectionName string, differing []string) string {
+	mismatch := fmt.Sprintf("The configured %s doesn't match what Infisical has. Set it to the value in Infisical.", differing[0])
+	if len(differing) > 1 {
+		mismatch = fmt.Sprintf("These configured fields don't match what Infisical has: %s. Set them to the values in Infisical.", strings.Join(differing, ", "))
+	}
+	return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. %s", appConnectionName, mismatch)
 }
 
 // AppConnectionBaseResource is the resource implementation.
@@ -333,16 +386,20 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 	}
 
 	// A failed read here is not worth failing the plan over: Update reads the connection again.
-	managed, err := r.credentialsManagedByInfisicalForID(id.ValueString())
-	if err != nil || !managed {
+	appConnection, err := r.readConnection(id.ValueString())
+	if err != nil || !credentialsManagedByInfisical(appConnection) {
 		return
 	}
 
 	if credentialsUnset(current) {
+		if differing := credentialsDifferingFromInfisical(planned, appConnection.Credentials); len(differing) > 0 {
+			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, differing))
+			return
+		}
 		resp.Diagnostics.AddAttributeWarning(
 			path.Root("credentials"),
 			"Credentials managed by Infisical",
-			fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform won't send the configured credentials. Change them in Infisical instead.", r.AppConnectionName),
+			fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform records the configured credentials without sending them.", r.AppConnectionName),
 		)
 		return
 	}
@@ -355,7 +412,7 @@ func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource
 }
 
 func credentialsManagedErrorDetail(appConnectionName string) string {
-	return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. Keep the configured credentials as they are. To change them, change them in Infisical or replace the connection.", appConnectionName)
+	return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials or credential rotation), so Terraform can't change them. Set the configured credentials back to their current values, or remove this resource and create a new connection.", appConnectionName)
 }
 
 // planReplacesConnection reports whether the plan replaces the connection: method and project_id
@@ -624,7 +681,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	managed, err := r.credentialsManagedByInfisicalForID(state.ID.ValueString())
+	current, err := r.readConnection(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating app connection",
@@ -632,8 +689,9 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		)
 		return
 	}
+	managed := credentialsManagedByInfisical(current)
 
-	// ModifyPlan refuses this when it can; a credential known only at apply reaches here.
+	// ModifyPlan refuses these when it can; a credential known only at apply reaches here.
 	if managed && !credentialsUnset(state.Credentials) && !plan.Credentials.Equal(state.Credentials) {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("credentials"),
@@ -641,6 +699,12 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 			credentialsManagedErrorDetail(r.AppConnectionName),
 		)
 		return
+	}
+	if managed && credentialsUnset(state.Credentials) {
+		if differing := credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
+			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, differing))
+			return
+		}
 	}
 
 	// A nil map leaves credentials out of the request, so Infisical keeps the ones it manages.
