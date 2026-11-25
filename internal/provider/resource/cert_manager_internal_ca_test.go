@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	infisical "terraform-provider-infisical/internal/client"
 
@@ -36,6 +37,8 @@ type fakeInternalCABackend struct {
 	createOmitsKeySource bool
 	failDelete           bool
 	failGet              bool
+	failGetTimes         int
+	gets                 int
 	cas                  map[string]infisical.CertificateAuthority
 	lastCreated          map[string]any
 	deletes              int
@@ -103,8 +106,9 @@ func (b *fakeInternalCABackend) handler() http.Handler {
 	})
 
 	mux.HandleFunc("GET /api/v1/cert-manager/ca/internal/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if b.failGet {
-			b.writeJSON(w, http.StatusInternalServerError, map[string]any{"message": "Something went wrong"})
+		b.gets++
+		if b.failGet || b.gets <= b.failGetTimes {
+			b.writeJSON(w, http.StatusNotFound, map[string]any{"message": "CA not found"})
 			return
 		}
 		ca, ok := b.cas[r.PathValue("id")]
@@ -359,23 +363,44 @@ func TestInternalCAConfirmsKeySourceWhenCreateResponseOmitsIt(t *testing.T) {
 	}
 }
 
-func TestInternalCAKeepsCAWhenKeySourceCannotBeConfirmed(t *testing.T) {
+func TestInternalCAReadBackAfterCreate(t *testing.T) {
 	s := internalCATestSchema(t)
-	backend := newFakeInternalCABackend(t)
-	backend.createOmitsKeySource = true
-	backend.failGet = true
-	r := newInternalCATestResource(t, backend)
-
-	created := createInternalCA(t, r, internalCAPlan(t, s, internalCAModel(CA_KEY_SOURCE_HSM, func(m *certManagerInternalCAResourceModel) {
+	delays := internalCAReadBackDelays
+	internalCAReadBackDelays = make([]time.Duration, len(delays))
+	t.Cleanup(func() { internalCAReadBackDelays = delays })
+	hsmPlan := internalCAModel(CA_KEY_SOURCE_HSM, func(m *certManagerInternalCAResourceModel) {
 		m.HsmConnectorId = types.StringValue(testHsmConnectorID)
-	})))
-	if created.Diagnostics.HasError() || created.Diagnostics.WarningsCount() != 1 || backend.deletes != 0 {
-		t.Fatalf("expected a warning, no error and no delete, got %d deletes and %v", backend.deletes, created.Diagnostics)
-	}
-	model := internalCAStateModel(t, created.State)
-	if model.Id.ValueString() != testInternalCAID || model.KeySource.ValueString() != CA_KEY_SOURCE_HSM || model.HsmConnectorId.ValueString() != testHsmConnectorID {
-		t.Errorf("expected the CA to be saved with the configured key source, got %+v", model)
-	}
+	})
+
+	t.Run("a lagging read is retried and the create succeeds", func(t *testing.T) {
+		backend := newFakeInternalCABackend(t)
+		backend.createOmitsKeySource = true
+		backend.failGetTimes = 2
+		r := newInternalCATestResource(t, backend)
+
+		created := createInternalCA(t, r, internalCAPlan(t, s, hsmPlan))
+		if created.Diagnostics.HasError() || backend.gets != 3 || backend.deletes != 0 {
+			t.Fatalf("expected success after 3 reads and no delete, got %d reads, %d deletes, %v", backend.gets, backend.deletes, created.Diagnostics)
+		}
+		if model := internalCAStateModel(t, created.State); model.KeySource.ValueString() != CA_KEY_SOURCE_HSM {
+			t.Errorf("unexpected state after create: %+v", model)
+		}
+	})
+
+	t.Run("a read that keeps failing keeps the CA in state and fails", func(t *testing.T) {
+		backend := newFakeInternalCABackend(t)
+		backend.createOmitsKeySource = true
+		backend.failGet = true
+		r := newInternalCATestResource(t, backend)
+
+		created := createInternalCA(t, r, internalCAPlan(t, s, hsmPlan))
+		if !created.Diagnostics.HasError() || backend.gets != len(delays) || backend.deletes != 0 {
+			t.Fatalf("expected an error after %d reads and no delete, got %d reads, %d deletes, %v", len(delays), backend.gets, backend.deletes, created.Diagnostics)
+		}
+		if model := internalCAStateModel(t, created.State); model.Id.ValueString() != testInternalCAID {
+			t.Errorf("expected the CA to be tracked in state, got %+v", model)
+		}
+	})
 }
 
 func TestInternalCADefaultKeySourceOnOldServer(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	infisical "terraform-provider-infisical/internal/client"
 	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
@@ -199,16 +200,36 @@ func fillUnknownKeySourceFromAPI(configuration infisical.CertificateAuthorityCon
 	}
 }
 
+var internalCAReadBackDelays = []time.Duration{0, time.Second, 2 * time.Second, 4 * time.Second}
+
+func (r *certManagerInternalCAResource) readCreatedCA(ctx context.Context, id string) (infisical.GetCAResponse, error) {
+	var ca infisical.GetCAResponse
+	var err error
+	for _, delay := range internalCAReadBackDelays {
+		select {
+		case <-ctx.Done():
+			return ca, ctx.Err()
+		case <-time.After(delay):
+		}
+		if ca, err = r.client.GetInternalCA(infisical.GetCARequest{CAId: id}); err == nil {
+			return ca, nil
+		}
+	}
+	return ca, err
+}
+
 func (r *certManagerInternalCAResource) confirmCreatedKeySource(ctx context.Context, plan *certManagerInternalCAResourceModel, created infisical.CreateInternalCAResponse, resp *resource.CreateResponse) bool {
 	configuration := created.Configuration
 	if configuration.KeySource == "" && plannedKeySource(plan.KeySource) != CA_KEY_SOURCE_INFISICAL {
-		ca, err := r.client.GetInternalCA(infisical.GetCARequest{CAId: created.Id})
+		ca, err := r.readCreatedCA(ctx, created.Id)
 		if err != nil {
+			plan.Id = types.StringValue(created.Id)
+			plan.Status = types.StringValue(created.Status)
 			fillUnknownKeySourceFromAPI(created.Configuration, plan)
-			resp.Diagnostics.AddWarning("Couldn't confirm the CA's key source",
-				"The CA was created, but reading it back to confirm where its signing key is kept failed: "+err.Error()+
-					". Terraform saved the CA with the configured key source, and the next plan shows a difference if Infisical reports another one.")
-			return true
+			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+			resp.Diagnostics.AddError("Error creating CA",
+				"The CA was created, but reading it back to confirm where its signing key is kept failed: "+err.Error())
+			return false
 		}
 		configuration = ca.Configuration
 	}
