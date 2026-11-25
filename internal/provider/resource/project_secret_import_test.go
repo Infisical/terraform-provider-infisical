@@ -57,6 +57,11 @@ func (b *fakeSecretImportBackend) notFound(w http.ResponseWriter) {
 	b.writeJSON(w, http.StatusNotFound, map[string]any{"statusCode": http.StatusNotFound, "message": "Secret import not found", "error": "NotFound"})
 }
 
+// canonicalizeSecretPath in Infisical core: create stores canonical paths and folder lookups skip empty segments.
+func fakeCanonicalPath(p string) string {
+	return "/" + strings.Join(strings.FieldsFunc(p, func(r rune) bool { return r == '/' }), "/")
+}
+
 func (b *fakeSecretImportBackend) handler() http.Handler {
 	mux := http.NewServeMux()
 
@@ -83,8 +88,8 @@ func (b *fakeSecretImportBackend) handler() http.Handler {
 		b.nextID++
 		id := fmt.Sprintf("00000000-0000-4000-8000-%012d", b.nextID)
 		b.imports[id] = fakeSecretImport{
-			ProjectID: body.ProjectID, Environment: body.Environment, SecretPath: body.Path,
-			SourceProjectID: sourceProjectID, ImportEnv: body.Import.Environment, ImportPath: body.Import.Path,
+			ProjectID: body.ProjectID, Environment: body.Environment, SecretPath: fakeCanonicalPath(body.Path),
+			SourceProjectID: sourceProjectID, ImportEnv: body.Import.Environment, ImportPath: fakeCanonicalPath(body.Import.Path),
 			IsReplication: body.IsReplication,
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"secretImport": map[string]any{"id": id}})
@@ -126,7 +131,7 @@ func (b *fakeSecretImportBackend) handler() http.Handler {
 			return
 		}
 		id := r.PathValue("id")
-		if imp, ok := b.imports[id]; !ok || imp.ProjectID != body.ProjectID || imp.Environment != body.Environment || imp.SecretPath != body.Path {
+		if imp, ok := b.imports[id]; !ok || imp.ProjectID != body.ProjectID || imp.Environment != body.Environment || imp.SecretPath != fakeCanonicalPath(body.Path) {
 			b.notFound(w)
 			return
 		}
@@ -293,6 +298,44 @@ func TestSecretImportSameProjectLifecycle(t *testing.T) {
 	}
 }
 
+// Delete finds the import by its destination folder, so Read must pick up a folder renamed outside Terraform, or
+// destroy would get a 404 for the old folder, treat it as success, and leave the import behind.
+func TestSecretImportDestinationRenamedOutsideTerraform(t *testing.T) {
+	backend := newFakeSecretImportBackend(t)
+	r := newSecretImportTestResource(t, backend)
+
+	state := createSecretImport(t, r, secretImportTestSchema(t), secretImportTestModel(types.StringValue("destination"), types.StringValue("source"), false))
+	id := secretImportStateModel(t, state).ID.ValueString()
+	renamed := backend.imports[id]
+	renamed.Environment, renamed.SecretPath = "staging", "/renamed"
+	backend.imports[id] = renamed
+
+	state = readSecretImport(t, r, state)
+	if got := secretImportStateModel(t, state); got.EnvironmentSlug.ValueString() != "staging" || got.SecretPath.ValueString() != "/renamed" {
+		t.Errorf("destination after refresh = %q %q, want staging /renamed", got.EnvironmentSlug.ValueString(), got.SecretPath.ValueString())
+	}
+
+	deleteSecretImport(t, r, state)
+	if _, ok := backend.imports[id]; ok {
+		t.Error("expected Delete to remove the import from its renamed folder")
+	}
+}
+
+// The API stores canonical paths. A configured "/app/" must stay in state, or the import would be replaced on every
+// apply.
+func TestSecretImportReadKeepsEquivalentPath(t *testing.T) {
+	backend := newFakeSecretImportBackend(t)
+	r := newSecretImportTestResource(t, backend)
+
+	model := secretImportTestModel(types.StringValue("destination"), types.StringNull(), false)
+	model.SecretPath = types.StringValue("/app/")
+	state := createSecretImport(t, r, secretImportTestSchema(t), model)
+
+	if got := secretImportStateModel(t, readSecretImport(t, r, state)).SecretPath.ValueString(); got != "/app/" {
+		t.Errorf("folder_path after refresh = %q, want /app/", got)
+	}
+}
+
 func TestSecretImportReadEmptyID(t *testing.T) {
 	backend := newFakeSecretImportBackend(t)
 	r := newSecretImportTestResource(t, backend)
@@ -388,21 +431,24 @@ func TestSecretImportReadKeepsImportProjectIDOnOldServer(t *testing.T) {
 	}
 }
 
-func TestSecretImportValidateConfigRejectsCrossProjectReplication(t *testing.T) {
+func TestSecretImportValidateConfig(t *testing.T) {
 	s := secretImportTestSchema(t)
 
 	for name, tc := range map[string]struct {
 		projectID, importProjectID types.String
-		wantError                  bool
+		isReplication, wantError   bool
 	}{
-		"cross-project":                   {types.StringValue("destination"), types.StringValue("source"), true},
-		"same project":                    {types.StringValue("destination"), types.StringNull(), false},
-		"import_project_id is project_id": {types.StringValue("destination"), types.StringValue("destination"), false},
-		"import_project_id not known yet": {types.StringValue("destination"), types.StringUnknown(), false},
-		"project_id not known yet":        {types.StringUnknown(), types.StringValue("destination"), false},
+		"cross-project":                          {types.StringValue("destination"), types.StringValue("source"), false, false},
+		"cross-project replication":              {types.StringValue("destination"), types.StringValue("source"), true, true},
+		"same project replication":               {types.StringValue("destination"), types.StringNull(), true, false},
+		"import_project_id is project_id":        {types.StringValue("destination"), types.StringValue("destination"), false, true},
+		"import_project_id not known yet":        {types.StringValue("destination"), types.StringUnknown(), true, false},
+		"project_id not known yet":               {types.StringUnknown(), types.StringValue("destination"), true, false},
+		"project_id not known, no replication":   {types.StringUnknown(), types.StringValue("source"), false, false},
+		"import_project_id is project_id, known": {types.StringValue("source"), types.StringValue("source"), true, true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			config := tfsdk.Config{Schema: s, Raw: secretImportTestPlan(t, s, secretImportTestModel(tc.projectID, tc.importProjectID, true)).Raw}
+			config := tfsdk.Config{Schema: s, Raw: secretImportTestPlan(t, s, secretImportTestModel(tc.projectID, tc.importProjectID, tc.isReplication)).Raw}
 			resp := resource.ValidateConfigResponse{}
 			(&projectSecretImportResource{}).ValidateConfig(context.Background(), resource.ValidateConfigRequest{Config: config}, &resp)
 

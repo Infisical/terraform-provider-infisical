@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -84,7 +85,7 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"import_project_id": schema.StringAttribute{
-				Description:   "The ID of the project to import secrets from. Omit it to import from `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.16 or later.",
+				Description:   "The ID of the project to import secrets from. Omit it to import from `project_id`, and don't set it to `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.16 or later.",
 				Optional:      true,
 				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -98,15 +99,26 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 	}
 }
 
-// ValidateConfig catches cross-project replication at plan time, before a replacement deletes the existing import.
+// ValidateConfig catches invalid import_project_id values at plan time, before a replacement deletes the existing import.
 func (r *projectSecretImportResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config projectSecretImportResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-	if resp.Diagnostics.HasError() || !config.IsReplication.ValueBool() || config.ImportProjectID.IsNull() {
+	if resp.Diagnostics.HasError() || config.ImportProjectID.IsNull() || config.ImportProjectID.IsUnknown() || config.ProjectID.IsUnknown() {
 		return
 	}
 
-	if config.ProjectID.IsUnknown() || config.ImportProjectID.IsUnknown() || config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
+	// A same-project import reads back with import_project_id null, so setting it to project_id would plan a
+	// replacement after terraform import or when the attribute is removed.
+	if config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("import_project_id"),
+			"Invalid import_project_id",
+			"import_project_id is the same as project_id. Remove import_project_id to import from the same project.",
+		)
+		return
+	}
+
+	if !config.IsReplication.ValueBool() {
 		return
 	}
 
@@ -276,6 +288,9 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
+	// Delete finds the import by its destination folder, so a folder renamed outside Terraform must reach state.
+	state.EnvironmentSlug = types.StringValue(secretImport.SecretImport.Environment.Slug)
+	state.SecretPath = secretPathFromAPI(state.SecretPath, secretImport.SecretImport.SecretPath)
 	state.ImportProjectID = importProjectIDFromAPI(state.ImportProjectID, secretImport.SecretImport.ProjectID, secretImport.SecretImport.ImportEnvironment.ProjectID)
 
 	diags = resp.State.Set(ctx, &state)
@@ -405,4 +420,25 @@ func importProjectIDFromAPI(current types.String, projectID, apiSourceProjectID 
 		return current
 	}
 	return types.StringValue(apiSourceProjectID)
+}
+
+// secretPathFromAPI keeps the configured path when it names the same folder as the API path. The API stores paths in
+// canonical form ("app", "/app/" and "//app" all become "/app"), and folder_path requires replacement, so writing the
+// canonical form over a configured "/app/" would replace the import on every apply.
+func secretPathFromAPI(current types.String, apiPath string) types.String {
+	if !current.IsNull() && canonicalSecretPath(current.ValueString()) == canonicalSecretPath(apiPath) {
+		return current
+	}
+	return types.StringValue(apiPath)
+}
+
+// canonicalSecretPath follows canonicalizeSecretPath in Infisical core: folder lookups skip empty segments.
+func canonicalSecretPath(secretPath string) string {
+	var segments []string
+	for _, segment := range strings.Split(secretPath, "/") {
+		if segment != "" {
+			segments = append(segments, segment)
+		}
+	}
+	return "/" + strings.Join(segments, "/")
 }
