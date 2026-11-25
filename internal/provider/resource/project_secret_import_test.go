@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -23,12 +26,14 @@ type fakeSecretImport struct {
 	SourceProjectID, ImportEnv, ImportPath string
 }
 
-// Fake of the secret import routes, following getImports, getImportById and deleteImport in
+// Fake of the secret import routes, following createImport, getImports, getImportById and deleteImport in
 // backend/src/services/secret-import/secret-import-service.ts.
 type fakeSecretImportBackend struct {
 	t                   *testing.T
 	crossProjectSharing bool
+	noProjectGrant      bool
 	imports             map[string]fakeSecretImport
+	lastCreatePath      string
 }
 
 func (b *fakeSecretImportBackend) writeJSON(w http.ResponseWriter, status int, body any) {
@@ -58,11 +63,25 @@ func (b *fakeSecretImportBackend) handler() http.Handler {
 			b.writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"statusCode": http.StatusUnprocessableEntity, "message": err.Error()})
 			return
 		}
+		b.lastCreatePath = r.URL.Path
+		projectID, sourceProjectID := body.ProjectID, body.Import.SourceProjectID
+		if r.URL.Path == "/api/v1/secret-imports" {
+			// v1 names the project workspaceId and drops import.sourceProjectId.
+			projectID, sourceProjectID = body.WorkspaceID, ""
+		}
+		sourceProjectID = cmp.Or(sourceProjectID, projectID)
+		if sourceProjectID != projectID && !b.crossProjectSharing {
+			b.writeJSON(w, http.StatusForbidden, map[string]any{"statusCode": http.StatusForbidden, "message": "Cross-project secret sharing is not enabled for this organization"})
+			return
+		}
+		if sourceProjectID != projectID && b.noProjectGrant {
+			b.writeJSON(w, http.StatusForbidden, map[string]any{"statusCode": http.StatusForbidden, "message": "No project grant found allowing this cross-project import"})
+			return
+		}
 		id := fmt.Sprintf("import-%d", len(b.imports)+1)
-		projectID := cmp.Or(body.ProjectID, body.WorkspaceID)
 		b.imports[id] = fakeSecretImport{
 			ProjectID: projectID, Environment: body.Environment, SecretPath: body.Path,
-			SourceProjectID: cmp.Or(body.Import.SourceProjectID, projectID), ImportEnv: body.Import.Environment, ImportPath: body.Import.Path,
+			SourceProjectID: sourceProjectID, ImportEnv: body.Import.Environment, ImportPath: body.Import.Path,
 		}
 		b.writeJSON(w, http.StatusOK, map[string]any{"secretImport": map[string]any{"id": id}})
 	}
@@ -180,6 +199,16 @@ func readSecretImport(t *testing.T, r *projectSecretImportResource, state tfsdk.
 	return resp.State
 }
 
+func importSecretImport(t *testing.T, r *projectSecretImportResource, s schema.Schema, id string) resource.ImportStateResponse {
+	t.Helper()
+	resp := resource.ImportStateResponse{State: tfsdk.State{Schema: s}}
+	if diags := resp.State.Set(context.Background(), &projectSecretImportResourceModel{}); diags.HasError() {
+		t.Fatal(diags)
+	}
+	r.ImportState(context.Background(), resource.ImportStateRequest{ID: id}, &resp)
+	return resp
+}
+
 func secretImportTestModel(t *testing.T, state tfsdk.State) projectSecretImportResourceModel {
 	t.Helper()
 	var model projectSecretImportResourceModel
@@ -192,8 +221,9 @@ func secretImportTestModel(t *testing.T, state tfsdk.State) projectSecretImportR
 func TestSecretImportCrossProjectLifecycle(t *testing.T) {
 	backend := &fakeSecretImportBackend{t: t, crossProjectSharing: true, imports: map[string]fakeSecretImport{}}
 	r := newSecretImportTestResource(t, backend)
+	s := secretImportTestSchema(t)
 
-	state := createSecretImport(t, r, secretImportTestSchema(t), types.StringValue("source"))
+	state := createSecretImport(t, r, s, types.StringValue("source"))
 	created := secretImportTestModel(t, state)
 	id := created.ID.ValueString()
 	want := fakeSecretImport{
@@ -207,6 +237,14 @@ func TestSecretImportCrossProjectLifecycle(t *testing.T) {
 	state = readSecretImport(t, r, state)
 	if got := secretImportTestModel(t, state); got != created {
 		t.Errorf("state after refresh = %+v, want %+v", got, created)
+	}
+
+	imported := importSecretImport(t, r, s, id)
+	if imported.Diagnostics.HasError() {
+		t.Fatal(imported.Diagnostics)
+	}
+	if got := secretImportTestModel(t, imported.State); got != created {
+		t.Errorf("state after import = %+v, want %+v", got, created)
 	}
 
 	want.SecretPath = "/renamed"
@@ -234,14 +272,33 @@ func TestSecretImportCrossProjectLifecycle(t *testing.T) {
 func TestSecretImportSameProjectLifecycle(t *testing.T) {
 	backend := &fakeSecretImportBackend{t: t, imports: map[string]fakeSecretImport{}}
 	r := newSecretImportTestResource(t, backend)
+	s := secretImportTestSchema(t)
 
-	state := createSecretImport(t, r, secretImportTestSchema(t), types.StringNull())
+	state := createSecretImport(t, r, s, types.StringNull())
+	created := secretImportTestModel(t, state)
+	// Same-project creates stay on v1, which older servers also have.
+	want := fakeSecretImport{
+		ProjectID: "destination", Environment: "prod", SecretPath: "/app",
+		SourceProjectID: "destination", ImportEnv: "dev", ImportPath: "/shared",
+	}
+	if got := backend.imports[created.ID.ValueString()]; backend.lastCreatePath != "/api/v1/secret-imports" || got != want {
+		t.Fatalf("create via %s saved %+v, want /api/v1/secret-imports and %+v", backend.lastCreatePath, got, want)
+	}
+
 	refreshed := readSecretImport(t, r, state)
 	if refreshed.Raw.IsNull() {
 		t.Fatal("expected Read to keep the import in state")
 	}
-	if got, want := secretImportTestModel(t, refreshed), secretImportTestModel(t, state); got != want {
-		t.Errorf("state after refresh = %+v, want %+v", got, want)
+	if got := secretImportTestModel(t, refreshed); got != created {
+		t.Errorf("state after refresh = %+v, want %+v", got, created)
+	}
+
+	imported := importSecretImport(t, r, s, created.ID.ValueString())
+	if imported.Diagnostics.HasError() {
+		t.Fatal(imported.Diagnostics)
+	}
+	if got := secretImportTestModel(t, imported.State); got != created {
+		t.Errorf("state after import = %+v, want %+v", got, created)
 	}
 
 	deleteResp := resource.DeleteResponse{State: refreshed}
@@ -255,19 +312,68 @@ func TestSecretImportSameProjectLifecycle(t *testing.T) {
 }
 
 // The v2 list hides cross-project imports while cross-project secret sharing is turned off, but they still exist.
-func TestSecretImportReadWithCrossProjectSharingTurnedOff(t *testing.T) {
+func TestSecretImportWithCrossProjectSharingTurnedOff(t *testing.T) {
 	backend := &fakeSecretImportBackend{t: t, crossProjectSharing: true, imports: map[string]fakeSecretImport{}}
 	r := newSecretImportTestResource(t, backend)
+	s := secretImportTestSchema(t)
 
-	state := createSecretImport(t, r, secretImportTestSchema(t), types.StringValue("source"))
+	state := createSecretImport(t, r, s, types.StringValue("source"))
+	created := secretImportTestModel(t, state)
 	backend.crossProjectSharing = false
 
 	refreshed := readSecretImport(t, r, state)
 	if refreshed.Raw.IsNull() {
 		t.Fatal("expected Read to keep the import in state")
 	}
-	if got, want := secretImportTestModel(t, refreshed), secretImportTestModel(t, state); got != want {
-		t.Errorf("state after refresh = %+v, want %+v", got, want)
+	if got := secretImportTestModel(t, refreshed); got != created {
+		t.Errorf("state after refresh = %+v, want %+v", got, created)
+	}
+
+	// Importing without the source project would save a null import_project_id, and the next plan would replace the import.
+	imported := importSecretImport(t, r, s, created.ID.ValueString())
+	if errs := imported.Diagnostics.Errors(); len(errs) != 1 || !strings.Contains(errs[0].Detail(), "Turn it on under Secrets Management > Product Settings") {
+		t.Errorf("expected import to fail and ask to turn on cross-project secret sharing, got %v", imported.Diagnostics)
+	}
+}
+
+func TestSecretImportCreateExplainsCrossProjectSetup(t *testing.T) {
+	s := secretImportTestSchema(t)
+
+	for name, tc := range map[string]struct {
+		crossProjectSharing, noProjectGrant bool
+		wantMessage, wantHint               string
+	}{
+		"sharing turned off": {
+			wantMessage: "Cross-project secret sharing is not enabled for this organization",
+			wantHint:    "An organization admin must turn on cross-project secret sharing under Secrets Management > Product Settings.",
+		},
+		"no project grant": {
+			crossProjectSharing: true, noProjectGrant: true,
+			wantMessage: "No project grant found allowing this cross-project import",
+			wantHint:    `In project "source", add a project grant under Project Settings > Policies that shares folder "/shared" in environment "dev" with project "destination".`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			backend := &fakeSecretImportBackend{t: t, crossProjectSharing: tc.crossProjectSharing, noProjectGrant: tc.noProjectGrant, imports: map[string]fakeSecretImport{}}
+			r := newSecretImportTestResource(t, backend)
+
+			resp := resource.CreateResponse{State: tfsdk.State{Schema: s}}
+			plan := secretImportTestPlan(t, s, types.StringValue("destination"), types.StringValue("source"), false)
+			r.Create(context.Background(), resource.CreateRequest{Plan: plan}, &resp)
+
+			errs := resp.Diagnostics.Errors()
+			if len(errs) != 1 {
+				t.Fatalf("expected one error, got %v", resp.Diagnostics)
+			}
+			if withPath, ok := errs[0].(diag.DiagnosticWithPath); !ok || !withPath.Path().Equal(path.Root("import_project_id")) {
+				t.Errorf("expected the error on import_project_id, got %v", errs[0])
+			}
+			for _, want := range []string{tc.wantMessage, tc.wantHint} {
+				if !strings.Contains(errs[0].Detail(), want) {
+					t.Errorf("expected the detail to contain %q, got:\n%s", want, errs[0].Detail())
+				}
+			}
+		})
 	}
 }
 

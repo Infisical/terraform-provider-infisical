@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	infisical "terraform-provider-infisical/internal/client"
 	infisicalerrors "terraform-provider-infisical/internal/errors"
 
@@ -170,6 +171,14 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 	})
 
 	if err != nil {
+		if hint := crossProjectSetupHint(plan, err); hint != "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("import_project_id"),
+				"Error creating project secret import",
+				"Couldn't save import to Infisical: "+err.Error()+"\n\n"+hint,
+			)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error creating project secret import",
 			"Couldn't save import to Infisical, unexpected error: "+err.Error(),
@@ -405,4 +414,21 @@ func importProjectIDFromAPI(current types.String, projectID, apiSourceProjectID 
 		return current
 	}
 	return types.StringValue(apiSourceProjectID)
+}
+
+// crossProjectSetupHint says what to set up when createImport (secret-import-service.ts) refuses a cross-project import.
+// Both refusals are 403s, like a missing permission, so only the message tells them apart.
+func crossProjectSetupHint(plan projectSecretImportResourceModel, err error) string {
+	var apiErr *infisicalerrors.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden {
+		return ""
+	}
+	switch {
+	case strings.Contains(apiErr.ErrorMessage, "Cross-project secret sharing is not enabled"):
+		return "An organization admin must turn on cross-project secret sharing under Secrets Management > Product Settings."
+	case strings.Contains(apiErr.ErrorMessage, "No project grant found"):
+		return fmt.Sprintf("In project %q, add a project grant under Project Settings > Policies that shares folder %q in environment %q with project %q.",
+			plan.ImportProjectID.ValueString(), plan.ImportPath.ValueString(), plan.ImportEnvSlug.ValueString(), plan.ProjectID.ValueString())
+	}
+	return ""
 }
