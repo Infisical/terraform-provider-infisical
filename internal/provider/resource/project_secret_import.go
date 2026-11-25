@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicalerrors "terraform-provider-infisical/internal/errors"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -103,30 +105,30 @@ func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.Schem
 func (r *projectSecretImportResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var config projectSecretImportResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-	if resp.Diagnostics.HasError() || config.ImportProjectID.IsNull() || config.ImportProjectID.IsUnknown() || config.ProjectID.IsUnknown() {
+	if resp.Diagnostics.HasError() || config.ImportProjectID.IsNull() || config.ImportProjectID.IsUnknown() {
+		return
+	}
+
+	// Any import_project_id makes replication invalid: another project is a cross-project import, and project_id
+	// itself is rejected below. So this check doesn't need project_id to be known.
+	if config.IsReplication.ValueBool() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("is_replication"),
+			"Invalid is_replication",
+			"Infisical doesn't support replication for cross-project imports. Set is_replication to false, or remove import_project_id.",
+		)
 		return
 	}
 
 	// A same-project import reads back with import_project_id null, so setting it to project_id would plan a
 	// replacement after terraform import or when the attribute is removed.
-	if config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
+	if !config.ProjectID.IsUnknown() && config.ProjectID.ValueString() == config.ImportProjectID.ValueString() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("import_project_id"),
 			"Invalid import_project_id",
 			"import_project_id is the same as project_id. Remove import_project_id to import from the same project.",
 		)
-		return
 	}
-
-	if !config.IsReplication.ValueBool() {
-		return
-	}
-
-	resp.Diagnostics.AddAttributeError(
-		path.Root("is_replication"),
-		"Invalid is_replication",
-		"Infisical doesn't support replication for cross-project imports. Set is_replication to false, or remove import_project_id.",
-	)
 }
 
 // Configure adds the provider configured client to the resource.
@@ -180,6 +182,14 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 	})
 
 	if err != nil {
+		if hint := crossProjectImportSetupHint(err, plan); hint != "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("import_project_id"),
+				"Error creating project secret import",
+				hint+"\n\nInfisical returned: "+err.Error(),
+			)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error creating project secret import",
 			"Couldn't save import to Infisical, unexpected error: "+err.Error(),
@@ -411,6 +421,27 @@ func (r *projectSecretImportResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_folder_path"), secretImport.SecretImport.ImportPath)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("import_environment_slug"), secretImport.SecretImport.ImportEnvironment.Slug)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("is_replication"), secretImport.SecretImport.IsReplication)...)
+}
+
+// crossProjectImportSetupHint explains the two 403s that createImport in Infisical core returns when a cross-project
+// import isn't set up yet. They need an admin to change a setting, which the error message alone doesn't say.
+func crossProjectImportSetupHint(err error, plan projectSecretImportResourceModel) string {
+	var apiErr *infisicalerrors.APIError
+	if plan.ImportProjectID.IsNull() || !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden {
+		return ""
+	}
+
+	switch {
+	case strings.Contains(apiErr.ErrorMessage, "Cross-project secret sharing is not enabled"):
+		return "Cross-project secret sharing is turned off for this organization. An organization admin can turn it on in " +
+			"the organization's Product Settings, in the Secrets Management section. Then apply again."
+	case strings.Contains(apiErr.ErrorMessage, "No project grant found"):
+		return fmt.Sprintf("Project %s doesn't share folder %q of environment %q with project %s. In the settings of project "+
+			"%s, share that folder with project %s in the cross-project sharing section. Then apply again.",
+			plan.ImportProjectID.ValueString(), plan.ImportPath.ValueString(), plan.ImportEnvSlug.ValueString(),
+			plan.ProjectID.ValueString(), plan.ImportProjectID.ValueString(), plan.ProjectID.ValueString())
+	}
+	return ""
 }
 
 // importProjectIDFromAPI keeps import_project_id null for a same-project import, and keeps the current value when the

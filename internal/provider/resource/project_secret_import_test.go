@@ -10,8 +10,10 @@ import (
 	"testing"
 
 	infisical "terraform-provider-infisical/internal/client"
+	infisicalerrors "terraform-provider-infisical/internal/errors"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -39,6 +41,9 @@ type fakeSecretImportBackend struct {
 	// omitsImportProjectID is Infisical before v0.167.16: get by ID strips importEnv.projectId.
 	omitsImportProjectID bool
 	failDelete           bool
+	// sharingDisabled and missingGrant are the cross-project checks in createImport, which return 403.
+	sharingDisabled bool
+	missingGrant    bool
 }
 
 func newFakeSecretImportBackend(t *testing.T) *fakeSecretImportBackend {
@@ -84,6 +89,14 @@ func (b *fakeSecretImportBackend) handler() http.Handler {
 		sourceProjectID := body.Import.SourceProjectID
 		if sourceProjectID == "" || b.ignoresSourceProject {
 			sourceProjectID = body.ProjectID
+		}
+		if sourceProjectID != body.ProjectID && (b.sharingDisabled || b.missingGrant) {
+			message := "Cross-project secret sharing is not enabled for this organization"
+			if !b.sharingDisabled {
+				message = "No project grant found allowing this cross-project import"
+			}
+			b.writeJSON(w, http.StatusForbidden, map[string]any{"statusCode": http.StatusForbidden, "message": message, "error": "PermissionDenied"})
+			return
 		}
 		b.nextID++
 		id := fmt.Sprintf("00000000-0000-4000-8000-%012d", b.nextID)
@@ -376,6 +389,46 @@ func TestSecretImportImportState(t *testing.T) {
 }
 
 // A cross-project import on Infisical before v0.167.16 must fail and leave nothing behind.
+// Turning on cross-project sharing and adding a project grant need an admin, so the error must say where.
+func TestSecretImportCrossProjectSetupErrors(t *testing.T) {
+	for name, tc := range map[string]struct {
+		backend  *fakeSecretImportBackend
+		wantHint string
+	}{
+		"sharing turned off": {&fakeSecretImportBackend{sharingDisabled: true}, "Product Settings"},
+		"no project grant":   {&fakeSecretImportBackend{missingGrant: true}, `share that folder with project destination`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tc.backend.t, tc.backend.imports = t, map[string]fakeSecretImport{}
+			r := newSecretImportTestResource(t, tc.backend)
+
+			resp := createSecretImportResp(t, r, secretImportTestSchema(t), secretImportTestModel(types.StringValue("destination"), types.StringValue("source"), false))
+			errs := resp.Diagnostics.Errors()
+			if len(errs) != 1 {
+				t.Fatalf("expected one error, got %v", resp.Diagnostics)
+			}
+			withPath, ok := errs[0].(diag.DiagnosticWithPath)
+			if !ok || !withPath.Path().Equal(path.Root("import_project_id")) {
+				t.Errorf("expected the error on import_project_id, got %v", errs[0])
+			}
+			if !strings.Contains(errs[0].Detail(), tc.wantHint) {
+				t.Errorf("error detail %q doesn't contain %q", errs[0].Detail(), tc.wantHint)
+			}
+			if len(tc.backend.imports) != 0 || !resp.State.Raw.IsNull() {
+				t.Error("expected no import and no state")
+			}
+		})
+	}
+
+	// A same-project create never hits these checks, so a 403 there keeps the generic error.
+	t.Run("same project 403", func(t *testing.T) {
+		if hint := crossProjectImportSetupHint(&infisicalerrors.APIError{StatusCode: http.StatusForbidden, ErrorMessage: "No project grant found allowing this cross-project import"},
+			secretImportTestModel(types.StringValue("destination"), types.StringNull(), false)); hint != "" {
+			t.Errorf("expected no hint for a same-project import, got %q", hint)
+		}
+	})
+}
+
 func TestSecretImportCrossProjectOnOldServer(t *testing.T) {
 	for name, backend := range map[string]*fakeSecretImportBackend{
 		"before v0.161.12": {ignoresSourceProject: true, omitsImportProjectID: true},
@@ -443,7 +496,7 @@ func TestSecretImportValidateConfig(t *testing.T) {
 		"same project replication":               {types.StringValue("destination"), types.StringNull(), true, false},
 		"import_project_id is project_id":        {types.StringValue("destination"), types.StringValue("destination"), false, true},
 		"import_project_id not known yet":        {types.StringValue("destination"), types.StringUnknown(), true, false},
-		"project_id not known yet":               {types.StringUnknown(), types.StringValue("destination"), true, false},
+		"project_id not known, replication":      {types.StringUnknown(), types.StringValue("source"), true, true},
 		"project_id not known, no replication":   {types.StringUnknown(), types.StringValue("source"), false, false},
 		"import_project_id is project_id, known": {types.StringValue("source"), types.StringValue("source"), true, true},
 	} {
