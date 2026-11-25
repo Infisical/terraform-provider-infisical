@@ -61,7 +61,7 @@ func certManagerInternalCAKeySourceAttributes() map[string]schema.Attribute {
 			Description: "Where the CA's signing key is generated and kept. Supported values: " + strings.Join(SUPPORTED_CA_KEY_SOURCES, ", ") + ". " +
 				"When omitted, an existing CA keeps the key source it has in Infisical, and a CA that Terraform creates, including one it creates again (replaced, tainted or deleted outside Terraform), uses '" + CA_KEY_SOURCE_INFISICAL + "'. Set it to keep the key of a re-created CA in the HSM or AWS KMS. " +
 				"'infisical' keeps the key in Infisical. " +
-				"'hsm' generates the key in the HSM reached through `hsm_connector_id`, and supports the key algorithms " + strings.Join(hsmCAKeyAlgorithms(), ", ") + ". Infisical does not remove the key from the HSM when the CA is deleted. Requires an Enterprise license and Infisical " + CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_HSM] + " or later. " +
+				"'hsm' generates the key in the HSM reached through `hsm_connector_id`, and supports the key algorithms " + strings.Join(hsmCAKeyAlgorithms(), ", ") + ". An ML-DSA key in an HSM needs Infisical v0.167.5 or later. Infisical does not remove the key from the HSM when the CA is deleted. Requires an Enterprise license and Infisical " + CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_HSM] + " or later. " +
 				"'aws-kms' generates the key in AWS KMS through `app_connection_id` in `region`, and AWS KMS makes every signature. When the CA is deleted, Infisical asks AWS KMS to schedule the key for deletion. Requires an Enterprise license and Infisical " + CA_KEY_SOURCE_MIN_VERSIONS[CA_KEY_SOURCE_AWS_KMS] + " or later. " +
 				"Changing it replaces the CA.",
 			Optional:      true,

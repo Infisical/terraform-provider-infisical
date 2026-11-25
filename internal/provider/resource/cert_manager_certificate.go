@@ -179,7 +179,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"csr": schema.StringAttribute{
-				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")). Changing the CSR renews the certificate in place with the new CSR. Adding or removing the CSR replaces the certificate.",
+				Description: "Certificate Signing Request (CSR) in PEM format. If provided, the certificate will be issued based on the CSR. Use Terraform's file() function to read from a file (e.g., file(\"./my-certificate.csr\")). Changing the CSR renews the certificate in place with the new CSR. Adding or removing the CSR replaces the certificate. A CSR with a post-quantum key needs Infisical v0.167.7 or later, because older versions refuse a CSR longer than 4096 characters.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
