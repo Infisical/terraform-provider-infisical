@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -362,6 +363,30 @@ func TestPkiResourcesReadRemovesStateWithEmptyId(t *testing.T) {
 			}
 			if !resp.State.Raw.IsNull() {
 				t.Error("a state with an empty id must be removed")
+			}
+		})
+	}
+}
+
+func TestCsrMatchesCertificateKeyForPqcKeys(t *testing.T) {
+	// Fixtures from OpenSSL 3.5: a CSR, a certificate for the same key, and a certificate for another key. crypto/x509
+	// can't parse SLH-DSA keys, and ML-DSA only from Go 1.27, so a parsed-key comparison would report a match for both.
+	for _, algorithm := range []string{"EC", "ML-DSA-65", "SLH-DSA-SHA2-128f"} {
+		t.Run(algorithm, func(t *testing.T) {
+			read := func(name string) string {
+				t.Helper()
+				data, err := os.ReadFile("testdata/csr_key_match/" + algorithm + "-" + name + ".pem")
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(data)
+			}
+			csr := read("csr")
+			if !csrMatchesCertificateKey(csr, read("same-key-cert")) {
+				t.Error("a certificate for the CSR's key must match")
+			}
+			if csrMatchesCertificateKey(csr, read("other-key-cert")) {
+				t.Error("a certificate for another key must not match")
 			}
 		})
 	}

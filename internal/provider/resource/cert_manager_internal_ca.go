@@ -127,7 +127,7 @@ func (r *certManagerInternalCAResource) Schema(_ context.Context, _ resource.Sch
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
-				Description: "The key algorithm for the CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", ") + ". Defaults to '" + DEFAULT_CA_KEY_ALGORITHM + "'. The ML-DSA values are post-quantum algorithms and need an Infisical Enterprise license. A CA with an ML-DSA key signs certificates only with that same ML-DSA variant.",
+				Description: "The key algorithm for the CA. Supported values: " + strings.Join(SUPPORTED_ROOT_CA_KEY_ALGORITHMS, ", ") + ". Defaults to '" + DEFAULT_CA_KEY_ALGORITHM + "'. The ML-DSA values are post-quantum algorithms and need an Infisical Enterprise license. A CA with an ML-DSA key signs certificates only with that same ML-DSA variant. " + PQC_MIN_VERSION_NOTE,
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(DEFAULT_CA_KEY_ALGORITHM),

@@ -404,7 +404,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 				Description: "Algorithm constraints for the certificate policy. Omit the block to accept any algorithm; each list restricts its own kind independently and needs at least one value when set.",
 				Attributes: map[string]schema.Attribute{
 					"signature": schema.ListAttribute{
-						Description: "List of allowed signature algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE,
+						Description: "List of allowed signature algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_SIGNATURE_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE + " " + PQC_MIN_VERSION_NOTE,
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{
@@ -413,7 +413,7 @@ func (r *certManagerCertificatePolicyResource) Schema(_ context.Context, _ resou
 						},
 					},
 					"key_algorithm": schema.ListAttribute{
-						Description: "List of allowed key algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_KEY_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE,
+						Description: "List of allowed key algorithms (at least one value when set). Supported values: " + strings.Join(SUPPORTED_KEY_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE + " " + PQC_MIN_VERSION_NOTE,
 						Optional:    true,
 						ElementType: types.StringType,
 						Validators: []validator.List{

@@ -50,6 +50,10 @@ var (
 	// Infisical core checks the pkiPqc license only when a certificate is issued, not when a profile or policy is saved.
 	PQC_ISSUE_LICENSE_NOTE = "Issuing a certificate with a post-quantum value (ML-DSA or SLH-DSA) needs an Infisical Enterprise license."
 
+	// Core added CertKeyAlgorithm and CertSignatureAlgorithm PQC values in v0.159.12. Older servers reject them, except
+	// on policies, where they are stored as plain strings that no request can match.
+	PQC_MIN_VERSION_NOTE = "Post-quantum values need Infisical v0.159.12 or later."
+
 	SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS = slices.Concat([]string{
 		"RSA_2048", "RSA_3072", "RSA_4096",
 		"EC_prime256v1", "EC_secp384r1", "EC_secp521r1",
@@ -265,7 +269,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"key_algorithm": schema.StringAttribute{
-				Description: "The key algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". The ML-DSA and SLH-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license.",
+				Description: "The key algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". The ML-DSA and SLH-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. " + PQC_MIN_VERSION_NOTE,
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -277,7 +281,7 @@ func (r *certManagerCertificateResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"signature_algorithm": schema.StringAttribute{
-				Description: "The signature algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". The ML-DSA and SLH-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. An internal CA with an ML-DSA key signs only with that same ML-DSA variant.",
+				Description: "The signature algorithm for the certificate. Supported: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". The ML-DSA and SLH-DSA values are post-quantum algorithms, and issuing a certificate with one needs an Infisical Enterprise license. An internal CA with an ML-DSA key signs only with that same ML-DSA variant. " + PQC_MIN_VERSION_NOTE,
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{

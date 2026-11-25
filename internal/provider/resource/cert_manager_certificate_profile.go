@@ -120,14 +120,14 @@ func (r *certManagerCertificateProfileResource) Schema(_ context.Context, _ reso
 						Optional:    true,
 					},
 					"key_algorithm": schema.StringAttribute{
-						Description: "Default key algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE,
+						Description: "Default key algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE + " " + PQC_MIN_VERSION_NOTE,
 						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_KEY_ALGORITHMS...),
 						},
 					},
 					"signature_algorithm": schema.StringAttribute{
-						Description: "Default signature algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE + " The value must be one the profile's CA can sign with.",
+						Description: "Default signature algorithm. Supported values: " + strings.Join(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS, ", ") + ". " + PQC_ISSUE_LICENSE_NOTE + " The value must be one the profile's CA can sign with. " + PQC_MIN_VERSION_NOTE,
 						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(SUPPORTED_CERT_ISSUE_SIGNATURE_ALGORITHMS...),

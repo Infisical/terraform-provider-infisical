@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/json"
@@ -198,15 +199,9 @@ func csrMatchesCertificateKey(csrPEM, certificatePEM string) bool {
 	if err != nil {
 		return true
 	}
-	csrKey, err := x509.MarshalPKIXPublicKey(csr.PublicKey)
-	if err != nil {
-		return true
-	}
-	certificateKey, err := x509.MarshalPKIXPublicKey(certificate.PublicKey)
-	if err != nil {
-		return true
-	}
-	return string(csrKey) == string(certificateKey)
+	// Compare the encoded keys rather than the parsed ones: crypto/x509 can't parse ML-DSA before Go 1.27 or SLH-DSA
+	// at all, and an unparsed key would otherwise look like a match.
+	return bytes.Equal(csr.RawSubjectPublicKeyInfo, certificate.RawSubjectPublicKeyInfo)
 }
 
 func certificateReplacementPlanned(plan, state certManagerCertificateResourceModel, issuedFromCSR bool) bool {
