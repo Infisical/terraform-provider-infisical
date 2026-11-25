@@ -3,12 +3,12 @@
 page_title: "infisical_cert_manager_external_ca_microsoft_adcs Resource - terraform-provider-infisical"
 subcategory: "Certificate Management"
 description: |-
-  Create and manage external Microsoft ADCS (Active Directory Certificate Services) certificate authorities in Certificate Manager. Infisical reaches the AD CS server through the Gateway of an infisical_app_connection_adcs connection. For the older Azure ADCS web-enrollment CA, use infisical_cert_manager_external_ca_adcs. Only Machine Identity authentication is supported for this resource.
+  Create and manage external Microsoft ADCS (Active Directory Certificate Services) certificate authorities in Certificate Manager. Infisical reaches the AD CS server through the Gateway of an infisical_app_connection_adcs connection. For the older Azure ADCS web-enrollment CA, use infisical_cert_manager_external_ca_adcs. Only Machine Identity authentication is supported for this resource. Requires Infisical v0.161.14 or later.
 ---
 
 # infisical_cert_manager_external_ca_microsoft_adcs (Resource)
 
-Create and manage external Microsoft ADCS (Active Directory Certificate Services) certificate authorities in Certificate Manager. Infisical reaches the AD CS server through the Gateway of an `infisical_app_connection_adcs` connection. For the older Azure ADCS web-enrollment CA, use `infisical_cert_manager_external_ca_adcs`. Only Machine Identity authentication is supported for this resource.
+Create and manage external Microsoft ADCS (Active Directory Certificate Services) certificate authorities in Certificate Manager. Infisical reaches the AD CS server through the Gateway of an `infisical_app_connection_adcs` connection. For the older Azure ADCS web-enrollment CA, use `infisical_cert_manager_external_ca_adcs`. Only Machine Identity authentication is supported for this resource. Requires Infisical v0.161.14 or later.
 
 ## Example Usage
 
@@ -57,7 +57,7 @@ resource "infisical_cert_manager_external_ca_microsoft_adcs" "adcs" {
 
 ### Optional
 
-- `ca_name` (String) The AD CS certification authority name, for example `corp-ca01-CA`. Run `certutil -getreg CA\CommonName` on the AD CS server to find it. If omitted, Infisical reads it from the CA host's registry over SMB (TCP 445) when the CA is created and whenever `app_connection_id` changes. Removing a `ca_name` you set keeps the current name. On create, and whenever `ca_name` or `app_connection_id` changes, Infisical checks through the Gateway that it can list certificate templates on the CA, and rejects the change if it cannot.
+- `ca_name` (String) The AD CS certification authority name, for example `corp-ca01-CA`. Run `certutil -getreg CA\CommonName` on the AD CS server to find it. If omitted, Infisical reads it from the CA host's registry over SMB (TCP 445) when the CA is created and whenever `app_connection_id` changes. Removing a `ca_name` you set keeps the current name. On create, and whenever `ca_name` or `app_connection_id` changes, Infisical checks through the Gateway that it can list certificate templates on the CA, and rejects the change if it cannot. This check needs Infisical v0.162.14 or later.
 - `status` (String) The status of the CA. Supported values: active, disabled. Defaults to 'active'.
 
 ### Read-Only

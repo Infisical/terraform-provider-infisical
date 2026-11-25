@@ -68,6 +68,8 @@ func NewAppConnectionADCSResource() resource.Resource {
 		AppConnectionName: "Microsoft ADCS",
 		ResourceTypeName:  "_app_connection_adcs",
 		DocsURL:           "https://infisical.com/docs/integrations/app-connections/adcs",
+		// The ADCS connection routes first shipped in Infisical v0.161.14.
+		MinimumInfisicalVersion: "v0.161.14",
 		// AD CS speaks DCOM, which Infisical cannot reach directly, so the API rejects every
 		// operation on a connection without a gateway.
 		SupportsGateway: true,
@@ -76,7 +78,7 @@ func NewAppConnectionADCSResource() resource.Resource {
 		CredentialsAttributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Required:    true,
-				Description: "The DNS name (FQDN) of the AD CS server, for example `ca01.corp.example.com`.",
+				Description: "The host name, FQDN or IP address of the AD CS server, as the gateway resolves it, for example `ca01.corp.example.com`.",
 				Validators:  adcsCredentialLengthValidators(),
 			},
 			"username": schema.StringAttribute{

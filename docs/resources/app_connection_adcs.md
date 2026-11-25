@@ -3,12 +3,12 @@
 page_title: "infisical_app_connection_adcs Resource - terraform-provider-infisical"
 subcategory: "App Connections"
 description: |-
-  Create and manage Microsoft ADCS App Connection. For setup, see the Microsoft ADCS app connection guide https://infisical.com/docs/integrations/app-connections/adcs.
+  Create and manage Microsoft ADCS App Connection. For setup, see the Microsoft ADCS app connection guide https://infisical.com/docs/integrations/app-connections/adcs. Requires Infisical v0.161.14 or later.
 ---
 
 # infisical_app_connection_adcs (Resource)
 
-Create and manage Microsoft ADCS App Connection. For setup, see the [Microsoft ADCS app connection guide](https://infisical.com/docs/integrations/app-connections/adcs).
+Create and manage Microsoft ADCS App Connection. For setup, see the [Microsoft ADCS app connection guide](https://infisical.com/docs/integrations/app-connections/adcs). Requires Infisical v0.161.14 or later.
 
 ## Example Usage
 
@@ -72,7 +72,7 @@ resource "infisical_app_connection_adcs" "app-connection-adcs" {
 
 Required:
 
-- `host` (String) The DNS name (FQDN) of the AD CS server, for example `ca01.corp.example.com`.
+- `host` (String) The host name, FQDN or IP address of the AD CS server, as the gateway resolves it, for example `ca01.corp.example.com`.
 - `password` (String, Sensitive) The password of the Windows account.
 - `username` (String) The Windows account used for enrollment, in the form `DOMAIN\user` or `user@domain`.
 

@@ -132,15 +132,16 @@ func credentialsMismatchDetail(appConnectionName string, appConnection infisical
 
 // AppConnectionBaseResource is the resource implementation.
 type AppConnectionBaseResource struct {
-	App                   infisical.AppConnectionApp // used for identifying secret sync route
-	ResourceTypeName      string                     // terraform resource name suffix
-	AppConnectionName     string                     // complete descriptive name of the app connection
-	DocsURL               string                     // optional Infisical guide linked from the resource description
-	SupportsGateway       bool                       // when true, exposes gateway_id and gateway_pool_id and sends them to the API
-	RequiresGateway       bool                       // when true, one of gateway_id or gateway_pool_id is required
-	client                *infisical.Client
-	AllowedMethods        []string
-	CredentialsAttributes map[string]schema.Attribute
+	App                     infisical.AppConnectionApp // used for identifying secret sync route
+	ResourceTypeName        string                     // terraform resource name suffix
+	AppConnectionName       string                     // complete descriptive name of the app connection
+	DocsURL                 string                     // optional Infisical guide linked from the resource description
+	MinimumInfisicalVersion string                     // optional; the resource description names it
+	SupportsGateway         bool                       // when true, exposes gateway_id and gateway_pool_id and sends them to the API
+	RequiresGateway         bool                       // when true, one of gateway_id or gateway_pool_id is required
+	client                  *infisical.Client
+	AllowedMethods          []string
+	CredentialsAttributes   map[string]schema.Attribute
 	// API keys of credential attributes whose names don't follow snake_case to camelCase, for
 	// comparing the configuration with the credentials Infisical returns.
 	CredentialsAPIKeys               map[string]string
@@ -366,6 +367,12 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 	description := fmt.Sprintf("Create and manage %s App Connection", r.AppConnectionName)
 	if r.DocsURL != "" {
 		description += fmt.Sprintf(". For setup, see the [%s app connection guide](%s).", r.AppConnectionName, r.DocsURL)
+	}
+	if r.MinimumInfisicalVersion != "" {
+		if !strings.HasSuffix(description, ".") {
+			description += "."
+		}
+		description += fmt.Sprintf(" Requires Infisical %s or later.", r.MinimumInfisicalVersion)
 	}
 
 	resp.Schema = schema.Schema{
