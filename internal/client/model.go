@@ -3327,6 +3327,9 @@ type CertificateAuthorityConfiguration struct {
 	DN             string `json:"dn,omitempty"`
 	SerialNumber   string `json:"serialNumber,omitempty"`
 	ActiveCaCertId string `json:"activeCaCertId,omitempty"`
+	KeySource      string `json:"keySource,omitempty"`
+	HsmConnectorId string `json:"hsmConnectorId,omitempty"`
+	Region         string `json:"region,omitempty"`
 
 	// ACME-specific fields
 	DNSAppConnectionId string                 `json:"dnsAppConnectionId,omitempty"`
