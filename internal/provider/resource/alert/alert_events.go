@@ -20,6 +20,7 @@ const (
 	alertResourceTypeCertManager            = "cert-manager"
 	alertResourceTypeCertManagerSigner      = "cert-manager.signer"
 	alertResourceTypeSecretRotation         = "secret.rotation"
+	alertResourceTypeSecretSync             = "secret.sync"
 
 	alertEventTypeIdentityAuthenticationExpiry            = "identity.authentication.expiry"
 	alertEventTypeIdentityAuthenticationAuthMethodChanged = "identity.authentication.auth-method-changed"
@@ -37,6 +38,7 @@ const (
 	alertEventTypeCertManagerSignerCertExpiry = "cert-manager.signer.certificate.expiry"
 
 	alertEventTypeSecretRotationFailed = "secret.rotation.failed"
+	alertEventTypeSecretSyncFailed     = "secret.sync.failed"
 )
 
 type alertResourceTypeTraits struct {
@@ -52,6 +54,7 @@ var alertResourceTypes = map[string]alertResourceTypeTraits{
 	alertResourceTypeCertManager:            {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
 	alertResourceTypeCertManagerSigner:      {resolvesProject: true, allowsEmailRecipients: true, scopeWide: true},
 	alertResourceTypeSecretRotation:         {resolvesProject: true, allowsProjectRecipients: true},
+	alertResourceTypeSecretSync:             {resolvesProject: true, allowsProjectRecipients: true},
 }
 
 type alertEvent struct {
@@ -93,6 +96,7 @@ var alertEvents = []alertEvent{
 	{resourceType: alertResourceTypeCertManagerSigner, eventType: alertEventTypeCertManagerSignerCertExpiry, maxAlertBeforeDays: 365, filters: []string{"signer_ids"}},
 
 	{resourceType: alertResourceTypeSecretRotation, eventType: alertEventTypeSecretRotationFailed},
+	{resourceType: alertResourceTypeSecretSync, eventType: alertEventTypeSecretSyncFailed},
 }
 
 func alertResourceTypesWhere(match func(alertResourceTypeTraits) bool) []string {

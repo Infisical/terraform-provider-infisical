@@ -155,3 +155,20 @@ resource "infisical_alert" "rotation_failed" {
     }
   }
 }
+
+# Syncs created through Terraform need an explicit failure alert.
+resource "infisical_alert" "sync_failed" {
+  resource_type = "secret.sync"
+  resource_id   = "<your-secret-sync-id>"
+  name          = "Secret sync failure alert"
+  event_type    = "failed"
+
+  channels = {
+    project_admins = {
+      name = "Project admins"
+      email = {
+        recipients = [{ type = "project-admins", id = "<your-project-id>" }]
+      }
+    }
+  }
+}

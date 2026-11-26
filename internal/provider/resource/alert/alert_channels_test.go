@@ -876,13 +876,15 @@ func TestValidateRecipientTypesForResourceType(t *testing.T) {
 		t.Errorf("email recipient on an application alert: diagnostics = %v, want none", diags)
 	}
 
-	diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(alertResourceTypeIdentityAuthentication)), alertResourceTypeIdentityAuthentication)
-	if !diags.HasError() {
-		t.Fatal("email recipient on an identity alert: no error, want one")
-	}
-	want := path.Root("channels").AtMapKey("on_call").AtName("email").AtName("recipients")
-	if got := errorPath(t, diags); !got.Equal(want) {
-		t.Errorf("error path = %v, want %v", got, want)
+	for _, resourceType := range []string{alertResourceTypeIdentityAuthentication, "secret.sync"} {
+		diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(resourceType)), resourceType)
+		if !diags.HasError() {
+			t.Fatalf("email recipient on a %s alert: no error, want one", resourceType)
+		}
+		want := path.Root("channels").AtMapKey("on_call").AtName("email").AtName("recipients")
+		if got := errorPath(t, diags); !got.Equal(want) {
+			t.Errorf("%s error path = %v, want %v", resourceType, got, want)
+		}
 	}
 }
 
@@ -904,8 +906,10 @@ func TestValidateProjectRecipientsForResourceType(t *testing.T) {
 	}
 
 	for _, recipientType := range []string{AlertRecipientTypeProjectAdmins, AlertRecipientTypeProjectMembers} {
-		if diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(alertResourceTypeSecretRotation, recipientType)), alertResourceTypeSecretRotation); diags.HasError() {
-			t.Errorf("%s on a rotation alert: diagnostics = %v, want none", recipientType, diags)
+		for _, resourceType := range []string{alertResourceTypeSecretRotation, "secret.sync"} {
+			if diags := validateRecipientTypesForResourceType(ctx, alertConfig(t, s, model(resourceType, recipientType)), resourceType); diags.HasError() {
+				t.Errorf("%s on a %s alert: diagnostics = %v, want none", recipientType, resourceType, diags)
+			}
 		}
 
 		for _, resourceType := range []string{alertResourceTypeIdentityAuthentication, alertResourceTypeCertManagerApplication} {
