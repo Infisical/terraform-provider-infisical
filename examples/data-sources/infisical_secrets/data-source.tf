@@ -23,6 +23,13 @@ data "infisical_secrets" "common_secrets" {
   folder_path  = "/"
 }
 
+data "infisical_secrets" "secrets_with_imports" {
+  env_slug        = "dev"
+  workspace_id    = "<project id>" // project ID
+  folder_path     = "/backend"
+  include_imports = true // also return the secrets imported into /backend
+}
+
 output "all-project-secrets" {
   value = nonsensitive(data.infisical_secrets.common_secrets.secrets["SECRET-NAME"].value)
 }
