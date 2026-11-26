@@ -61,6 +61,8 @@ type fakeSecretSyncBackend struct {
 	createBodies  []map[string]any
 	patchBodies   []map[string]any
 	statusAtPatch []string
+
+	duplicateChecks int
 }
 
 func newFakeSecretSyncBackend(t *testing.T) *fakeSecretSyncBackend {
@@ -104,6 +106,14 @@ func (b *fakeSecretSyncBackend) queueRun(s *fakeSecretSync) {
 
 func (b *fakeSecretSyncBackend) handler() http.Handler {
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /api/v1/secret-syncs/{app}/check-destination", func(w http.ResponseWriter, r *http.Request) {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+
+		b.duplicateChecks++
+		b.writeJSON(w, http.StatusOK, infisical.CheckDuplicateDestinationResponse{})
+	})
 
 	mux.HandleFunc("POST /api/v1/secret-syncs/{app}", func(w http.ResponseWriter, r *http.Request) {
 		b.mu.Lock()
@@ -421,6 +431,47 @@ func expectDiagnosticError(t *testing.T, diags diag.Diagnostics, fragments ...st
 			t.Errorf("expected the diagnostics to contain %q, got: %s", fragment, text)
 		}
 	}
+}
+
+func TestSecretSyncModifyPlanSkipsDuplicateCheckForUnknownInputs(t *testing.T) {
+	forEachSecretSyncVariant(t, func(t *testing.T, v secretSyncTestVariant) {
+		for name, tc := range map[string]struct {
+			mutate     func(h *secretSyncTestHarness, m *SecretSyncBaseResourceModel)
+			wantChecks int
+		}{
+			"known inputs": {mutate: func(*secretSyncTestHarness, *SecretSyncBaseResourceModel) {}, wantChecks: 1},
+			"unknown project": {mutate: func(_ *secretSyncTestHarness, m *SecretSyncBaseResourceModel) {
+				m.ProjectID = types.StringUnknown()
+			}},
+			"unknown destination attribute": {mutate: func(h *secretSyncTestHarness, m *SecretSyncBaseResourceModel) {
+				attrs := m.DestinationConfig.Attributes()
+				for k := range attrs {
+					attrs[k] = types.StringUnknown()
+				}
+				m.DestinationConfig = h.object("destination_config", attrs)
+			}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				h := newSecretSyncTestHarness(t, v)
+				model := h.model(false, nil)
+				tc.mutate(h, &model)
+				plan := h.plan(model)
+				state := tfsdk.State{Schema: h.schema, Raw: tftypes.NewValue(h.schema.Type().TerraformType(t.Context()), nil)}
+
+				resp := resource.ModifyPlanResponse{Plan: plan}
+				h.r.ModifyPlan(t.Context(), resource.ModifyPlanRequest{Plan: plan, State: state}, &resp)
+				if resp.Diagnostics.HasError() {
+					t.Fatal(resp.Diagnostics)
+				}
+
+				h.backend.mu.Lock()
+				defer h.backend.mu.Unlock()
+				if h.backend.duplicateChecks != tc.wantChecks {
+					t.Errorf("expected %d duplicate checks, got %d", tc.wantChecks, h.backend.duplicateChecks)
+				}
+			})
+		}
+	})
 }
 
 func TestSecretSyncCreateWithoutWaitDoesNotPoll(t *testing.T) {
