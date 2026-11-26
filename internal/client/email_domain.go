@@ -55,7 +55,7 @@ func (client Client) ListEmailDomains() ([]EmailDomain, error) {
 	return responseData.EmailDomains, nil
 }
 
-// API has no get by ID endpoint, hence using ListEmailDomains
+// GetEmailDomainByID lists the email domains and picks one, because the API has no get by ID endpoint.
 func (client Client) GetEmailDomainByID(request GetEmailDomainByIDRequest) (EmailDomain, error) {
 	emailDomains, err := client.ListEmailDomains()
 	if err != nil {

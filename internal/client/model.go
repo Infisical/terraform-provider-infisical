@@ -5428,3 +5428,59 @@ type VerifyEmailDomainRequest struct {
 type VerifyEmailDomainResponse struct {
 	EmailDomain EmailDomain `json:"emailDomain"`
 }
+
+type OidcConfig struct {
+	ID                     string   `json:"id"`
+	OrgID                  string   `json:"orgId"`
+	ConfigurationType      string   `json:"configurationType"`
+	DiscoveryURL           string   `json:"discoveryURL"`
+	Issuer                 string   `json:"issuer"`
+	AuthorizationEndpoint  string   `json:"authorizationEndpoint"`
+	TokenEndpoint          string   `json:"tokenEndpoint"`
+	JwksUri                string   `json:"jwksUri"`
+	UserinfoEndpoint       string   `json:"userinfoEndpoint"`
+	ClientID               string   `json:"clientId"`
+	ClientSecret           string   `json:"clientSecret"`
+	AllowedEmailDomains    string   `json:"allowedEmailDomains"`
+	JwtSignatureAlgorithm  string   `json:"jwtSignatureAlgorithm"`
+	ManageGroupMemberships bool     `json:"manageGroupMemberships"`
+	IsActive               bool     `json:"isActive"`
+	MfaClaimName           string   `json:"mfaClaimName"`
+	MfaAmrValues           []string `json:"mfaAmrValues"`
+}
+
+type CreateOidcConfigRequest struct {
+	ConfigurationType      string   `json:"configurationType"`
+	DiscoveryURL           string   `json:"discoveryURL,omitempty"`
+	Issuer                 string   `json:"issuer,omitempty"`
+	AuthorizationEndpoint  string   `json:"authorizationEndpoint,omitempty"`
+	TokenEndpoint          string   `json:"tokenEndpoint,omitempty"`
+	JwksUri                string   `json:"jwksUri,omitempty"`
+	UserinfoEndpoint       string   `json:"userinfoEndpoint,omitempty"`
+	ClientID               string   `json:"clientId"`
+	ClientSecret           string   `json:"clientSecret"`
+	AllowedEmailDomains    string   `json:"allowedEmailDomains"`
+	JwtSignatureAlgorithm  string   `json:"jwtSignatureAlgorithm"`
+	ManageGroupMemberships bool     `json:"manageGroupMemberships"`
+	IsActive               bool     `json:"isActive"`
+	MfaClaimName           string   `json:"mfaClaimName"`
+	MfaAmrValues           []string `json:"mfaAmrValues,omitempty"`
+}
+
+type UpdateOidcConfigRequest struct {
+	ConfigurationType      string   `json:"configurationType"`
+	DiscoveryURL           string   `json:"discoveryURL,omitempty"`
+	Issuer                 string   `json:"issuer,omitempty"`
+	AuthorizationEndpoint  string   `json:"authorizationEndpoint,omitempty"`
+	TokenEndpoint          string   `json:"tokenEndpoint,omitempty"`
+	JwksUri                string   `json:"jwksUri,omitempty"`
+	UserinfoEndpoint       string   `json:"userinfoEndpoint,omitempty"`
+	ClientID               string   `json:"clientId"`
+	ClientSecret           string   `json:"clientSecret"`
+	AllowedEmailDomains    string   `json:"allowedEmailDomains"`
+	JwtSignatureAlgorithm  string   `json:"jwtSignatureAlgorithm"`
+	ManageGroupMemberships bool     `json:"manageGroupMemberships"`
+	IsActive               bool     `json:"isActive"`
+	MfaClaimName           string   `json:"mfaClaimName"`
+	MfaAmrValues           []string `json:"mfaAmrValues"`
+}

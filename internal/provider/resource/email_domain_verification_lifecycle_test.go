@@ -146,7 +146,7 @@ func newEmailDomainVerificationTestResource(t *testing.T, backend *fakeEmailDoma
 	}
 }
 
-// useFastEmailDomainVerificationPolling sets both retry intervals to 1ms so retry tests finish quickly
+// useFastEmailDomainVerificationPolling sets both retry intervals to 1ms so retry tests finish quickly.
 func useFastEmailDomainVerificationPolling(t *testing.T) {
 	t.Helper()
 	initial, maxInterval := emailDomainVerificationInitialInterval, emailDomainVerificationMaxInterval
@@ -175,12 +175,12 @@ func emailDomainVerificationTimeouts(create string) timeouts.Value {
 	return timeouts.Value{Object: types.ObjectValueMust(attrTypes, map[string]attr.Value{"create": types.StringValue(create)})}
 }
 
-func emailDomainVerificationPlan(t *testing.T, s schema.Schema, emailDomainID, createTimeout string) tfsdk.Plan {
+func emailDomainVerificationPlan(t *testing.T, s schema.Schema, createTimeout string) tfsdk.Plan {
 	t.Helper()
 	plan := tfsdk.Plan{Schema: s}
 	if diags := plan.Set(context.Background(), &EmailDomainVerificationResourceModel{
 		ID:            types.StringUnknown(),
-		EmailDomainID: types.StringValue(emailDomainID),
+		EmailDomainID: types.StringValue(emailDomainVerificationTestID),
 		Timeouts:      emailDomainVerificationTimeouts(createTimeout),
 	}); diags.HasError() {
 		t.Fatal(diags)
@@ -228,7 +228,7 @@ func TestEmailDomainVerificationLifecycle(t *testing.T) {
 	backend.dnsMisses = 2
 	r := newEmailDomainVerificationTestResource(t, backend)
 
-	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, emailDomainVerificationTestID, ""))
+	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, ""))
 	if resp.Diagnostics.HasError() {
 		t.Fatal(resp.Diagnostics)
 	}
@@ -265,7 +265,7 @@ func TestEmailDomainVerificationCreateAlreadyVerified(t *testing.T) {
 	backend.statuses[emailDomainVerificationTestID] = "verified"
 	r := newEmailDomainVerificationTestResource(t, backend)
 
-	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, emailDomainVerificationTestID, ""))
+	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, ""))
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("expected the 409 for an already verified domain to count as success, got: %v", resp.Diagnostics)
 	}
@@ -308,7 +308,7 @@ func TestEmailDomainVerificationCreateFailsAtOnce(t *testing.T) {
 			tc.setup(backend)
 			r := newEmailDomainVerificationTestResource(t, backend)
 
-			resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, emailDomainVerificationTestID, ""))
+			resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, ""))
 			if !resp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(resp.Diagnostics), tc.want) {
 				t.Errorf("expected an error containing %q, got: %v", tc.want, resp.Diagnostics)
 			}
@@ -325,7 +325,7 @@ func TestEmailDomainVerificationCreateTimesOut(t *testing.T) {
 	backend.dnsMisses = 1_000_000
 	r := newEmailDomainVerificationTestResource(t, backend)
 
-	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, emailDomainVerificationTestID, "50ms"))
+	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, "50ms"))
 	diags := fmt.Sprint(resp.Diagnostics)
 	if !resp.Diagnostics.HasError() || !strings.Contains(diags, "timed out") || !strings.Contains(diags, "DNS") {
 		t.Errorf("expected a timeout error with the last DNS message, got: %v", resp.Diagnostics)
@@ -345,7 +345,7 @@ func TestEmailDomainVerificationReadDropsUnverifiedDomain(t *testing.T) {
 			backend := newFakeEmailDomainVerificationBackend(t)
 			r := newEmailDomainVerificationTestResource(t, backend)
 
-			resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, emailDomainVerificationTestID, ""))
+			resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, ""))
 			if resp.Diagnostics.HasError() {
 				t.Fatal(resp.Diagnostics)
 			}

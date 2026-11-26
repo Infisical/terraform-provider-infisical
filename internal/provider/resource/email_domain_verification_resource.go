@@ -33,7 +33,7 @@ var (
 	emailDomainVerificationMaxInterval     = 30 * time.Second
 )
 
-// The error code can help determine whether to retry or not, on domain-verificaiton
+// The error codes that the verify endpoint returns. They decide whether a failed verification is retried.
 const (
 	emailDomainErrorDNSLookupFailed     = "EMAIL_DOMAIN_DNS_LOOKUP_FAILED"
 	emailDomainErrorDNSRecordMismatch   = "EMAIL_DOMAIN_DNS_RECORD_MISMATCH"
