@@ -125,7 +125,7 @@ func credentialsMismatchDetail(appConnectionName string, appConnection infisical
 		mismatch = fmt.Sprintf("These configured fields don't match what Infisical has: %s. Set them to the values in Infisical.", strings.Join(differing, ", "))
 	}
 	if appConnection.IsPlatformManagedCredentials {
-		return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials) and rejects any change to them, so Terraform doesn't send them. %s To use different credentials, create a new connection: run `terraform taint` on this resource, then apply. `terraform apply -replace` stops at this check too.", appConnectionName, mismatch)
+		return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials) and rejects any change to them, so Terraform doesn't send them. %s", appConnectionName, mismatch)
 	}
 	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection, so after an import or a rotation Terraform records the configured credentials without sending them. %s After that apply, Terraform sends changes to the credentials again.", appConnectionName, mismatch)
 }
@@ -396,10 +396,11 @@ func (r *AppConnectionBaseResource) ConfigValidators(_ context.Context) []resour
 }
 
 // ModifyPlan checks configured credentials that differ from state on a connection whose
-// credentials Infisical manages. With rotation on, a change that would send a password Infisical
-// may have rotated is refused. When the apply would record the credentials without sending them
-// (always for platform-managed credentials; with rotation on, after an import or a rotation), a
-// non-secret field that differs from Infisical's is refused, and otherwise the plan warns.
+// credentials Infisical manages. With rotation on, the plan warns about a change that would send
+// a password Infisical may have rotated. When the apply would record the credentials without
+// sending them (always for platform-managed credentials; with rotation on, after an import or a
+// rotation), a non-secret field that differs from Infisical's is refused, and otherwise the plan
+// warns.
 func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
