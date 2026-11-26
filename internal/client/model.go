@@ -5484,3 +5484,28 @@ type UpdateOidcConfigRequest struct {
 	MfaClaimName           string   `json:"mfaClaimName"`
 	MfaAmrValues           []string `json:"mfaAmrValues"`
 }
+
+type OrgSsoSettings struct {
+	OrgID                 string      `json:"orgId"`
+	AuthEnforced          bool        `json:"authEnforced"`
+	GoogleSsoAuthEnforced bool        `json:"googleSsoAuthEnforced"`
+	BypassOrgAuthEnabled  bool        `json:"bypassOrgAuthEnabled"`
+	SsoMfaTrust           SsoMfaTrust `json:"ssoMfaTrust"`
+}
+
+type GetOrgSsoSettingsResponse struct {
+	SsoSettings OrgSsoSettings `json:"ssoSettings"`
+}
+
+// UpdateOrgSsoSettingsRequest always sends all four fields. The API leaves an omitted field unchanged, so
+// omitempty would make false and "none" impossible to set.
+type UpdateOrgSsoSettingsRequest struct {
+	AuthEnforced          bool        `json:"authEnforced"`
+	GoogleSsoAuthEnforced bool        `json:"googleSsoAuthEnforced"`
+	BypassOrgAuthEnabled  bool        `json:"bypassOrgAuthEnabled"`
+	SsoMfaTrust           SsoMfaTrust `json:"ssoMfaTrust"`
+}
+
+type UpdateOrgSsoSettingsResponse struct {
+	SsoSettings OrgSsoSettings `json:"ssoSettings"`
+}
