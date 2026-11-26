@@ -123,7 +123,7 @@ func (r *EmailDomainVerificationResource) verifyEmailDomain(ctx context.Context,
 		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("stopped verifying the email domain because the operation was cancelled. Last response: %s", lastMessage)
 		}
-		return fmt.Errorf("timed out waiting for Infisical to find the DNS TXT record. Last response: %s. DNS changes can take time to propagate. To wait longer, increase timeouts.create", lastMessage)
+		return fmt.Errorf("timed out waiting for Infisical to find the DNS TXT record. To wait longer, increase timeouts.create. Last response: %s", lastMessage)
 	}
 
 	for {

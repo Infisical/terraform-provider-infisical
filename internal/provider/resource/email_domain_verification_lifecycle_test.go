@@ -327,7 +327,7 @@ func TestEmailDomainVerificationCreateTimesOut(t *testing.T) {
 
 	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, "50ms"))
 	diags := fmt.Sprint(resp.Diagnostics)
-	if !resp.Diagnostics.HasError() || !strings.Contains(diags, "timed out") || !strings.Contains(diags, "DNS") {
+	if !resp.Diagnostics.HasError() || !strings.Contains(diags, "timed out") || !strings.Contains(diags, "Last response: DNS TXT record not found") {
 		t.Errorf("expected a timeout error with the last DNS message, got: %v", resp.Diagnostics)
 	}
 	if backend.verifyRequests() < 2 {
