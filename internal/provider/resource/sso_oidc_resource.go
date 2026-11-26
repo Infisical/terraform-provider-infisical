@@ -148,6 +148,7 @@ func (r *SsoOidcResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"client_secret_wo": schema.StringAttribute{
 				Description: "The client secret to use for OIDC authentication, as a write-only value that is not stored in state. Exactly one of `client_secret` and `client_secret_wo` must be set. Requires Terraform version 1.11.0 or higher.",
 				Optional:    true,
+				Sensitive:   true,
 				WriteOnly:   true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),

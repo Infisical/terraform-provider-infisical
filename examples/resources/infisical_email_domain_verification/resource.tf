@@ -4,6 +4,10 @@ terraform {
       # version = <latest version>
       source = "infisical/infisical"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
   }
 }
 
@@ -17,20 +21,27 @@ provider "infisical" {
   }
 }
 
+# 1. Claim the email domain.
 resource "infisical_email_domain" "example" {
   domain = "example.com"
 }
 
-# Publish a DNS TXT record before the verification runs, with your DNS provider's resource:
-#   name:  infisical_email_domain.example.verification_record_name
-#   value: infisical_email_domain.example.verification_code
-# Add that resource to depends_on below, so Terraform creates the record first.
+# 2. Publish the DNS TXT record. Any DNS provider works; this example uses Cloudflare.
+resource "cloudflare_dns_record" "infisical_verification" {
+  zone_id = "<your-cloudflare-zone-id>"
+  type    = "TXT"
+  name    = infisical_email_domain.example.verification_record_name
+  content = infisical_email_domain.example.verification_code
+  ttl     = 300
+}
 
+# 3. Verify the domain. Create retries while the DNS record propagates.
 resource "infisical_email_domain_verification" "example" {
   email_domain_id = infisical_email_domain.example.id
 
-  # Verification retries while the DNS record propagates.
   timeouts = {
     create = "15m"
   }
+
+  depends_on = [cloudflare_dns_record.infisical_verification]
 }
