@@ -4,6 +4,7 @@ import (
 	"context"
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -114,7 +115,18 @@ func NewAppConnectionCloudflareResource() resource.Resource {
 			return credentialsConfig, diags
 		},
 		OverwriteCredentialsFields: func(state *AppConnectionBaseResourceModel) diag.Diagnostics {
-			return nil
+			credentialsConfig := map[string]attr.Value{
+				"account_id": types.StringNull(),
+				"api_token":  types.StringNull(),
+			}
+
+			var diags diag.Diagnostics
+			state.Credentials, diags = types.ObjectValue(map[string]attr.Type{
+				"account_id": types.StringType,
+				"api_token":  types.StringType,
+			}, credentialsConfig)
+
+			return diags
 		},
 	}
 }

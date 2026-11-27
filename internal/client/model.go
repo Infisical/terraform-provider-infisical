@@ -2556,6 +2556,12 @@ type AppConnection struct {
 	Method          string  `json:"method"`
 	CredentialsHash string  `json:"credentialsHash"`
 	GatewayId       *string `json:"gatewayId"`
+	GatewayPoolId   *string `json:"gatewayPoolId"`
+	// Set when Infisical manages the credentials, so the provider must not send them on update.
+	IsPlatformManagedCredentials bool `json:"isPlatformManagedCredentials"`
+	IsAutoRotationEnabled        bool `json:"isAutoRotationEnabled"`
+	// The non-secret credential fields; the API never returns passwords, keys or tokens.
+	Credentials map[string]any `json:"credentials"`
 }
 
 type CreateAppConnectionRequest struct {
@@ -2569,7 +2575,8 @@ type CreateAppConnectionRequest struct {
 
 type CreateAppConnectionWithGateway struct {
 	CreateAppConnectionRequest
-	GatewayId *string `json:"gatewayId"`
+	GatewayId     *string `json:"gatewayId"`
+	GatewayPoolId *string `json:"gatewayPoolId"`
 }
 
 type CreateAppConnectionResponse struct {
@@ -2597,7 +2604,8 @@ type UpdateAppConnectionRequest struct {
 
 type UpdateAppConnectionWithGateway struct {
 	UpdateAppConnectionRequest
-	GatewayId *string `json:"gatewayId"`
+	GatewayId     *string `json:"gatewayId"`
+	GatewayPoolId *string `json:"gatewayPoolId"`
 }
 
 type UpdateAppConnectionResponse struct {

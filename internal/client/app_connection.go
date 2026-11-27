@@ -51,6 +51,7 @@ const (
 	AppConnectionAppWinRM                 AppConnectionApp = "winrm"
 	AppConnectionAppSpacelift             AppConnectionApp = "spacelift"
 	AppConnectionAppLiteLLM               AppConnectionApp = "litellm"
+	AppConnectionAppADCS                  AppConnectionApp = "adcs"
 )
 
 const (
@@ -180,6 +181,9 @@ func (client Client) DeleteAppConnection(request DeleteAppConnectionRequest) (Ap
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return AppConnection{}, ErrNotFound
+		}
 		return AppConnection{}, errors.NewAPIErrorWithResponse(operationDeleteAppConnection, response, nil)
 	}
 

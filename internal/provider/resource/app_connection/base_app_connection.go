@@ -5,31 +5,146 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"sort"
 	"strings"
 	infisical "terraform-provider-infisical/internal/client"
+	infisicaltf "terraform-provider-infisical/internal/pkg/terraform"
 	"time"
 
+	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
+
+var (
+	_ resource.ResourceWithImportState      = &AppConnectionBaseResource{}
+	_ resource.ResourceWithConfigValidators = &AppConnectionBaseResource{}
+	_ resource.ResourceWithModifyPlan       = &AppConnectionBaseResource{}
+)
+
+// credentialsManagedByInfisical reports whether Infisical changes the connection's credentials
+// itself: platform-managed credentials or a credential rotation that is turned on
+// (backend/src/services/app-connection/app-connection-service.ts in Infisical core). A paused
+// rotation can't be detected: GET by ID doesn't return the rotation, only the list endpoint does.
+func credentialsManagedByInfisical(appConnection infisical.AppConnection) bool {
+	return appConnection.IsPlatformManagedCredentials || appConnection.IsAutoRotationEnabled
+}
+
+// readConnection reads the connection before an update, to find out whether Infisical manages
+// its credentials and which non-secret credential fields it holds.
+func (r *AppConnectionBaseResource) readConnection(id string) (infisical.AppConnection, error) {
+	return r.client.GetAppConnectionById(infisical.GetAppConnectionByIdRequest{App: r.App, ID: id})
+}
+
+// credentialsDifferingFromInfisical lists the configured credential fields that differ from the
+// non-secret credentials Infisical returns. Each attribute is matched to its API key, the name in
+// camelCase unless CredentialsAPIKeys says otherwise. Secret fields aren't returned and are
+// skipped. Infisical leaves out a non-secret field that has no value, so an absent string counts
+// as empty; an absent bool or number is skipped, since Infisical applies its own default to it.
+func (r *AppConnectionBaseResource) credentialsDifferingFromInfisical(planned types.Object, apiCredentials map[string]any) []string {
+	var differing []string
+	for name, value := range planned.Attributes() {
+		if value.IsUnknown() {
+			continue
+		}
+		apiValue, returned := apiCredentials[r.credentialsAPIKey(name)]
+		if !returned {
+			attribute, known := r.CredentialsAttributes[name]
+			if known && attribute.IsSensitive() {
+				continue
+			}
+			if _, isString := value.(basetypes.StringValue); !isString {
+				continue
+			}
+			apiValue = nil
+		}
+		// A removed setting matches only when Infisical has none either.
+		if value.IsNull() {
+			if apiValue != nil && apiValue != "" {
+				differing = append(differing, "credentials."+name)
+			}
+			continue
+		}
+		if !credentialValueMatches(value, apiValue) {
+			differing = append(differing, "credentials."+name)
+		}
+	}
+	sort.Strings(differing)
+	return differing
+}
+
+func credentialValueMatches(value attr.Value, apiValue any) bool {
+	switch v := value.(type) {
+	case basetypes.StringValue:
+		// Infisical leaves out or nulls a string that has no value, which an empty one matches.
+		if apiValue == nil {
+			apiValue = ""
+		}
+		s, ok := apiValue.(string)
+		return ok && strings.TrimSpace(s) == strings.TrimSpace(v.ValueString())
+	case basetypes.BoolValue:
+		b, ok := apiValue.(bool)
+		return ok && b == v.ValueBool()
+	case basetypes.Int32Value:
+		n, ok := apiValue.(float64)
+		return ok && int32(n) == v.ValueInt32()
+	case basetypes.Int64Value:
+		n, ok := apiValue.(float64)
+		return ok && int64(n) == v.ValueInt64()
+	case basetypes.Float64Value:
+		n, ok := apiValue.(float64)
+		return ok && n == v.ValueFloat64()
+	}
+	// A type this comparison doesn't handle never counts as a match.
+	return false
+}
+
+func snakeToCamel(name string) string {
+	parts := strings.Split(name, "_")
+	for i := 1; i < len(parts); i++ {
+		if parts[i] != "" {
+			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+func credentialsMismatchDetail(appConnectionName string, appConnection infisical.AppConnection, differing []string) string {
+	mismatch := fmt.Sprintf("The configured %s doesn't match what Infisical has. Set it to the value in Infisical.", differing[0])
+	if len(differing) > 1 {
+		mismatch = fmt.Sprintf("These configured fields don't match what Infisical has: %s. Set them to the values in Infisical.", strings.Join(differing, ", "))
+	}
+	if appConnection.IsPlatformManagedCredentials {
+		return fmt.Sprintf("Infisical manages the credentials of this %s App Connection (platform-managed credentials) and rejects any change to them, so Terraform doesn't send them. %s", appConnectionName, mismatch)
+	}
+	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection, so after an import or a rotation Terraform records the configured credentials without sending them. %s After that apply, Terraform sends changes to the credentials again.", appConnectionName, mismatch)
+}
 
 // AppConnectionBaseResource is the resource implementation.
 type AppConnectionBaseResource struct {
-	App                              infisical.AppConnectionApp // used for identifying secret sync route
-	ResourceTypeName                 string                     // terraform resource name suffix
-	AppConnectionName                string                     // complete descriptive name of the app connection
-	DocsURL                          string                     // optional Infisical guide linked from the resource description
-	SupportsGateway                  bool                       // when true, exposes gateway_id and sends it to the API
-	RequiresGateway                  bool                       // when true, gateway_id is required
-	client                           *infisical.Client
-	AllowedMethods                   []string
-	CredentialsAttributes            map[string]schema.Attribute
+	App                     infisical.AppConnectionApp // used for identifying secret sync route
+	ResourceTypeName        string                     // terraform resource name suffix
+	AppConnectionName       string                     // complete descriptive name of the app connection
+	DocsURL                 string                     // optional Infisical guide linked from the resource description
+	MinimumInfisicalVersion string                     // optional; the resource description names it
+	SupportsGateway         bool                       // when true, exposes gateway_id and gateway_pool_id and sends them to the API
+	RequiresGateway         bool                       // when true, one of gateway_id or gateway_pool_id is required
+	client                  *infisical.Client
+	AllowedMethods          []string
+	CredentialsAttributes   map[string]schema.Attribute
+	// API keys of credential attributes whose names don't follow snake_case to camelCase, for
+	// comparing the configuration with the credentials Infisical returns.
+	CredentialsAPIKeys               map[string]string
 	ReadCredentialsForCreateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	ReadCredentialsForUpdateFromPlan func(ctx context.Context, plan AppConnectionBaseResourceModel, state AppConnectionBaseResourceModel) (map[string]any, diag.Diagnostics)
 	OverwriteCredentialsFields       func(state *AppConnectionBaseResourceModel) diag.Diagnostics
@@ -105,11 +220,19 @@ type AppConnectionBaseResourceModel struct {
 
 // appConnectionGatewayResourceModel is used for plan/state I/O on connections that support
 // gateways. The embedded base model's tfsdk fields are promoted, so this matches the schema
-// that includes gateway_id. Connections without gateway support keep using the base model
-// directly, leaving their schema untouched.
+// that includes gateway_id and gateway_pool_id. Connections without gateway support keep using
+// the base model directly, leaving their schema untouched.
 type appConnectionGatewayResourceModel struct {
 	AppConnectionBaseResourceModel
-	GatewayId types.String `tfsdk:"gateway_id"`
+	GatewayId     types.String `tfsdk:"gateway_id"`
+	GatewayPoolId types.String `tfsdk:"gateway_pool_id"`
+}
+
+// appConnectionGateway is how a connection reaches its host: one gateway, a gateway pool, or
+// neither (the Internet Gateway). The API allows at most one of the two.
+type appConnectionGateway struct {
+	Id     types.String
+	PoolId types.String
 }
 
 // planStateGetter is satisfied by both tfsdk.Plan and tfsdk.State (value receivers), letting
@@ -119,57 +242,63 @@ type planStateGetter interface {
 }
 
 // readModel reads plan/state into the base model. For gateway-enabled connections it also
-// returns the configured gateway_id; otherwise that value is null.
-func (r *AppConnectionBaseResource) readModel(ctx context.Context, src planStateGetter) (AppConnectionBaseResourceModel, types.String, diag.Diagnostics) {
+// returns the configured gateway_id and gateway_pool_id; otherwise both are null.
+func (r *AppConnectionBaseResource) readModel(ctx context.Context, src planStateGetter) (AppConnectionBaseResourceModel, appConnectionGateway, diag.Diagnostics) {
 	if r.SupportsGateway {
 		var m appConnectionGatewayResourceModel
 		diags := src.Get(ctx, &m)
-		return m.AppConnectionBaseResourceModel, m.GatewayId, diags
+		return m.AppConnectionBaseResourceModel, appConnectionGateway{Id: m.GatewayId, PoolId: m.GatewayPoolId}, diags
 	}
 
 	var m AppConnectionBaseResourceModel
 	diags := src.Get(ctx, &m)
-	return m, types.StringNull(), diags
+	return m, appConnectionGateway{Id: types.StringNull(), PoolId: types.StringNull()}, diags
 }
 
 // stateValue returns the value to write to state, gateway-aware when the connection supports
-// gateways so the struct matches the schema (which then includes gateway_id).
-func (r *AppConnectionBaseResource) stateValue(model AppConnectionBaseResourceModel, gatewayId types.String) interface{} {
+// gateways so the struct matches the schema (which then includes gateway_id and gateway_pool_id).
+func (r *AppConnectionBaseResource) stateValue(model AppConnectionBaseResourceModel, gateway appConnectionGateway) interface{} {
 	if r.SupportsGateway {
 		return appConnectionGatewayResourceModel{
 			AppConnectionBaseResourceModel: model,
-			GatewayId:                      gatewayId,
+			GatewayId:                      gateway.Id,
+			GatewayPoolId:                  gateway.PoolId,
 		}
 	}
 	return model
 }
 
-// reconcileGatewayId returns the gateway_id to persist from the API response. For connections
-// that don't support gateways it leaves the current value untouched.
-func (r *AppConnectionBaseResource) reconcileGatewayId(current types.String, appConnection infisical.AppConnection) types.String {
+// reconcileGateway returns the gateway_id and gateway_pool_id to persist from the API response,
+// so a gateway or pool chosen in the dashboard shows up as drift. For connections that don't
+// support gateways it leaves the current value untouched.
+func (r *AppConnectionBaseResource) reconcileGateway(current appConnectionGateway, appConnection infisical.AppConnection) appConnectionGateway {
 	if !r.SupportsGateway {
 		return current
 	}
-	if appConnection.GatewayId != nil {
-		return types.StringValue(*appConnection.GatewayId)
+	return appConnectionGateway{
+		Id:     stringValueOrNull(appConnection.GatewayId),
+		PoolId: stringValueOrNull(appConnection.GatewayPoolId),
 	}
-	return types.StringNull()
 }
 
-// gatewayIdForRequest returns the gateway_id value to send to the API. It returns a non-nil
-// pointer only when the resource supports gateways and a value is set. When the gateway has
-// been removed from the configuration it returns nil, which serializes to an explicit `null`
-// so the API resets the connection back to the Internet Gateway (omitting the field would
-// leave the existing gateway untouched).
-func (r *AppConnectionBaseResource) gatewayIdForRequest(gatewayId types.String) *string {
-	if !r.SupportsGateway {
+func stringValueOrNull(value *string) types.String {
+	if value == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(*value)
+}
+
+// gatewayFieldForRequest returns a gateway_id or gateway_pool_id value to send to the API. Both
+// are always sent, and an unset one goes as an explicit `null`. The API clears a field it
+// receives as null and leaves an omitted one as it is, and setting a gateway clears the pool
+// (and the reverse) only for the field that was left out, so sending both is the only way the
+// result matches the configuration.
+func gatewayFieldForRequest(value types.String) *string {
+	if value.IsNull() || value.IsUnknown() || value.ValueString() == "" {
 		return nil
 	}
-	if gatewayId.IsNull() || gatewayId.IsUnknown() || gatewayId.ValueString() == "" {
-		return nil
-	}
-	value := gatewayId.ValueString()
-	return &value
+	v := value.ValueString()
+	return &v
 }
 
 // Metadata returns the resource type name.
@@ -215,17 +344,23 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 	}
 
 	if r.SupportsGateway {
-		description := "The Gateway ID to use for the app connection. If not specified, the Internet Gateway will be used."
+		gatewayDescription := "The Gateway ID to use for the app connection. Conflicts with `gateway_pool_id`. If neither is specified, the Internet Gateway will be used."
+		poolDescription := "The ID of the gateway pool to use for the app connection, instead of a single gateway. Conflicts with `gateway_id`. Gateway pools require an Infisical Enterprise plan. Requires Infisical v0.159.29 or later."
 		if r.RequiresGateway {
-			description = fmt.Sprintf("The Gateway ID to use for the app connection. %s connections can only reach the host through a gateway.", r.AppConnectionName)
+			gatewayDescription = fmt.Sprintf("The Gateway ID to use for the app connection. %s connections can only reach the host through a gateway, so set either `gateway_id` or `gateway_pool_id`.", r.AppConnectionName)
+			poolDescription = fmt.Sprintf("The ID of the gateway pool to use for the app connection, instead of a single gateway. %s connections can only reach the host through a gateway, so set either `gateway_id` or `gateway_pool_id`. Gateway pools require an Infisical Enterprise plan. Requires Infisical v0.159.29 or later.", r.AppConnectionName)
 		}
 		attributes["gateway_id"] = schema.StringAttribute{
-			Optional:    !r.RequiresGateway,
-			Required:    r.RequiresGateway,
-			Description: description,
+			Optional:    true,
+			Description: gatewayDescription,
 			Validators: []validator.String{
 				stringvalidator.LengthAtLeast(1),
 			},
+		}
+		attributes["gateway_pool_id"] = schema.StringAttribute{
+			Optional:    true,
+			Description: poolDescription,
+			Validators:  []validator.String{infisicaltf.UuidValidator},
 		}
 	}
 
@@ -233,11 +368,180 @@ func (r *AppConnectionBaseResource) Schema(_ context.Context, _ resource.SchemaR
 	if r.DocsURL != "" {
 		description += fmt.Sprintf(". For setup, see the [%s app connection guide](%s).", r.AppConnectionName, r.DocsURL)
 	}
+	if r.MinimumInfisicalVersion != "" {
+		if !strings.HasSuffix(description, ".") {
+			description += "."
+		}
+		description += fmt.Sprintf(" Requires Infisical %s or later.", r.MinimumInfisicalVersion)
+	}
 
 	resp.Schema = schema.Schema{
 		Description: description,
 		Attributes:  attributes,
 	}
+}
+
+// ConfigValidators makes gateway_id and gateway_pool_id mutually exclusive, as the API does, and
+// requires one of them when the connection can only reach its host through a gateway.
+func (r *AppConnectionBaseResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	if !r.SupportsGateway {
+		return nil
+	}
+
+	gatewayPaths := []path.Expression{path.MatchRoot("gateway_id"), path.MatchRoot("gateway_pool_id")}
+	if r.RequiresGateway {
+		return []resource.ConfigValidator{resourcevalidator.ExactlyOneOf(gatewayPaths...)}
+	}
+	return []resource.ConfigValidator{resourcevalidator.Conflicting(gatewayPaths...)}
+}
+
+// ModifyPlan checks configured credentials that differ from state on a connection whose
+// credentials Infisical manages. With rotation on, the plan warns about a change that would send
+// a password Infisical may have rotated. When the apply would record the credentials without
+// sending them (always for platform-managed credentials; with rotation on, after an import or a
+// rotation), a non-secret field that differs from Infisical's is refused, and otherwise the plan
+// warns.
+func (r *AppConnectionBaseResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var id types.String
+	var planned, current types.Object
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("id"), &id)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("credentials"), &planned)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("credentials"), &current)...)
+	if resp.Diagnostics.HasError() || planned.Equal(current) || r.client == nil {
+		return
+	}
+
+	// A replacement creates a new connection, which takes the configured credentials. A value
+	// known only at apply is checked by Update instead.
+	replacing, diags := planReplacesConnection(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() || replacing || hasUnknownAttribute(planned) {
+		return
+	}
+
+	// A failed read here is not worth failing the plan over: Update reads the connection again.
+	appConnection, err := r.readConnection(id.ValueString())
+	if err != nil {
+		return
+	}
+	if r.sendsUnchangedPassword(appConnection, planned, current) {
+		resp.Diagnostics.AddAttributeWarning(path.Root("credentials"), "Credentials managed by Infisical", rotationSendsPasswordDetail(r.AppConnectionName))
+		return
+	}
+	if !recordsCredentialsWithoutSending(appConnection, current) {
+		return
+	}
+
+	if differing := r.credentialsDifferingFromInfisical(planned, appConnection.Credentials); len(differing) > 0 {
+		resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, appConnection, differing))
+		return
+	}
+	resp.Diagnostics.AddAttributeWarning(
+		path.Root("credentials"),
+		"Credentials managed by Infisical",
+		fmt.Sprintf("Infisical manages the credentials of this %s App Connection (%s), so Terraform records the configured credentials without sending them.", r.AppConnectionName, credentialsManager(appConnection)),
+	)
+}
+
+// recordsCredentialsWithoutSending reports whether an update records the configured credentials
+// in state without sending them. Infisical rejects any credentials sent to a platform-managed
+// connection. With rotation on, it accepts them, but after an import or a rotation, when state
+// holds no credentials, the configured ones are likely stale and would replace the ones Infisical
+// rotated; once state holds them, a change the user makes is sent.
+func recordsCredentialsWithoutSending(appConnection infisical.AppConnection, stateCredentials types.Object) bool {
+	if appConnection.IsPlatformManagedCredentials {
+		return true
+	}
+	return appConnection.IsAutoRotationEnabled && credentialsUnset(stateCredentials)
+}
+
+// sendsUnchangedPassword reports whether a credentials change on a connection with rotation on sends
+// a password the change doesn't set. The API takes the credentials as one object, so a change to a
+// setting such as a certificate sends the configured password too. Infisical may have rotated it
+// since, and only the API can tell, since GET never returns it, so the plan warns and the API
+// decides. A secret field is one marked sensitive that Infisical doesn't return: Azure marks
+// client_id sensitive, but GET returns it, and Infisical rotates only the client secret.
+func (r *AppConnectionBaseResource) sendsUnchangedPassword(appConnection infisical.AppConnection, planned, current types.Object) bool {
+	if !appConnection.IsAutoRotationEnabled || credentialsUnset(current) || planned.Equal(current) {
+		return false
+	}
+	plannedAttributes, currentAttributes := planned.Attributes(), current.Attributes()
+	for name, attribute := range r.CredentialsAttributes {
+		if _, returned := appConnection.Credentials[r.credentialsAPIKey(name)]; returned || !attribute.IsSensitive() {
+			continue
+		}
+		if !plannedAttributes[name].Equal(currentAttributes[name]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *AppConnectionBaseResource) credentialsAPIKey(name string) string {
+	if key, mapped := r.CredentialsAPIKeys[name]; mapped {
+		return key
+	}
+	return snakeToCamel(name)
+}
+
+func rotationSendsPasswordDetail(appConnectionName string) string {
+	return fmt.Sprintf("Infisical rotates the credentials of this %s App Connection. This change sends the configured password with it, and if Infisical has rotated the password since it was set, Infisical rejects the change at apply. In that case, set the current password in the configuration along with this change.", appConnectionName)
+}
+
+func credentialsManager(appConnection infisical.AppConnection) string {
+	if appConnection.IsPlatformManagedCredentials {
+		return "platform-managed credentials"
+	}
+	return "credential rotation"
+}
+
+// planReplacesConnection reports whether the plan replaces the connection: method and project_id
+// use RequiresReplace, and an unknown value there replaces it too. The framework doesn't pass
+// attribute-level replacements to ModifyPlan, so they are compared here.
+func planReplacesConnection(ctx context.Context, req resource.ModifyPlanRequest) (bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	for _, attribute := range []string{"method", "project_id"} {
+		var planned, current types.String
+		diags.Append(req.Plan.GetAttribute(ctx, path.Root(attribute), &planned)...)
+		diags.Append(req.State.GetAttribute(ctx, path.Root(attribute), &current)...)
+		if diags.HasError() {
+			return false, diags
+		}
+		if planned.IsUnknown() || !planned.Equal(current) {
+			return true, diags
+		}
+	}
+	return false, diags
+}
+
+func hasUnknownAttribute(object types.Object) bool {
+	if object.IsUnknown() {
+		return true
+	}
+	for _, value := range object.Attributes() {
+		if value.IsUnknown() {
+			return true
+		}
+	}
+	return false
+}
+
+// credentialsUnset reports whether state holds no credentials: none after an import, or all
+// fields nulled by OverwriteCredentialsFields after the hash changed.
+func credentialsUnset(credentials types.Object) bool {
+	if credentials.IsNull() || credentials.IsUnknown() {
+		return true
+	}
+	for _, value := range credentials.Attributes() {
+		if !value.IsNull() {
+			return false
+		}
+	}
+	return true
 }
 
 // Configure adds the provider configured client to the resource.
@@ -271,7 +575,7 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Retrieve values from plan
-	plan, gatewayId, diags := r.readModel(ctx, req.Plan)
+	plan, gateway, diags := r.readModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -314,7 +618,8 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 		if r.SupportsGateway {
 			appConnection, apiErr = r.client.CreateAppConnectionWithGateway(infisical.CreateAppConnectionWithGateway{
 				CreateAppConnectionRequest: baseRequest,
-				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+				GatewayId:                  gatewayFieldForRequest(gateway.Id),
+				GatewayPoolId:              gatewayFieldForRequest(gateway.PoolId),
 			})
 		} else {
 			appConnection, apiErr = r.client.CreateAppConnection(baseRequest)
@@ -332,9 +637,9 @@ func (r *AppConnectionBaseResource) Create(ctx context.Context, req resource.Cre
 
 	plan.ID = types.StringValue(appConnection.Id)
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
-	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+	gateway = r.reconcileGateway(gateway, appConnection)
 
-	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
+	diags = resp.State.Set(ctx, r.stateValue(plan, gateway))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -352,9 +657,14 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	// Get current state
-	state, gatewayId, diags := r.readModel(ctx, req.State)
+	state, gateway, diags := r.readModel(ctx, req.State)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.ID.ValueString() == "" {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -376,25 +686,28 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 		}
 	}
 
-	// Reconcile gateway_id from the API so out-of-band changes are detected as drift.
-	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+	gateway = r.reconcileGateway(gateway, appConnection)
 
 	if state.CredentialsHash.ValueString() != appConnection.CredentialsHash {
-		resp.Diagnostics.AddWarning(
-			"App connection credentials conflict",
-			fmt.Sprintf("The credentials for the %s App Connection with ID %s have been updated outside of Terraform.", r.AppConnectionName, state.ID.ValueString()),
-		)
+		// An import starts with no hash. The API never returns secret credentials, so there is
+		// nothing to compare against and no conflict to warn about. When Infisical manages the
+		// credentials, it changes them itself, so a new hash is not a conflict either.
+		if !state.CredentialsHash.IsNull() && !credentialsManagedByInfisical(appConnection) {
+			resp.Diagnostics.AddWarning(
+				"App connection credentials conflict",
+				fmt.Sprintf("The credentials for the %s App Connection with ID %s have been updated outside of Terraform.", r.AppConnectionName, state.ID.ValueString()),
+			)
+		}
 
-		// force TF update
+		// Nulling the credentials makes the next apply take the configured credentials again:
+		// Update sends them, or records them without sending when Infisical manages them.
 		diags = r.OverwriteCredentialsFields(&state)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 
-		diags = resp.State.Set(ctx, r.stateValue(state, gatewayId))
-		resp.Diagnostics.Append(diags...)
-		return
+		state.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
 	}
 
 	if !(state.Description.IsNull() && appConnection.Description == "") {
@@ -410,7 +723,7 @@ func (r *AppConnectionBaseResource) Read(ctx context.Context, req resource.ReadR
 	state.Method = types.StringValue(appConnection.Method)
 	state.Name = types.StringValue(appConnection.Name)
 
-	diags = resp.State.Set(ctx, r.stateValue(state, gatewayId))
+	diags = resp.State.Set(ctx, r.stateValue(state, gateway))
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -424,7 +737,7 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	// Retrieve values from plan
-	plan, gatewayId, diags := r.readModel(ctx, req.Plan)
+	plan, gateway, diags := r.readModel(ctx, req.Plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -452,14 +765,39 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	credentialsMap, diags := r.ReadCredentialsForUpdateFromPlan(ctx, plan, state)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
+	current, err := r.readConnection(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating app connection",
+			"Couldn't read app connection before updating it, unexpected error: "+err.Error(),
+		)
 		return
+	}
+	// With rotation on and credentials in state, only a change the user made is sent: resending
+	// unchanged credentials would replace the ones Infisical rotated.
+	skipCredentials := recordsCredentialsWithoutSending(current, state.Credentials) ||
+		(current.IsAutoRotationEnabled && plan.Credentials.Equal(state.Credentials))
+
+	// ModifyPlan refuses these when it can; a credential known only at apply reaches here.
+	if recordsCredentialsWithoutSending(current, state.Credentials) {
+		if differing := r.credentialsDifferingFromInfisical(plan.Credentials, current.Credentials); len(differing) > 0 {
+			resp.Diagnostics.AddAttributeError(path.Root("credentials"), "Credentials managed by Infisical", credentialsMismatchDetail(r.AppConnectionName, current, differing))
+			return
+		}
+	}
+
+	// A nil map leaves credentials out of the request, so Infisical keeps the ones it has.
+	var credentialsMap map[string]any
+	if !skipCredentials {
+		credentialsMap, diags = r.ReadCredentialsForUpdateFromPlan(ctx, plan, state)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
 	}
 
 	var appConnection infisical.AppConnection
-	err := retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
+	err = retryAppConnectionOp(ctx, r.IsRetryableError, func() error {
 		var apiErr error
 		baseRequest := infisical.UpdateAppConnectionRequest{
 			ID:          state.ID.ValueString(),
@@ -474,7 +812,8 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 		if r.SupportsGateway {
 			appConnection, apiErr = r.client.UpdateAppConnectionWithGateway(infisical.UpdateAppConnectionWithGateway{
 				UpdateAppConnectionRequest: baseRequest,
-				GatewayId:                  r.gatewayIdForRequest(gatewayId),
+				GatewayId:                  gatewayFieldForRequest(gateway.Id),
+				GatewayPoolId:              gatewayFieldForRequest(gateway.PoolId),
 			})
 		} else {
 			appConnection, apiErr = r.client.UpdateAppConnection(baseRequest)
@@ -491,9 +830,9 @@ func (r *AppConnectionBaseResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	plan.CredentialsHash = types.StringValue(appConnection.CredentialsHash)
-	gatewayId = r.reconcileGatewayId(gatewayId, appConnection)
+	gateway = r.reconcileGateway(gateway, appConnection)
 
-	diags = resp.State.Set(ctx, r.stateValue(plan, gatewayId))
+	diags = resp.State.Set(ctx, r.stateValue(plan, gateway))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -520,10 +859,30 @@ func (r *AppConnectionBaseResource) Delete(ctx context.Context, req resource.Del
 		ID:  state.ID.ValueString(),
 	})
 
+	// Already gone, which is what the delete wanted.
+	if err == infisical.ErrNotFound {
+		return
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting app connection",
 			"Couldn't delete app connection from Infisical, unexpected error: "+err.Error(),
 		)
 	}
+}
+
+// ImportState accepts the app connection ID. Read then fills in everything the API returns. The
+// API never returns secret credentials, so the first plan after an import sends the configured
+// credentials again.
+func (r *AppConnectionBaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if _, err := uuid.ParseUUID(req.ID); err != nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected the ID of an app connection, such as 3f091b42-1661-41a1-b647-98c6a45af047, got: %q", req.ID),
+		)
+		return
+	}
+
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
