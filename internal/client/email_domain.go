@@ -71,7 +71,7 @@ func (client Client) GetEmailDomainByID(request GetEmailDomainByIDRequest) (Emai
 	return EmailDomain{}, ErrNotFound
 }
 
-// VerifyEmailDomainWithContext stops the request, and any 429 retry wait, when ctx ends.
+// VerifyEmailDomainWithContext returns when ctx ends, even mid-request or while waiting to retry a 429.
 func (client Client) VerifyEmailDomainWithContext(ctx context.Context, request VerifyEmailDomainRequest) (EmailDomain, error) {
 	var responseData VerifyEmailDomainResponse
 	response, err := client.Config.HttpClient.

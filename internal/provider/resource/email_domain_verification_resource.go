@@ -151,7 +151,7 @@ func (r *EmailDomainVerificationResource) verifyEmailDomain(ctx context.Context,
 			return err
 		}
 		switch {
-		// The API answers 409 when this organization already verified the domain, which is the result we want.
+		// The API answers 409 when this organization already verified the domain.
 		case apiErr.StatusCode == http.StatusConflict:
 			return nil
 		case isEmailDomainDNSNotReady(apiErr):

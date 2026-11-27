@@ -539,7 +539,8 @@ func (r *SsoOidcResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-// ImportState takes the organization ID, because an organization has at most one OIDC configuration.
+const ssoOidcWriteOnlyImportPrefix = "write-only:"
+
 func (r *SsoOidcResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if !r.client.Config.IsMachineIdentityAuth {
 		resp.Diagnostics.AddError(
@@ -549,10 +550,14 @@ func (r *SsoOidcResource) ImportState(ctx context.Context, req resource.ImportSt
 		return
 	}
 
-	if _, err := uuid.ParseUUID(req.ID); err != nil {
+	// Import does not see the configuration, so the ID says whether the secret belongs in state.
+	writeOnly := strings.HasPrefix(req.ID, ssoOidcWriteOnlyImportPrefix)
+	orgID := strings.TrimPrefix(req.ID, ssoOidcWriteOnlyImportPrefix)
+
+	if _, err := uuid.ParseUUID(orgID); err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid import ID",
-			"Import ID must be the ID of the organization (a UUID)",
+			"Import ID must be the ID of the organization (a UUID), or 'write-only:<organization-id>' for a configuration that uses client_secret_wo",
 		)
 		return
 	}
@@ -571,21 +576,19 @@ func (r *SsoOidcResource) ImportState(ctx context.Context, req resource.ImportSt
 	}
 
 	// The API reads the organization from the token, so the ID only confirms which organization that is.
-	if config.OrgID != req.ID {
+	if config.OrgID != orgID {
 		resp.Diagnostics.AddError(
 			"Error importing OIDC SSO configuration",
-			fmt.Sprintf("The machine identity belongs to organization %s, not %s. Use the provider credentials of a machine identity in the organization to import.", config.OrgID, req.ID),
+			fmt.Sprintf("The machine identity belongs to organization %s, not %s. Use the provider credentials of a machine identity in the organization to import.", config.OrgID, orgID),
 		)
 		return
 	}
 
-	// client_secret starts as known, so the secret is imported into state. Configurations that use
-	// client_secret_wo drop it on the next apply.
-	prior := SsoOidcResourceModel{
-		ClientSecret:          types.StringValue(""),
-		ClientSecretWOVersion: types.Int64Null(),
-		AllowedEmailDomains:   types.SetNull(types.StringType),
-		MfaAmrValues:          types.SetNull(types.StringType),
+	// A known client_secret puts the secret from GET into state. A write-only import keeps it null and starts client_secret_wo_version at 1
+	prior := SsoOidcResourceModel{ClientSecret: types.StringValue("")}
+	if writeOnly {
+		prior.ClientSecret = types.StringNull()
+		prior.ClientSecretWOVersion = types.Int64Value(1)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, ssoOidcModelFromAPI(config, prior))...)
 }

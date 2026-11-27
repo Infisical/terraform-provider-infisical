@@ -11,13 +11,11 @@ import (
 	infisicalerrors "terraform-provider-infisical/internal/errors"
 )
 
-// requestRecorder keeps the method, path and JSON body of the last request.
 type requestRecorder struct {
 	method, path string
 	body         map[string]any
 }
 
-// handler records the request and answers 200 with response.
 func (rec *requestRecorder) handler(t *testing.T, response string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rec.method, rec.path, rec.body = r.Method, r.URL.Path, nil

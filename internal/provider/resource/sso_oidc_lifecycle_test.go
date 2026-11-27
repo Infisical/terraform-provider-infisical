@@ -550,6 +550,53 @@ func TestSsoOidcImport(t *testing.T) {
 	}
 }
 
+// The write-only prefix keeps the secret that GET returns out of state, and matches a configuration that uses
+// client_secret_wo with version 1.
+func TestSsoOidcImportWriteOnly(t *testing.T) {
+	ctx := context.Background()
+	s := ssoOidcTestSchema(t)
+	backend := newFakeOidcBackend(t)
+	r := newSsoOidcTestResource(t, backend)
+
+	model := ssoOidcBaseModel()
+	model.ClientSecret = types.StringNull()
+	model.ClientSecretWO = types.StringValue("write-only-secret")
+	model.ClientSecretWOVersion = types.Int64Value(1)
+	created := ssoOidcModel(t, mustCreateSsoOidc(t, r, s, model))
+
+	importWith := func(id string) resource.ImportStateResponse {
+		resp := resource.ImportStateResponse{State: ssoOidcState(t, s, ssoOidcBaseModel())}
+		r.ImportState(ctx, resource.ImportStateRequest{ID: id}, &resp)
+		return resp
+	}
+
+	for _, id := range []string{"write-only:", "write-only:not-a-uuid"} {
+		if diags := fmt.Sprint(importWith(id).Diagnostics); !strings.Contains(diags, "Invalid import ID") {
+			t.Errorf("expected an Invalid import ID error for %q, got: %v", id, diags)
+		}
+	}
+	if diags := fmt.Sprint(importWith("write-only:00000000-0000-4000-8000-000000000000").Diagnostics); !strings.Contains(diags, "belongs to organization "+ssoOidcTestOrgID) {
+		t.Errorf("expected an organization mismatch error, got: %v", diags)
+	}
+
+	resp := importWith("write-only:" + ssoOidcTestOrgID)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	imported := ssoOidcModel(t, resp.State)
+	if !imported.ClientSecret.IsNull() || !imported.ClientSecretWO.IsNull() || imported.ClientSecretWOVersion.ValueInt64() != 1 {
+		t.Errorf("expected no secret in state and client_secret_wo_version 1, got %+v", imported)
+	}
+
+	readResp := readSsoOidc(r, resp.State)
+	if readResp.Diagnostics.HasError() {
+		t.Fatal(readResp.Diagnostics)
+	}
+	if refreshed := ssoOidcModel(t, readResp.State); !reflect.DeepEqual(refreshed, created) {
+		t.Errorf("expected the import to rebuild the full state, got %+v, want %+v", refreshed, created)
+	}
+}
+
 func TestSsoOidcUpdateSendsFullConfig(t *testing.T) {
 	s := ssoOidcTestSchema(t)
 	backend := newFakeOidcBackend(t)

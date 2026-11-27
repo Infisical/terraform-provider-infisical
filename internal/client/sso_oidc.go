@@ -60,7 +60,6 @@ func (client Client) CreateOidcConfig(request CreateOidcConfigRequest) (OidcConf
 	return responseData, nil
 }
 
-// UpdateOidcConfig sends the full configuration. The response leaves out the client ID and the client secret.
 func (client Client) UpdateOidcConfig(request UpdateOidcConfigRequest) (OidcConfig, error) {
 	var responseData OidcConfig
 	response, err := client.Config.HttpClient.
