@@ -27,9 +27,10 @@ type fakeEmailDomainVerificationBackend struct {
 	t        *testing.T
 	statuses map[string]string
 	// The number of verify calls that miss the DNS record before it is found.
-	dnsMisses      int
-	planRestricted bool
-	// Another organization verifies the domain while this one is pending, so the final claim is refused.
+	dnsMisses          int
+	onlyRecordMismatch bool
+	planRestricted     bool
+
 	verifiedByAnotherOrg bool
 	// Sends errors without the `error` code, as an older Infisical does.
 	omitErrorCodes bool
@@ -61,11 +62,14 @@ func (b *fakeEmailDomainVerificationBackend) apiError(w http.ResponseWriter, sta
 
 func (b *fakeEmailDomainVerificationBackend) emailDomain(id string) map[string]any {
 	return map[string]any{
-		"id":                     id,
-		"domain":                 "example.com",
-		"verificationCode":       "infisical-domain-verification=code",
-		"verificationRecordName": "_infisical-verification.example.com",
-		"status":                 b.statuses[id],
+		"id":     id,
+		"domain": "example.com",
+		"verificationRecord": map[string]any{
+			"type":  "TXT",
+			"name":  "_infisical-verification.example.com",
+			"value": "infisical-domain-verification=code",
+		},
+		"status": b.statuses[id],
 	}
 }
 
@@ -102,7 +106,7 @@ func (b *fakeEmailDomainVerificationBackend) handler() http.Handler {
 		if b.dnsMisses > 0 {
 			b.dnsMisses--
 			// The service answers with one of two messages, depending on whether the lookup itself failed.
-			if b.dnsMisses%2 == 0 {
+			if b.dnsMisses%2 == 0 && !b.onlyRecordMismatch {
 				b.apiError(w, http.StatusBadRequest, "EMAIL_DOMAIN_DNS_LOOKUP_FAILED", "Failed to resolve DNS records for the domain. Please verify the DNS TXT record exists and try again. DNS changes may take time to propagate.")
 			} else {
 				b.apiError(w, http.StatusBadRequest, "EMAIL_DOMAIN_DNS_RECORD_MISMATCH", "DNS TXT record not found or value does not match. Expected a TXT record at _infisical-verification.example.com with value: infisical-domain-verification=code")
@@ -323,6 +327,7 @@ func TestEmailDomainVerificationCreateTimesOut(t *testing.T) {
 	s := emailDomainVerificationTestSchema(t)
 	backend := newFakeEmailDomainVerificationBackend(t)
 	backend.dnsMisses = 1_000_000
+	backend.onlyRecordMismatch = true
 	r := newEmailDomainVerificationTestResource(t, backend)
 
 	resp := createEmailDomainVerification(r, emailDomainVerificationPlan(t, s, "50ms"))

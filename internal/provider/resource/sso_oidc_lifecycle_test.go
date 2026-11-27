@@ -466,6 +466,20 @@ func TestSsoOidcReadDropsDeletedConfig(t *testing.T) {
 	}
 }
 
+func TestSsoOidcReadRejectsOtherOrganization(t *testing.T) {
+	s := ssoOidcTestSchema(t)
+	backend := newFakeOidcBackend(t)
+	r := newSsoOidcTestResource(t, backend)
+	state := mustCreateSsoOidc(t, r, s, ssoOidcBaseModel())
+
+	backend.config.ID = "00000000-0000-4000-8000-000000000001"
+	backend.config.OrgID = "00000000-0000-4000-8000-000000000002"
+	readResp := readSsoOidc(r, state)
+	if !readResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(readResp.Diagnostics), "does not match state") {
+		t.Errorf("expected a mismatch error, got: %v", readResp.Diagnostics)
+	}
+}
+
 func TestSsoOidcReadEmptyID(t *testing.T) {
 	backend := newFakeOidcBackend(t)
 	r := newSsoOidcTestResource(t, backend)

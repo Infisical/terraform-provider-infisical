@@ -8,9 +8,11 @@ import (
 
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -32,10 +34,15 @@ type EmailDomainResource struct {
 }
 
 type EmailDomainResourceModel struct {
-	ID                     types.String `tfsdk:"id"`
-	Domain                 types.String `tfsdk:"domain"`
-	VerificationRecordName types.String `tfsdk:"verification_record_name"`
-	VerificationCode       types.String `tfsdk:"verification_code"`
+	ID                 types.String `tfsdk:"id"`
+	Domain             types.String `tfsdk:"domain"`
+	VerificationRecord types.Object `tfsdk:"verification_record"`
+}
+
+var emailDomainVerificationRecordAttrTypes = map[string]attr.Type{
+	"type":  types.StringType,
+	"name":  types.StringType,
+	"value": types.StringType,
 }
 
 func (r *EmailDomainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -45,7 +52,7 @@ func (r *EmailDomainResource) Metadata(_ context.Context, req resource.MetadataR
 func (r *EmailDomainResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Claim an email domain for the organization. The domain belongs to the organization of the machine identity. " +
-			"A new domain is pending: publish a DNS TXT record with the name `verification_record_name` and the content `verification_code`, then verify the domain with `infisical_email_domain_verification`. " +
+			"A new domain is pending: publish the DNS record in `verification_record`, then verify the domain with `infisical_email_domain_verification`. " +
 			"The verification code expires 7 days after the domain is created. Only Machine Identity authentication is supported for this resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -59,15 +66,24 @@ func (r *EmailDomainResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Validators:    []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`^[^\sA-Z]+$`), "must be lowercase and must not contain whitespace")},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"verification_record_name": schema.StringAttribute{
-				Description:   "The name of the DNS TXT record that proves ownership of the domain (`_infisical-verification.<domain>`).",
+			"verification_record": schema.SingleNestedAttribute{
+				Description:   "The DNS record that proves ownership of the domain.",
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"verification_code": schema.StringAttribute{
-				Description:   "The content of the DNS TXT record that proves ownership of the domain (`infisical-domain-verification=<code>`).",
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
+				Attributes: map[string]schema.Attribute{
+					"type": schema.StringAttribute{
+						Description: "The type of the DNS record (`TXT`).",
+						Computed:    true,
+					},
+					"name": schema.StringAttribute{
+						Description: "The name of the DNS record (`_infisical-verification.<domain>`).",
+						Computed:    true,
+					},
+					"value": schema.StringAttribute{
+						Description: "The content of the DNS record (`infisical-domain-verification=<code>`).",
+						Computed:    true,
+					},
+				},
 			},
 		},
 	}
@@ -92,10 +108,13 @@ func (r *EmailDomainResource) Configure(_ context.Context, req resource.Configur
 
 func emailDomainModelFromAPI(emailDomain infisical.EmailDomain) EmailDomainResourceModel {
 	return EmailDomainResourceModel{
-		ID:                     types.StringValue(emailDomain.ID),
-		Domain:                 types.StringValue(emailDomain.Domain),
-		VerificationRecordName: types.StringValue(emailDomain.VerificationRecordName),
-		VerificationCode:       types.StringValue(emailDomain.VerificationCode),
+		ID:     types.StringValue(emailDomain.ID),
+		Domain: types.StringValue(emailDomain.Domain),
+		VerificationRecord: types.ObjectValueMust(emailDomainVerificationRecordAttrTypes, map[string]attr.Value{
+			"type":  types.StringValue(emailDomain.VerificationRecord.Type),
+			"name":  types.StringValue(emailDomain.VerificationRecord.Name),
+			"value": types.StringValue(emailDomain.VerificationRecord.Value),
+		}),
 	}
 }
 

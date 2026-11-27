@@ -3,12 +3,12 @@
 page_title: "infisical_email_domain Resource - terraform-provider-infisical"
 subcategory: "SSO"
 description: |-
-  Claim an email domain for the organization. The domain belongs to the organization of the machine identity. A new domain is pending: publish a DNS TXT record with the name verification_record_name and the content verification_code, then verify the domain with infisical_email_domain_verification. The verification code expires 7 days after the domain is created. Only Machine Identity authentication is supported for this resource.
+  Claim an email domain for the organization. The domain belongs to the organization of the machine identity. A new domain is pending: publish the DNS record in verification_record, then verify the domain with infisical_email_domain_verification. The verification code expires 7 days after the domain is created. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_email_domain (Resource)
 
-Claim an email domain for the organization. The domain belongs to the organization of the machine identity. A new domain is pending: publish a DNS TXT record with the name `verification_record_name` and the content `verification_code`, then verify the domain with `infisical_email_domain_verification`. The verification code expires 7 days after the domain is created. Only Machine Identity authentication is supported for this resource.
+Claim an email domain for the organization. The domain belongs to the organization of the machine identity. A new domain is pending: publish the DNS record in `verification_record`, then verify the domain with `infisical_email_domain_verification`. The verification code expires 7 days after the domain is created. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -36,13 +36,13 @@ resource "infisical_email_domain" "example" {
   domain = "example.com"
 }
 
-# Publish these values as a DNS TXT record, then verify the domain with infisical_email_domain_verification.
+# Publish this DNS record, then verify the domain with infisical_email_domain_verification.
 output "infisical_txt_record_name" {
-  value = infisical_email_domain.example.verification_record_name
+  value = infisical_email_domain.example.verification_record.name
 }
 
 output "infisical_txt_record_value" {
-  value = infisical_email_domain.example.verification_code
+  value = infisical_email_domain.example.verification_record.value
 }
 ```
 
@@ -56,8 +56,16 @@ output "infisical_txt_record_value" {
 ### Read-Only
 
 - `id` (String) The ID of the email domain.
-- `verification_code` (String) The content of the DNS TXT record that proves ownership of the domain (`infisical-domain-verification=<code>`).
-- `verification_record_name` (String) The name of the DNS TXT record that proves ownership of the domain (`_infisical-verification.<domain>`).
+- `verification_record` (Attributes) The DNS record that proves ownership of the domain. (see [below for nested schema](#nestedatt--verification_record))
+
+<a id="nestedatt--verification_record"></a>
+### Nested Schema for `verification_record`
+
+Read-Only:
+
+- `name` (String) The name of the DNS record (`_infisical-verification.<domain>`).
+- `type` (String) The type of the DNS record (`TXT`).
+- `value` (String) The content of the DNS record (`infisical-domain-verification=<code>`).
 
 ## Import
 

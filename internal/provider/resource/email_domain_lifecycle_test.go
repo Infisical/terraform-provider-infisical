@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
 	infisical "terraform-provider-infisical/internal/client"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -27,13 +29,11 @@ const (
 )
 
 type fakeEmailDomain struct {
-	ID                     string `json:"id"`
-	OrgID                  string `json:"orgId"`
-	Domain                 string `json:"domain"`
-	VerificationMethod     string `json:"verificationMethod"`
-	VerificationCode       string `json:"verificationCode"`
-	VerificationRecordName string `json:"verificationRecordName"`
-	Status                 string `json:"status"`
+	ID                 string            `json:"id"`
+	OrgID              string            `json:"orgId"`
+	Domain             string            `json:"domain"`
+	VerificationRecord map[string]string `json:"verificationRecord"`
+	Status             string            `json:"status"`
 }
 
 type fakeEmailDomainBackend struct {
@@ -131,13 +131,15 @@ func (b *fakeEmailDomainBackend) handler() http.Handler {
 		}
 
 		emailDomain := &fakeEmailDomain{
-			ID:                     b.nextEmailDomainIDs[0],
-			OrgID:                  emailDomainTestOrgID,
-			Domain:                 domain,
-			VerificationMethod:     "dns-txt",
-			VerificationCode:       fmt.Sprintf("infisical-domain-verification=code-%d", len(b.emailDomains)+1),
-			VerificationRecordName: "_infisical-verification." + domain,
-			Status:                 "pending",
+			ID:     b.nextEmailDomainIDs[0],
+			OrgID:  emailDomainTestOrgID,
+			Domain: domain,
+			VerificationRecord: map[string]string{
+				"type":  "TXT",
+				"name":  "_infisical-verification." + domain,
+				"value": fmt.Sprintf("infisical-domain-verification=code-%d", len(b.emailDomains)+1),
+			},
+			Status: "pending",
 		}
 		b.nextEmailDomainIDs = b.nextEmailDomainIDs[1:]
 		b.emailDomains = append(b.emailDomains, emailDomain)
@@ -200,10 +202,9 @@ func emailDomainCreatePlan(t *testing.T, s schema.Schema, domain string) tfsdk.P
 	t.Helper()
 	plan := tfsdk.Plan{Schema: s}
 	if diags := plan.Set(context.Background(), &EmailDomainResourceModel{
-		ID:                     types.StringUnknown(),
-		Domain:                 types.StringValue(domain),
-		VerificationRecordName: types.StringUnknown(),
-		VerificationCode:       types.StringUnknown(),
+		ID:                 types.StringUnknown(),
+		Domain:             types.StringValue(domain),
+		VerificationRecord: types.ObjectUnknown(emailDomainVerificationRecordAttrTypes),
 	}); diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -212,6 +213,9 @@ func emailDomainCreatePlan(t *testing.T, s schema.Schema, domain string) tfsdk.P
 
 func emailDomainState(t *testing.T, s schema.Schema, model EmailDomainResourceModel) tfsdk.State {
 	t.Helper()
+	if len(model.VerificationRecord.AttributeTypes(context.Background())) == 0 {
+		model.VerificationRecord = types.ObjectNull(emailDomainVerificationRecordAttrTypes)
+	}
 	state := tfsdk.State{Schema: s}
 	if diags := state.Set(context.Background(), &model); diags.HasError() {
 		t.Fatal(diags)
@@ -271,12 +275,15 @@ func TestEmailDomainLifecycle(t *testing.T) {
 
 	created := emailDomainModel(t, state)
 	want := EmailDomainResourceModel{
-		ID:                     types.StringValue(emailDomainTestID),
-		Domain:                 types.StringValue("example.com"),
-		VerificationRecordName: types.StringValue("_infisical-verification.example.com"),
-		VerificationCode:       types.StringValue("infisical-domain-verification=code-1"),
+		ID:     types.StringValue(emailDomainTestID),
+		Domain: types.StringValue("example.com"),
+		VerificationRecord: types.ObjectValueMust(emailDomainVerificationRecordAttrTypes, map[string]attr.Value{
+			"type":  types.StringValue("TXT"),
+			"name":  types.StringValue("_infisical-verification.example.com"),
+			"value": types.StringValue("infisical-domain-verification=code-1"),
+		}),
 	}
-	if created != want {
+	if !reflect.DeepEqual(created, want) {
 		t.Errorf("unexpected state after create: %+v", created)
 	}
 
@@ -284,7 +291,7 @@ func TestEmailDomainLifecycle(t *testing.T) {
 	if readResp.Diagnostics.HasError() {
 		t.Fatal(readResp.Diagnostics)
 	}
-	if refreshed := emailDomainModel(t, readResp.State); refreshed != created {
+	if refreshed := emailDomainModel(t, readResp.State); !reflect.DeepEqual(refreshed, created) {
 		t.Errorf("expected no drift after a refresh, got %+v, want %+v", refreshed, created)
 	}
 
@@ -448,7 +455,7 @@ func TestEmailDomainImport(t *testing.T) {
 	if readResp.Diagnostics.HasError() {
 		t.Fatal(readResp.Diagnostics)
 	}
-	if imported := emailDomainModel(t, readResp.State); imported != created {
+	if imported := emailDomainModel(t, readResp.State); !reflect.DeepEqual(imported, created) {
 		t.Errorf("expected the import to rebuild the full state, got %+v, want %+v", imported, created)
 	}
 }

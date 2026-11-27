@@ -444,6 +444,18 @@ func (r *SsoOidcResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// The API reads the organization from the token, this prevents side-effects due to switching creds in between.
+	if config.ID != state.ID.ValueString() {
+		resp.Diagnostics.AddError(
+			"OIDC SSO configuration does not match state",
+			fmt.Sprintf("The provider credentials see OIDC configuration %s in organization %s, but state holds configuration %s. "+
+				"Either the credentials belong to a different organization, or the configuration was recreated outside Terraform. "+
+				"Use the credentials of the organization that owns this resource, or run terraform state rm and import it again with the organization ID.",
+				config.ID, config.OrgID, state.ID.ValueString()),
+		)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, ssoOidcModelFromAPI(config, state))...)
 }
 

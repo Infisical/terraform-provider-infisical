@@ -3,12 +3,12 @@
 page_title: "infisical_email_domain_verification Resource - terraform-provider-infisical"
 subcategory: "SSO"
 description: |-
-  Verify an email domain that was claimed with infisical_email_domain. Infisical looks up the DNS TXT record named in verification_record_name and expects the value in verification_code. Create retries while the record is not found yet, because DNS changes take time to propagate, and waits up to the create value in timeouts (default: 10m). If the domain is no longer verified, the next plan creates this resource again. The API cannot remove a verification, so destroying this resource only removes it from the Terraform state. Verifying a domain needs a plan that includes SAML, LDAP or OIDC SSO. Only Machine Identity authentication is supported for this resource.
+  Verify an email domain that was claimed with infisical_email_domain. Infisical looks up the DNS record in the verification_record of the email domain. Create retries while the record is not found yet, because DNS changes take time to propagate, and waits up to the create value in timeouts (default: 10m). If the domain is no longer verified, the next plan creates this resource again. The API cannot remove a verification, so destroying this resource only removes it from the Terraform state. Verifying a domain needs a plan that includes SAML, LDAP or OIDC SSO. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_email_domain_verification (Resource)
 
-Verify an email domain that was claimed with `infisical_email_domain`. Infisical looks up the DNS TXT record named in `verification_record_name` and expects the value in `verification_code`. Create retries while the record is not found yet, because DNS changes take time to propagate, and waits up to the create value in timeouts (default: 10m). If the domain is no longer verified, the next plan creates this resource again. The API cannot remove a verification, so destroying this resource only removes it from the Terraform state. Verifying a domain needs a plan that includes SAML, LDAP or OIDC SSO. Only Machine Identity authentication is supported for this resource.
+Verify an email domain that was claimed with `infisical_email_domain`. Infisical looks up the DNS record in the `verification_record` of the email domain. Create retries while the record is not found yet, because DNS changes take time to propagate, and waits up to the create value in timeouts (default: 10m). If the domain is no longer verified, the next plan creates this resource again. The API cannot remove a verification, so destroying this resource only removes it from the Terraform state. Verifying a domain needs a plan that includes SAML, LDAP or OIDC SSO. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
@@ -41,12 +41,12 @@ resource "infisical_email_domain" "example" {
   domain = "example.com"
 }
 
-# 2. Publish the DNS TXT record. Any DNS provider works; this example uses Cloudflare.
+# 2. Publish the DNS record. Any DNS provider works; this example uses Cloudflare.
 resource "cloudflare_dns_record" "infisical_verification" {
   zone_id = "<your-cloudflare-zone-id>"
-  type    = "TXT"
-  name    = infisical_email_domain.example.verification_record_name
-  content = infisical_email_domain.example.verification_code
+  type    = infisical_email_domain.example.verification_record.type
+  name    = infisical_email_domain.example.verification_record.name
+  content = infisical_email_domain.example.verification_record.value
   ttl     = 300
 }
 

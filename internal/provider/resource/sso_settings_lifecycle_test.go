@@ -284,6 +284,20 @@ func TestSsoSettingsLifecycle(t *testing.T) {
 	}
 }
 
+func TestSsoSettingsReadRejectsOtherOrganization(t *testing.T) {
+	s := ssoSettingsTestSchema(t)
+	backend := newFakeSsoSettingsBackend(t)
+	r := newSsoSettingsTestResource(t, backend)
+
+	model := ssoSettingsDefaultModel()
+	model.ID = types.StringValue(ssoSettingsTestOrgID)
+	backend.settings.OrgID = "00000000-0000-4000-8000-000000000002"
+	readResp := readSsoSettings(r, ssoSettingsState(t, s, model))
+	if !readResp.Diagnostics.HasError() || !strings.Contains(fmt.Sprint(readResp.Diagnostics), "belong to a different organization") {
+		t.Errorf("expected a mismatch error, got: %v", readResp.Diagnostics)
+	}
+}
+
 // Infisical rejects enforcement until someone has logged in through the active configuration.
 func TestSsoSettingsCreateEnforceBeforeLogin(t *testing.T) {
 	s := ssoSettingsTestSchema(t)

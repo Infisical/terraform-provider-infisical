@@ -26,12 +26,12 @@ resource "infisical_email_domain" "example" {
   domain = "example.com"
 }
 
-# 2. Publish the DNS TXT record. Any DNS provider works; this example uses Cloudflare.
+# 2. Publish the DNS record. Any DNS provider works; this example uses Cloudflare.
 resource "cloudflare_dns_record" "infisical_verification" {
   zone_id = "<your-cloudflare-zone-id>"
-  type    = "TXT"
-  name    = infisical_email_domain.example.verification_record_name
-  content = infisical_email_domain.example.verification_code
+  type    = infisical_email_domain.example.verification_record.type
+  name    = infisical_email_domain.example.verification_record.name
+  content = infisical_email_domain.example.verification_record.value
   ttl     = 300
 }
 

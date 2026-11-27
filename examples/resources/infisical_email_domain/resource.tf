@@ -21,11 +21,11 @@ resource "infisical_email_domain" "example" {
   domain = "example.com"
 }
 
-# Publish these values as a DNS TXT record, then verify the domain with infisical_email_domain_verification.
+# Publish this DNS record, then verify the domain with infisical_email_domain_verification.
 output "infisical_txt_record_name" {
-  value = infisical_email_domain.example.verification_record_name
+  value = infisical_email_domain.example.verification_record.name
 }
 
 output "infisical_txt_record_value" {
-  value = infisical_email_domain.example.verification_code
+  value = infisical_email_domain.example.verification_record.value
 }

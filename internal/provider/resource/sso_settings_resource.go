@@ -205,6 +205,17 @@ func (r *SsoSettingsResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
+	// The API reads the organization from the token, this prevents side-effects due to switching creds in between.
+	if settings.OrgID != state.ID.ValueString() {
+		resp.Diagnostics.AddError(
+			"SSO settings belong to a different organization",
+			fmt.Sprintf("The provider credentials belong to organization %s, but this resource manages organization %s. "+
+				"Use the credentials of organization %s, or run terraform state rm to stop managing it.",
+				settings.OrgID, state.ID.ValueString(), state.ID.ValueString()),
+		)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, ssoSettingsModelFromAPI(settings))...)
 }
 

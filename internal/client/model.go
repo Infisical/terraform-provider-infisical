@@ -5393,12 +5393,17 @@ type PamAccessApprovalPolicyResponse struct {
 	Policy PamAccessApprovalPolicy `json:"policy"`
 }
 
+type EmailDomainVerificationRecord struct {
+	Type  string `json:"type"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type EmailDomain struct {
-	ID                     string `json:"id"`
-	Domain                 string `json:"domain"`
-	VerificationCode       string `json:"verificationCode"`
-	VerificationRecordName string `json:"verificationRecordName"`
-	Status                 string `json:"status"`
+	ID                 string                        `json:"id"`
+	Domain             string                        `json:"domain"`
+	VerificationRecord EmailDomainVerificationRecord `json:"verificationRecord"`
+	Status             string                        `json:"status"`
 }
 
 type CreateEmailDomainRequest struct {

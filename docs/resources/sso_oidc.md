@@ -42,7 +42,7 @@ resource "infisical_email_domain" "example" {
   domain = "example.com"
 }
 
-# Publish verification_record_name and verification_code as a DNS TXT record with your DNS provider,
+# Publish the verification_record of the email domain with your DNS provider,
 # and add that record to depends_on here.
 resource "infisical_email_domain_verification" "example" {
   email_domain_id = infisical_email_domain.example.id

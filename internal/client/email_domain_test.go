@@ -12,8 +12,8 @@ import (
 )
 
 const emailDomainsListJSON = `{"emailDomains":[
-	{"id":"d1","orgId":"o1","domain":"example.com","verificationCode":"code1","verificationRecordName":"_infisical-verification.example.com","status":"pending"},
-	{"id":"d2","orgId":"o1","domain":"example.org","verificationCode":"code2","verificationRecordName":"_infisical-verification.example.org","status":"verified"}
+	{"id":"d1","orgId":"o1","domain":"example.com","verificationRecord":{"type":"TXT","name":"_infisical-verification.example.com","value":"infisical-domain-verification=code1"},"status":"pending"},
+	{"id":"d2","orgId":"o1","domain":"example.org","verificationRecord":{"type":"TXT","name":"_infisical-verification.example.org","value":"infisical-domain-verification=code2"},"status":"verified"}
 ]}`
 
 func TestCreateEmailDomainRequest(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCreateEmailDomainRequest(t *testing.T) {
 		if err := json.Unmarshal(raw, &gotBody); err != nil {
 			t.Error(err)
 		}
-		jsonResponse(http.StatusOK, `{"emailDomain":{"id":"d1","domain":"example.com","verificationCode":"code1","verificationRecordName":"_infisical-verification.example.com"}}`)(w, r)
+		jsonResponse(http.StatusOK, `{"emailDomain":{"id":"d1","domain":"example.com","verificationRecord":{"type":"TXT","name":"_infisical-verification.example.com","value":"infisical-domain-verification=code1"}}}`)(w, r)
 	})
 
 	emailDomain, err := client.CreateEmailDomain(CreateEmailDomainRequest{Domain: "example.com"})
@@ -42,7 +42,7 @@ func TestCreateEmailDomainRequest(t *testing.T) {
 	if len(gotBody) != 1 || gotBody["domain"] != "example.com" {
 		t.Errorf("unexpected request body: %v", gotBody)
 	}
-	want := EmailDomain{ID: "d1", Domain: "example.com", VerificationCode: "code1", VerificationRecordName: "_infisical-verification.example.com"}
+	want := EmailDomain{ID: "d1", Domain: "example.com", VerificationRecord: EmailDomainVerificationRecord{Type: "TXT", Name: "_infisical-verification.example.com", Value: "infisical-domain-verification=code1"}}
 	if emailDomain != want {
 		t.Errorf("unexpected email domain: %+v", emailDomain)
 	}
@@ -56,7 +56,7 @@ func TestGetEmailDomainByIDFiltersList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if emailDomain.Domain != "example.org" || emailDomain.VerificationCode != "code2" {
+	if emailDomain.Domain != "example.org" || emailDomain.VerificationRecord.Value != "infisical-domain-verification=code2" {
 		t.Errorf("unexpected email domain: %+v", emailDomain)
 	}
 

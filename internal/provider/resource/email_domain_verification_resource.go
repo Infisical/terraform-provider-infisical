@@ -68,7 +68,7 @@ func (r *EmailDomainVerificationResource) Metadata(_ context.Context, req resour
 func (r *EmailDomainVerificationResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Verify an email domain that was claimed with `infisical_email_domain`. " +
-			"Infisical looks up the DNS TXT record named in `verification_record_name` and expects the value in `verification_code`. " +
+			"Infisical looks up the DNS record in the `verification_record` of the email domain. " +
 			fmt.Sprintf("Create retries while the record is not found yet, because DNS changes take time to propagate, and waits up to the create value in timeouts (default: %s). ", defaultEmailDomainVerificationTimeoutText) +
 			"If the domain is no longer verified, the next plan creates this resource again. " +
 			"The API cannot remove a verification, so destroying this resource only removes it from the Terraform state. " +
