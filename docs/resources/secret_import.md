@@ -3,12 +3,12 @@
 page_title: "infisical_secret_import Resource - terraform-provider-infisical"
 subcategory: "Secrets"
 description: |-
-  Create secret import & save to Infisical.
+  Imports the secrets of one folder (the source) into another folder (the destination), so the destination can read them. The source can be in the same project or, with import_project_id, in another project.
 ---
 
 # infisical_secret_import (Resource)
 
-Create secret import & save to Infisical.
+Imports the secrets of one folder (the source) into another folder (the destination), so the destination can read them. The source can be in the same project or, with `import_project_id`, in another project.
 
 ## Example Usage
 
