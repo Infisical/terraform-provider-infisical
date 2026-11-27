@@ -381,7 +381,7 @@ type SecretImport struct {
 	SecretPath string `json:"secretPath"`
 	ImportPath string `json:"importPath"`
 
-	// The create response returns projectId from Infisical v0.167.16.
+	// The create response returns projectId from Infisical v0.167.17.
 	ImportEnvironment struct {
 		ProjectID string `json:"projectId"`
 	} `json:"importEnv"`
@@ -394,7 +394,7 @@ type SecretImportByID struct {
 	ProjectID     string `json:"projectId"`
 	IsReplication bool   `json:"isReplication"`
 
-	// Imported from. Infisical v0.167.16 and later return projectId.
+	// Imported from. Infisical v0.167.17 and later return projectId.
 	ImportEnvironment struct {
 		ID        string `json:"id"`
 		Name      string `json:"name"`

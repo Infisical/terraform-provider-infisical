@@ -54,46 +54,46 @@ func (r *projectSecretImportResource) Metadata(_ context.Context, req resource.M
 // Schema defines the schema for the resource.
 func (r *projectSecretImportResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Create secret import & save to Infisical.",
+		Description: "Imports the secrets of one folder (the source) into another folder (the destination), so the destination can read them. The source can be in the same project or, with `import_project_id`, in another project.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description:   "The ID of the secret import",
+				Description:   "The ID of the secret import.",
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
-				Description:   "The Infisical project ID",
+				Description:   "The ID of the project to import secrets into (the destination).",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"environment_slug": schema.StringAttribute{
-				Description:   "The environment slug of the secret import to modify/create",
+				Description:   "The slug of the environment to import secrets into (the destination), such as `prod`.",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"folder_path": schema.StringAttribute{
-				Description:   "The path where the secret should be imported",
+				Description:   "The path of the folder to import secrets into (the destination), such as `/` or `/app`.",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"import_folder_path": schema.StringAttribute{
-				Description:   "The path where the secret should be imported from",
+				Description:   "The path of the folder to import secrets from (the source), such as `/shared`.",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"import_environment_slug": schema.StringAttribute{
-				Description:   "The environment slug of the secret import to modify/create",
+				Description:   "The slug of the environment to import secrets from (the source), such as `dev`. It belongs to `import_project_id` when that is set, and to `project_id` otherwise.",
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"import_project_id": schema.StringAttribute{
-				Description:   "The ID of the project to import secrets from. Omit it to import from `project_id`, and don't set it to `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.16 or later.",
+				Description:   "The ID of the project to import secrets from (the source). Omit it to import from `project_id`, and don't set it to `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.17 or later.",
 				Optional:      true,
 				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"is_replication": schema.BoolAttribute{
-				Description:   "The is_replication of the secret import to modify/create",
+				Description:   "When `true`, Infisical copies the source secrets into the destination instead of reading them from the source. If an approval policy applies to the destination, the copies are sent as approval requests. Replication needs a plan that includes secret approvals, and cross-project imports can't use it.",
 				Required:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace()},
 			},
@@ -213,7 +213,7 @@ func (r *projectSecretImportResource) Create(ctx context.Context, req resource.C
 	}
 }
 
-// verifyCrossProjectImport checks that the server created the import from import_project_id. Infisical before v0.167.16
+// verifyCrossProjectImport checks that the server created the import from import_project_id. Infisical before v0.167.17
 // leaves importEnv.projectId out of the create response, and before v0.161.12 it ignores sourceProjectId and creates
 // a same-project import instead. In both cases the import is deleted again, so no wrong import is left behind.
 func (r *projectSecretImportResource) verifyCrossProjectImport(ctx context.Context, plan *projectSecretImportResourceModel, createdSourceProjectID string, resp *resource.CreateResponse) {
@@ -233,7 +233,7 @@ func (r *projectSecretImportResource) verifyCrossProjectImport(ctx context.Conte
 			"Error creating project secret import",
 			"This Infisical instance does not support import_project_id, so the secret import was not created from "+
 				"the source project, and deleting it again failed: "+err.Error()+". Destroy the secret import, then "+
-				"either upgrade to Infisical v0.167.16 or later or remove import_project_id from the configuration.",
+				"either upgrade to Infisical v0.167.17 or later or remove import_project_id from the configuration.",
 		)
 		return
 	}
@@ -241,7 +241,7 @@ func (r *projectSecretImportResource) verifyCrossProjectImport(ctx context.Conte
 	resp.Diagnostics.AddError(
 		"Error creating project secret import",
 		"This Infisical instance does not support import_project_id, so the secret import was not created from the "+
-			"source project. The secret import was deleted again. Upgrade to Infisical v0.167.16 or later, or remove "+
+			"source project. The secret import was deleted again. Upgrade to Infisical v0.167.17 or later, or remove "+
 			"import_project_id from the configuration.",
 	)
 }
@@ -434,7 +434,7 @@ func crossProjectImportSetupHint(err error, plan projectSecretImportResourceMode
 }
 
 // importProjectIDFromAPI keeps import_project_id null for a same-project import, and keeps the current value when the
-// API leaves it out (Infisical before v0.167.16).
+// API leaves it out (Infisical before v0.167.17).
 func importProjectIDFromAPI(current types.String, projectID, apiSourceProjectID string) types.String {
 	if apiSourceProjectID == "" || (current.IsNull() && apiSourceProjectID == projectID) {
 		return current

@@ -32,20 +32,28 @@ provider "infisical" {
   }
 }
 
+# prod:/app reads the secrets of dev:/shared in the same project.
 resource "infisical_secret_import" "same-project" {
-  project_id              = "<your-infisical-project-id>"
-  environment_slug        = "prod"
-  folder_path             = "/app"
+  # Destination: where the secrets are imported into.
+  project_id       = "<your-infisical-project-id>"
+  environment_slug = "prod"
+  folder_path      = "/app"
+
+  # Source: where the secrets are imported from.
   import_environment_slug = "dev"
   import_folder_path      = "/shared"
   is_replication          = false
 }
 
+# prod:/app reads the secrets of prod:/database in another project.
 # Needs cross-project secret sharing and a project grant in the source project.
 resource "infisical_secret_import" "cross-project" {
-  project_id              = "<your-infisical-project-id>"
-  environment_slug        = "prod"
-  folder_path             = "/app"
+  # Destination: where the secrets are imported into.
+  project_id       = "<your-infisical-project-id>"
+  environment_slug = "prod"
+  folder_path      = "/app"
+
+  # Source: where the secrets are imported from.
   import_project_id       = "<source-infisical-project-id>"
   import_environment_slug = "prod"
   import_folder_path      = "/database"
@@ -58,20 +66,20 @@ resource "infisical_secret_import" "cross-project" {
 
 ### Required
 
-- `environment_slug` (String) The environment slug of the secret import to modify/create
-- `folder_path` (String) The path where the secret should be imported
-- `import_environment_slug` (String) The environment slug of the secret import to modify/create
-- `import_folder_path` (String) The path where the secret should be imported from
-- `is_replication` (Boolean) The is_replication of the secret import to modify/create
-- `project_id` (String) The Infisical project ID
+- `environment_slug` (String) The slug of the environment to import secrets into (the destination), such as `prod`.
+- `folder_path` (String) The path of the folder to import secrets into (the destination), such as `/` or `/app`.
+- `import_environment_slug` (String) The slug of the environment to import secrets from (the source), such as `dev`. It belongs to `import_project_id` when that is set, and to `project_id` otherwise.
+- `import_folder_path` (String) The path of the folder to import secrets from (the source), such as `/shared`.
+- `is_replication` (Boolean) When `true`, Infisical copies the source secrets into the destination instead of reading them from the source. If an approval policy applies to the destination, the copies are sent as approval requests. Replication needs a plan that includes secret approvals, and cross-project imports can't use it.
+- `project_id` (String) The ID of the project to import secrets into (the destination).
 
 ### Optional
 
-- `import_project_id` (String) The ID of the project to import secrets from. Omit it to import from `project_id`, and don't set it to `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.16 or later.
+- `import_project_id` (String) The ID of the project to import secrets from (the source). Omit it to import from `project_id`, and don't set it to `project_id`. A cross-project import needs cross-project secret sharing turned on for the organization and a project grant in the source project, and can't use replication. Requires Infisical v0.167.17 or later.
 
 ### Read-Only
 
-- `id` (String) The ID of the secret import
+- `id` (String) The ID of the secret import.
 
 ## Import
 

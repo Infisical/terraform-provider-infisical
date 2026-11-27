@@ -38,7 +38,7 @@ type fakeSecretImportBackend struct {
 
 	// ignoresSourceProject is Infisical before v0.161.12: the create body schema strips sourceProjectId.
 	ignoresSourceProject bool
-	// omitsImportProjectID is Infisical before v0.167.16: create and get by ID strip importEnv.projectId.
+	// omitsImportProjectID is Infisical before v0.167.17: create and get by ID strip importEnv.projectId.
 	omitsImportProjectID bool
 	failDelete           bool
 	// sharingDisabled and missingGrant are the cross-project checks in createImport, which return 403.
@@ -395,7 +395,7 @@ func TestSecretImportImportState(t *testing.T) {
 	}
 }
 
-// A cross-project import on Infisical before v0.167.16 must fail and leave nothing behind.
+// A cross-project import on Infisical before v0.167.17 must fail and leave nothing behind.
 // Turning on cross-project sharing and adding a project grant need an admin, so the error must say where.
 func TestSecretImportCrossProjectSetupErrors(t *testing.T) {
 	for name, tc := range map[string]struct {
@@ -439,15 +439,15 @@ func TestSecretImportCrossProjectSetupErrors(t *testing.T) {
 func TestSecretImportCrossProjectOnOldServer(t *testing.T) {
 	for name, backend := range map[string]*fakeSecretImportBackend{
 		"before v0.161.12": {ignoresSourceProject: true, omitsImportProjectID: true},
-		"before v0.167.16": {omitsImportProjectID: true},
+		"before v0.167.17": {omitsImportProjectID: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			backend.t, backend.imports = t, map[string]fakeSecretImport{}
 			r := newSecretImportTestResource(t, backend)
 
 			resp := createSecretImportResp(t, r, secretImportTestSchema(t), secretImportTestModel(types.StringValue("destination"), types.StringValue("source"), false))
-			if !resp.Diagnostics.HasError() || !strings.Contains(resp.Diagnostics.Errors()[0].Detail(), "v0.167.16") {
-				t.Fatalf("expected an error that names v0.167.16, got %v", resp.Diagnostics)
+			if !resp.Diagnostics.HasError() || !strings.Contains(resp.Diagnostics.Errors()[0].Detail(), "v0.167.17") {
+				t.Fatalf("expected an error that names v0.167.17, got %v", resp.Diagnostics)
 			}
 			if len(backend.imports) != 0 {
 				t.Errorf("expected Create to delete the import again, backend has %+v", backend.imports)
@@ -478,7 +478,7 @@ func TestSecretImportCrossProjectOnOldServerKeepsImportWhenDeleteFails(t *testin
 	}
 }
 
-// Infisical before v0.167.16 leaves importEnv.projectId out, so Read keeps import_project_id from state.
+// Infisical before v0.167.17 leaves importEnv.projectId out, so Read keeps import_project_id from state.
 func TestSecretImportReadKeepsImportProjectIDOnOldServer(t *testing.T) {
 	backend := newFakeSecretImportBackend(t)
 	r := newSecretImportTestResource(t, backend)
