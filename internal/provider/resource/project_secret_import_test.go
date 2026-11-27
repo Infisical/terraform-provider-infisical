@@ -341,6 +341,23 @@ func TestSecretImportDestinationRenamedOutsideTerraform(t *testing.T) {
 	}
 }
 
+// updateSecretImport in Infisical core can move the source to another environment or folder.
+func TestSecretImportSourceChangedOutsideTerraform(t *testing.T) {
+	backend := newFakeSecretImportBackend(t)
+	r := newSecretImportTestResource(t, backend)
+
+	state := createSecretImport(t, r, secretImportTestSchema(t), secretImportTestModel(types.StringValue("destination"), types.StringValue("source"), false))
+	id := secretImportStateModel(t, state).ID.ValueString()
+	changed := backend.imports[id]
+	changed.ImportEnv, changed.ImportPath = "staging", "/moved"
+	backend.imports[id] = changed
+
+	state = readSecretImport(t, r, state)
+	if got := secretImportStateModel(t, state); got.ImportEnvSlug.ValueString() != "staging" || got.ImportPath.ValueString() != "/moved" {
+		t.Errorf("source after refresh = %q %q, want staging /moved", got.ImportEnvSlug.ValueString(), got.ImportPath.ValueString())
+	}
+}
+
 // The API stores canonical paths. A configured "/app/" must stay in state, or the import would be replaced on every
 // apply.
 func TestSecretImportReadKeepsEquivalentPath(t *testing.T) {
@@ -349,10 +366,12 @@ func TestSecretImportReadKeepsEquivalentPath(t *testing.T) {
 
 	model := secretImportTestModel(types.StringValue("destination"), types.StringNull(), false)
 	model.SecretPath = types.StringValue("/app/")
+	model.ImportPath = types.StringValue("shared/")
 	state := createSecretImport(t, r, secretImportTestSchema(t), model)
 
-	if got := secretImportStateModel(t, readSecretImport(t, r, state)).SecretPath.ValueString(); got != "/app/" {
-		t.Errorf("folder_path after refresh = %q, want /app/", got)
+	got := secretImportStateModel(t, readSecretImport(t, r, state))
+	if got.SecretPath.ValueString() != "/app/" || got.ImportPath.ValueString() != "shared/" {
+		t.Errorf("paths after refresh = %q %q, want /app/ shared/", got.SecretPath.ValueString(), got.ImportPath.ValueString())
 	}
 }
 

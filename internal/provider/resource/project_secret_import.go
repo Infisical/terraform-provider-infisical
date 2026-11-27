@@ -288,9 +288,14 @@ func (r *projectSecretImportResource) Read(ctx context.Context, req resource.Rea
 	}
 
 	// Delete finds the import by its destination folder, so a folder renamed outside Terraform must reach state.
+	state.ProjectID = types.StringValue(secretImport.SecretImport.ProjectID)
 	state.EnvironmentSlug = types.StringValue(secretImport.SecretImport.Environment.Slug)
 	state.SecretPath = secretPathFromAPI(state.SecretPath, secretImport.SecretImport.SecretPath)
+	// PATCH can change the source, so a change made outside Terraform shows up as drift.
+	state.ImportEnvSlug = types.StringValue(secretImport.SecretImport.ImportEnvironment.Slug)
+	state.ImportPath = secretPathFromAPI(state.ImportPath, secretImport.SecretImport.ImportPath)
 	state.ImportProjectID = importProjectIDFromAPI(state.ImportProjectID, secretImport.SecretImport.ProjectID, secretImport.SecretImport.ImportEnvironment.ProjectID)
+	state.IsReplication = types.BoolValue(secretImport.SecretImport.IsReplication)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
