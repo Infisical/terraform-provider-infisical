@@ -47,6 +47,8 @@ func TestResolveAlertEvent(t *testing.T) {
 		{alertResourceTypeIdentityAuthentication, "auth-method-changed", alertEventTypeIdentityAuthenticationAuthMethodChanged},
 		{alertResourceTypeIdentityAuthentication, "expiry", alertEventTypeIdentityAuthenticationExpiry},
 		{alertResourceTypeSecretRotation, "failed", alertEventTypeSecretRotationFailed},
+		{"secret.sync", "failed", "secret.sync.failed"},
+		{"secret.sync", "secret.sync.failed", "secret.sync.failed"},
 	}
 	for _, c := range cases {
 		event, ok := resolveAlertEvent(c.resourceType, c.eventType)
@@ -59,6 +61,8 @@ func TestResolveAlertEvent(t *testing.T) {
 		{alertResourceTypeCertManagerApplication, alertEventTypeCertManagerCertExpiry},
 		{alertResourceTypeCertManagerSigner, "certificate.issuance"},
 		{alertResourceTypeIdentityAuthentication, "certificate.expiry"},
+		{"secret.sync", alertEventTypeSecretRotationFailed},
+		{alertResourceTypeSecretRotation, "secret.sync.failed"},
 	} {
 		if event, ok := resolveAlertEvent(c.resourceType, c.eventType); ok {
 			t.Errorf("resolveAlertEvent(%q, %q) = %q, want no event", c.resourceType, c.eventType, event.eventType)
@@ -79,6 +83,9 @@ func TestAlertEventTypeSemanticEquality(t *testing.T) {
 		{"certificate.expiry", "certificate.issuance", false},
 		{alertEventTypeCertManagerApplicationCertExpiry, alertEventTypeCertManagerCertExpiry, false},
 		{"expiry", "auth-method-changed", false},
+		{"failed", "secret.sync.failed", true},
+		{"secret.sync.failed", "failed", true},
+		{"secret.sync.failed", alertEventTypeSecretRotationFailed, false},
 	}
 	for _, c := range cases {
 		equal, diags := newAlertEventTypeValue(c.a).StringSemanticEquals(ctx, newAlertEventTypeValue(c.b))
@@ -134,6 +141,7 @@ func TestAlertConditionForAPI(t *testing.T) {
 			`{"alertBefore":"45d","dailyReminder":false,"applicationIds":["app-1","app-2"],"sources":["issued"]}`},
 		"event with filters":    {alertResourceTypeCertManager, "certificate.issuance", issuanceFiltered, nil, `{"profileIds":["profile-1"]}`},
 		"event without filters": {alertResourceTypeCertManagerApplication, "certificate.revocation", nil, nil, `null`},
+		"sync failure":          {"secret.sync", "failed", nil, nil, `null`},
 		"identity expiry":       {alertResourceTypeIdentityAuthentication, "expiry", identityExpiry, nil, `{"alertBefore":"30d","dailyReminder":true}`},
 		"signer expiry with signer_ids": {alertResourceTypeCertManagerSigner, "certificate.expiry", signerExpiry, nil,
 			`{"alertBefore":"30d","dailyReminder":false,"signerIds":["signer-1","signer-2"]}`},
@@ -306,6 +314,11 @@ func TestValidateAlertEvent(t *testing.T) {
 		"event with alert_before_days":          {alertResourceTypeCertManager, "certificate.issuance", withDays(30), nil, true},
 		"empty condition":                       {alertResourceTypeCertManager, "certificate.issuance", emptyCondition(), nil, true},
 		"auth method changed":                   {alertResourceTypeIdentityAuthentication, "auth-method-changed", nil, nil, false},
+		"sync failure, short form":              {"secret.sync", "failed", nil, nil, false},
+		"sync failure, full form":               {"secret.sync", "secret.sync.failed", nil, nil, false},
+		"sync failure with a condition":         {"secret.sync", "failed", withDays(30), nil, true},
+		"sync failure with empty condition":     {"secret.sync", "failed", emptyCondition(), nil, true},
+		"sync failure with another event":       {"secret.sync", alertEventTypeSecretRotationFailed, nil, nil, true},
 		"event of another resource type":        {alertResourceTypeIdentityAuthentication, "certificate.expiry", withDays(30), nil, true},
 		"full event of another resource type":   {alertResourceTypeCertManagerApplication, alertEventTypeCertManagerCertIssuance, nil, nil, true},
 		"deprecated expiry on identity":         {alertResourceTypeIdentityAuthentication, "", nil, &expiryConditionModel{AlertBeforeDays: types.Int64Value(30), DailyReminder: types.BoolValue(false)}, false},

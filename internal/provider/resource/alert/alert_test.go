@@ -2,11 +2,15 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	infisical "terraform-provider-infisical/internal/client"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -472,6 +476,8 @@ func TestValidateProjectIDForResourceType(t *testing.T) {
 		"application alert with a project":    {alertResourceTypeCertManagerApplication, types.StringValue("project-1"), true},
 		"application alert without a project": {alertResourceTypeCertManagerApplication, types.StringNull(), false},
 		"project level identity alert":        {alertResourceTypeIdentityAuthentication, types.StringValue("project-1"), false},
+		"sync alert with a project":           {"secret.sync", types.StringValue("project-1"), true},
+		"sync alert without a project":        {"secret.sync", types.StringNull(), false},
 	}
 
 	for name, c := range cases {
@@ -502,6 +508,10 @@ func TestSetStateFromAlertProjectID(t *testing.T) {
 		"project level identity alert": {
 			alert: infisical.Alert{ResourceType: alertResourceTypeIdentityAuthentication, EventType: alertEventTypeIdentityAuthenticationExpiry, Condition: []byte(`{"alertBefore":"30d"}`)},
 			want:  types.StringValue(projectID),
+		},
+		"sync alert": {
+			alert: infisical.Alert{ResourceType: "secret.sync", EventType: "secret.sync.failed"},
+			want:  types.StringNull(),
 		},
 	}
 
@@ -535,6 +545,8 @@ func TestValidateResourceIDForResourceType(t *testing.T) {
 		"product-wide alert bound to a resource":   {alertResourceTypeCertManager, types.StringValue("app-1"), true},
 		"signer alert":                             {alertResourceTypeCertManagerSigner, types.StringNull(), false},
 		"identity alert without an identity":       {alertResourceTypeIdentityAuthentication, types.StringNull(), true},
+		"sync alert on a sync":                     {"secret.sync", types.StringValue("sync-1"), false},
+		"sync alert without a sync":                {"secret.sync", types.StringNull(), true},
 	}
 
 	for name, c := range cases {
@@ -588,6 +600,90 @@ func TestValidateConfigWithUnknownValues(t *testing.T) {
 				t.Errorf("validation diagnostics = %v, want none while values are unknown", diags)
 			}
 		})
+	}
+}
+
+func TestSecretSyncAlertCreateAndRead(t *testing.T) {
+	ctx := context.Background()
+	s := alertSchema(t)
+	model := alertModel(t, map[string]alertChannelModel{"project_admins": {
+		Name:    types.StringValue("Project admins"),
+		Enabled: types.BoolValue(true),
+		Email: emailChannel(t, alertChannelRecipientModel{
+			Type: types.StringValue(AlertRecipientTypeProjectAdmins), ID: types.StringValue("project-1"),
+		}),
+	}})
+	model.ResourceType = types.StringValue("secret.sync")
+	model.ResourceID = types.StringValue("sync-1")
+	model.ID = types.StringUnknown()
+	model.OrgID = types.StringUnknown()
+	model.Name = types.StringValue("Sync failure")
+	model.EventType = newAlertEventTypeValue("failed")
+	model.Condition = nil
+
+	// Core's secret-sync-alert-provider resolves the project from the sync and takes no condition.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/alerts":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Errorf("decoding the create request: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			for field, want := range map[string]any{
+				"resourceType": "secret.sync", "resourceId": "sync-1", "eventType": "secret.sync.failed", "enabled": true,
+			} {
+				if body[field] != want {
+					t.Errorf("%s = %v, want %v", field, body[field], want)
+				}
+			}
+			if _, present := body["projectId"]; present || body["condition"] != nil {
+				t.Errorf("unexpected projectId or condition in create request: %v", body)
+			}
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/alerts/alert-1":
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"alert":{
+			"id":"alert-1","name":"Sync failure","resourceType":"secret.sync","resourceId":"sync-1",
+			"eventType":"secret.sync.failed","condition":null,"enabled":true,"orgId":"org-1","projectId":"project-1",
+			"channels":[{"id":"channel-1","name":"Project admins","channelType":"email","enabled":true,
+			"config":{},"recipients":[{"principalType":"project-admins","principalId":"project-1"}]}]
+		}}`)); err != nil {
+			t.Errorf("writing the alert response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	r := &alertResource{client: &infisical.Client{Config: infisical.Config{HttpClient: resty.New().SetBaseURL(server.URL)}}}
+	created := &resource.CreateResponse{State: tfsdk.State{Schema: s}}
+	r.Create(ctx, resource.CreateRequest{Plan: alertPlan(t, s, model)}, created)
+	if created.Diagnostics.HasError() {
+		t.Fatalf("Create() diagnostics = %v", created.Diagnostics)
+	}
+
+	read := &resource.ReadResponse{State: created.State}
+	r.Read(ctx, resource.ReadRequest{State: created.State}, read)
+	if read.Diagnostics.HasError() {
+		t.Fatalf("Read() diagnostics = %v", read.Diagnostics)
+	}
+	var state alertResourceModel
+	if diags := read.State.Get(ctx, &state); diags.HasError() {
+		t.Fatalf("reading alert state: %v", diags)
+	}
+	if state.ID.ValueString() != "alert-1" || state.ResourceType.ValueString() != "secret.sync" || state.ResourceID.ValueString() != "sync-1" || state.OrgID.ValueString() != "org-1" {
+		t.Errorf("unexpected alert state: %+v", state)
+	}
+	if state.EventType.ValueString() != "secret.sync.failed" || !state.ProjectID.IsNull() || state.Condition != nil {
+		t.Errorf("unexpected event, project or condition: %+v", state)
+	}
+	if state.Channels["project_admins"].ID.ValueString() != "channel-1" {
+		t.Errorf("channel did not retain its key and ID: %v", state.Channels)
 	}
 }
 
