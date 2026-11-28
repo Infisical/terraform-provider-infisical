@@ -163,6 +163,7 @@ func TestPamAccountTemplateRoundTrip(t *testing.T) {
 				"region":     types.StringValue("us-east-1"),
 				"key_prefix": types.StringNull(),
 			}),
+			"azure_blob": types.ObjectNull(pamTemplateRecordingAzureBlobAttrTypes),
 		}),
 		"session_log_masking": pamObject(t, pamTemplateSessionLogMaskingAttrTypes, map[string]attr.Value{
 			"patterns":           pamStringList(`password=\S+`, `token=\S+`),
@@ -223,6 +224,63 @@ func TestPamAccountTemplateRoundTrip(t *testing.T) {
 	deletePamResource(t, r, state)
 	if len(backend.templates) != 0 {
 		t.Error("expected the template to be deleted")
+	}
+}
+
+func TestPamAccountTemplateAzureBlobRecordingRoundTrip(t *testing.T) {
+	backend := newFakePamBackend(t)
+	r := &pamAccountTemplateResource{}
+	configurePamResource(t, r, newPamTestClient(t, backend))
+
+	azureSettings := func(container, prefix string) types.Object {
+		return pamTemplateSettings(t, map[string]attr.Value{
+			"recording": pamObject(t, pamTemplateRecordingAttrTypes, map[string]attr.Value{
+				"enabled":         types.BoolNull(),
+				"storage_backend": types.StringValue("azure-blob"),
+				"connection_id":   types.StringValue("55555555-5555-5555-5555-555555555555"),
+				"s3":              types.ObjectNull(pamTemplateRecordingS3AttrTypes),
+				"azure_blob": pamObject(t, pamTemplateRecordingAzureBlobAttrTypes, map[string]attr.Value{
+					"container":  types.StringValue(container),
+					"key_prefix": types.StringValue(prefix),
+				}),
+			}),
+		})
+	}
+
+	state := createPamResource(t, r, mustPlanPamTemplate(t, r, pamTemplateConfig("windows", types.ObjectNull(pamTemplatePoliciesAttrTypes), azureSettings("pam-recordings", "win/"))))
+	created := pamTemplateModel(t, state)
+
+	sent := backend.requestsTo("POST", "/api/v1/pam/account-templates")[0]
+	if sent["recordingConnectionId"] != "55555555-5555-5555-5555-555555555555" {
+		t.Errorf("expected the Azure connection beside the settings, got %v", sent["recordingConnectionId"])
+	}
+	sentSettings := jsonObject(t, sent["settings"])
+	if sentSettings["recordingStorageBackend"] != "azure-blob" {
+		t.Errorf("expected the azure-blob backend, got %v", sentSettings["recordingStorageBackend"])
+	}
+	azureConfig := jsonObject(t, sentSettings["recordingAzureBlobConfig"])
+	if azureConfig["container"] != "pam-recordings" || azureConfig["keyPrefix"] != "win/" {
+		t.Errorf("unexpected Azure config sent: %v", azureConfig)
+	}
+	if _, ok := sentSettings["recordingS3Config"]; ok {
+		t.Error("expected no S3 config for an Azure template")
+	}
+
+	refreshed := readPamResource(t, r, state)
+	if !refreshed.Raw.Equal(state.Raw) {
+		t.Errorf("expected no drift after a refresh.\ngot:  %v\nwant: %v", refreshed.Raw, state.Raw)
+	}
+
+	updateConfig := pamTemplateConfig("windows", types.ObjectNull(pamTemplatePoliciesAttrTypes), azureSettings("pam-recordings-2", "win2/"))
+	updateConfig.ID = created.ID
+	state = updatePamResource(t, r, mustPlanPamTemplate(t, r, updateConfig), refreshed)
+	patch := backend.requestsTo("PATCH", "/api/v1/pam/account-templates/"+created.ID.ValueString())[0]
+	patchedAzure := jsonObject(t, jsonObject(t, patch["settings"])["recordingAzureBlobConfig"])
+	if patchedAzure["container"] != "pam-recordings-2" || patchedAzure["keyPrefix"] != "win2/" {
+		t.Errorf("unexpected Azure config in the update: %v", patchedAzure)
+	}
+	if refreshed := readPamResource(t, r, state); !refreshed.Raw.Equal(state.Raw) {
+		t.Errorf("expected no drift after the update.\ngot:  %v\nwant: %v", refreshed.Raw, state.Raw)
 	}
 }
 
@@ -334,9 +392,40 @@ func TestPamAccountTemplateValidateConfig(t *testing.T) {
 					"storage_backend": types.StringValue("aws-s3"),
 					"connection_id":   types.StringValue("44444444-4444-4444-4444-444444444444"),
 					"s3":              types.ObjectNull(pamTemplateRecordingS3AttrTypes),
+					"azure_blob":      types.ObjectNull(pamTemplateRecordingAzureBlobAttrTypes),
 				})})
 			},
 			wantError: "needs both `connection_id` and `s3`",
+		},
+		"azure recording without a container": {
+			accountType: "ssh",
+			settings: func(t *testing.T) types.Object {
+				return pamTemplateSettings(t, map[string]attr.Value{"recording": pamObject(t, pamTemplateRecordingAttrTypes, map[string]attr.Value{
+					"enabled":         types.BoolNull(),
+					"storage_backend": types.StringValue("azure-blob"),
+					"connection_id":   types.StringValue("44444444-4444-4444-4444-444444444444"),
+					"s3":              types.ObjectNull(pamTemplateRecordingS3AttrTypes),
+					"azure_blob":      types.ObjectNull(pamTemplateRecordingAzureBlobAttrTypes),
+				})})
+			},
+			wantError: "needs both `connection_id` and `azure_blob`",
+		},
+		"azure recording with an s3 block": {
+			accountType: "ssh",
+			settings: func(t *testing.T) types.Object {
+				return pamTemplateSettings(t, map[string]attr.Value{"recording": pamObject(t, pamTemplateRecordingAttrTypes, map[string]attr.Value{
+					"enabled":         types.BoolNull(),
+					"storage_backend": types.StringValue("azure-blob"),
+					"connection_id":   types.StringValue("44444444-4444-4444-4444-444444444444"),
+					"s3": pamObject(t, pamTemplateRecordingS3AttrTypes, map[string]attr.Value{
+						"bucket": types.StringValue("b"), "region": types.StringNull(), "key_prefix": types.StringNull(),
+					}),
+					"azure_blob": pamObject(t, pamTemplateRecordingAzureBlobAttrTypes, map[string]attr.Value{
+						"container": types.StringValue("pam-recordings"), "key_prefix": types.StringNull(),
+					}),
+				})})
+			},
+			wantError: "only reads `azure_blob`",
 		},
 		"required characters longer than the password": {
 			accountType: "postgres",

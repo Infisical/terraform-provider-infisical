@@ -3,12 +3,12 @@
 page_title: "infisical_pam_account_windows_ad Resource - terraform-provider-infisical"
 subcategory: "PAM"
 description: |-
-  Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Sessions only launch if the template records to S3: settings.recording needs storage_backend = "aws-s3", connection_id and s3. Only Machine Identity authentication is supported for this resource.
+  Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Sessions only launch if the template records to external storage: settings.recording needs storage_backend = "aws-s3" with connection_id and s3, or storage_backend = "azure-blob" with connection_id and azure_blob. Only Machine Identity authentication is supported for this resource.
 ---
 
 # infisical_pam_account_windows_ad (Resource)
 
-Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Sessions only launch if the template records to S3: `settings.recording` needs `storage_backend = "aws-s3"`, `connection_id` and `s3`. Only Machine Identity authentication is supported for this resource.
+Create and manage Windows Active Directory accounts in Infisical PAM. The connection is tested when the account is created or its connection changes. Sessions only launch if the template records to external storage: `settings.recording` needs `storage_backend = "aws-s3"` with `connection_id` and `s3`, or `storage_backend = "azure-blob"` with `connection_id` and `azure_blob`. Only Machine Identity authentication is supported for this resource.
 
 ## Example Usage
 
