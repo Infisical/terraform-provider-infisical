@@ -2,6 +2,7 @@ package infisicalclient
 
 import (
 	"fmt"
+	"net/http"
 	"terraform-provider-infisical/internal/errors"
 )
 
@@ -150,6 +151,9 @@ func (client Client) GetProjectIdentitySpecificPrivilegeBySlug(request GetProjec
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectIdentitySpecificPrivilegeResponse{}, ErrNotFound
+		}
 		return GetProjectIdentitySpecificPrivilegeResponse{}, errors.NewAPIErrorWithResponse(operationGetProjectIdentitySpecificPrivilegeBySlug, response, nil)
 	}
 
@@ -170,6 +174,9 @@ func (client Client) GetProjectIdentitySpecificPrivilegeV2(request GetProjectIde
 	}
 
 	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			return GetProjectIdentitySpecificPrivilegeV2Response{}, ErrNotFound
+		}
 		return GetProjectIdentitySpecificPrivilegeV2Response{}, errors.NewAPIErrorWithResponse(operationGetProjectIdentitySpecificPrivilegeV2, response, nil)
 	}
 
