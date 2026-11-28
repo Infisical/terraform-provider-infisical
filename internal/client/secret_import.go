@@ -6,49 +6,11 @@ import (
 )
 
 const (
-	operationGetSecretImport     = "CallGetSecretImport"
 	operationGetSecretImportByID = "CallGetSecretImportByID"
-	operationGetSecretImportList = "CallGetSecretImportList"
 	operationCreateSecretImport  = "CallCreateSecretImport"
 	operationUpdateSecretImport  = "CallUpdateSecretImport"
 	operationDeleteSecretImport  = "CallDeleteSecretImport"
 )
-
-// Workaround to getSecretImportById API call.
-func findSecretImportByID(secretImports []SecretImport, id string) (GetSecretImportResponse, error) {
-	for _, secretImport := range secretImports {
-		if secretImport.ID == id {
-			return GetSecretImportResponse{SecretImport: secretImport}, nil
-		}
-	}
-
-	return GetSecretImportResponse{}, NewNotFoundError("SecretImport", id)
-}
-
-func (client Client) GetSecretImport(request GetSecretImportRequest) (GetSecretImportResponse, error) {
-	var body ListSecretImportResponse
-
-	httpRequest := client.Config.HttpClient.
-		R().
-		SetResult(&body).
-		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("workspaceId", request.ProjectID).
-		SetQueryParam("environment", request.Environment).
-		SetQueryParam("path", request.SecretPath)
-
-	response, err := httpRequest.Get("api/v1/secret-imports")
-
-	if err != nil {
-		return GetSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImport, err)
-	}
-
-	if response.IsError() {
-		return GetSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImport, response, nil)
-	}
-
-	return findSecretImportByID(body.SecretImports, request.ID)
-
-}
 
 func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (GetSecretImportByIDResponse, error) {
 	var body GetSecretImportByIDResponse
@@ -58,7 +20,7 @@ func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (Ge
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT)
 
-	response, err := httpRequest.Get("api/v1/secret-imports/" + request.ID)
+	response, err := httpRequest.Get("api/v2/secret-imports/" + request.ID)
 
 	if err != nil {
 		return GetSecretImportByIDResponse{}, errors.NewGenericRequestError(operationGetSecretImportByID, err)
@@ -74,30 +36,6 @@ func (client Client) GetSecretImportByID(request GetSecretImportByIDRequest) (Ge
 	return body, nil
 }
 
-func (client Client) GetSecretImportList(request ListSecretImportRequest) (ListSecretImportResponse, error) {
-	var body ListSecretImportResponse
-
-	httpRequest := client.Config.HttpClient.
-		R().
-		SetResult(&body).
-		SetHeader("User-Agent", USER_AGENT).
-		SetQueryParam("workspaceId", request.ProjectID).
-		SetQueryParam("environment", request.Environment).
-		SetQueryParam("path", request.SecretPath)
-
-	response, err := httpRequest.Get("api/v1/secret-imports")
-
-	if err != nil {
-		return ListSecretImportResponse{}, errors.NewGenericRequestError(operationGetSecretImportList, err)
-	}
-
-	if response.IsError() {
-		return ListSecretImportResponse{}, errors.NewAPIErrorWithResponse(operationGetSecretImportList, response, nil)
-	}
-
-	return body, nil
-}
-
 func (client Client) CreateSecretImport(request CreateSecretImportRequest) (CreateSecretImportResponse, error) {
 	var body CreateSecretImportResponse
 	response, err := client.Config.HttpClient.
@@ -105,7 +43,7 @@ func (client Client) CreateSecretImport(request CreateSecretImportRequest) (Crea
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Post("api/v1/secret-imports")
+		Post("api/v2/secret-imports")
 
 	if err != nil {
 		return CreateSecretImportResponse{}, errors.NewGenericRequestError(operationCreateSecretImport, err)
@@ -125,7 +63,7 @@ func (client Client) UpdateSecretImport(request UpdateSecretImportRequest) (Upda
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Patch("api/v1/secret-imports/" + request.ID)
+		Patch("api/v2/secret-imports/" + request.ID)
 
 	if err != nil {
 		return UpdateSecretImportResponse{}, errors.NewGenericRequestError(operationUpdateSecretImport, err)
@@ -149,7 +87,7 @@ func (client Client) DeleteSecretImport(request DeleteSecretImportRequest) (Dele
 		SetResult(&body).
 		SetHeader("User-Agent", USER_AGENT).
 		SetBody(request).
-		Delete("api/v1/secret-imports/" + request.ID)
+		Delete("api/v2/secret-imports/" + request.ID)
 
 	if err != nil {
 		return DeleteSecretImportResponse{}, errors.NewGenericRequestError(operationDeleteSecretImport, err)
