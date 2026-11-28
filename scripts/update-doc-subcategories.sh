@@ -114,6 +114,10 @@ for file in "$DOCS_DIR/resources/"*.md; do
         # PAM
         pam_*)
             update_subcategory "$file" "PAM";;
+
+        # SSO
+        sso_*|email_domain|email_domain_*)
+            update_subcategory "$file" "SSO";;
     esac
 done
 

@@ -5380,3 +5380,123 @@ type DeletePamAccessApprovalPolicyRequest struct {
 type PamAccessApprovalPolicyResponse struct {
 	Policy PamAccessApprovalPolicy `json:"policy"`
 }
+
+type EmailDomainVerificationRecord struct {
+	Type  string `json:"type"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type EmailDomain struct {
+	ID                 string                        `json:"id"`
+	Domain             string                        `json:"domain"`
+	VerificationRecord EmailDomainVerificationRecord `json:"verificationRecord"`
+	Status             string                        `json:"status"`
+}
+
+type CreateEmailDomainRequest struct {
+	Domain string `json:"domain"`
+}
+
+type CreateEmailDomainResponse struct {
+	EmailDomain EmailDomain `json:"emailDomain"`
+}
+
+type ListEmailDomainsResponse struct {
+	EmailDomains []EmailDomain `json:"emailDomains"`
+}
+
+type GetEmailDomainByIDRequest struct {
+	ID string
+}
+
+type DeleteEmailDomainRequest struct {
+	ID string
+}
+
+type VerifyEmailDomainRequest struct {
+	ID string
+}
+
+type VerifyEmailDomainResponse struct {
+	EmailDomain EmailDomain `json:"emailDomain"`
+}
+
+type OidcConfig struct {
+	ID                     string   `json:"id"`
+	OrgID                  string   `json:"orgId"`
+	ConfigurationType      string   `json:"configurationType"`
+	DiscoveryURL           string   `json:"discoveryURL"`
+	Issuer                 string   `json:"issuer"`
+	AuthorizationEndpoint  string   `json:"authorizationEndpoint"`
+	TokenEndpoint          string   `json:"tokenEndpoint"`
+	JwksUri                string   `json:"jwksUri"`
+	UserinfoEndpoint       string   `json:"userinfoEndpoint"`
+	ClientID               string   `json:"clientId"`
+	ClientSecret           string   `json:"clientSecret"`
+	AllowedEmailDomains    string   `json:"allowedEmailDomains"`
+	JwtSignatureAlgorithm  string   `json:"jwtSignatureAlgorithm"`
+	ManageGroupMemberships bool     `json:"manageGroupMemberships"`
+	IsActive               bool     `json:"isActive"`
+	MfaClaimName           string   `json:"mfaClaimName"`
+	MfaAmrValues           []string `json:"mfaAmrValues"`
+}
+
+type CreateOidcConfigRequest struct {
+	ConfigurationType      string   `json:"configurationType"`
+	DiscoveryURL           string   `json:"discoveryURL,omitempty"`
+	Issuer                 string   `json:"issuer,omitempty"`
+	AuthorizationEndpoint  string   `json:"authorizationEndpoint,omitempty"`
+	TokenEndpoint          string   `json:"tokenEndpoint,omitempty"`
+	JwksUri                string   `json:"jwksUri,omitempty"`
+	UserinfoEndpoint       string   `json:"userinfoEndpoint,omitempty"`
+	ClientID               string   `json:"clientId"`
+	ClientSecret           string   `json:"clientSecret"`
+	AllowedEmailDomains    string   `json:"allowedEmailDomains"`
+	JwtSignatureAlgorithm  string   `json:"jwtSignatureAlgorithm"`
+	ManageGroupMemberships bool     `json:"manageGroupMemberships"`
+	IsActive               bool     `json:"isActive"`
+	MfaClaimName           string   `json:"mfaClaimName"`
+	MfaAmrValues           []string `json:"mfaAmrValues,omitempty"`
+}
+
+type UpdateOidcConfigRequest struct {
+	ConfigurationType      string   `json:"configurationType"`
+	DiscoveryURL           string   `json:"discoveryURL,omitempty"`
+	Issuer                 string   `json:"issuer,omitempty"`
+	AuthorizationEndpoint  string   `json:"authorizationEndpoint,omitempty"`
+	TokenEndpoint          string   `json:"tokenEndpoint,omitempty"`
+	JwksUri                string   `json:"jwksUri,omitempty"`
+	UserinfoEndpoint       string   `json:"userinfoEndpoint,omitempty"`
+	ClientID               string   `json:"clientId"`
+	ClientSecret           string   `json:"clientSecret"`
+	AllowedEmailDomains    string   `json:"allowedEmailDomains"`
+	JwtSignatureAlgorithm  string   `json:"jwtSignatureAlgorithm"`
+	ManageGroupMemberships bool     `json:"manageGroupMemberships"`
+	IsActive               bool     `json:"isActive"`
+	MfaClaimName           string   `json:"mfaClaimName"`
+	MfaAmrValues           []string `json:"mfaAmrValues"`
+}
+
+type OrgSsoSettings struct {
+	OrgID                 string      `json:"orgId"`
+	AuthEnforced          bool        `json:"authEnforced"`
+	GoogleSsoAuthEnforced bool        `json:"googleSsoAuthEnforced"`
+	BypassOrgAuthEnabled  bool        `json:"bypassOrgAuthEnabled"`
+	SsoMfaTrust           SsoMfaTrust `json:"ssoMfaTrust"`
+}
+
+type GetOrgSsoSettingsResponse struct {
+	SsoSettings OrgSsoSettings `json:"ssoSettings"`
+}
+
+type UpdateOrgSsoSettingsRequest struct {
+	AuthEnforced          bool        `json:"authEnforced"`
+	GoogleSsoAuthEnforced bool        `json:"googleSsoAuthEnforced"`
+	BypassOrgAuthEnabled  bool        `json:"bypassOrgAuthEnabled"`
+	SsoMfaTrust           SsoMfaTrust `json:"ssoMfaTrust"`
+}
+
+type UpdateOrgSsoSettingsResponse struct {
+	SsoSettings OrgSsoSettings `json:"ssoSettings"`
+}
